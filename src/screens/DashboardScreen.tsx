@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import {
@@ -78,6 +78,7 @@ function TaskCard({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
+  const insets = useSafeAreaInsets();
   const [dayNumber, setDayNumber] = useState<number>(1);
   const [dayData, setDayData] = useState<DayWithLog | null>(null);
   const [loading, setLoading] = useState(true);
@@ -193,8 +194,8 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+      {/* Header — top padding accounts for status bar / notch inset */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View>
           <Text style={styles.headerDate}>{formatDate()}</Text>
           <Text style={styles.headerDay}>
@@ -328,13 +329,12 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
   },
 
-  // Header
+  // Header — paddingTop set dynamically via insets.top in the component
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: Spacing.md,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,

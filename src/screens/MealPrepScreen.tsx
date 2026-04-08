@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
   LayoutAnimation,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GROCERY_LIST, RECIPES, GroceryCategory, Recipe } from '../data/mealPrepData';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 
@@ -97,12 +97,13 @@ function RecipeCard({ recipe }: { recipe: Recipe }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function MealPrepScreen() {
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'grocery' | 'recipes'>('grocery');
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Text style={styles.headerTitle}>Meal Prep</Text>
         <Text style={styles.headerSubtitle}>Bi-weekly grocery list & 500-cal recipes</Text>
 
@@ -146,10 +147,10 @@ export default function MealPrepScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
 
+  // Header — paddingTop dynamically set via insets.top
   header: {
     backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
