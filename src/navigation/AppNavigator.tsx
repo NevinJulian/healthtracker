@@ -5,16 +5,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DashboardScreen from '../screens/DashboardScreen';
 import OverviewScreen from '../screens/OverviewScreen';
 import MealPrepScreen from '../screens/MealPrepScreen';
+import TemplateEditorScreen from '../screens/TemplateEditorScreen';
 import { Colors, Typography } from '../theme/tokens';
 
 const Tab = createBottomTabNavigator();
 
-// ─── Tab icon ─────────────────────────────────────────────────────────────────
-
 const TAB_ICONS: Record<string, string> = {
   Today: '🏋️',
-  '90 Days': '📅',
+  Schedule: '📅',
   'Meal Prep': '🥗',
+  Template: '✏️',
 };
 
 function TabIcon({ label }: { label: string }) {
@@ -25,14 +25,8 @@ function TabIcon({ label }: { label: string }) {
   );
 }
 
-// ─── Navigator ────────────────────────────────────────────────────────────────
-
 export default function AppNavigator() {
-  // Safe area insets give us the bottom padding required to clear the system
-  // navigation bar on Android (gesture nav bar / 3-button nav / notch devices).
   const insets = useSafeAreaInsets();
-
-  // Tab bar total height = visible content (62px) + system bottom inset.
   const tabBarHeight = 62 + insets.bottom;
 
   return (
@@ -47,22 +41,18 @@ export default function AppNavigator() {
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarLabelStyle: styles.tabLabel,
-        tabBarIcon: ({ focused }) => (
-          <TabIcon label={route.name} />
-        ),
+        tabBarIcon: () => <TabIcon label={route.name} />,
       })}
     >
       <Tab.Screen name="Today" component={DashboardScreen} />
-      <Tab.Screen name="90 Days" component={OverviewScreen} />
+      <Tab.Screen name="Schedule" component={OverviewScreen} />
       <Tab.Screen name="Meal Prep" component={MealPrepScreen} />
+      <Tab.Screen name="Template" component={TemplateEditorScreen} />
     </Tab.Navigator>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  // Base tab bar properties — height & paddingBottom are applied dynamically above.
   tabBarBase: {
     backgroundColor: Colors.surface,
     borderTopColor: Colors.border,
@@ -74,10 +64,6 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.semibold,
     marginTop: 2,
   },
-  iconContainer: {
-    alignItems: 'center',
-  },
-  iconEmoji: {
-    fontSize: 20,
-  },
+  iconContainer: { alignItems: 'center' },
+  iconEmoji: { fontSize: 20 },
 });

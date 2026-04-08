@@ -10,78 +10,98 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getAllDays, getTodayDayNumber, DayWithLog } from '../db/database';
+import {
+  DailyLogEntry,
+  getRollingWindow,
+  syncRollingSchedule,
+  toISODate,
+} from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 
-// ─── Badge ────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type BadgeStatus = 'full' | 'partial' | 'none' | 'rest';
 
-function getStatus(day: DayWithLog): BadgeStatus {
-  if (day.is_rest_day) return 'rest';
-  const log = day.log;
-  if (!log) return 'none';
-  const completed = [log.walk_completed, log.workout_completed, log.fasting_completed].filter(
-    Boolean
-  ).length;
-  if (completed === 3) return 'full';
-  if (completed > 0) return 'partial';
+function getStatus(entry: DailyLogEntry, isToday: boolean): BadgeStatus {
+  if (isToday && !entry.walk_completed && !entry.hammer_completed && !entry.fasting_completed) {
+    // Today with nothing done yet — still "pending", not rest
+  }
+  const done = [
+    entry.walk_completed,
+    entry.hammer_completed,
+    entry.fasting_completed,
+  ].filter(Boolean).length;
+  if (done === 3) return 'full';
+  if (done > 0) return 'partial';
   return 'none';
 }
 
-const BADGE_CONFIG: Record<BadgeStatus, { color: string; emoji: string; label: string }> = {
-  full:    { color: Colors.badgeComplete, emoji: '✅', label: 'Complete' },
-  partial: { color: Colors.badgePartial,  emoji: '🟡', label: 'Partial' },
-  none:    { color: Colors.badgeNone,     emoji: '⬜', label: 'Pending' },
-  rest:    { color: Colors.badgeRest,     emoji: '💤', label: 'Rest' },
+const BADGE: Record<BadgeStatus, { emoji: string; color: string; label: string }> = {
+  full:    { emoji: '✅', color: Colors.badgeComplete, label: 'Complete' },
+  partial: { emoji: '🟡', color: Colors.badgePartial, label: 'Partial' },
+  none:    { emoji: '⬜', color: Colors.badgeNone, label: 'Pending' },
+  rest:    { emoji: '💤', color: Colors.badgeRest, label: 'Rest' },
 };
 
-// ─── Day Row ──────────────────────────────────────────────────────────────────
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function formatShortDate(iso: string): { day: string; date: string } {
+  const d = new Date(iso);
+  return {
+    day: d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase(),
+    date: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+  };
+}
+
+function isFuture(iso: string): boolean {
+  return iso > toISODate();
+}
+
+// ─── Row component ────────────────────────────────────────────────────────────
 
 function DayRow({
-  day,
+  entry,
   isToday,
   onPress,
 }: {
-  day: DayWithLog;
+  entry: DailyLogEntry;
   isToday: boolean;
   onPress: () => void;
 }) {
-  const status = getStatus(day);
-  const badge = BADGE_CONFIG[status];
+  const status = getStatus(entry, isToday);
+  const badge = BADGE[status];
+  const future = isFuture(entry.date);
+  const { day, date } = formatShortDate(entry.date);
 
   return (
     <TouchableOpacity
-      style={[styles.dayRow, isToday && styles.dayRowToday]}
+      style={[styles.row, isToday && styles.rowToday, future && styles.rowFuture]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      {/* Day number + today indicator */}
-      <View style={styles.dayNumberContainer}>
-        <Text style={[styles.dayNumber, isToday && styles.dayNumberToday]}>
-          {day.day_number}
-        </Text>
+      {/* Date pill */}
+      <View style={styles.datePill}>
+        <Text style={[styles.dayShort, isToday && styles.dayShortToday]}>{day}</Text>
+        <Text style={[styles.dateNum, isToday && styles.dateNumToday]}>{date}</Text>
         {isToday && <View style={styles.todayDot} />}
       </View>
 
-      {/* Tasks summary */}
-      <View style={styles.dayInfo}>
-        <Text style={styles.dayWalk} numberOfLines={1}>
-          {day.walking_task}
+      {/* Summary */}
+      <View style={styles.rowInfo}>
+        <Text style={[styles.rowWalk, future && styles.rowTextFuture]} numberOfLines={1}>
+          🚶 {entry.walking_task}
         </Text>
-        {!day.is_rest_day && (
-          <Text style={styles.dayWorkout} numberOfLines={1}>
-            {day.workout_description}
-          </Text>
-        )}
-        {day.is_meal_prep_day && (
+        <Text style={[styles.rowHammer, future && styles.rowTextFuture]} numberOfLines={1}>
+          🏋️ {entry.hammer_task}
+        </Text>
+        {entry.is_meal_prep_day && (
           <Text style={styles.mealPrepTag}>🥗 Meal Prep</Text>
         )}
       </View>
 
-      {/* Badge */}
-      <View style={[styles.badge, { backgroundColor: badge.color + '20', borderColor: badge.color }]}>
-        <Text style={styles.badgeEmoji}>{badge.emoji}</Text>
+      {/* Badge — future days show clock */}
+      <View style={[styles.badge, { backgroundColor: badge.color + '22', borderColor: badge.color }]}>
+        <Text style={styles.badgeEmoji}>{future ? '🕐' : badge.emoji}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -90,83 +110,78 @@ function DayRow({
 // ─── Day Detail Modal ─────────────────────────────────────────────────────────
 
 function DayDetailModal({
-  day,
+  entry,
+  isToday,
   visible,
   onClose,
 }: {
-  day: DayWithLog | null;
+  entry: DailyLogEntry | null;
+  isToday: boolean;
   visible: boolean;
   onClose: () => void;
 }) {
-  if (!day) return null;
-  const status = getStatus(day);
-  const badge = BADGE_CONFIG[status];
+  if (!entry) return null;
+  const { day, date } = formatShortDate(entry.date);
+  const status = getStatus(entry, isToday);
+  const badge = BADGE[status];
+  const future = isFuture(entry.date);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalSheet}>
-          {/* Handle */}
           <View style={styles.modalHandle} />
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Header */}
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalDayLabel}>DAY</Text>
-                <Text style={styles.modalDayNumber}>{day.day_number}</Text>
+                <Text style={styles.modalDayLabel}>{day}</Text>
+                <Text style={styles.modalDateValue}>{date}</Text>
+                {isToday && <Text style={styles.modalTodayTag}>TODAY</Text>}
               </View>
-              <View
-                style={[
-                  styles.modalBadge,
-                  { backgroundColor: badge.color + '20', borderColor: badge.color },
-                ]}
-              >
+              <View style={[styles.modalBadge, { backgroundColor: badge.color + '22', borderColor: badge.color }]}>
                 <Text style={[styles.modalBadgeText, { color: badge.color }]}>
-                  {badge.emoji} {badge.label}
+                  {future ? '🕐 Upcoming' : `${badge.emoji} ${badge.label}`}
                 </Text>
               </View>
             </View>
-
-            {/* Target weight */}
-            {day.target_weight != null && (
-              <View style={styles.modalWeightRow}>
-                <Text style={styles.modalWeightLabel}>🎯 Target weight</Text>
-                <Text style={styles.modalWeightValue}>{day.target_weight} kg</Text>
-              </View>
-            )}
 
             {/* Walking */}
             <View style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>🚶 Walking Pad</Text>
-              <Text style={styles.modalSectionBody}>{day.walking_task}</Text>
-              <Text style={[styles.modalStatus, { color: day.log?.walk_completed ? Colors.success : Colors.textMuted }]}>
-                {day.log?.walk_completed ? '✓ Completed' : '○ Not logged'}
-              </Text>
+              <Text style={styles.modalSectionTitle}>🚶 Walking</Text>
+              <Text style={styles.modalSectionBody}>{entry.walking_task}</Text>
+              {!future && (
+                <Text style={[styles.modalStatus, { color: entry.walk_completed ? Colors.accent : Colors.textMuted }]}>
+                  {entry.walk_completed ? '✓ Completed' : '○ Not logged'}
+                </Text>
+              )}
             </View>
 
-            {/* Workout */}
-            {!day.is_rest_day && (
+            {/* Hammer */}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>🏋️ Hammer Multi-Gym</Text>
+              <Text style={styles.modalSectionBody}>{entry.hammer_task}</Text>
+              {!future && (
+                <Text style={[styles.modalStatus, { color: entry.hammer_completed ? Colors.accent : Colors.textMuted }]}>
+                  {entry.hammer_completed ? '✓ Completed' : '○ Not logged'}
+                </Text>
+              )}
+            </View>
+
+            {/* Fasting */}
+            {!future && (
               <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>🏋️ Training</Text>
-                <Text style={styles.modalSectionBody}>{day.workout_description}</Text>
-                <Text style={[styles.modalStatus, { color: day.log?.workout_completed ? Colors.success : Colors.textMuted }]}>
-                  {day.log?.workout_completed ? '✓ Completed' : '○ Not logged'}
+                <Text style={styles.modalSectionTitle}>⏱️ Intermittent Fasting</Text>
+                <Text style={styles.modalSectionBody}>16:8 — eating window 12 pm → 8 pm</Text>
+                <Text style={[styles.modalStatus, { color: entry.fasting_completed ? Colors.accent : Colors.textMuted }]}>
+                  {entry.fasting_completed ? '✓ Completed' : '○ Not logged'}
                 </Text>
               </View>
             )}
 
-            {/* Fasting */}
-            <View style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>⏱️ Intermittent Fasting</Text>
-              <Text style={styles.modalSectionBody}>16:8 — eating window 12 pm → 8 pm</Text>
-              <Text style={[styles.modalStatus, { color: day.log?.fasting_completed ? Colors.success : Colors.textMuted }]}>
-                {day.log?.fasting_completed ? '✓ Completed' : '○ Not logged'}
-              </Text>
-            </View>
-
             {/* Meal Prep */}
-            {day.is_meal_prep_day && (
+            {entry.is_meal_prep_day && (
               <View style={[styles.modalSection, styles.modalMealPrep]}>
                 <Text style={styles.modalSectionTitle}>🥗 Meal Prep Day</Text>
                 <Text style={styles.modalSectionBody}>
@@ -187,36 +202,47 @@ function DayDetailModal({
   );
 }
 
-// ─── Overview Screen ──────────────────────────────────────────────────────────
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function OverviewScreen() {
   const insets = useSafeAreaInsets();
-  const [days, setDays] = useState<DayWithLog[]>([]);
-  const [todayDayNumber, setTodayDayNumber] = useState(1);
+  const [entries, setEntries] = useState<DailyLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDay, setSelectedDay] = useState<DayWithLog | null>(null);
+  const [selected, setSelected] = useState<DailyLogEntry | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const listRef = useRef<FlatList>(null);
+  const today = toISODate();
 
   useEffect(() => {
     (async () => {
-      const [allDays, todayDN] = await Promise.all([getAllDays(), getTodayDayNumber()]);
-      setDays(allDays);
-      setTodayDayNumber(todayDN);
+      await syncRollingSchedule();
+      const data = await getRollingWindow();
+      setEntries(data);
       setLoading(false);
-      // Scroll to today
-      setTimeout(() => {
-        const idx = todayDN - 1;
-        listRef.current?.scrollToIndex({ index: Math.max(0, idx - 2), animated: true });
-      }, 300);
-    })();
-  }, []);
 
-  const completedCount = days.filter((d) => getStatus(d) === 'full').length;
+      // Scroll to today
+      const todayIdx = data.findIndex((e) => e.date === today);
+      if (todayIdx >= 0) {
+        setTimeout(() => {
+          listRef.current?.scrollToIndex({
+            index: Math.max(0, todayIdx - 2),
+            animated: true,
+          });
+        }, 300);
+      }
+    })();
+  }, [today]);
+
+  const completedCount = entries.filter(
+    (e) => e.walk_completed && e.hammer_completed && e.fasting_completed
+  ).length;
+
+  const pastEntries = entries.filter((e) => e.date < today).length;
+  const futureEntries = entries.filter((e) => e.date > today).length;
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centred}>
         <ActivityIndicator size="large" color={Colors.accent} />
       </View>
     );
@@ -225,42 +251,47 @@ export default function OverviewScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.overviewHeader, { paddingTop: insets.top + 8 }]}>
-        <Text style={styles.overviewTitle}>90-Day Overview</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Text style={styles.headerTitle}>Rolling Schedule</Text>
         <View style={styles.statsRow}>
           <View style={styles.statPill}>
-            <Text style={styles.statNumber}>{completedCount}</Text>
-            <Text style={styles.statLabel}> days done</Text>
+            <Text style={styles.statNum}>{completedCount}</Text>
+            <Text style={styles.statLabel}> done</Text>
           </View>
           <View style={styles.statPill}>
-            <Text style={styles.statNumber}>{90 - completedCount}</Text>
-            <Text style={styles.statLabel}> remaining</Text>
+            <Text style={styles.statNum}>{pastEntries + 1}</Text>
+            <Text style={styles.statLabel}> tracked</Text>
+          </View>
+          <View style={styles.statPill}>
+            <Text style={styles.statNum}>{futureEntries}</Text>
+            <Text style={styles.statLabel}> upcoming</Text>
           </View>
         </View>
       </View>
 
       <FlatList
         ref={listRef}
-        data={days}
-        keyExtractor={(item) => String(item.day_number)}
+        data={entries}
+        keyExtractor={(item) => item.date}
         renderItem={({ item }) => (
           <DayRow
-            day={item}
-            isToday={item.day_number === todayDayNumber}
+            entry={item}
+            isToday={item.date === today}
             onPress={() => {
-              setSelectedDay(item);
+              setSelected(item);
               setModalVisible(true);
             }}
           />
         )}
         contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         onScrollToIndexFailed={() => {}}
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
 
       <DayDetailModal
-        day={selectedDay}
+        entry={selected}
+        isToday={selected?.date === today}
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
       />
@@ -272,15 +303,15 @@ export default function OverviewScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  loadingContainer: {
+  centred: {
     flex: 1,
     backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Overview header — paddingTop applied dynamically via insets.top
-  overviewHeader: {
+  // Header
+  header: {
     backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
@@ -288,15 +319,12 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
     gap: Spacing.sm,
   },
-  overviewTitle: {
+  headerTitle: {
     fontSize: Typography.sizes.xl,
     color: Colors.textPrimary,
     fontWeight: Typography.weights.bold,
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
+  statsRow: { flexDirection: 'row', gap: Spacing.sm },
   statPill: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -307,7 +335,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  statNumber: {
+  statNum: {
     fontSize: Typography.sizes.md,
     color: Colors.accent,
     fontWeight: Typography.weights.bold,
@@ -318,187 +346,128 @@ const styles = StyleSheet.create({
   },
 
   // List
-  listContent: {
-    paddingVertical: Spacing.sm,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginLeft: 80,
-  },
+  listContent: { paddingVertical: Spacing.sm },
+  separator: { height: 1, backgroundColor: Colors.border, marginLeft: 80 },
 
-  // Day Row
-  dayRow: {
+  // Row
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     gap: Spacing.md,
   },
-  dayRowToday: {
-    backgroundColor: Colors.accentGlow,
-  },
-  dayNumberContainer: {
-    width: 44,
-    alignItems: 'center',
-  },
-  dayNumber: {
-    fontSize: Typography.sizes.xl,
+  rowToday: { backgroundColor: Colors.accentGlow },
+  rowFuture: { opacity: 0.65 },
+
+  // Date pill
+  datePill: { width: 52, alignItems: 'center', gap: 2 },
+  dayShort: {
+    fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
     fontWeight: Typography.weights.bold,
+    letterSpacing: 0.5,
+  },
+  dayShortToday: { color: Colors.accent },
+  dateNum: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    fontWeight: Typography.weights.semibold,
     textAlign: 'center',
+    lineHeight: 16,
   },
-  dayNumberToday: {
-    color: Colors.accent,
-  },
+  dateNumToday: { color: Colors.accent },
   todayDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.accent,
-    marginTop: 2,
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: Colors.accent, marginTop: 2,
   },
-  dayInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  dayWalk: {
+
+  // Row info
+  rowInfo: { flex: 1, gap: 2 },
+  rowWalk: {
     fontSize: Typography.sizes.sm,
     color: Colors.textPrimary,
     fontWeight: Typography.weights.medium,
   },
-  dayWorkout: {
+  rowHammer: {
     fontSize: Typography.sizes.xs,
     color: Colors.textSecondary,
   },
+  rowTextFuture: { color: Colors.textMuted },
   mealPrepTag: {
     fontSize: Typography.sizes.xs,
     color: Colors.accent,
     fontWeight: Typography.weights.semibold,
     marginTop: 2,
   },
+
+  // Badge
   badge: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
+    width: 36, height: 36, borderRadius: Radius.full,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1,
   },
-  badgeEmoji: {
-    fontSize: 16,
-  },
+  badgeEmoji: { fontSize: 16 },
 
   // Modal
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end',
   },
   modalSheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: 24,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 24,
     maxHeight: '80%',
   },
   modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: Spacing.lg,
+    width: 40, height: 4, backgroundColor: Colors.border,
+    borderRadius: 2, alignSelf: 'center', marginBottom: Spacing.lg,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.lg,
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'flex-start', marginBottom: Spacing.lg,
   },
   modalDayLabel: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
-    fontWeight: Typography.weights.semibold,
-    letterSpacing: 1.2,
+    fontSize: Typography.sizes.xs, color: Colors.textMuted,
+    fontWeight: Typography.weights.semibold, letterSpacing: 1.2,
   },
-  modalDayNumber: {
-    fontSize: Typography.sizes.hero,
-    color: Colors.textPrimary,
+  modalDateValue: {
+    fontSize: Typography.sizes.hero, color: Colors.textPrimary,
     fontWeight: Typography.weights.black,
   },
+  modalTodayTag: {
+    fontSize: Typography.sizes.xs, color: Colors.accent,
+    fontWeight: Typography.weights.bold, letterSpacing: 1,
+  },
   modalBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
-    borderWidth: 1,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs,
+    borderRadius: Radius.full, borderWidth: 1,
   },
   modalBadgeText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-  },
-  modalWeightRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.secondaryGlow,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.secondary,
-  },
-  modalWeightLabel: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.sm,
-  },
-  modalWeightValue: {
-    color: Colors.secondary,
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.bold,
+    fontSize: Typography.sizes.sm, fontWeight: Typography.weights.semibold,
   },
   modalSection: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    gap: 4,
+    backgroundColor: Colors.surfaceElevated, borderRadius: Radius.md,
+    padding: Spacing.md, marginBottom: Spacing.sm, gap: 4,
   },
-  modalMealPrep: {
-    borderWidth: 1,
-    borderColor: Colors.accent,
-  },
+  modalMealPrep: { borderWidth: 1, borderColor: Colors.accent },
   modalSectionTitle: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.sm, color: Colors.textMuted,
     fontWeight: Typography.weights.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 4,
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4,
   },
   modalSectionBody: {
-    fontSize: Typography.sizes.md,
-    color: Colors.textPrimary,
-    lineHeight: 22,
+    fontSize: Typography.sizes.md, color: Colors.textPrimary, lineHeight: 22,
   },
   modalStatus: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-    marginTop: 4,
+    fontSize: Typography.sizes.sm, fontWeight: Typography.weights.semibold, marginTop: 4,
   },
   modalClose: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    marginTop: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceElevated, borderRadius: Radius.md,
+    paddingVertical: Spacing.md, alignItems: 'center',
+    marginTop: Spacing.md, borderWidth: 1, borderColor: Colors.border,
   },
   modalCloseText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.sizes.md,
+    color: Colors.textPrimary, fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
   },
 });

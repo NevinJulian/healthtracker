@@ -5,39 +5,33 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 import {
-  getDay,
-  getTodayDayNumber,
-  upsertLog,
-  importScheduleFromJSON,
-  DayWithLog,
+  DailyLogEntry,
+  getLogByDate,
+  upsertLogField,
+  syncRollingSchedule,
+  toISODate,
 } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 
-// ─── Checkbox Component ───────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Checkbox({
   checked,
   label,
   onToggle,
-  disabled,
 }: {
   checked: boolean;
   label: string;
   onToggle: () => void;
-  disabled?: boolean;
 }) {
   return (
     <TouchableOpacity
-      style={[styles.checkboxRow, disabled && styles.checkboxDisabled]}
+      style={styles.checkboxRow}
       onPress={onToggle}
-      disabled={disabled}
       activeOpacity={0.7}
     >
       <View style={[styles.checkboxBox, checked && styles.checkboxBoxChecked]}>
@@ -50,8 +44,6 @@ function Checkbox({
   );
 }
 
-// ─── Task Card ────────────────────────────────────────────────────────────────
-
 function TaskCard({
   icon,
   title,
@@ -61,11 +53,10 @@ function TaskCard({
   icon: string;
   title: string;
   description: string;
-  accentColor?: string;
+  accentColor: string;
 }) {
-  const borderColor = accentColor || Colors.border;
   return (
-    <View style={[styles.taskCard, { borderLeftColor: borderColor }]}>
+    <View style={[styles.taskCard, { borderLeftColor: accentColor }]}>
       <Text style={styles.taskIcon}>{icon}</Text>
       <View style={styles.taskCardContent}>
         <Text style={styles.taskTitle}>{title}</Text>
@@ -79,112 +70,80 @@ function TaskCard({
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
-  const [dayNumber, setDayNumber] = useState<number>(1);
-  const [dayData, setDayData] = useState<DayWithLog | null>(null);
+  const [entry, setEntry] = useState<DailyLogEntry | null>(null);
   const [loading, setLoading] = useState(true);
+  const today = toISODate();
 
-  const loadDay = useCallback(async () => {
+  const loadToday = useCallback(async () => {
     setLoading(true);
     try {
-      const dn = await getTodayDayNumber();
-      setDayNumber(dn);
-      const data = await getDay(dn);
-      setDayData(data);
+      // Re-sync in case days were missed (e.g., device clock advanced)
+      await syncRollingSchedule();
+      const data = await getLogByDate(today);
+      setEntry(data);
     } catch (err) {
-      console.error('DashboardScreen: loadDay error', err);
+      console.error('DashboardScreen: loadToday error', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [today]);
 
   useEffect(() => {
-    loadDay();
-  }, [loadDay]);
+    loadToday();
+  }, [loadToday]);
 
   const handleToggle = async (
-    field: 'walk_completed' | 'workout_completed' | 'fasting_completed'
+    field: 'walk_completed' | 'hammer_completed' | 'fasting_completed'
   ) => {
-    if (!dayData) return;
-    const current = dayData.log?.[field] ?? false;
-    const newValue = !current;
+    if (!entry) return;
+    const newValue = !entry[field];
 
-    // Optimistic update
-    setDayData((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        log: {
-          id: prev.log?.id ?? 0,
-          day_number: dayNumber,
-          walk_completed: field === 'walk_completed' ? newValue : (prev.log?.walk_completed ?? false),
-          workout_completed: field === 'workout_completed' ? newValue : (prev.log?.workout_completed ?? false),
-          fasting_completed: field === 'fasting_completed' ? newValue : (prev.log?.fasting_completed ?? false),
-          logged_date: prev.log?.logged_date ?? null,
-        },
-      };
-    });
+    // Optimistic UI update
+    setEntry((prev) => prev ? { ...prev, [field]: newValue } : prev);
 
     try {
-      await upsertLog(dayNumber, { [field]: newValue });
+      await upsertLogField(today, field, newValue);
     } catch (err) {
-      console.error('upsertLog error', err);
-      loadDay(); // Revert on error
+      console.error('upsertLogField error', err);
+      loadToday(); // Revert on error
     }
   };
 
-  const handleImportJSON = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/json',
-        copyToCacheDirectory: true,
-      });
+  // ── Helpers ──────────────────────────────────────────────────────────────────
 
-      if (result.canceled) return;
-
-      const uri = result.assets[0].uri;
-      const jsonString = await FileSystem.readAsStringAsync(uri);
-      await importScheduleFromJSON(jsonString);
-      Alert.alert('✅ Import Successful', 'Schedule updated. Reloading…');
-      loadDay();
-    } catch (err: any) {
-      Alert.alert('❌ Import Failed', err.message ?? 'Unknown error');
-    }
-  };
-
-  // ── Render helpers ──────────────────────────────────────────────────────────
-
-  const formatDate = () => {
-    return new Date().toLocaleDateString('en-GB', {
+  const formatDate = () =>
+    new Date().toLocaleDateString('en-GB', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
     });
+
+  const completionCount = () => {
+    if (!entry) return 0;
+    return (
+      (entry.walk_completed ? 1 : 0) +
+      (entry.hammer_completed ? 1 : 0) +
+      (entry.fasting_completed ? 1 : 0)
+    );
   };
 
-  const completionProgress = () => {
-    if (!dayData) return 0;
-    const log = dayData.log;
-    const totalTasks = dayData.is_rest_day ? 1 : 3;
-    const completed =
-      (log?.walk_completed ? 1 : 0) +
-      (!dayData.is_rest_day && log?.workout_completed ? 1 : 0) +
-      (log?.fasting_completed ? 1 : 0);
-    return completed / totalTasks;
-  };
+  const completionProgress = () => (entry ? completionCount() / 3 : 0);
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centred}>
         <ActivityIndicator size="large" color={Colors.accent} />
-        <Text style={styles.loadingText}>Loading your day…</Text>
+        <Text style={styles.loadingText}>Syncing schedule…</Text>
       </View>
     );
   }
 
-  if (!dayData) {
+  if (!entry) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>No schedule data found.</Text>
+      <View style={styles.centred}>
+        <Text style={styles.loadingText}>No entry for today — try reopening the app.</Text>
       </View>
     );
   }
@@ -194,111 +153,93 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header — top padding accounts for status bar / notch inset */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View>
           <Text style={styles.headerDate}>{formatDate()}</Text>
-          <Text style={styles.headerDay}>
-            Day <Text style={styles.headerDayNumber}>{dayNumber}</Text>
-            <Text style={styles.headerDayTotal}> / 90</Text>
+          <Text style={styles.headerTitle}>
+            {isAllDone ? '🎉 All done today!' : "Today's Training"}
           </Text>
         </View>
-        <TouchableOpacity style={styles.importBtn} onPress={handleImportJSON}>
-          <Text style={styles.importBtnText}>📥</Text>
-        </TouchableOpacity>
+        {entry.is_meal_prep_day && (
+          <View style={styles.mealPrepPill}>
+            <Text style={styles.mealPrepPillText}>🥗 Meal Prep</Text>
+          </View>
+        )}
       </View>
 
-      {/* Progress Bar */}
+      {/* ── Progress bar ──────────────────────────────────────────────────── */}
       <View style={styles.progressContainer}>
         <View style={styles.progressTrack}>
           <View
             style={[
               styles.progressFill,
               {
-                width: `${progress * 100}%` as any,
+                width: `${Math.round(progress * 100)}%` as any,
                 backgroundColor: isAllDone ? Colors.accent : Colors.secondary,
               },
             ]}
           />
         </View>
         <Text style={styles.progressLabel}>
-          {isAllDone ? '🎉 All done!' : `${Math.round(progress * 100)}% complete`}
+          {completionCount()} / 3 tasks complete
         </Text>
       </View>
 
+      {/* ── Rest day banner ───────────────────────────────────────────────── */}
+      {entry.is_rest_day && (
+        <View style={styles.restBanner}>
+          <Text style={styles.restBannerText}>
+            💤 Rest / Recovery Day — lighter weights, focus on form
+          </Text>
+        </View>
+      )}
+
       <ScrollView
-        style={styles.scrollView}
+        style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Meal Prep Banner */}
-        {dayData.is_meal_prep_day && (
-          <View style={styles.mealPrepBanner}>
-            <Text style={styles.mealPrepBannerText}>
-              🥗 Meal Prep Saturday — check the Meal Prep tab!
-            </Text>
-          </View>
-        )}
-
-        {/* Rest Day Banner */}
-        {dayData.is_rest_day && (
-          <View style={styles.restBanner}>
-            <Text style={styles.restBannerText}>
-              💤 Rest Day — recovery is part of the programme
-            </Text>
-          </View>
-        )}
-
-        {/* Walking Task */}
+        {/* ── Walking task ─────────────────────────────────────────────────── */}
         <View style={styles.section}>
           <TaskCard
             icon="🚶"
-            title="Walking Pad"
-            description={dayData.walking_task}
+            title="Walking"
+            description={entry.walking_task}
             accentColor={Colors.accent}
           />
           <Checkbox
-            checked={dayData.log?.walk_completed ?? false}
+            checked={entry.walk_completed}
             label="Walk completed"
             onToggle={() => handleToggle('walk_completed')}
-            disabled={dayData.is_rest_day}
           />
         </View>
 
-        {/* Workout Task */}
-        {!dayData.is_rest_day && (
-          <View style={styles.section}>
-            <TaskCard
-              icon="🏋️"
-              title="Training"
-              description={dayData.workout_description}
-              accentColor={Colors.secondary}
-            />
-            {dayData.target_weight != null && (
-              <View style={styles.targetWeightBadge}>
-                <Text style={styles.targetWeightText}>
-                  🎯 Target: {dayData.target_weight} kg
-                </Text>
-              </View>
-            )}
-            <Checkbox
-              checked={dayData.log?.workout_completed ?? false}
-              label="Workout completed"
-              onToggle={() => handleToggle('workout_completed')}
-            />
-          </View>
-        )}
+        {/* ── Hammer / Gym task ────────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <TaskCard
+            icon="🏋️"
+            title="Hammer Multi-Gym"
+            description={entry.hammer_task}
+            accentColor={Colors.secondary}
+          />
+          <Checkbox
+            checked={entry.hammer_completed}
+            label="Gym session completed"
+            onToggle={() => handleToggle('hammer_completed')}
+          />
+        </View>
 
-        {/* Intermittent Fasting */}
+        {/* ── Intermittent fasting ─────────────────────────────────────────── */}
         <View style={styles.section}>
           <TaskCard
             icon="⏱️"
             title="Intermittent Fasting"
             description="16:8 protocol — eating window: 12 pm → 8 pm"
-            accentColor={Colors.warning}
+            accentColor={Colors.warning ?? '#F6AD55'}
           />
           <Checkbox
-            checked={dayData.log?.fasting_completed ?? false}
+            checked={entry.fasting_completed}
             label="Fasting window completed"
             onToggle={() => handleToggle('fasting_completed')}
           />
@@ -313,11 +254,8 @@ export default function DashboardScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  loadingContainer: {
+  container: { flex: 1, backgroundColor: Colors.background },
+  centred: {
     flex: 1,
     backgroundColor: Colors.background,
     alignItems: 'center',
@@ -327,9 +265,11 @@ const styles = StyleSheet.create({
   loadingText: {
     color: Colors.textSecondary,
     fontSize: Typography.sizes.md,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.lg,
   },
 
-  // Header — paddingTop set dynamically via insets.top in the component
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -346,31 +286,23 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.medium,
     marginBottom: 2,
   },
-  headerDay: {
-    fontSize: Typography.sizes.xxl,
+  headerTitle: {
+    fontSize: Typography.sizes.xl,
     color: Colors.textPrimary,
     fontWeight: Typography.weights.bold,
   },
-  headerDayNumber: {
-    color: Colors.accent,
-    fontWeight: Typography.weights.black,
-  },
-  headerDayTotal: {
-    color: Colors.textMuted,
-    fontSize: Typography.sizes.lg,
-  },
-  importBtn: {
-    width: 40,
-    height: 40,
+  mealPrepPill: {
+    backgroundColor: Colors.accent + '20',
     borderRadius: Radius.full,
-    backgroundColor: Colors.surfaceElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.accent,
   },
-  importBtnText: {
-    fontSize: 18,
+  mealPrepPillText: {
+    color: Colors.accent,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
   },
 
   // Progress
@@ -396,32 +328,13 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.medium,
   },
 
-  // Scroll
-  scrollView: { flex: 1 },
-  scrollContent: {
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
-
-  // Banners
-  mealPrepBanner: {
-    backgroundColor: 'rgba(0, 229, 160, 0.08)',
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-  },
-  mealPrepBannerText: {
-    color: Colors.accent,
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-  },
+  // Rest banner
   restBanner: {
-    backgroundColor: 'rgba(74, 85, 104, 0.2)',
-    borderWidth: 1,
-    borderColor: Colors.rest,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+    backgroundColor: 'rgba(74, 85, 104, 0.15)',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
   },
   restBannerText: {
     color: Colors.textSecondary,
@@ -429,10 +342,15 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.medium,
   },
 
-  // Section
-  section: {
-    gap: Spacing.sm,
+  // Scroll
+  scroll: { flex: 1 },
+  scrollContent: {
+    padding: Spacing.lg,
+    gap: Spacing.md,
   },
+
+  // Section
+  section: { gap: Spacing.sm },
 
   // Task Card
   taskCard: {
@@ -444,16 +362,10 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     borderLeftWidth: 3,
   },
-  taskIcon: {
-    fontSize: 22,
-    marginTop: 2,
-  },
-  taskCardContent: {
-    flex: 1,
-    gap: 4,
-  },
+  taskIcon: { fontSize: 22, marginTop: 2 },
+  taskCardContent: { flex: 1, gap: 4 },
   taskTitle: {
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
     fontWeight: Typography.weights.semibold,
     textTransform: 'uppercase',
@@ -464,22 +376,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontWeight: Typography.weights.medium,
     lineHeight: 22,
-  },
-
-  // Target weight badge
-  targetWeightBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.secondaryGlow,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.secondary,
-  },
-  targetWeightText: {
-    color: Colors.secondary,
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
   },
 
   // Checkbox
@@ -493,9 +389,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.border,
-  },
-  checkboxDisabled: {
-    opacity: 0.4,
   },
   checkboxBox: {
     width: 24,
