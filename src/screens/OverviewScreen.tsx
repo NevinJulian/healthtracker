@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAllDays, getTodayDayNumber, DayWithLog } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 
@@ -190,6 +190,7 @@ function DayDetailModal({
 // ─── Overview Screen ──────────────────────────────────────────────────────────
 
 export default function OverviewScreen() {
+  const insets = useSafeAreaInsets();
   const [days, setDays] = useState<DayWithLog[]>([]);
   const [todayDayNumber, setTodayDayNumber] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -224,7 +225,7 @@ export default function OverviewScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.overviewHeader}>
+      <View style={[styles.overviewHeader, { paddingTop: insets.top + 8 }]}>
         <Text style={styles.overviewTitle}>90-Day Overview</Text>
         <View style={styles.statsRow}>
           <View style={styles.statPill}>
@@ -278,11 +279,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Overview header
+  // Overview header — paddingTop applied dynamically via insets.top
   overviewHeader: {
     backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    paddingBottom: 24,
     maxHeight: '80%',
   },
   modalHandle: {
