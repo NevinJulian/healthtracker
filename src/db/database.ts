@@ -1,6 +1,11 @@
 /**
  * Database layer for the 7-Day Rolling Window architecture.
  *
+ * Additional fix:
+ *   Old-schema reset — if daily_log already exists from a previous app version
+ *   without the 'date' column, the DB is deleted and recreated before migrations
+ *   run, avoiding "no such column: date" on first launch after an upgrade.
+ *
  * Key concepts:
  *   - app_state stores the app_start_date (ISO date string, set once on first launch)
  *   - weekly_template holds 7 base rows indexed by JavaScript day-of-week (0=Sun…6=Sat)
@@ -142,6 +147,49 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
 }
 
 // ─────────────────────────────────────────────
+// Old-schema reset helper
+// ─────────────────────────────────────────────
+
+/**
+ * Checks whether daily_log already exists with an INCOMPATIBLE schema (i.e.
+ * from a previous app version that used different column names like
+ * day_number, target_weight, etc.).
+ *
+ * If an incompatible table is detected, the entire database file is deleted
+ * via expo-sqlite's built-in API and a fresh connection is returned, allowing
+ * the migration runner to rebuild the schema from scratch.
+ *
+ * Returns the same `db` reference if the schema is compatible or the table
+ * doesn't exist yet, otherwise returns a brand-new open database handle.
+ */
+async function resetIfIncompatibleSchema(
+  db: SQLite.SQLiteDatabase
+): Promise<SQLite.SQLiteDatabase> {
+  // PRAGMA table_info returns one row per column; empty means table absent.
+  const columns = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(daily_log)'
+  );
+
+  // Table doesn't exist yet — fresh install, nothing to reset.
+  if (columns.length === 0) return db;
+
+  const hasDateColumn = columns.some((c) => c.name === 'date');
+  if (hasDateColumn) return db; // Compatible schema ✓
+
+  // Old incompatible schema detected → nuke and restart.
+  console.warn(
+    '[DB] Incompatible daily_log schema detected (missing "date" column). ' +
+    'Deleting old database and starting fresh…'
+  );
+  await db.closeAsync();
+  await SQLite.deleteDatabaseAsync(DB_NAME);
+  console.log('[DB] Old database deleted. Opening fresh database…');
+  const freshDb = await SQLite.openDatabaseAsync(DB_NAME);
+  await freshDb.execAsync('PRAGMA journal_mode = WAL;');
+  return freshDb;
+}
+
+// ─────────────────────────────────────────────
 // Rolling schedule sync — internal impl  (#37)
 // ─────────────────────────────────────────────
 
@@ -254,11 +302,16 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (_db) return _db;
 
   console.log('[DB] Opening database…');
-  const db = await SQLite.openDatabaseAsync(DB_NAME);
+  let db = await SQLite.openDatabaseAsync(DB_NAME);
 
   try {
     // Enable WAL for better concurrent reads
     await db.execAsync('PRAGMA journal_mode = WAL;');
+
+    // Detect and handle an old incompatible schema left from a previous build.
+    // If daily_log exists without the 'date' column the DB file is wiped and
+    // a fresh connection is reassigned before migrations run.
+    db = await resetIfIncompatibleSchema(db);
 
     // Run versioned migrations (idempotent)  (#39)
     await runMigrations(db);
