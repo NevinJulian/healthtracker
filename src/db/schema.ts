@@ -214,58 +214,58 @@ export const EXERCISES_SUN: Exercise[] = [
 
 const SEED_MON = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
   VALUES (1, 'Office Pad (10k-15k steps)',
              'Chest Press, Lat Pulldown, Seated Row, Butterfly (3 x 8-10)',
-             0, 0, '[]');
+             0, 0);
 `;
 
 const SEED_TUE = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
   VALUES (2, 'Office Pad (10k-15k steps)',
              'Smith Squats, Reverse Lunges, Leg Ext, Leg Curls (4 x 10-12)',
-             0, 0, '[]');
+             0, 0);
 `;
 
 const SEED_WED = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
   VALUES (3, 'Rest (No Walk)',
              'Cable Bicep Curls, Tricep Pushdowns, Cable Crunches (3 x 15)',
-             1, 0, '[]');
+             1, 0);
 `;
 
 const SEED_THU = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
   VALUES (4, 'Office Pad (10k-15k steps)',
              'Incline Press, Pull-ups, Upright Row, Lateral Raise (4 x 6-8)',
-             0, 0, '[]');
+             0, 0);
 `;
 
 const SEED_FRI = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
   VALUES (5, 'Office Pad (10k-15k steps)',
              'Cable RDLs, Split Squats, Leg Ext, Leg Curls (3 x 15-20)',
-             0, 0, '[]');
+             0, 0);
 `;
 
 const SEED_SAT = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
   VALUES (6, 'Meal Prep Weekend (No Walk)',
              'Face Pulls, Pull-throughs, Calf Raises, Core Twists (3 x 12-15)',
-             0, 1, '[]');
+             0, 1);
 `;
 
 const SEED_SUN = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
   VALUES (0, 'Buochs Marina Loop (6.99 km)',
              'Light Cable Recovery & 45min Deep Stretching',
-             1, 0, '[]');
+             1, 0);
 `;
 
 // ─── Exercise JSON seed UPDATEs (migration v13–v19) ───────────────────────────

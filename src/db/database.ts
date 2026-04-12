@@ -190,9 +190,9 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   const cutoffDate = addDays(today, -DAYS_HISTORY);
   const cutoffISO = toISODate(cutoffDate);
 
-  // Pre-fetch existing dates OUTSIDE the transaction (#37)
-  const existingRows = await db.getAllAsync<{ date: string }>(
-    'SELECT date FROM daily_log WHERE date >= ?',
+  // Pre-fetch existing rows with their exercises OUTSIDE the transaction (#37)
+  const existingRows = await db.getAllAsync<{ date: string; exercises: string }>(
+    'SELECT date, exercises FROM daily_log WHERE date >= ?',
     [cutoffISO]
   );
   const existingDates = new Set(existingRows.map((r) => r.date));
@@ -200,15 +200,31 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   type InsertParams = [string, string, string, number, number, string];
   const inserts: InsertParams[] = [];
 
+  // Backfill: existing entries whose exercises are empty but template now has them
+  type BackfillParams = [string, string]; // [exercisesJson, date]
+  const backfills: BackfillParams[] = [];
+
   for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
     const targetDate = addDays(today, offset);
     const targetISO = toISODate(targetDate);
-
-    if (existingDates.has(targetISO)) continue;
-
     const dow = targetDate.getDay();
     const template = templateMap.get(dow);
     if (!template) continue;
+
+    // Parse template exercises (reset completed → false)
+    const templateExercises = parseExercises(template.exercises);
+    const baseExercises = templateExercises.map((ex) => ({ ...ex, completed: false }));
+    const baseExercisesJson = JSON.stringify(baseExercises);
+
+    if (existingDates.has(targetISO)) {
+      // Row exists — check if exercises need to be backfilled
+      const existing = existingRows.find((r) => r.date === targetISO);
+      const currentExercises = parseExercises(existing?.exercises);
+      if (currentExercises.length === 0 && templateExercises.length > 0) {
+        backfills.push([baseExercisesJson, targetISO]);
+      }
+      continue;
+    }
 
     const daysDiff = daysBetween(startDateISO, targetISO);
     const hammerWithWeight = buildHammerTask(
@@ -217,19 +233,13 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
       daysDiff
     );
 
-    // Parse template exercises and reset completed → false for the new day
-    const baseExercises = parseExercises(template.exercises).map((ex) => ({
-      ...ex,
-      completed: false,
-    }));
-
     inserts.push([
       targetISO,
       template.walking_task,
       hammerWithWeight,
       template.is_rest_day,
       template.is_meal_prep_day,
-      JSON.stringify(baseExercises),
+      baseExercisesJson,
     ]);
   }
 
@@ -240,6 +250,13 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
            (date, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
          VALUES (?, ?, ?, ?, ?, ?)`,
         params
+      );
+    }
+    // Backfill exercises into rows that currently have an empty array
+    for (const [exercisesJson, date] of backfills) {
+      await db.runAsync(
+        'UPDATE daily_log SET exercises = ? WHERE date = ?',
+        [exercisesJson, date]
       );
     }
     await db.runAsync('DELETE FROM daily_log WHERE date < ?', [cutoffISO]);
