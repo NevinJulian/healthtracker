@@ -9,14 +9,27 @@
  * Migration tracking:
  *   schema_version — records every applied migration version so that each
  *   statement runs exactly once, even across app updates.
+ *
+ * v11: ADD COLUMN exercises TEXT to weekly_template
+ * v12: ADD COLUMN exercises TEXT to daily_log
  */
+
+// ─── Exercise type (shared between DB layer and UI) ───────────────────────────
+
+export interface Exercise {
+  /** Stable per-exercise identifier — survives restarts. */
+  id: string;
+  name: string;
+  sets: string;
+  reps: string;
+  /** YouTube URL; empty string if no tutorial available. */
+  videoUrl: string;
+  /** Per-day completion state stored in daily_log.exercises. */
+  completed: boolean;
+}
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
-/**
- * Created first, before anything else, so the migration runner can track
- * which statements have already been applied.
- */
 export const CREATE_SCHEMA_VERSION_TABLE = `
   CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY NOT NULL
@@ -32,11 +45,6 @@ export const CREATE_APP_STATE_TABLE = `
   );
 `;
 
-/**
- * day_of_week follows JavaScript's Date.getDay():
- *   0 = Sunday, 1 = Monday, 2 = Tuesday, 3 = Wednesday,
- *   4 = Thursday, 5 = Friday, 6 = Saturday
- */
 export const CREATE_WEEKLY_TEMPLATE_TABLE = `
   CREATE TABLE IF NOT EXISTS weekly_template (
     day_of_week      INTEGER PRIMARY KEY NOT NULL,
@@ -60,73 +68,254 @@ export const CREATE_DAILY_LOG_TABLE = `
   );
 `;
 
-// ─── Seed Data ────────────────────────────────────────────────────────────────
-// Each weekday gets its own INSERT OR IGNORE statement (one row per statement).
-// This is compatible with every SQLite version, including those bundled by
-// older Android API levels that do not support multi-row VALUES clauses.
-// INSERT OR IGNORE ensures rows are inserted only once and are never
-// overwritten — the Template Editor uses UPDATE to modify them later.
+// ─── Column additions (v11 / v12) ─────────────────────────────────────────────
+
+export const ADD_EXERCISES_TO_WEEKLY_TEMPLATE = `
+  ALTER TABLE weekly_template ADD COLUMN exercises TEXT NOT NULL DEFAULT '[]';
+`;
+
+export const ADD_EXERCISES_TO_DAILY_LOG = `
+  ALTER TABLE daily_log ADD COLUMN exercises TEXT NOT NULL DEFAULT '[]';
+`;
+
+// ─── Exercise seed data ───────────────────────────────────────────────────────
+// Stable IDs use deterministic short strings so they never change between
+// migrations or reinstalls — the UI relies on these IDs for completion state.
+
+/** Monday — Upper Push/Pull */
+export const EXERCISES_MON: Exercise[] = [
+  {
+    id: 'mon-01', name: 'Chest Press', sets: '3', reps: '8-10',
+    videoUrl: 'https://www.youtube.com/watch?v=cgHlQLlYffk', completed: false,
+  },
+  {
+    id: 'mon-02', name: 'Lat Pulldown', sets: '3', reps: '8-10',
+    videoUrl: 'https://www.youtube.com/watch?v=TRC5LCYi6W0', completed: false,
+  },
+  {
+    id: 'mon-03', name: 'Seated Row', sets: '3', reps: '8-10',
+    videoUrl: 'https://www.youtube.com/watch?v=qvJK5l34WsY', completed: false,
+  },
+  {
+    id: 'mon-04', name: 'Butterfly', sets: '3', reps: '8-10',
+    videoUrl: 'https://www.youtube.com/watch?v=y5Z4V_cBDoE', completed: false,
+  },
+];
+
+/** Tuesday — Lower Body */
+export const EXERCISES_TUE: Exercise[] = [
+  {
+    id: 'tue-01', name: 'Smith Squats', sets: '4', reps: '10-12',
+    videoUrl: 'https://www.youtube.com/watch?v=KvpLvDF0kfA', completed: false,
+  },
+  {
+    id: 'tue-02', name: 'Reverse Lunges', sets: '4', reps: '10-12',
+    videoUrl: '', completed: false,
+  },
+  {
+    id: 'tue-03', name: 'Leg Extension', sets: '4', reps: '10-12',
+    videoUrl: 'https://www.youtube.com/watch?v=MAbThtU8Sis', completed: false,
+  },
+  {
+    id: 'tue-04', name: 'Leg Curls', sets: '4', reps: '10-12',
+    videoUrl: 'https://www.youtube.com/watch?v=MAbThtU8Sis', completed: false,
+  },
+];
+
+/** Wednesday — Arms / Core (rest day) */
+export const EXERCISES_WED: Exercise[] = [
+  {
+    id: 'wed-01', name: 'Cable Bicep Curls', sets: '3', reps: '15',
+    videoUrl: 'https://www.youtube.com/watch?v=Z8CE9QVpNtM', completed: false,
+  },
+  {
+    id: 'wed-02', name: 'Tricep Pushdowns', sets: '3', reps: '15',
+    videoUrl: 'https://www.youtube.com/watch?v=Z8CE9QVpNtM', completed: false,
+  },
+  {
+    id: 'wed-03', name: 'Cable Crunches', sets: '3', reps: '15',
+    videoUrl: '', completed: false,
+  },
+];
+
+/** Thursday — Upper Heavy */
+export const EXERCISES_THU: Exercise[] = [
+  {
+    id: 'thu-01', name: 'Incline Press', sets: '4', reps: '6-8',
+    videoUrl: '', completed: false,
+  },
+  {
+    id: 'thu-02', name: 'Pull-ups', sets: '4', reps: '6-8',
+    videoUrl: '', completed: false,
+  },
+  {
+    id: 'thu-03', name: 'Upright Row', sets: '4', reps: '6-8',
+    videoUrl: '', completed: false,
+  },
+  {
+    id: 'thu-04', name: 'Lateral Raise', sets: '4', reps: '6-8',
+    videoUrl: '', completed: false,
+  },
+];
+
+/** Friday — Lower Volume */
+export const EXERCISES_FRI: Exercise[] = [
+  {
+    id: 'fri-01', name: 'Cable RDLs', sets: '3', reps: '15-20',
+    videoUrl: '', completed: false,
+  },
+  {
+    id: 'fri-02', name: 'Split Squats', sets: '3', reps: '15-20',
+    videoUrl: '', completed: false,
+  },
+  {
+    id: 'fri-03', name: 'Leg Extension', sets: '3', reps: '15-20',
+    videoUrl: 'https://www.youtube.com/watch?v=MAbThtU8Sis', completed: false,
+  },
+  {
+    id: 'fri-04', name: 'Leg Curls', sets: '3', reps: '15-20',
+    videoUrl: 'https://www.youtube.com/watch?v=MAbThtU8Sis', completed: false,
+  },
+];
+
+/** Saturday — Accessories / Meal Prep */
+export const EXERCISES_SAT: Exercise[] = [
+  {
+    id: 'sat-01', name: 'Face Pulls', sets: '3', reps: '12-15',
+    videoUrl: '', completed: false,
+  },
+  {
+    id: 'sat-02', name: 'Pull-throughs', sets: '3', reps: '12-15',
+    videoUrl: '', completed: false,
+  },
+  {
+    id: 'sat-03', name: 'Calf Raises', sets: '3', reps: '12-15',
+    videoUrl: '', completed: false,
+  },
+  {
+    id: 'sat-04', name: 'Core Twists', sets: '3', reps: '12-15',
+    videoUrl: '', completed: false,
+  },
+];
+
+/** Sunday — Recovery */
+export const EXERCISES_SUN: Exercise[] = [
+  {
+    id: 'sun-01', name: 'Light Cable Recovery', sets: '1', reps: 'Light',
+    videoUrl: '', completed: false,
+  },
+  {
+    id: 'sun-02', name: 'Deep Stretching', sets: '1', reps: '45 min',
+    videoUrl: '', completed: false,
+  },
+];
+
+// ─── Seed INSERTs (individual rows — compatible with all SQLite versions) ──────
 
 const SEED_MON = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
   VALUES (1, 'Office Pad (10k-15k steps)',
              'Chest Press, Lat Pulldown, Seated Row, Butterfly (3 x 8-10)',
-             0, 0);
+             0, 0, '[]');
 `;
 
 const SEED_TUE = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
   VALUES (2, 'Office Pad (10k-15k steps)',
              'Smith Squats, Reverse Lunges, Leg Ext, Leg Curls (4 x 10-12)',
-             0, 0);
+             0, 0, '[]');
 `;
 
 const SEED_WED = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
   VALUES (3, 'Rest (No Walk)',
              'Cable Bicep Curls, Tricep Pushdowns, Cable Crunches (3 x 15)',
-             1, 0);
+             1, 0, '[]');
 `;
 
 const SEED_THU = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
   VALUES (4, 'Office Pad (10k-15k steps)',
              'Incline Press, Pull-ups, Upright Row, Lateral Raise (4 x 6-8)',
-             0, 0);
+             0, 0, '[]');
 `;
 
 const SEED_FRI = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
   VALUES (5, 'Office Pad (10k-15k steps)',
              'Cable RDLs, Split Squats, Leg Ext, Leg Curls (3 x 15-20)',
-             0, 0);
+             0, 0, '[]');
 `;
 
 const SEED_SAT = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
   VALUES (6, 'Meal Prep Weekend (No Walk)',
              'Face Pulls, Pull-throughs, Calf Raises, Core Twists (3 x 12-15)',
-             0, 1);
+             0, 1, '[]');
 `;
 
 const SEED_SUN = `
   INSERT OR IGNORE INTO weekly_template
-    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
+    (day_of_week, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
   VALUES (0, 'Buochs Marina Loop (6.99 km)',
              'Light Cable Recovery & 45min Deep Stretching',
-             1, 0);
+             1, 0, '[]');
+`;
+
+// ─── Exercise JSON seed UPDATEs (migration v13–v19) ───────────────────────────
+// Run AFTER the ALTER TABLE migrations so the column exists.
+// Uses UPDATE with WHERE day_of_week so they are safe to rerun (no-op if data matches).
+// These run as separate versioned migrations so they fire once on each device.
+
+export const SEED_EXERCISES_MON = `
+  UPDATE weekly_template
+  SET exercises = '${JSON.stringify(EXERCISES_MON)}'
+  WHERE day_of_week = 1 AND (exercises IS NULL OR exercises = '[]');
+`;
+
+export const SEED_EXERCISES_TUE = `
+  UPDATE weekly_template
+  SET exercises = '${JSON.stringify(EXERCISES_TUE)}'
+  WHERE day_of_week = 2 AND (exercises IS NULL OR exercises = '[]');
+`;
+
+export const SEED_EXERCISES_WED = `
+  UPDATE weekly_template
+  SET exercises = '${JSON.stringify(EXERCISES_WED)}'
+  WHERE day_of_week = 3 AND (exercises IS NULL OR exercises = '[]');
+`;
+
+export const SEED_EXERCISES_THU = `
+  UPDATE weekly_template
+  SET exercises = '${JSON.stringify(EXERCISES_THU)}'
+  WHERE day_of_week = 4 AND (exercises IS NULL OR exercises = '[]');
+`;
+
+export const SEED_EXERCISES_FRI = `
+  UPDATE weekly_template
+  SET exercises = '${JSON.stringify(EXERCISES_FRI)}'
+  WHERE day_of_week = 5 AND (exercises IS NULL OR exercises = '[]');
+`;
+
+export const SEED_EXERCISES_SAT = `
+  UPDATE weekly_template
+  SET exercises = '${JSON.stringify(EXERCISES_SAT)}'
+  WHERE day_of_week = 6 AND (exercises IS NULL OR exercises = '[]');
+`;
+
+export const SEED_EXERCISES_SUN = `
+  UPDATE weekly_template
+  SET exercises = '${JSON.stringify(EXERCISES_SUN)}'
+  WHERE day_of_week = 0 AND (exercises IS NULL OR exercises = '[]');
 `;
 
 // ─── Versioned Migration List ─────────────────────────────────────────────────
-// Each entry runs exactly once per device, tracked by `schema_version`.
-// To add future schema changes (e.g. ALTER TABLE) append a new entry with the
-// next version number — never edit or reorder existing entries.
 
 export interface Migration {
   version: number;
@@ -134,14 +323,27 @@ export interface Migration {
 }
 
 export const MIGRATIONS: Migration[] = [
-  { version: 1, sql: CREATE_APP_STATE_TABLE },
-  { version: 2, sql: CREATE_WEEKLY_TEMPLATE_TABLE },
-  { version: 3, sql: CREATE_DAILY_LOG_TABLE },
-  { version: 4, sql: SEED_MON },
-  { version: 5, sql: SEED_TUE },
-  { version: 6, sql: SEED_WED },
-  { version: 7, sql: SEED_THU },
-  { version: 8, sql: SEED_FRI },
-  { version: 9, sql: SEED_SAT },
+  // v1–v3: table creation
+  { version: 1,  sql: CREATE_APP_STATE_TABLE },
+  { version: 2,  sql: CREATE_WEEKLY_TEMPLATE_TABLE },
+  { version: 3,  sql: CREATE_DAILY_LOG_TABLE },
+  // v4–v10: per-row template seeds
+  { version: 4,  sql: SEED_MON },
+  { version: 5,  sql: SEED_TUE },
+  { version: 6,  sql: SEED_WED },
+  { version: 7,  sql: SEED_THU },
+  { version: 8,  sql: SEED_FRI },
+  { version: 9,  sql: SEED_SAT },
   { version: 10, sql: SEED_SUN },
+  // v11–v12: add exercises column
+  { version: 11, sql: ADD_EXERCISES_TO_WEEKLY_TEMPLATE },
+  { version: 12, sql: ADD_EXERCISES_TO_DAILY_LOG },
+  // v13–v19: populate exercises JSON for each weekday
+  { version: 13, sql: SEED_EXERCISES_MON },
+  { version: 14, sql: SEED_EXERCISES_TUE },
+  { version: 15, sql: SEED_EXERCISES_WED },
+  { version: 16, sql: SEED_EXERCISES_THU },
+  { version: 17, sql: SEED_EXERCISES_FRI },
+  { version: 18, sql: SEED_EXERCISES_SAT },
+  { version: 19, sql: SEED_EXERCISES_SUN },
 ];
