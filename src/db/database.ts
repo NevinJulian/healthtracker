@@ -6,10 +6,18 @@
  *   - weekly_template holds 7 base rows indexed by JavaScript day-of-week (0=Sun…6=Sat)
  *   - daily_log is the rolling tracker: always contains today–7 to today+7
  *   - syncRollingSchedule() must be called on every app launch
+ *
+ * Fixes applied:
+ *   - #34  Better error propagation (stack preserved, logged to console)
+ *   - #35  Multi-row INSERT replaced by versioned individual statements
+ *   - #36  _db singleton only assigned after full successful init; cleaned up on failure
+ *   - #37  SELECT moved outside withTransactionAsync to avoid SQLITE_BUSY on iOS
+ *   - #38  _db reset to null on failure so a hot-reload or retry can re-open cleanly
+ *   - #39  Versioned migration runner using schema_version table
  */
 
 import * as SQLite from 'expo-sqlite';
-import { ALL_MIGRATIONS } from './schema';
+import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS } from './schema';
 
 // ─────────────────────────────────────────────
 // Constants
@@ -18,15 +26,16 @@ import { ALL_MIGRATIONS } from './schema';
 const DB_NAME = 'healthtracker.db';
 const START_DATE_KEY = 'app_start_date';
 
-// Weight added per 21-day progression cycle (kg)
+/** Weight added per 21-day progression cycle (kg) */
 const KG_PER_CYCLE = 5;
-// Number of days per progression cycle
+/** Number of days per progression cycle */
 const CYCLE_DAYS = 21;
-// Days to generate ahead of today
+/** Days to generate ahead of today */
 const DAYS_AHEAD = 7;
-// Days of history to retain (older than this are pruned)
+/** Days of history to retain (entries older than this are pruned) */
 const DAYS_HISTORY = 7;
 
+/** Module-level singleton. Only assigned after a fully successful init. */
 let _db: SQLite.SQLiteDatabase | null = null;
 
 // ─────────────────────────────────────────────
@@ -100,66 +109,50 @@ function buildHammerTask(
 }
 
 // ─────────────────────────────────────────────
-// Database Init
+// Versioned migration runner  (#39)
 // ─────────────────────────────────────────────
 
 /**
- * Opens the database, runs all migrations/seeds, records start date on first
- * launch, then syncs the rolling schedule.
- * Must be awaited before any other DB call.
+ * Creates the schema_version table if needed, then applies every migration
+ * that has not yet been recorded there. Each migration runs once and is
+ * immediately marked as applied, so re-running initDatabase() is safe.
  */
-export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (_db) return _db;
+async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
+  // Ensure the version-tracking table exists first
+  await db.execAsync(CREATE_SCHEMA_VERSION_TABLE);
 
-  _db = await SQLite.openDatabaseAsync(DB_NAME);
-
-  // Enable WAL for better concurrent reads
-  await _db.execAsync('PRAGMA journal_mode = WAL;');
-
-  // Run all migrations (idempotent CREATE TABLE IF NOT EXISTS + INSERT OR IGNORE)
-  for (const statement of ALL_MIGRATIONS) {
-    await _db.execAsync(statement);
-  }
-
-  // Record start date on very first launch
-  const existing = await _db.getFirstAsync<{ value: string }>(
-    'SELECT value FROM app_state WHERE key = ?',
-    [START_DATE_KEY]
+  // Fetch already-applied versions
+  const appliedRows = await db.getAllAsync<{ version: number }>(
+    'SELECT version FROM schema_version ORDER BY version ASC'
   );
-  if (!existing) {
-    const today = toISODate();
-    await _db.runAsync(
-      'INSERT INTO app_state (key, value) VALUES (?, ?)',
-      [START_DATE_KEY, today]
+  const applied = new Set(appliedRows.map((r) => r.version));
+
+  // Apply each pending migration in order
+  for (const migration of MIGRATIONS) {
+    if (applied.has(migration.version)) continue;
+
+    console.log(`[DB] Applying migration v${migration.version}…`);
+    await db.execAsync(migration.sql);
+    await db.runAsync(
+      'INSERT INTO schema_version (version) VALUES (?)',
+      [migration.version]
     );
+    console.log(`[DB] Migration v${migration.version} applied ✓`);
   }
-
-  // Generate / prune the rolling window
-  await syncRollingSchedule();
-
-  return _db;
-}
-
-/** Returns the open DB instance. initDatabase() must have been called first. */
-export function getDatabase(): SQLite.SQLiteDatabase {
-  if (!_db) throw new Error('Database not initialised. Call initDatabase() first.');
-  return _db;
 }
 
 // ─────────────────────────────────────────────
-// Task 3 — Rolling Schedule Sync
+// Rolling schedule sync — internal impl  (#37)
 // ─────────────────────────────────────────────
 
 /**
- * Ensures the daily_log table always has entries from today up to today+7.
- * Any entry older than today-7 is pruned.
+ * Internal implementation that accepts an explicit db reference so it can be
+ * called safely during initDatabase() before _db is assigned.  (#36 / #37)
  *
- * Called automatically by initDatabase() and can be called manually on
- * app foregrounding.
+ * SELECTs are performed OUTSIDE the transaction to avoid SQLITE_BUSY on iOS
+ * with expo-sqlite v14+. Only write operations run inside the transaction.
  */
-export async function syncRollingSchedule(): Promise<void> {
-  const db = getDatabase();
-
+async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   // 1. Fetch app_start_date for progression maths
   const startRow = await db.getFirstAsync<{ value: string }>(
     'SELECT value FROM app_state WHERE key = ?',
@@ -181,54 +174,147 @@ export async function syncRollingSchedule(): Promise<void> {
     templateMap.set(row.day_of_week, row);
   }
 
-  // 3. Determine the dates that should exist: today … today+DAYS_AHEAD
+  // 3. Determine target dates: today … today+DAYS_AHEAD
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const cutoffDate = addDays(today, -DAYS_HISTORY);
+  const cutoffISO = toISODate(cutoffDate);
 
+  // 4. Pre-fetch existing log dates OUTSIDE the transaction  (#37)
+  //    This avoids read calls inside withTransactionAsync which can cause
+  //    SQLITE_BUSY / "database is locked" on iOS (expo-sqlite v14+).
+  const existingRows = await db.getAllAsync<{ date: string }>(
+    'SELECT date FROM daily_log WHERE date >= ?',
+    [cutoffISO]
+  );
+  const existingDates = new Set(existingRows.map((r) => r.date));
+
+  // Build the list of inserts needed before entering the transaction
+  type InsertParams = [string, string, string, number, number];
+  const inserts: InsertParams[] = [];
+
+  for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
+    const targetDate = addDays(today, offset);
+    const targetISO = toISODate(targetDate);
+
+    if (existingDates.has(targetISO)) continue;
+
+    const dow = targetDate.getDay(); // 0=Sun … 6=Sat
+    const template = templateMap.get(dow);
+    if (!template) continue; // No template row — shouldn't happen after seeding
+
+    const daysDiff = daysBetween(startDateISO, targetISO);
+    const hammerWithWeight = buildHammerTask(
+      template.hammer_task,
+      template.is_rest_day === 1,
+      daysDiff
+    );
+
+    inserts.push([
+      targetISO,
+      template.walking_task,
+      hammerWithWeight,
+      template.is_rest_day,
+      template.is_meal_prep_day,
+    ]);
+  }
+
+  // 5. Execute inserts + prune inside a single transaction (writes only)  (#37)
   await db.withTransactionAsync(async () => {
-    for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
-      const targetDate = addDays(today, offset);
-      const targetISO = toISODate(targetDate);
-
-      // Skip if a log entry already exists for this date
-      const existing = await db.getFirstAsync<{ date: string }>(
-        'SELECT date FROM daily_log WHERE date = ?',
-        [targetISO]
-      );
-      if (existing) continue;
-
-      // Look up the template row for this weekday
-      const dow = targetDate.getDay(); // 0=Sun … 6=Sat
-      const template = templateMap.get(dow);
-      if (!template) continue; // No template row — skip (shouldn't happen)
-
-      // Calculate progression
-      const daysDiff = daysBetween(startDateISO, targetISO);
-      const hammerWithWeight = buildHammerTask(
-        template.hammer_task,
-        template.is_rest_day === 1,
-        daysDiff
-      );
-
-      // Insert the generated log entry (all checkboxes start unchecked)
+    for (const params of inserts) {
       await db.runAsync(
         `INSERT OR IGNORE INTO daily_log
            (date, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
          VALUES (?, ?, ?, ?, ?)`,
-        [
-          targetISO,
-          template.walking_task,
-          hammerWithWeight,
-          template.is_rest_day,
-          template.is_meal_prep_day,
-        ]
+        params
       );
     }
 
-    // 4. Prune entries older than today - DAYS_HISTORY
-    const cutoff = toISODate(addDays(today, -DAYS_HISTORY));
-    await db.runAsync('DELETE FROM daily_log WHERE date < ?', [cutoff]);
+    // Prune entries older than today - DAYS_HISTORY
+    await db.runAsync('DELETE FROM daily_log WHERE date < ?', [cutoffISO]);
   });
+}
+
+// ─────────────────────────────────────────────
+// Database Init  (#36 / #38)
+// ─────────────────────────────────────────────
+
+/**
+ * Opens the database, runs all versioned migrations, records the start date on
+ * first launch, then syncs the rolling schedule.
+ *
+ * The module-level `_db` singleton is only assigned after the full sequence
+ * succeeds. If anything throws, the connection is closed and `_db` remains
+ * null so that the next call (e.g. after a dev hot-reload) can try again
+ * cleanly.  (#36 / #38)
+ *
+ * Must be awaited before any other DB call.
+ */
+export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
+  if (_db) return _db;
+
+  console.log('[DB] Opening database…');
+  const db = await SQLite.openDatabaseAsync(DB_NAME);
+
+  try {
+    // Enable WAL for better concurrent reads
+    await db.execAsync('PRAGMA journal_mode = WAL;');
+
+    // Run versioned migrations (idempotent)  (#39)
+    await runMigrations(db);
+
+    // Record start date on very first launch
+    const existing = await db.getFirstAsync<{ value: string }>(
+      'SELECT value FROM app_state WHERE key = ?',
+      [START_DATE_KEY]
+    );
+    if (!existing) {
+      const today = toISODate();
+      console.log(`[DB] First launch — recording start date: ${today}`);
+      await db.runAsync(
+        'INSERT INTO app_state (key, value) VALUES (?, ?)',
+        [START_DATE_KEY, today]
+      );
+    }
+
+    // Generate / prune the rolling window
+    await _syncRollingSchedule(db);
+
+    // Only assign the singleton after full success  (#36)
+    _db = db;
+    console.log('[DB] Initialisation complete ✓');
+  } catch (err) {
+    // Clean up the connection so a retry (e.g. after Metro hot-reload) works  (#38)
+    console.error('[DB] Initialisation failed — closing connection:', err);
+    await db.closeAsync().catch((closeErr) =>
+      console.warn('[DB] Failed to close connection during cleanup:', closeErr)
+    );
+    // _db is deliberately NOT assigned — remains null for next call
+    throw err; // rethrow so App.tsx can display the real message
+  }
+
+  return _db!;
+}
+
+/** Returns the open DB instance. initDatabase() must have been called first. */
+export function getDatabase(): SQLite.SQLiteDatabase {
+  if (!_db) throw new Error('Database not initialised. Call initDatabase() first.');
+  return _db;
+}
+
+// ─────────────────────────────────────────────
+// Task 3 — Rolling Schedule Sync (public API)
+// ─────────────────────────────────────────────
+
+/**
+ * Ensures the daily_log table always has entries from today up to today+7.
+ * Any entry older than today-7 is pruned.
+ *
+ * Called automatically by initDatabase() and can be called manually on
+ * app foregrounding.
+ */
+export async function syncRollingSchedule(): Promise<void> {
+  return _syncRollingSchedule(getDatabase());
 }
 
 // ─────────────────────────────────────────────
