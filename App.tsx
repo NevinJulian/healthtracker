@@ -22,8 +22,14 @@ export default function App() {
         await initDatabase();
         setDbReady(true);
       } catch (err: any) {
-        console.error('DB init failed:', err);
-        setError(err?.message ?? 'Unknown error during database init');
+        console.error('[App] DB init failed:', err);
+        // Build a readable detail string: message + first 8 stack lines  (#34)
+        const stackLines = (err?.stack as string | undefined)
+          ?.split('\n')
+          .slice(0, 8)
+          .join('\n');
+        const detail = [err?.message, stackLines].filter(Boolean).join('\n\n');
+        setError(detail || 'Unknown error during database initialisation');
       }
     })();
   }, []);
@@ -32,7 +38,7 @@ export default function App() {
     return (
       <View style={styles.splash}>
         <Text style={styles.errorText}>❌ Failed to initialise database</Text>
-        <Text style={styles.errorDetail}>{error}</Text>
+        <Text style={styles.errorDetail} selectable>{error}</Text>
       </View>
     );
   }

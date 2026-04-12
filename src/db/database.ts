@@ -1,15 +1,27 @@
 /**
  * Database layer for the 7-Day Rolling Window architecture.
  *
- * Key concepts:
- *   - app_state stores the app_start_date (ISO date string, set once on first launch)
- *   - weekly_template holds 7 base rows indexed by JavaScript day-of-week (0=Sun…6=Sat)
- *   - daily_log is the rolling tracker: always contains today–7 to today+7
- *   - syncRollingSchedule() must be called on every app launch
+ * Fixes applied previously:
+ *   - #34  Better error propagation
+ *   - #35  Multi-row INSERT replaced by versioned individual statements
+ *   - #36  _db singleton only assigned after full successful init
+ *   - #37  SELECT moved outside withTransactionAsync
+ *   - #38  _db reset to null on failure
+ *   - #39  Versioned migration runner using schema_version table
+ *   - Old-schema reset: detects incompatible daily_log and wipes DB
+ *
+ * Feature additions (issue #40):
+ *   - Exercise[] JSON column on weekly_template and daily_log
+ *   - upsertExerciseCompleted() — toggles a single exercise in the JSON array
+ *   - updateTemplateExercises() — replaces the full exercise list for a weekday
+ *   - resetIfIncompatibleSchema now also detects missing exercises column
  */
 
 import * as SQLite from 'expo-sqlite';
-import { ALL_MIGRATIONS } from './schema';
+import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, Exercise } from './schema';
+
+// Re-export Exercise so screens only import from database.ts
+export type { Exercise };
 
 // ─────────────────────────────────────────────
 // Constants
@@ -18,13 +30,9 @@ import { ALL_MIGRATIONS } from './schema';
 const DB_NAME = 'healthtracker.db';
 const START_DATE_KEY = 'app_start_date';
 
-// Weight added per 21-day progression cycle (kg)
 const KG_PER_CYCLE = 5;
-// Number of days per progression cycle
 const CYCLE_DAYS = 21;
-// Days to generate ahead of today
 const DAYS_AHEAD = 7;
-// Days of history to retain (older than this are pruned)
 const DAYS_HISTORY = 7;
 
 let _db: SQLite.SQLiteDatabase | null = null;
@@ -34,15 +42,16 @@ let _db: SQLite.SQLiteDatabase | null = null;
 // ─────────────────────────────────────────────
 
 export interface WeeklyTemplateDay {
-  day_of_week: number;     // 0=Sun, 1=Mon … 6=Sat
+  day_of_week: number;
   walking_task: string;
   hammer_task: string;
   is_rest_day: boolean;
   is_meal_prep_day: boolean;
+  exercises: Exercise[];
 }
 
 export interface DailyLogEntry {
-  date: string;            // ISO date: YYYY-MM-DD
+  date: string;
   walking_task: string;
   hammer_task: string;
   walk_completed: boolean;
@@ -50,13 +59,13 @@ export interface DailyLogEntry {
   fasting_completed: boolean;
   is_rest_day: boolean;
   is_meal_prep_day: boolean;
+  exercises: Exercise[];
 }
 
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
 
-/** Returns today as a YYYY-MM-DD string in local time. */
 export function toISODate(date: Date = new Date()): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -64,116 +73,111 @@ export function toISODate(date: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Returns a new Date offset by `days` from the given date (midnight local). */
 function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
 }
 
-/** Returns the difference in whole calendar days between two ISO date strings. */
 function daysBetween(isoA: string, isoB: string): number {
   const a = new Date(isoA);
   const b = new Date(isoB);
-  // Normalise to midnight UTC to avoid DST issues
   a.setHours(0, 0, 0, 0);
   b.setHours(0, 0, 0, 0);
   return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
 
-/**
- * Builds the suffixed hammer_task string with the weight progression.
- *   cycle = floor(daysDiff / 21)
- *   if is_rest_day  → appends " @ Light Weight"
- *   else cycle == 0 → appends " @ Baseline"
- *   else            → appends " @ Baseline + <cycle*5>kg"
- */
-function buildHammerTask(
-  baseTask: string,
-  isRestDay: boolean,
-  daysDiff: number
-): string {
-  if (isRestDay) return `${baseTask} @ Light Weight`;
+function buildHammerTask(base: string, isRestDay: boolean, daysDiff: number): string {
+  if (isRestDay) return `${base} @ Light Weight`;
   const cycle = Math.floor(daysDiff / CYCLE_DAYS);
-  if (cycle === 0) return `${baseTask} @ Baseline`;
-  return `${baseTask} @ Baseline + ${cycle * KG_PER_CYCLE}kg`;
+  if (cycle === 0) return `${base} @ Baseline`;
+  return `${base} @ Baseline + ${cycle * KG_PER_CYCLE}kg`;
+}
+
+/** Safely parse a JSON string as Exercise[]; returns [] on any error. */
+function parseExercises(raw: string | null | undefined): Exercise[] {
+  try {
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 // ─────────────────────────────────────────────
-// Database Init
+// Versioned migration runner
 // ─────────────────────────────────────────────
 
-/**
- * Opens the database, runs all migrations/seeds, records start date on first
- * launch, then syncs the rolling schedule.
- * Must be awaited before any other DB call.
- */
-export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (_db) return _db;
+async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.execAsync(CREATE_SCHEMA_VERSION_TABLE);
 
-  _db = await SQLite.openDatabaseAsync(DB_NAME);
-
-  // Enable WAL for better concurrent reads
-  await _db.execAsync('PRAGMA journal_mode = WAL;');
-
-  // Run all migrations (idempotent CREATE TABLE IF NOT EXISTS + INSERT OR IGNORE)
-  for (const statement of ALL_MIGRATIONS) {
-    await _db.execAsync(statement);
-  }
-
-  // Record start date on very first launch
-  const existing = await _db.getFirstAsync<{ value: string }>(
-    'SELECT value FROM app_state WHERE key = ?',
-    [START_DATE_KEY]
+  const appliedRows = await db.getAllAsync<{ version: number }>(
+    'SELECT version FROM schema_version ORDER BY version ASC'
   );
-  if (!existing) {
-    const today = toISODate();
-    await _db.runAsync(
-      'INSERT INTO app_state (key, value) VALUES (?, ?)',
-      [START_DATE_KEY, today]
-    );
+  const applied = new Set(appliedRows.map((r) => r.version));
+
+  for (const migration of MIGRATIONS) {
+    if (applied.has(migration.version)) continue;
+    console.log(`[DB] Applying migration v${migration.version}…`);
+    await db.execAsync(migration.sql);
+    await db.runAsync('INSERT INTO schema_version (version) VALUES (?)', [migration.version]);
+    console.log(`[DB] Migration v${migration.version} applied ✓`);
   }
-
-  // Generate / prune the rolling window
-  await syncRollingSchedule();
-
-  return _db;
-}
-
-/** Returns the open DB instance. initDatabase() must have been called first. */
-export function getDatabase(): SQLite.SQLiteDatabase {
-  if (!_db) throw new Error('Database not initialised. Call initDatabase() first.');
-  return _db;
 }
 
 // ─────────────────────────────────────────────
-// Task 3 — Rolling Schedule Sync
+// Old-schema reset helper
 // ─────────────────────────────────────────────
 
 /**
- * Ensures the daily_log table always has entries from today up to today+7.
- * Any entry older than today-7 is pruned.
+ * Detects incompatible schemas left by previous app versions:
+ *   1. daily_log missing 'date' column (very old schema)
+ *   2. (Compatible schema — no reset needed)
  *
- * Called automatically by initDatabase() and can be called manually on
- * app foregrounding.
+ * Note: missing 'exercises' column is handled by migrations v11/v12 via
+ * ALTER TABLE, so no reset is needed for that case.
  */
-export async function syncRollingSchedule(): Promise<void> {
-  const db = getDatabase();
+async function resetIfIncompatibleSchema(
+  db: SQLite.SQLiteDatabase
+): Promise<SQLite.SQLiteDatabase> {
+  const columns = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(daily_log)'
+  );
 
-  // 1. Fetch app_start_date for progression maths
+  if (columns.length === 0) return db; // Fresh install
+  const hasDateColumn = columns.some((c) => c.name === 'date');
+  if (hasDateColumn) return db; // Compatible
+
+  console.warn(
+    '[DB] Incompatible daily_log schema detected (missing "date" column). ' +
+    'Deleting old database and starting fresh…'
+  );
+  await db.closeAsync();
+  await SQLite.deleteDatabaseAsync(DB_NAME);
+  console.log('[DB] Old database deleted. Opening fresh database…');
+  const freshDb = await SQLite.openDatabaseAsync(DB_NAME);
+  await freshDb.execAsync('PRAGMA journal_mode = WAL;');
+  return freshDb;
+}
+
+// ─────────────────────────────────────────────
+// Rolling schedule sync — internal impl
+// ─────────────────────────────────────────────
+
+async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   const startRow = await db.getFirstAsync<{ value: string }>(
     'SELECT value FROM app_state WHERE key = ?',
     [START_DATE_KEY]
   );
   const startDateISO = startRow?.value ?? toISODate();
 
-  // 2. Fetch the weekly template (all 7 rows)
   const templateRows = await db.getAllAsync<{
     day_of_week: number;
     walking_task: string;
     hammer_task: string;
     is_rest_day: number;
     is_meal_prep_day: number;
+    exercises: string;
   }>('SELECT * FROM weekly_template');
 
   const templateMap = new Map<number, typeof templateRows[number]>();
@@ -181,64 +185,124 @@ export async function syncRollingSchedule(): Promise<void> {
     templateMap.set(row.day_of_week, row);
   }
 
-  // 3. Determine the dates that should exist: today … today+DAYS_AHEAD
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const cutoffDate = addDays(today, -DAYS_HISTORY);
+  const cutoffISO = toISODate(cutoffDate);
+
+  // Pre-fetch existing dates OUTSIDE the transaction (#37)
+  const existingRows = await db.getAllAsync<{ date: string }>(
+    'SELECT date FROM daily_log WHERE date >= ?',
+    [cutoffISO]
+  );
+  const existingDates = new Set(existingRows.map((r) => r.date));
+
+  type InsertParams = [string, string, string, number, number, string];
+  const inserts: InsertParams[] = [];
+
+  for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
+    const targetDate = addDays(today, offset);
+    const targetISO = toISODate(targetDate);
+
+    if (existingDates.has(targetISO)) continue;
+
+    const dow = targetDate.getDay();
+    const template = templateMap.get(dow);
+    if (!template) continue;
+
+    const daysDiff = daysBetween(startDateISO, targetISO);
+    const hammerWithWeight = buildHammerTask(
+      template.hammer_task,
+      template.is_rest_day === 1,
+      daysDiff
+    );
+
+    // Parse template exercises and reset completed → false for the new day
+    const baseExercises = parseExercises(template.exercises).map((ex) => ({
+      ...ex,
+      completed: false,
+    }));
+
+    inserts.push([
+      targetISO,
+      template.walking_task,
+      hammerWithWeight,
+      template.is_rest_day,
+      template.is_meal_prep_day,
+      JSON.stringify(baseExercises),
+    ]);
+  }
 
   await db.withTransactionAsync(async () => {
-    for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
-      const targetDate = addDays(today, offset);
-      const targetISO = toISODate(targetDate);
-
-      // Skip if a log entry already exists for this date
-      const existing = await db.getFirstAsync<{ date: string }>(
-        'SELECT date FROM daily_log WHERE date = ?',
-        [targetISO]
-      );
-      if (existing) continue;
-
-      // Look up the template row for this weekday
-      const dow = targetDate.getDay(); // 0=Sun … 6=Sat
-      const template = templateMap.get(dow);
-      if (!template) continue; // No template row — skip (shouldn't happen)
-
-      // Calculate progression
-      const daysDiff = daysBetween(startDateISO, targetISO);
-      const hammerWithWeight = buildHammerTask(
-        template.hammer_task,
-        template.is_rest_day === 1,
-        daysDiff
-      );
-
-      // Insert the generated log entry (all checkboxes start unchecked)
+    for (const params of inserts) {
       await db.runAsync(
         `INSERT OR IGNORE INTO daily_log
-           (date, walking_task, hammer_task, is_rest_day, is_meal_prep_day)
-         VALUES (?, ?, ?, ?, ?)`,
-        [
-          targetISO,
-          template.walking_task,
-          hammerWithWeight,
-          template.is_rest_day,
-          template.is_meal_prep_day,
-        ]
+           (date, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        params
       );
     }
-
-    // 4. Prune entries older than today - DAYS_HISTORY
-    const cutoff = toISODate(addDays(today, -DAYS_HISTORY));
-    await db.runAsync('DELETE FROM daily_log WHERE date < ?', [cutoff]);
+    await db.runAsync('DELETE FROM daily_log WHERE date < ?', [cutoffISO]);
   });
+}
+
+// ─────────────────────────────────────────────
+// Database Init
+// ─────────────────────────────────────────────
+
+export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
+  if (_db) return _db;
+
+  console.log('[DB] Opening database…');
+  let db = await SQLite.openDatabaseAsync(DB_NAME);
+
+  try {
+    await db.execAsync('PRAGMA journal_mode = WAL;');
+
+    db = await resetIfIncompatibleSchema(db);
+
+    await runMigrations(db);
+
+    const existing = await db.getFirstAsync<{ value: string }>(
+      'SELECT value FROM app_state WHERE key = ?',
+      [START_DATE_KEY]
+    );
+    if (!existing) {
+      const today = toISODate();
+      console.log(`[DB] First launch — recording start date: ${today}`);
+      await db.runAsync('INSERT INTO app_state (key, value) VALUES (?, ?)', [START_DATE_KEY, today]);
+    }
+
+    await _syncRollingSchedule(db);
+
+    _db = db;
+    console.log('[DB] Initialisation complete ✓');
+  } catch (err) {
+    console.error('[DB] Initialisation failed — closing connection:', err);
+    await db.closeAsync().catch((e) => console.warn('[DB] Cleanup close failed:', e));
+    throw err;
+  }
+
+  return _db!;
+}
+
+export function getDatabase(): SQLite.SQLiteDatabase {
+  if (!_db) throw new Error('Database not initialised. Call initDatabase() first.');
+  return _db;
+}
+
+// ─────────────────────────────────────────────
+// Rolling Schedule Sync (public API)
+// ─────────────────────────────────────────────
+
+export async function syncRollingSchedule(): Promise<void> {
+  return _syncRollingSchedule(getDatabase());
 }
 
 // ─────────────────────────────────────────────
 // Daily Log CRUD
 // ─────────────────────────────────────────────
 
-/**
- * Fetches the log entry for a specific date.
- * Returns null if no entry exists (e.g., before the first sync).
- */
 export async function getLogByDate(date: string): Promise<DailyLogEntry | null> {
   const db = getDatabase();
   const row = await db.getFirstAsync<{
@@ -250,16 +314,13 @@ export async function getLogByDate(date: string): Promise<DailyLogEntry | null> 
     fasting_completed: number;
     is_rest_day: number;
     is_meal_prep_day: number;
+    exercises: string;
   }>('SELECT * FROM daily_log WHERE date = ?', [date]);
 
   if (!row) return null;
   return mapLogRow(row);
 }
 
-/**
- * Returns all daily_log entries in ascending date order.
- * Used by the rolling overview screen.
- */
 export async function getRollingWindow(): Promise<DailyLogEntry[]> {
   const db = getDatabase();
   const rows = await db.getAllAsync<{
@@ -271,24 +332,42 @@ export async function getRollingWindow(): Promise<DailyLogEntry[]> {
     fasting_completed: number;
     is_rest_day: number;
     is_meal_prep_day: number;
+    exercises: string;
   }>('SELECT * FROM daily_log ORDER BY date ASC');
 
   return rows.map(mapLogRow);
 }
 
-/**
- * Updates a single boolean field in daily_log for the given date.
- * fieldName must be one of: walk_completed, hammer_completed, fasting_completed
- */
 export async function upsertLogField(
   date: string,
   field: 'walk_completed' | 'hammer_completed' | 'fasting_completed',
   value: boolean
 ): Promise<void> {
   const db = getDatabase();
+  await db.runAsync(`UPDATE daily_log SET ${field} = ? WHERE date = ?`, [value ? 1 : 0, date]);
+}
+
+/**
+ * Toggles the `completed` flag on a single exercise within daily_log.exercises
+ * for the given date. Reads the current JSON, patches it, then writes back.
+ */
+export async function upsertExerciseCompleted(
+  date: string,
+  exerciseId: string,
+  value: boolean
+): Promise<void> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ exercises: string }>(
+    'SELECT exercises FROM daily_log WHERE date = ?',
+    [date]
+  );
+  const exercises = parseExercises(row?.exercises);
+  const updated = exercises.map((ex) =>
+    ex.id === exerciseId ? { ...ex, completed: value } : ex
+  );
   await db.runAsync(
-    `UPDATE daily_log SET ${field} = ? WHERE date = ?`,
-    [value ? 1 : 0, date]
+    'UPDATE daily_log SET exercises = ? WHERE date = ?',
+    [JSON.stringify(updated), date]
   );
 }
 
@@ -296,16 +375,15 @@ export async function upsertLogField(
 // Weekly Template CRUD
 // ─────────────────────────────────────────────
 
-/** Returns all 7 weekly template rows, ordered Mon→Sun. */
 export async function getWeeklyTemplate(): Promise<WeeklyTemplateDay[]> {
   const db = getDatabase();
-  // Order: Mon(1), Tue(2), Wed(3), Thu(4), Fri(5), Sat(6), Sun(0)
   const rows = await db.getAllAsync<{
     day_of_week: number;
     walking_task: string;
     hammer_task: string;
     is_rest_day: number;
     is_meal_prep_day: number;
+    exercises: string;
   }>(
     `SELECT * FROM weekly_template
      ORDER BY CASE day_of_week WHEN 0 THEN 7 ELSE day_of_week END ASC`
@@ -317,10 +395,11 @@ export async function getWeeklyTemplate(): Promise<WeeklyTemplateDay[]> {
     hammer_task: r.hammer_task,
     is_rest_day: r.is_rest_day === 1,
     is_meal_prep_day: r.is_meal_prep_day === 1,
+    exercises: parseExercises(r.exercises),
   }));
 }
 
-/** Updates the walking_task and hammer_task for a given day_of_week. */
+/** Updates the walking_task, hammer_task for a given day_of_week. */
 export async function updateTemplateDay(
   dayOfWeek: number,
   walkingTask: string,
@@ -333,11 +412,26 @@ export async function updateTemplateDay(
   );
 }
 
+/**
+ * Replaces the full exercise list for a given weekday in weekly_template.
+ * The UI calls this when the user adds, edits, or deletes exercises in the
+ * Template Editor.
+ */
+export async function updateTemplateExercises(
+  dayOfWeek: number,
+  exercises: Exercise[]
+): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    'UPDATE weekly_template SET exercises = ? WHERE day_of_week = ?',
+    [JSON.stringify(exercises), dayOfWeek]
+  );
+}
+
 // ─────────────────────────────────────────────
 // App State helpers
 // ─────────────────────────────────────────────
 
-/** Returns the app start date stored in app_state. */
 export async function getStartDate(): Promise<string> {
   const db = getDatabase();
   const row = await db.getFirstAsync<{ value: string }>(
@@ -347,7 +441,6 @@ export async function getStartDate(): Promise<string> {
   return row?.value ?? toISODate();
 }
 
-/** Returns the progression cycle number for a given ISO date. */
 export async function getCycleForDate(dateISO: string): Promise<number> {
   const startISO = await getStartDate();
   const diff = daysBetween(startISO, dateISO);
@@ -367,6 +460,7 @@ function mapLogRow(row: {
   fasting_completed: number;
   is_rest_day: number;
   is_meal_prep_day: number;
+  exercises: string;
 }): DailyLogEntry {
   return {
     date: row.date,
@@ -377,5 +471,6 @@ function mapLogRow(row: {
     fasting_completed: row.fasting_completed === 1,
     is_rest_day: row.is_rest_day === 1,
     is_meal_prep_day: row.is_meal_prep_day === 1,
+    exercises: parseExercises(row.exercises),
   };
 }

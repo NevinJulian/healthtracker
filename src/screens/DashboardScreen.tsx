@@ -6,12 +6,16 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Linking,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   DailyLogEntry,
+  Exercise,
   getLogByDate,
   upsertLogField,
+  upsertExerciseCompleted,
   syncRollingSchedule,
   toISODate,
 } from '../db/database';
@@ -66,6 +70,127 @@ function TaskCard({
   );
 }
 
+// ─── Exercise Row ─────────────────────────────────────────────────────────────
+
+function ExerciseRow({
+  exercise,
+  onToggle,
+}: {
+  exercise: Exercise;
+  onToggle: () => void;
+}) {
+  const handleWatch = async () => {
+    if (!exercise.videoUrl) return;
+    const supported = await Linking.canOpenURL(exercise.videoUrl);
+    if (supported) {
+      await Linking.openURL(exercise.videoUrl);
+    } else {
+      Alert.alert('Cannot open URL', exercise.videoUrl);
+    }
+  };
+
+  return (
+    <View style={[styles.exerciseRow, exercise.completed && styles.exerciseRowDone]}>
+      {/* Checkbox */}
+      <TouchableOpacity
+        style={[styles.exCheckbox, exercise.completed && styles.exCheckboxDone]}
+        onPress={onToggle}
+        activeOpacity={0.7}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        {exercise.completed && <Text style={styles.exCheckmark}>✓</Text>}
+      </TouchableOpacity>
+
+      {/* Name + sets/reps */}
+      <View style={styles.exInfo}>
+        <Text style={[styles.exName, exercise.completed && styles.exNameDone]}>
+          {exercise.name}
+        </Text>
+        <Text style={styles.exMeta}>
+          {exercise.sets} sets × {exercise.reps} reps
+        </Text>
+      </View>
+
+      {/* Watch Tutorial button */}
+      {exercise.videoUrl ? (
+        <TouchableOpacity
+          style={styles.watchBtn}
+          onPress={handleWatch}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.watchBtnIcon}>▶</Text>
+          <Text style={styles.watchBtnLabel}>Watch</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.watchBtnPlaceholder} />
+      )}
+    </View>
+  );
+}
+
+// ─── Hammer Section ───────────────────────────────────────────────────────────
+
+function HammerSection({
+  entry,
+  onExerciseToggle,
+  onSessionToggle,
+}: {
+  entry: DailyLogEntry;
+  onExerciseToggle: (id: string, value: boolean) => void;
+  onSessionToggle: () => void;
+}) {
+  const doneCount = entry.exercises.filter((e) => e.completed).length;
+  const total = entry.exercises.length;
+  const allDone = total > 0 && doneCount === total;
+
+  return (
+    <View style={styles.section}>
+      {/* Section header */}
+      <View style={[styles.hammerHeader, { borderLeftColor: Colors.secondary }]}>
+        <View style={styles.hammerHeaderLeft}>
+          <Text style={styles.taskIcon}>🏋️</Text>
+          <View>
+            <Text style={styles.taskTitle}>HAMMER MULTI-GYM</Text>
+            <Text style={styles.hammerSubtitle}>{entry.hammer_task}</Text>
+          </View>
+        </View>
+        {total > 0 && (
+          <View style={[styles.exProgressPill, allDone && styles.exProgressPillDone]}>
+            <Text style={[styles.exProgressText, allDone && styles.exProgressTextDone]}>
+              {doneCount}/{total}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Exercise list */}
+      {entry.exercises.length > 0 ? (
+        <View style={styles.exerciseList}>
+          {entry.exercises.map((ex) => (
+            <ExerciseRow
+              key={ex.id}
+              exercise={ex}
+              onToggle={() => onExerciseToggle(ex.id, !ex.completed)}
+            />
+          ))}
+        </View>
+      ) : (
+        // Fallback for days with no exercise data yet
+        <Text style={styles.noExercisesHint}>
+          No individual exercises configured — use the Template Editor to add them.
+        </Text>
+      )}
+
+      {/* Session-level completion checkbox */}
+      <Checkbox
+        checked={entry.hammer_completed}
+        label="Mark full gym session complete"
+        onToggle={onSessionToggle}
+      />
+    </View>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
@@ -77,7 +202,6 @@ export default function DashboardScreen() {
   const loadToday = useCallback(async () => {
     setLoading(true);
     try {
-      // Re-sync in case days were missed (e.g., device clock advanced)
       await syncRollingSchedule();
       const data = await getLogByDate(today);
       setEntry(data);
@@ -97,15 +221,32 @@ export default function DashboardScreen() {
   ) => {
     if (!entry) return;
     const newValue = !entry[field];
-
-    // Optimistic UI update
     setEntry((prev) => prev ? { ...prev, [field]: newValue } : prev);
-
     try {
       await upsertLogField(today, field, newValue);
     } catch (err) {
       console.error('upsertLogField error', err);
-      loadToday(); // Revert on error
+      loadToday();
+    }
+  };
+
+  const handleExerciseToggle = async (exerciseId: string, value: boolean) => {
+    if (!entry) return;
+    // Optimistic update
+    setEntry((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        exercises: prev.exercises.map((ex) =>
+          ex.id === exerciseId ? { ...ex, completed: value } : ex
+        ),
+      };
+    });
+    try {
+      await upsertExerciseCompleted(today, exerciseId, value);
+    } catch (err) {
+      console.error('upsertExerciseCompleted error', err);
+      loadToday();
     }
   };
 
@@ -216,19 +357,11 @@ export default function DashboardScreen() {
         </View>
 
         {/* ── Hammer / Gym task ────────────────────────────────────────────── */}
-        <View style={styles.section}>
-          <TaskCard
-            icon="🏋️"
-            title="Hammer Multi-Gym"
-            description={entry.hammer_task}
-            accentColor={Colors.secondary}
-          />
-          <Checkbox
-            checked={entry.hammer_completed}
-            label="Gym session completed"
-            onToggle={() => handleToggle('hammer_completed')}
-          />
-        </View>
+        <HammerSection
+          entry={entry}
+          onExerciseToggle={handleExerciseToggle}
+          onSessionToggle={() => handleToggle('hammer_completed')}
+        />
 
         {/* ── Intermittent fasting ─────────────────────────────────────────── */}
         <View style={styles.section}>
@@ -416,5 +549,131 @@ const styles = StyleSheet.create({
   checkboxLabelChecked: {
     color: Colors.accent,
     textDecorationLine: 'line-through',
+  },
+
+  // Hammer section header
+  hammerHeader: {
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderLeftWidth: 3,
+    gap: Spacing.sm,
+  },
+  hammerHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
+    flex: 1,
+  },
+  hammerSubtitle: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginTop: 2,
+    flexShrink: 1,
+  },
+  exProgressPill: {
+    backgroundColor: Colors.border,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  exProgressPillDone: { backgroundColor: Colors.accent + '30' },
+  exProgressText: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    fontWeight: Typography.weights.bold,
+  },
+  exProgressTextDone: { color: Colors.accent },
+
+  // Exercise list
+  exerciseList: {
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  // Exercise row
+  exerciseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  exerciseRowDone: { backgroundColor: Colors.accent + '08' },
+  exCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: Colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  exCheckboxDone: {
+    backgroundColor: Colors.secondary,
+    borderColor: Colors.secondary,
+  },
+  exCheckmark: {
+    color: Colors.background,
+    fontSize: 12,
+    fontWeight: Typography.weights.bold,
+  },
+  exInfo: { flex: 1, gap: 1 },
+  exName: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textPrimary,
+    fontWeight: Typography.weights.semibold,
+  },
+  exNameDone: {
+    color: Colors.textMuted,
+    textDecorationLine: 'line-through',
+  },
+  exMeta: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+  },
+
+  // Watch button
+  watchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.secondary + '25',
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: Colors.secondary + '60',
+  },
+  watchBtnIcon: {
+    color: Colors.secondary,
+    fontSize: 10,
+  },
+  watchBtnLabel: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.secondary,
+    fontWeight: Typography.weights.semibold,
+  },
+  watchBtnPlaceholder: { width: 58 }, // same width as watchBtn to keep alignment
+
+  // No exercises hint
+  noExercisesHint: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: Spacing.md,
   },
 });
