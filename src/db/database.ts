@@ -50,6 +50,12 @@ export interface WeeklyTemplateDay {
   exercises: Exercise[];
 }
 
+export interface AdditionalWorkout {
+  id: string;
+  name: string;
+  completed: boolean;
+}
+
 export interface DailyLogEntry {
   date: string;
   walking_task: string;
@@ -60,6 +66,8 @@ export interface DailyLogEntry {
   is_rest_day: boolean;
   is_meal_prep_day: boolean;
   exercises: Exercise[];
+  body_weight: number | null;
+  additional_workouts: AdditionalWorkout[];
 }
 
 // ─────────────────────────────────────────────
@@ -96,6 +104,15 @@ function buildHammerTask(base: string, isRestDay: boolean, daysDiff: number): st
 
 /** Safely parse a JSON string as Exercise[]; returns [] on any error. */
 function parseExercises(raw: string | null | undefined): Exercise[] {
+  try {
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseAdditionalWorkouts(raw: string | null | undefined): AdditionalWorkout[] {
   try {
     const parsed = JSON.parse(raw ?? '[]');
     return Array.isArray(parsed) ? parsed : [];
@@ -190,9 +207,9 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   const cutoffDate = addDays(today, -DAYS_HISTORY);
   const cutoffISO = toISODate(cutoffDate);
 
-  // Pre-fetch existing dates OUTSIDE the transaction (#37)
-  const existingRows = await db.getAllAsync<{ date: string }>(
-    'SELECT date FROM daily_log WHERE date >= ?',
+  // Pre-fetch existing rows with their exercises OUTSIDE the transaction (#37)
+  const existingRows = await db.getAllAsync<{ date: string; exercises: string }>(
+    'SELECT date, exercises FROM daily_log WHERE date >= ?',
     [cutoffISO]
   );
   const existingDates = new Set(existingRows.map((r) => r.date));
@@ -200,15 +217,31 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   type InsertParams = [string, string, string, number, number, string];
   const inserts: InsertParams[] = [];
 
+  // Backfill: existing entries whose exercises are empty but template now has them
+  type BackfillParams = [string, string]; // [exercisesJson, date]
+  const backfills: BackfillParams[] = [];
+
   for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
     const targetDate = addDays(today, offset);
     const targetISO = toISODate(targetDate);
-
-    if (existingDates.has(targetISO)) continue;
-
     const dow = targetDate.getDay();
     const template = templateMap.get(dow);
     if (!template) continue;
+
+    // Parse template exercises (reset completed → false)
+    const templateExercises = parseExercises(template.exercises);
+    const baseExercises = templateExercises.map((ex) => ({ ...ex, completed: false }));
+    const baseExercisesJson = JSON.stringify(baseExercises);
+
+    if (existingDates.has(targetISO)) {
+      // Row exists — check if exercises need to be backfilled
+      const existing = existingRows.find((r) => r.date === targetISO);
+      const currentExercises = parseExercises(existing?.exercises);
+      if (currentExercises.length === 0 && templateExercises.length > 0) {
+        backfills.push([baseExercisesJson, targetISO]);
+      }
+      continue;
+    }
 
     const daysDiff = daysBetween(startDateISO, targetISO);
     const hammerWithWeight = buildHammerTask(
@@ -217,19 +250,13 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
       daysDiff
     );
 
-    // Parse template exercises and reset completed → false for the new day
-    const baseExercises = parseExercises(template.exercises).map((ex) => ({
-      ...ex,
-      completed: false,
-    }));
-
     inserts.push([
       targetISO,
       template.walking_task,
       hammerWithWeight,
       template.is_rest_day,
       template.is_meal_prep_day,
-      JSON.stringify(baseExercises),
+      baseExercisesJson,
     ]);
   }
 
@@ -240,6 +267,13 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
            (date, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
          VALUES (?, ?, ?, ?, ?, ?)`,
         params
+      );
+    }
+    // Backfill exercises into rows that currently have an empty array
+    for (const [exercisesJson, date] of backfills) {
+      await db.runAsync(
+        'UPDATE daily_log SET exercises = ? WHERE date = ?',
+        [exercisesJson, date]
       );
     }
     await db.runAsync('DELETE FROM daily_log WHERE date < ?', [cutoffISO]);
@@ -315,6 +349,8 @@ export async function getLogByDate(date: string): Promise<DailyLogEntry | null> 
     is_rest_day: number;
     is_meal_prep_day: number;
     exercises: string;
+    body_weight: number | null;
+    additional_workouts: string;
   }>('SELECT * FROM daily_log WHERE date = ?', [date]);
 
   if (!row) return null;
@@ -333,6 +369,8 @@ export async function getRollingWindow(): Promise<DailyLogEntry[]> {
     is_rest_day: number;
     is_meal_prep_day: number;
     exercises: string;
+    body_weight: number | null;
+    additional_workouts: string;
   }>('SELECT * FROM daily_log ORDER BY date ASC');
 
   return rows.map(mapLogRow);
@@ -369,6 +407,35 @@ export async function upsertExerciseCompleted(
     'UPDATE daily_log SET exercises = ? WHERE date = ?',
     [JSON.stringify(updated), date]
   );
+}
+
+export async function upsertBodyWeight(date: string, weight: number): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('UPDATE daily_log SET body_weight = ? WHERE date = ?', [weight, date]);
+}
+
+export async function upsertAdditionalWorkouts(
+  date: string,
+  workouts: AdditionalWorkout[]
+): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [
+    JSON.stringify(workouts),
+    date,
+  ]);
+}
+
+export async function getWeightHistory(days: number): Promise<{ date: string; weight: number }[]> {
+  const db = getDatabase();
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+
+  const rows = await db.getAllAsync<{ date: string; body_weight: number }>(
+    'SELECT date, body_weight FROM daily_log WHERE date >= ? AND body_weight IS NOT NULL ORDER BY date ASC',
+    [toISODate(cutoffDate)]
+  );
+
+  return rows.map((r) => ({ date: r.date, weight: r.body_weight }));
 }
 
 // ─────────────────────────────────────────────
@@ -461,6 +528,8 @@ function mapLogRow(row: {
   is_rest_day: number;
   is_meal_prep_day: number;
   exercises: string;
+  body_weight?: number | null;
+  additional_workouts?: string;
 }): DailyLogEntry {
   return {
     date: row.date,
@@ -472,5 +541,7 @@ function mapLogRow(row: {
     is_rest_day: row.is_rest_day === 1,
     is_meal_prep_day: row.is_meal_prep_day === 1,
     exercises: parseExercises(row.exercises),
+    body_weight: row.body_weight ?? null,
+    additional_workouts: parseAdditionalWorkouts(row.additional_workouts),
   };
 }
