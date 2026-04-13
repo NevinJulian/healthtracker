@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
-import { getRollingWindow, getWeightHistory } from '../db/database';
+import { getRollingWindow, getWeightHistory, toISODate } from '../db/database';
 
 export default function AnalyticsDashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -25,9 +25,9 @@ export default function AnalyticsDashboardScreen() {
       const computeStats = (days: number) => {
         const cutoff = new Date(today);
         cutoff.setDate(cutoff.getDate() - days);
-        const cutoffIso = cutoff.toISOString().split('T')[0];
+        const cutoffIso = toISODate(cutoff);
 
-        const relevantLogs = logs.filter(l => l.date >= cutoffIso && l.date <= today.toISOString().split('T')[0]);
+        const relevantLogs = logs.filter(l => l.date >= cutoffIso && l.date <= toISODate(today));
         const total = relevantLogs.length;
 
         if (total === 0) return { walk: 0, gym: 0, extra: 0 };
