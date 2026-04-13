@@ -26,6 +26,7 @@ import {
   toISODate,
 } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
+import BioForceModal from '../components/BioForceModal';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -199,13 +200,7 @@ function HammerSection({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-const BONUS_PROPOSALS = [
-  '15 Min Core Burn',
-  '30 Min Nordic Walking',
-  'HIIT Sprints',
-  '20 Min Stretching',
-  'Sauna Session'
-];
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -215,7 +210,6 @@ export default function DashboardScreen() {
   // New features state
   const [weightInput, setWeightInput] = useState('');
   const [isExtraModalVisible, setExtraModalVisible] = useState(false);
-  const [customExtraName, setCustomExtraName] = useState('');
 
   const today = toISODate();
 
@@ -288,14 +282,18 @@ export default function DashboardScreen() {
     }
   };
 
-  const handleAddExtraWorkout = async (name: string) => {
-    if (!name.trim() || !entry) return;
-    const newWorkout = { id: `ext-${Date.now()}`, name: name.trim(), completed: false };
-    const updated = [...(entry.additional_workouts || []), newWorkout];
+  const handleAddExtraWorkout = async (workout: {
+    id: string;
+    name: string;
+    muscle_group: string;
+    sets: string;
+    reps: string;
+    completed: boolean;
+  }) => {
+    if (!entry) return;
+    const updated = [...(entry.additional_workouts || []), workout];
     
     setEntry(prev => prev ? { ...prev, additional_workouts: updated } : prev);
-    setExtraModalVisible(false);
-    setCustomExtraName('');
     
     try {
       await upsertAdditionalWorkouts(today, updated);
@@ -479,12 +477,18 @@ export default function DashboardScreen() {
           </View>
           
           {(entry.additional_workouts || []).map(aw => (
-            <Checkbox
-              key={aw.id}
-              checked={aw.completed}
-              label={aw.name}
-              onToggle={() => handleToggleExtraWorkout(aw.id)}
-            />
+            <View key={aw.id} style={{ marginBottom: 4 }}>
+              <Checkbox
+                checked={aw.completed}
+                label={aw.name}
+                onToggle={() => handleToggleExtraWorkout(aw.id)}
+              />
+              {aw.muscle_group ? (
+                <Text style={{ marginLeft: 44, marginTop: -4, color: Colors.textMuted, fontSize: Typography.sizes.xs }}>
+                  {aw.muscle_group}  •  {aw.sets} sets × {aw.reps} reps
+                </Text>
+              ) : null}
+            </View>
           ))}
 
           <TouchableOpacity 
@@ -501,60 +505,11 @@ export default function DashboardScreen() {
       </ScrollView>
 
       {/* ── Add Extra Workout Modal ──────────────────────────────────────── */}
-      <Modal
-        visible={isExtraModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setExtraModalVisible(false)}
-      >
-        <KeyboardAvoidingView 
-          style={styles.modalOverlay} 
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Extra Workout</Text>
-              <TouchableOpacity onPress={() => setExtraModalVisible(false)}>
-                <Text style={styles.modalCloseText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.modalSubtitle}>Select a proposal:</Text>
-            <View style={styles.proposalsContainer}>
-              {BONUS_PROPOSALS.map(prop => (
-                <TouchableOpacity 
-                  key={prop} 
-                  style={styles.proposalChip}
-                  onPress={() => handleAddExtraWorkout(prop)}
-                >
-                  <Text style={styles.proposalChipText}>{prop}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.modalDivider} />
-
-            <Text style={styles.modalSubtitle}>Or add your own:</Text>
-            <View style={styles.customExtraContainer}>
-              <TextInput
-                style={styles.customExtraInput}
-                placeholder="e.g. 5k Run"
-                placeholderTextColor={Colors.textMuted}
-                value={customExtraName}
-                onChangeText={setCustomExtraName}
-                onSubmitEditing={() => handleAddExtraWorkout(customExtraName)}
-              />
-              <TouchableOpacity
-                style={[styles.customExtraBtn, !customExtraName.trim() && { opacity: 0.5 }]}
-                disabled={!customExtraName.trim()}
-                onPress={() => handleAddExtraWorkout(customExtraName)}
-              >
-                <Text style={styles.customExtraBtnText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <BioForceModal 
+        isVisible={isExtraModalVisible} 
+        onClose={() => setExtraModalVisible(false)} 
+        onAddWorkout={handleAddExtraWorkout} 
+      />
     </View>
   );
 }
@@ -913,89 +868,5 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     color: Colors.textSecondary,
     fontWeight: Typography.weights.medium,
-  },
-
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  modalContent: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    padding: Spacing.xl,
-    paddingBottom: Spacing.xxl + 20,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  modalTitle: {
-    fontSize: Typography.sizes.xl,
-    color: Colors.textPrimary,
-    fontWeight: Typography.weights.bold,
-  },
-  modalCloseText: {
-    fontSize: Typography.sizes.md,
-    color: Colors.accent,
-    fontWeight: Typography.weights.semibold,
-  },
-  modalSubtitle: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-  },
-  proposalsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  proposalChip: {
-    backgroundColor: Colors.surfaceElevated,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  proposalChipText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.sizes.sm,
-  },
-  modalDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: Spacing.lg,
-  },
-  customExtraContainer: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  customExtraInput: {
-    flex: 1,
-    backgroundColor: Colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    color: Colors.textPrimary,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    fontSize: Typography.sizes.md,
-  },
-  customExtraBtn: {
-    backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.lg,
-    justifyContent: 'center',
-    borderRadius: Radius.md,
-  },
-  customExtraBtnText: {
-    color: Colors.background,
-    fontWeight: Typography.weights.bold,
   },
 });

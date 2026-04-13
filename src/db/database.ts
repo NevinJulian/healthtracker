@@ -19,6 +19,25 @@
 
 import * as SQLite from 'expo-sqlite';
 import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, Exercise } from './schema';
+import { bioForceExercises } from '../../bioForceExercises';
+
+export interface BioForceExercise {
+  id: number;
+  title: string;
+  muscleGroup: string;
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+  difficulty: string;
+  cablePosition: string;
+  attachment: string;
+  seat: string;
+  sets: string;
+  reps: string;
+  description: string;
+  tips: string[];
+  videoId: string;
+  videoTitle: string;
+}
 
 // Re-export Exercise so screens only import from database.ts
 export type { Exercise };
@@ -53,6 +72,9 @@ export interface WeeklyTemplateDay {
 export interface AdditionalWorkout {
   id: string;
   name: string;
+  muscle_group?: string;
+  sets?: string;
+  reps?: string;
   completed: boolean;
 }
 
@@ -140,6 +162,35 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     await db.runAsync('INSERT INTO schema_version (version) VALUES (?)', [migration.version]);
     console.log(`[DB] Migration v${migration.version} applied ✓`);
   }
+}
+
+async function seedBioForceLibrary(db: SQLite.SQLiteDatabase): Promise<void> {
+  // Check if we already have exercises
+  const countRow = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM bio_force_library'
+  );
+  if (countRow && countRow.count > 0) return;
+
+  console.log('[DB] Seeding Bio Force Library...');
+  const insertStmt = await db.prepareAsync(
+    'INSERT INTO bio_force_library (id, name, muscle_group, description, video_url, data) VALUES (?, ?, ?, ?, ?, ?)'
+  );
+  
+  await db.withTransactionAsync(async () => {
+    for (const ex of bioForceExercises) {
+      await insertStmt.executeAsync([
+        ex.id,
+        ex.title,
+        ex.muscleGroup,
+        ex.description,
+        ex.videoId ? `https://www.youtube.com/watch?v=${ex.videoId}` : '',
+        JSON.stringify(ex),
+      ]);
+    }
+  });
+  
+  await insertStmt.finalizeAsync();
+  console.log('[DB] Bio Force Library seeded ✓');
 }
 
 // ─────────────────────────────────────────────
@@ -296,6 +347,7 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
     db = await resetIfIncompatibleSchema(db);
 
     await runMigrations(db);
+    await seedBioForceLibrary(db);
 
     const existing = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_state WHERE key = ?',
@@ -441,6 +493,12 @@ export async function getWeightHistory(days: number): Promise<{ date: string; we
 // ─────────────────────────────────────────────
 // Weekly Template CRUD
 // ─────────────────────────────────────────────
+
+export async function getBioForceLibrary(): Promise<BioForceExercise[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{ data: string }>('SELECT data FROM bio_force_library');
+  return rows.map((r) => JSON.parse(r.data) as BioForceExercise);
+}
 
 export async function getWeeklyTemplate(): Promise<WeeklyTemplateDay[]> {
   const db = getDatabase();

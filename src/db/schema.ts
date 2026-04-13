@@ -36,6 +36,17 @@ export const CREATE_SCHEMA_VERSION_TABLE = `
   );
 `;
 
+export const CREATE_BIO_FORCE_LIBRARY_TABLE = `
+  CREATE TABLE IF NOT EXISTS bio_force_library (
+    id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    muscle_group TEXT NOT NULL,
+    description TEXT,
+    video_url TEXT,
+    data TEXT NOT NULL
+  );
+`;
+
 // ─── Table DDL ────────────────────────────────────────────────────────────────
 
 export const CREATE_APP_STATE_TABLE = `
@@ -359,4 +370,6 @@ export const MIGRATIONS: Migration[] = [
   // v20–v21: add analytical columns
   { version: 20, sql: ADD_BODY_WEIGHT_TO_DAILY_LOG },
   { version: 21, sql: ADD_ADDITIONAL_WORKOUTS_TO_DAILY_LOG },
+  // v22: Bio Force library initialization
+  { version: 22, sql: CREATE_BIO_FORCE_LIBRARY_TABLE },
 ];
