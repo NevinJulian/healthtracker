@@ -50,6 +50,12 @@ export interface WeeklyTemplateDay {
   exercises: Exercise[];
 }
 
+export interface AdditionalWorkout {
+  id: string;
+  name: string;
+  completed: boolean;
+}
+
 export interface DailyLogEntry {
   date: string;
   walking_task: string;
@@ -60,6 +66,8 @@ export interface DailyLogEntry {
   is_rest_day: boolean;
   is_meal_prep_day: boolean;
   exercises: Exercise[];
+  body_weight: number | null;
+  additional_workouts: AdditionalWorkout[];
 }
 
 // ─────────────────────────────────────────────
@@ -96,6 +104,15 @@ function buildHammerTask(base: string, isRestDay: boolean, daysDiff: number): st
 
 /** Safely parse a JSON string as Exercise[]; returns [] on any error. */
 function parseExercises(raw: string | null | undefined): Exercise[] {
+  try {
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseAdditionalWorkouts(raw: string | null | undefined): AdditionalWorkout[] {
   try {
     const parsed = JSON.parse(raw ?? '[]');
     return Array.isArray(parsed) ? parsed : [];
@@ -332,6 +349,8 @@ export async function getLogByDate(date: string): Promise<DailyLogEntry | null> 
     is_rest_day: number;
     is_meal_prep_day: number;
     exercises: string;
+    body_weight: number | null;
+    additional_workouts: string;
   }>('SELECT * FROM daily_log WHERE date = ?', [date]);
 
   if (!row) return null;
@@ -350,6 +369,8 @@ export async function getRollingWindow(): Promise<DailyLogEntry[]> {
     is_rest_day: number;
     is_meal_prep_day: number;
     exercises: string;
+    body_weight: number | null;
+    additional_workouts: string;
   }>('SELECT * FROM daily_log ORDER BY date ASC');
 
   return rows.map(mapLogRow);
@@ -386,6 +407,35 @@ export async function upsertExerciseCompleted(
     'UPDATE daily_log SET exercises = ? WHERE date = ?',
     [JSON.stringify(updated), date]
   );
+}
+
+export async function upsertBodyWeight(date: string, weight: number): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('UPDATE daily_log SET body_weight = ? WHERE date = ?', [weight, date]);
+}
+
+export async function upsertAdditionalWorkouts(
+  date: string,
+  workouts: AdditionalWorkout[]
+): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [
+    JSON.stringify(workouts),
+    date,
+  ]);
+}
+
+export async function getWeightHistory(days: number): Promise<{ date: string; weight: number }[]> {
+  const db = getDatabase();
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+
+  const rows = await db.getAllAsync<{ date: string; body_weight: number }>(
+    'SELECT date, body_weight FROM daily_log WHERE date >= ? AND body_weight IS NOT NULL ORDER BY date ASC',
+    [toISODate(cutoffDate)]
+  );
+
+  return rows.map((r) => ({ date: r.date, weight: r.body_weight }));
 }
 
 // ─────────────────────────────────────────────
@@ -478,6 +528,8 @@ function mapLogRow(row: {
   is_rest_day: number;
   is_meal_prep_day: number;
   exercises: string;
+  body_weight?: number | null;
+  additional_workouts?: string;
 }): DailyLogEntry {
   return {
     date: row.date,
@@ -489,5 +541,7 @@ function mapLogRow(row: {
     is_rest_day: row.is_rest_day === 1,
     is_meal_prep_day: row.is_meal_prep_day === 1,
     exercises: parseExercises(row.exercises),
+    body_weight: row.body_weight ?? null,
+    additional_workouts: parseAdditionalWorkouts(row.additional_workouts),
   };
 }
