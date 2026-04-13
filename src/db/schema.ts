@@ -78,6 +78,16 @@ export const ADD_EXERCISES_TO_DAILY_LOG = `
   ALTER TABLE daily_log ADD COLUMN exercises TEXT NOT NULL DEFAULT '[]';
 `;
 
+// ─── Column additions (v20 / v21) ─────────────────────────────────────────────
+
+export const ADD_BODY_WEIGHT_TO_DAILY_LOG = `
+  ALTER TABLE daily_log ADD COLUMN body_weight REAL;
+`;
+
+export const ADD_ADDITIONAL_WORKOUTS_TO_DAILY_LOG = `
+  ALTER TABLE daily_log ADD COLUMN additional_workouts TEXT NOT NULL DEFAULT '[]';
+`;
+
 // ─── Exercise seed data ───────────────────────────────────────────────────────
 // Stable IDs use deterministic short strings so they never change between
 // migrations or reinstalls — the UI relies on these IDs for completion state.
@@ -346,4 +356,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 17, sql: SEED_EXERCISES_FRI },
   { version: 18, sql: SEED_EXERCISES_SAT },
   { version: 19, sql: SEED_EXERCISES_SUN },
+  // v20–v21: add analytical columns
+  { version: 20, sql: ADD_BODY_WEIGHT_TO_DAILY_LOG },
+  { version: 21, sql: ADD_ADDITIONAL_WORKOUTS_TO_DAILY_LOG },
 ];

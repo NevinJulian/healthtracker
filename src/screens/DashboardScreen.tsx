@@ -8,6 +8,10 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
+  TextInput,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -16,6 +20,8 @@ import {
   getLogByDate,
   upsertLogField,
   upsertExerciseCompleted,
+  upsertBodyWeight,
+  upsertAdditionalWorkouts,
   syncRollingSchedule,
   toISODate,
 } from '../db/database';
@@ -193,10 +199,24 @@ function HammerSection({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+const BONUS_PROPOSALS = [
+  '15 Min Core Burn',
+  '30 Min Nordic Walking',
+  'HIIT Sprints',
+  '20 Min Stretching',
+  'Sauna Session'
+];
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const [entry, setEntry] = useState<DailyLogEntry | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // New features state
+  const [weightInput, setWeightInput] = useState('');
+  const [isExtraModalVisible, setExtraModalVisible] = useState(false);
+  const [customExtraName, setCustomExtraName] = useState('');
+
   const today = toISODate();
 
   const loadToday = useCallback(async () => {
@@ -205,6 +225,9 @@ export default function DashboardScreen() {
       await syncRollingSchedule();
       const data = await getLogByDate(today);
       setEntry(data);
+      if (data?.body_weight) {
+        setWeightInput(data.body_weight.toString());
+      }
     } catch (err) {
       console.error('DashboardScreen: loadToday error', err);
     } finally {
@@ -246,6 +269,54 @@ export default function DashboardScreen() {
       await upsertExerciseCompleted(today, exerciseId, value);
     } catch (err) {
       console.error('upsertExerciseCompleted error', err);
+      loadToday();
+    }
+  };
+
+  const handleSaveWeight = async () => {
+    const val = parseFloat(weightInput);
+    if (isNaN(val)) {
+      Alert.alert('Invalid Weight', 'Please enter a valid number.');
+      return;
+    }
+    try {
+      await upsertBodyWeight(today, val);
+      setEntry(prev => prev ? { ...prev, body_weight: val } : prev);
+    } catch (err) {
+      console.error('upsertBodyWeight error', err);
+      Alert.alert('Error', 'Failed to save weight.');
+    }
+  };
+
+  const handleAddExtraWorkout = async (name: string) => {
+    if (!name.trim() || !entry) return;
+    const newWorkout = { id: `ext-${Date.now()}`, name: name.trim(), completed: false };
+    const updated = [...(entry.additional_workouts || []), newWorkout];
+    
+    setEntry(prev => prev ? { ...prev, additional_workouts: updated } : prev);
+    setExtraModalVisible(false);
+    setCustomExtraName('');
+    
+    try {
+      await upsertAdditionalWorkouts(today, updated);
+    } catch (err) {
+      console.error('upsertAdditionalWorkouts error', err);
+      loadToday();
+    }
+  };
+
+  const handleToggleExtraWorkout = async (id: string) => {
+    if (!entry) return;
+    const updated = (entry.additional_workouts || []).map(w => 
+      w.id === id ? { ...w, completed: !w.completed } : w
+    );
+    
+    setEntry(prev => prev ? { ...prev, additional_workouts: updated } : prev);
+    
+    try {
+      await upsertAdditionalWorkouts(today, updated);
+    } catch (err) {
+      console.error('upsertAdditionalWorkouts error', err);
       loadToday();
     }
   };
@@ -378,8 +449,112 @@ export default function DashboardScreen() {
           />
         </View>
 
+        {/* ── Body Weight Logging ──────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <View style={styles.weightCard}>
+            <Text style={styles.taskIcon}>⚖️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.taskTitle}>BODY WEIGHT</Text>
+              <TextInput
+                style={styles.weightInput}
+                placeholder="0.0"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="numeric"
+                value={weightInput}
+                onChangeText={setWeightInput}
+                onBlur={handleSaveWeight}
+                returnKeyType="done"
+              />
+            </View>
+            <TouchableOpacity style={styles.weightSaveBtn} onPress={handleSaveWeight}>
+              <Text style={styles.weightSaveBtnText}>Log</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Extra Workouts ───────────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <View style={styles.extraWorkoutsHeader}>
+            <Text style={styles.extraWorkoutsTitle}>Bonuses / Ad-hoc</Text>
+          </View>
+          
+          {(entry.additional_workouts || []).map(aw => (
+            <Checkbox
+              key={aw.id}
+              checked={aw.completed}
+              label={aw.name}
+              onToggle={() => handleToggleExtraWorkout(aw.id)}
+            />
+          ))}
+
+          <TouchableOpacity 
+            style={styles.addExtraBtn} 
+            activeOpacity={0.7}
+            onPress={() => setExtraModalVisible(true)}
+          >
+            <Text style={styles.addExtraBtnIcon}>➕</Text>
+            <Text style={styles.addExtraBtnText}>Add Extra Workout</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={{ height: 24 }} />
       </ScrollView>
+
+      {/* ── Add Extra Workout Modal ──────────────────────────────────────── */}
+      <Modal
+        visible={isExtraModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setExtraModalVisible(false)}
+      >
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay} 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Extra Workout</Text>
+              <TouchableOpacity onPress={() => setExtraModalVisible(false)}>
+                <Text style={styles.modalCloseText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>Select a proposal:</Text>
+            <View style={styles.proposalsContainer}>
+              {BONUS_PROPOSALS.map(prop => (
+                <TouchableOpacity 
+                  key={prop} 
+                  style={styles.proposalChip}
+                  onPress={() => handleAddExtraWorkout(prop)}
+                >
+                  <Text style={styles.proposalChipText}>{prop}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.modalDivider} />
+
+            <Text style={styles.modalSubtitle}>Or add your own:</Text>
+            <View style={styles.customExtraContainer}>
+              <TextInput
+                style={styles.customExtraInput}
+                placeholder="e.g. 5k Run"
+                placeholderTextColor={Colors.textMuted}
+                value={customExtraName}
+                onChangeText={setCustomExtraName}
+                onSubmitEditing={() => handleAddExtraWorkout(customExtraName)}
+              />
+              <TouchableOpacity
+                style={[styles.customExtraBtn, !customExtraName.trim() && { opacity: 0.5 }]}
+                disabled={!customExtraName.trim()}
+                onPress={() => handleAddExtraWorkout(customExtraName)}
+              >
+                <Text style={styles.customExtraBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -675,5 +850,152 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     paddingVertical: Spacing.md,
+  },
+
+  // Weight Logging
+  weightCard: {
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.accent,
+  },
+  weightInput: {
+    color: Colors.textPrimary,
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+    marginTop: 4,
+    padding: 0,
+  },
+  weightSaveBtn: {
+    backgroundColor: Colors.accent + '25',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.accent + '60',
+  },
+  weightSaveBtnText: {
+    color: Colors.accent,
+    fontWeight: Typography.weights.bold,
+    fontSize: Typography.sizes.sm,
+  },
+
+  // Extra workouts
+  extraWorkoutsHeader: {
+    paddingHorizontal: 4,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  extraWorkoutsTitle: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    fontWeight: Typography.weights.bold,
+    textTransform: 'uppercase',
+  },
+  addExtraBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  addExtraBtnIcon: { fontSize: 16 },
+  addExtraBtnText: {
+    fontSize: Typography.sizes.md,
+    color: Colors.textSecondary,
+    fontWeight: Typography.weights.medium,
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  modalContent: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    padding: Spacing.xl,
+    paddingBottom: Spacing.xxl + 20,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  modalTitle: {
+    fontSize: Typography.sizes.xl,
+    color: Colors.textPrimary,
+    fontWeight: Typography.weights.bold,
+  },
+  modalCloseText: {
+    fontSize: Typography.sizes.md,
+    color: Colors.accent,
+    fontWeight: Typography.weights.semibold,
+  },
+  modalSubtitle: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+  },
+  proposalsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  proposalChip: {
+    backgroundColor: Colors.surfaceElevated,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  proposalChipText: {
+    color: Colors.textPrimary,
+    fontSize: Typography.sizes.sm,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: Spacing.lg,
+  },
+  customExtraContainer: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  customExtraInput: {
+    flex: 1,
+    backgroundColor: Colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    color: Colors.textPrimary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: Typography.sizes.md,
+  },
+  customExtraBtn: {
+    backgroundColor: Colors.accent,
+    paddingHorizontal: Spacing.lg,
+    justifyContent: 'center',
+    borderRadius: Radius.md,
+  },
+  customExtraBtnText: {
+    color: Colors.background,
+    fontWeight: Typography.weights.bold,
   },
 });

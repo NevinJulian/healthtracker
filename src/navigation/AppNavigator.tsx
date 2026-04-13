@@ -4,6 +4,7 @@ import { Text, View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DashboardScreen from '../screens/DashboardScreen';
 import OverviewScreen from '../screens/OverviewScreen';
+import AnalyticsDashboardScreen from '../screens/AnalyticsDashboardScreen';
 import MealPrepScreen from '../screens/MealPrepScreen';
 import TemplateEditorScreen from '../screens/TemplateEditorScreen';
 import { Colors, Typography } from '../theme/tokens';
@@ -13,6 +14,7 @@ const Tab = createBottomTabNavigator();
 const TAB_ICONS: Record<string, string> = {
   Today: '🏋️',
   Schedule: '📅',
+  Analytics: '📊',
   'Meal Prep': '🥗',
   Template: '✏️',
 };
@@ -46,6 +48,7 @@ export default function AppNavigator() {
     >
       <Tab.Screen name="Today" component={DashboardScreen} />
       <Tab.Screen name="Schedule" component={OverviewScreen} />
+      <Tab.Screen name="Analytics" component={AnalyticsDashboardScreen} />
       <Tab.Screen name="Meal Prep" component={MealPrepScreen} />
       <Tab.Screen name="Template" component={TemplateEditorScreen} />
     </Tab.Navigator>
