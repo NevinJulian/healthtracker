@@ -47,6 +47,33 @@ export const CREATE_BIO_FORCE_LIBRARY_TABLE = `
   );
 `;
 
+export const CREATE_RECIPE_LIBRARY_TABLE = `
+  CREATE TABLE IF NOT EXISTS recipe_library (
+    id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    calories INTEGER NOT NULL,
+    protein INTEGER NOT NULL,
+    carbs INTEGER NOT NULL,
+    fat INTEGER NOT NULL,
+    prepTimeMinutes INTEGER NOT NULL,
+    defaultServings INTEGER NOT NULL,
+    ingredients TEXT NOT NULL,
+    instructions TEXT NOT NULL,
+    freezerTips TEXT
+  );
+`;
+
+export const CREATE_SHOPPING_LIST_TABLE = `
+  CREATE TABLE IF NOT EXISTS shopping_list (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingredient_name TEXT NOT NULL,
+    total_quantity REAL NOT NULL,
+    unit TEXT NOT NULL,
+    is_checked INTEGER NOT NULL DEFAULT 0
+  );
+`;
+
 // ─── Table DDL ────────────────────────────────────────────────────────────────
 
 export const CREATE_APP_STATE_TABLE = `
@@ -372,4 +399,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 21, sql: ADD_ADDITIONAL_WORKOUTS_TO_DAILY_LOG },
   // v22: Bio Force library initialization
   { version: 22, sql: CREATE_BIO_FORCE_LIBRARY_TABLE },
+  // v23-v24: Recipe Library & Shopping List initialization
+  { version: 23, sql: CREATE_RECIPE_LIBRARY_TABLE },
+  { version: 24, sql: CREATE_SHOPPING_LIST_TABLE },
 ];
