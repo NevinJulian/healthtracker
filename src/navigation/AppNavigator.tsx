@@ -7,9 +7,24 @@ import OverviewScreen from '../screens/OverviewScreen';
 import AnalyticsDashboardScreen from '../screens/AnalyticsDashboardScreen';
 import MealPrepScreen from '../screens/MealPrepScreen';
 import TemplateEditorScreen from '../screens/TemplateEditorScreen';
+import RecipesScreen from '../screens/RecipesScreen';
+import RecipeDetailScreen from '../screens/RecipeDetailScreen';
+import ShoppingListScreen from '../screens/ShoppingListScreen';
 import { Colors, Typography } from '../theme/tokens';
+import { createStackNavigator } from '@react-navigation/stack';
 
 const Tab = createBottomTabNavigator();
+const RecipeStack = createStackNavigator();
+
+function RecipesStackScreen() {
+  return (
+    <RecipeStack.Navigator screenOptions={{ headerShown: false }}>
+      <RecipeStack.Screen name="RecipesMain" component={RecipesScreen} />
+      <RecipeStack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
+    </RecipeStack.Navigator>
+  );
+}
+
 
 const TAB_ICONS: Record<string, string> = {
   Today: '🏋️',
@@ -17,6 +32,8 @@ const TAB_ICONS: Record<string, string> = {
   Analytics: '📊',
   'Meal Prep': '🥗',
   Template: '✏️',
+  Recipes: '🍽️',
+  Shopping: '🛒',
 };
 
 function TabIcon({ label }: { label: string }) {
@@ -50,6 +67,8 @@ export default function AppNavigator() {
       <Tab.Screen name="Schedule" component={OverviewScreen} />
       <Tab.Screen name="Analytics" component={AnalyticsDashboardScreen} />
       <Tab.Screen name="Meal Prep" component={MealPrepScreen} />
+      <Tab.Screen name="Recipes" component={RecipesStackScreen} />
+      <Tab.Screen name="Shopping" component={ShoppingListScreen} />
       <Tab.Screen name="Template" component={TemplateEditorScreen} />
     </Tab.Navigator>
   );

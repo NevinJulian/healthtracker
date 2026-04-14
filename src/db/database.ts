@@ -20,6 +20,36 @@
 import * as SQLite from 'expo-sqlite';
 import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
+import { recipes } from '../data/recipes';
+
+export interface RecipeIngredient {
+  name: string;
+  baseQuantity: number;
+  unit: string;
+}
+
+export interface Recipe {
+  id: string;
+  title: string;
+  category: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  prepTimeMinutes: number;
+  defaultServings: number;
+  ingredients: RecipeIngredient[];
+  instructions: string;
+  freezerTips: string;
+}
+
+export interface ShoppingListItem {
+  id: number;
+  ingredient_name: string;
+  total_quantity: number;
+  unit: string;
+  is_checked: boolean;
+}
 
 export interface BioForceExercise {
   id: number;
@@ -193,6 +223,42 @@ async function seedBioForceLibrary(db: SQLite.SQLiteDatabase): Promise<void> {
   console.log('[DB] Bio Force Library seeded ✓');
 }
 
+async function seedRecipeLibrary(db: SQLite.SQLiteDatabase): Promise<void> {
+  const countRow = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM recipe_library'
+  );
+  if (countRow && countRow.count > 0) return;
+
+  console.log('[DB] Seeding Recipe Library...');
+  const insertStmt = await db.prepareAsync(
+    `INSERT OR IGNORE INTO recipe_library 
+      (id, title, category, calories, protein, carbs, fat, prepTimeMinutes, defaultServings, ingredients, instructions, freezerTips)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  
+  await db.withTransactionAsync(async () => {
+    for (const r of recipes) {
+      await insertStmt.executeAsync([
+        r.id,
+        r.title,
+        r.category,
+        r.calories,
+        r.protein,
+        r.carbs,
+        r.fat,
+        r.prepTimeMinutes,
+        r.defaultServings,
+        JSON.stringify(r.ingredients),
+        r.instructions,
+        r.freezerTips || '',
+      ]);
+    }
+  });
+  
+  await insertStmt.finalizeAsync();
+  console.log('[DB] Recipe Library seeded ✓');
+}
+
 // ─────────────────────────────────────────────
 // Old-schema reset helper
 // ─────────────────────────────────────────────
@@ -348,6 +414,7 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
 
     await runMigrations(db);
     await seedBioForceLibrary(db);
+    await seedRecipeLibrary(db);
 
     const existing = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_state WHERE key = ?',
@@ -602,4 +669,64 @@ function mapLogRow(row: {
     body_weight: row.body_weight ?? null,
     additional_workouts: parseAdditionalWorkouts(row.additional_workouts),
   };
+}
+
+// ─────────────────────────────────────────────
+// Recipes CRUD
+// ─────────────────────────────────────────────
+
+export async function getRecipes(category?: string): Promise<Recipe[]> {
+  const db = getDatabase();
+  let rows: any[];
+  if (category && category !== 'All') {
+    rows = await db.getAllAsync('SELECT * FROM recipe_library WHERE category = ?', [category]);
+  } else {
+    rows = await db.getAllAsync('SELECT * FROM recipe_library');
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    ingredients: JSON.parse(r.ingredients),
+  }));
+}
+
+export async function getRecipeById(id: string): Promise<Recipe | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<any>('SELECT * FROM recipe_library WHERE id = ?', [id]);
+  if (!row) return null;
+  return {
+    ...row,
+    ingredients: JSON.parse(row.ingredients),
+  };
+}
+
+// ─────────────────────────────────────────────
+// Shopping List CRUD
+// ─────────────────────────────────────────────
+
+export async function getShoppingListItems(): Promise<ShoppingListItem[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<any>('SELECT * FROM shopping_list ORDER BY is_checked ASC, id DESC');
+  return rows.map((r) => ({
+    ...r,
+    is_checked: r.is_checked === 1,
+  }));
+}
+
+export async function addShoppingListItem(name: string, total_quantity: number, unit: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    'INSERT INTO shopping_list (ingredient_name, total_quantity, unit, is_checked) VALUES (?, ?, ?, 0)',
+    [name, total_quantity, unit]
+  );
+}
+
+export async function toggleShoppingListItem(id: number, is_checked: boolean): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('UPDATE shopping_list SET is_checked = ? WHERE id = ?', [is_checked ? 1 : 0, id]);
+}
+
+export async function clearCompletedShoppingList(): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('DELETE FROM shopping_list WHERE is_checked = 1');
 }
