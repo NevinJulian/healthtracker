@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Ale
 import { Colors, Typography } from '../theme/tokens';
 import { getRecipeById, Recipe, addShoppingListItem } from '../db/database';
 import { useRoute, useNavigation } from '@react-navigation/native';
-
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function RecipeDetailScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { recipeId } = route.params || {};
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
@@ -44,10 +45,10 @@ export default function RecipeDetailScreen() {
     }
   };
 
-  if (!recipe) return <SafeAreaView style={styles.container}><Text>Loading...</Text></SafeAreaView>;
+  if (!recipe) return <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}><Text>Loading...</Text></SafeAreaView>;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>← Back</Text>
