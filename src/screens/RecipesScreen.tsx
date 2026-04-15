@@ -3,10 +3,12 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Scrol
 import { Colors, Typography } from '../theme/tokens';
 import { getRecipes, Recipe } from '../db/database';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const CATEGORIES = ["All", "Fresh & Fridge", "Quick Cook", "Freezer Batch", "Freezer Sauce"];
 
 export default function RecipesScreen() {
+  const insets = useSafeAreaInsets();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [activeCategory, setActiveCategory] = useState("All");
   const navigation = useNavigation<any>();
@@ -37,7 +39,7 @@ export default function RecipesScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
       <Text style={styles.headerTitle}>Recipe Library</Text>
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
