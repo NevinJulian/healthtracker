@@ -74,6 +74,27 @@ export const CREATE_SHOPPING_LIST_TABLE = `
   );
 `;
 
+export const CREATE_MEAL_INVENTORY_TABLE = `
+  CREATE TABLE IF NOT EXISTS meal_inventory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id TEXT NOT NULL,
+    portions_available INTEGER NOT NULL CHECK(portions_available >= 0),
+    date_cooked TEXT NOT NULL,
+    FOREIGN KEY(recipe_id) REFERENCES recipe_library(id)
+  );
+`;
+
+export const CREATE_WEEKLY_MEAL_PLAN_TABLE = `
+  CREATE TABLE IF NOT EXISTS weekly_meal_plan (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    meal_type TEXT NOT NULL,
+    recipe_id TEXT NOT NULL,
+    is_consumed INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY(recipe_id) REFERENCES recipe_library(id)
+  );
+`;
+
 // ─── Table DDL ────────────────────────────────────────────────────────────────
 
 export const CREATE_APP_STATE_TABLE = `
@@ -402,4 +423,7 @@ export const MIGRATIONS: Migration[] = [
   // v23-v24: Recipe Library & Shopping List initialization
   { version: 23, sql: CREATE_RECIPE_LIBRARY_TABLE },
   { version: 24, sql: CREATE_SHOPPING_LIST_TABLE },
+  // v25-v26: Meal Inventory and Weekly Meal Plan
+  { version: 25, sql: CREATE_MEAL_INVENTORY_TABLE },
+  { version: 26, sql: CREATE_WEEKLY_MEAL_PLAN_TABLE },
 ];

@@ -24,6 +24,9 @@ import {
   upsertAdditionalWorkouts,
   syncRollingSchedule,
   toISODate,
+  getTodaysMealsWithRecipe,
+  MealPlanWithRecipe,
+  toggleMealConsumed,
 } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import BioForceModal from '../components/BioForceModal';
@@ -205,6 +208,7 @@ function HammerSection({
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const [entry, setEntry] = useState<DailyLogEntry | null>(null);
+  const [todaysMeals, setTodaysMeals] = useState<MealPlanWithRecipe[]>([]);
   const [loading, setLoading] = useState(true);
 
   // New features state
@@ -218,7 +222,10 @@ export default function DashboardScreen() {
     try {
       await syncRollingSchedule();
       const data = await getLogByDate(today);
+      const meals = await getTodaysMealsWithRecipe(today);
+      
       setEntry(data);
+      setTodaysMeals(meals);
       if (data?.body_weight) {
         setWeightInput(data.body_weight.toString());
       }
@@ -316,6 +323,15 @@ export default function DashboardScreen() {
     } catch (err) {
       console.error('upsertAdditionalWorkouts error', err);
       loadToday();
+    }
+  };
+
+  const handleToggleMeal = async (planId: number, currentVal: boolean) => {
+    try {
+      await toggleMealConsumed(planId, !currentVal);
+      loadToday();
+    } catch (err) {
+      console.error('toggleMeal error', err);
     }
   };
 
@@ -445,6 +461,36 @@ export default function DashboardScreen() {
             label="Fasting window completed"
             onToggle={() => handleToggle('fasting_completed')}
           />
+        </View>
+
+        {/* ── Today's Meals ───────────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <TaskCard
+            icon="🍽️"
+            title="Today's Meal Plan"
+            description="Your configured meals for today"
+            accentColor={Colors.accent}
+          />
+          {todaysMeals.length > 0 ? (
+            todaysMeals.map(meal => (
+              <View key={meal.id} style={{ marginBottom: 4 }}>
+                <Checkbox
+                  checked={meal.is_consumed}
+                  label={meal.recipe?.title ? `${meal.meal_type}: ${meal.recipe.title}` : `${meal.meal_type}: Unknown`}
+                  onToggle={() => handleToggleMeal(meal.id, meal.is_consumed)}
+                />
+                {meal.recipe ? (
+                  <Text style={{ marginLeft: 44, marginTop: -4, color: Colors.textMuted, fontSize: Typography.sizes.xs }}>
+                    {meal.recipe.calories} kcal • {meal.recipe.protein}g protein
+                  </Text>
+                ) : null}
+              </View>
+            ))
+          ) : (
+            <Text style={{ marginLeft: 44, color: Colors.textMuted, fontSize: Typography.sizes.sm }}>
+              No meals planned for today.
+            </Text>
+          )}
         </View>
 
         {/* ── Body Weight Logging ──────────────────────────────────────────── */}
