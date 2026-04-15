@@ -69,6 +69,21 @@ export interface BioForceExercise {
   videoTitle: string;
 }
 
+export interface MealInventoryItem {
+  id: number;
+  recipe_id: string;
+  portions_available: number;
+  date_cooked: string;
+}
+
+export interface WeeklyMealPlanItem {
+  id: number;
+  date: string;
+  meal_type: string;
+  recipe_id: string;
+  is_consumed: boolean;
+}
+
 // Re-export Exercise so screens only import from database.ts
 export type { Exercise };
 
