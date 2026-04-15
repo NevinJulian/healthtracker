@@ -78,7 +78,7 @@ export const CREATE_MEAL_INVENTORY_TABLE = `
   CREATE TABLE IF NOT EXISTS meal_inventory (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     recipe_id TEXT NOT NULL,
-    portions_available INTEGER NOT NULL,
+    portions_available INTEGER NOT NULL CHECK(portions_available >= 0),
     date_cooked TEXT NOT NULL,
     FOREIGN KEY(recipe_id) REFERENCES recipe_library(id)
   );

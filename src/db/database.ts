@@ -745,3 +745,157 @@ export async function clearCompletedShoppingList(): Promise<void> {
   const db = getDatabase();
   await db.runAsync('DELETE FROM shopping_list WHERE is_checked = 1');
 }
+
+// ─────────────────────────────────────────────
+// Meal Inventory & Planner CRUD
+// ─────────────────────────────────────────────
+
+export interface MealInventoryWithRecipe extends MealInventoryItem {
+  recipe: Recipe;
+}
+
+export async function getMealInventory(): Promise<MealInventoryWithRecipe[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<any>(`
+    SELECT m.*, r.title, r.calories, r.protein, r.carbs, r.fat 
+    FROM meal_inventory m
+    JOIN recipe_library r ON m.recipe_id = r.id
+    WHERE m.portions_available > 0
+    ORDER BY m.date_cooked DESC
+  `);
+  
+  return rows.map((r) => ({
+    id: r.id,
+    recipe_id: r.recipe_id,
+    portions_available: r.portions_available,
+    date_cooked: r.date_cooked,
+    recipe: {
+      id: r.recipe_id,
+      title: r.title,
+      calories: r.calories,
+      protein: r.protein,
+      carbs: r.carbs,
+      fat: r.fat,
+    } as Recipe
+  }));
+}
+
+export async function logCookedMeal(recipe_id: string, portions: number): Promise<void> {
+  const db = getDatabase();
+  const date_cooked = toISODate();
+  // Check if active stock exists
+  const existing = await db.getFirstAsync<any>(
+    'SELECT * FROM meal_inventory WHERE recipe_id = ? AND portions_available > 0', 
+    [recipe_id]
+  );
+  if (existing) {
+    await db.runAsync(
+      'UPDATE meal_inventory SET portions_available = portions_available + ?, date_cooked = ? WHERE id = ?',
+      [portions, date_cooked, existing.id]
+    );
+  } else {
+    await db.runAsync(
+      'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, ?, ?)',
+      [recipe_id, portions, date_cooked]
+    );
+  }
+}
+
+export async function getWeeklyMealPlan(): Promise<WeeklyMealPlanItem[]> {
+  const db = getDatabase();
+  return await db.getAllAsync<WeeklyMealPlanItem>('SELECT * FROM weekly_meal_plan');
+}
+
+export interface MealPlanWithRecipe extends WeeklyMealPlanItem {
+  recipe?: Recipe;
+}
+
+export async function getTodaysMealsWithRecipe(date: string): Promise<MealPlanWithRecipe[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<any>(`
+    SELECT p.*, r.title, r.calories, r.protein, r.carbs, r.fat 
+    FROM weekly_meal_plan p
+    LEFT JOIN recipe_library r ON p.recipe_id = r.id
+    WHERE p.date = ?
+    ORDER BY p.meal_type DESC
+  `, [date]);
+  
+  return rows.map(r => ({
+    ...r,
+    is_consumed: Boolean(r.is_consumed),
+    recipe: r.recipe_id ? {
+      id: r.recipe_id,
+      title: r.title,
+      calories: r.calories,
+      protein: r.protein,
+      carbs: r.carbs,
+      fat: r.fat,
+    } : undefined
+  }));
+}
+
+export async function assignMealToPlan(date: string, meal_type: string, recipe_id: string): Promise<void> {
+  const db = getDatabase();
+  const existing = await db.getFirstAsync<any>(
+    'SELECT * FROM weekly_meal_plan WHERE date = ? AND meal_type = ?', 
+    [date, meal_type]
+  );
+  if (existing) {
+    await db.runAsync(
+      'UPDATE weekly_meal_plan SET recipe_id = ?, is_consumed = 0 WHERE id = ?',
+      [recipe_id, existing.id]
+    );
+  } else {
+    await db.runAsync(
+      'INSERT INTO weekly_meal_plan (date, meal_type, recipe_id, is_consumed) VALUES (?, ?, ?, 0)',
+      [date, meal_type, recipe_id]
+    );
+  }
+}
+
+export async function removeMealFromPlan(id: number): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('DELETE FROM weekly_meal_plan WHERE id = ?', [id]);
+}
+
+export async function toggleMealConsumed(id: number, is_consumed: boolean): Promise<void> {
+  const db = getDatabase();
+  await db.withTransactionAsync(async () => {
+    const meal = await db.getFirstAsync<any>('SELECT * FROM weekly_meal_plan WHERE id = ?', [id]);
+    if (!meal) return;
+    
+    // Changing to consumed
+    if (is_consumed && meal.is_consumed === 0) {
+      const inv = await db.getFirstAsync<any>(
+        'SELECT * FROM meal_inventory WHERE recipe_id = ? AND portions_available > 0 ORDER BY date_cooked ASC LIMIT 1', 
+        [meal.recipe_id]
+      );
+      if (inv) {
+        await db.runAsync(
+          'UPDATE meal_inventory SET portions_available = portions_available - 1 WHERE id = ?',
+          [inv.id]
+        );
+      }
+    } 
+    // Reverting from consumed back to planned
+    else if (!is_consumed && meal.is_consumed === 1) {
+       const inv = await db.getFirstAsync<any>(
+        'SELECT * FROM meal_inventory WHERE recipe_id = ? ORDER BY date_cooked DESC LIMIT 1', 
+        [meal.recipe_id]
+      );
+      if (inv) {
+         await db.runAsync(
+          'UPDATE meal_inventory SET portions_available = portions_available + 1 WHERE id = ?',
+          [inv.id]
+        );
+      } else {
+         await db.runAsync(
+          'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, 1, ?)',
+          [meal.recipe_id, toISODate()]
+        );
+      }
+    }
+    
+    await db.runAsync('UPDATE weekly_meal_plan SET is_consumed = ? WHERE id = ?', [is_consumed ? 1 : 0, id]);
+  });
+} 
