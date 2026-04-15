@@ -1,5 +1,5 @@
 import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createDrawerNavigator } from '@react-navigation/drawer';
 import { Text, View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -13,7 +13,7 @@ import ShoppingListScreen from '../screens/ShoppingListScreen';
 import { Colors, Typography } from '../theme/tokens';
 import { createStackNavigator } from '@react-navigation/stack';
 
-const Tab = createBottomTabNavigator();
+const Drawer = createDrawerNavigator();
 const RecipeStack = createStackNavigator();
 
 function RecipesStackScreen() {
@@ -25,8 +25,7 @@ function RecipesStackScreen() {
   );
 }
 
-
-const TAB_ICONS: Record<string, string> = {
+const DRAWER_ICONS: Record<string, string> = {
   Today: '🏋️',
   Schedule: '📅',
   Analytics: '📊',
@@ -36,56 +35,62 @@ const TAB_ICONS: Record<string, string> = {
   Shopping: '🛒',
 };
 
-function TabIcon({ label }: { label: string }) {
+function DrawerIcon({ label }: { label: string }) {
   return (
     <View style={styles.iconContainer}>
-      <Text style={styles.iconEmoji}>{TAB_ICONS[label]}</Text>
+      <Text style={styles.iconEmoji}>{DRAWER_ICONS[label]}</Text>
     </View>
   );
 }
 
 export default function AppNavigator() {
   const insets = useSafeAreaInsets();
-  const tabBarHeight = 62 + insets.bottom;
 
   return (
-    <Tab.Navigator
+    <Drawer.Navigator
       screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: {
-          ...styles.tabBarBase,
-          height: tabBarHeight,
-          paddingBottom: 8 + insets.bottom,
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: Colors.surface,
+          borderBottomWidth: 1,
+          borderBottomColor: Colors.border,
         },
-        tabBarActiveTintColor: Colors.accent,
-        tabBarInactiveTintColor: Colors.textMuted,
-        tabBarLabelStyle: styles.tabLabel,
-        tabBarIcon: () => <TabIcon label={route.name} />,
+        headerTintColor: Colors.textPrimary,
+        headerTitleStyle: {
+          fontWeight: Typography.weights.bold,
+          fontSize: Typography.sizes.lg,
+        },
+        drawerStyle: {
+          backgroundColor: Colors.background,
+          width: 280,
+        },
+        drawerActiveTintColor: Colors.accent,
+        drawerInactiveTintColor: Colors.textSecondary,
+        drawerActiveBackgroundColor: Colors.surface,
+        drawerLabelStyle: styles.drawerLabel,
+        drawerIcon: () => <DrawerIcon label={route.name} />,
       })}
     >
-      <Tab.Screen name="Today" component={DashboardScreen} />
-      <Tab.Screen name="Schedule" component={OverviewScreen} />
-      <Tab.Screen name="Analytics" component={AnalyticsDashboardScreen} />
-      <Tab.Screen name="Meal Prep" component={MealPrepScreen} />
-      <Tab.Screen name="Recipes" component={RecipesStackScreen} />
-      <Tab.Screen name="Shopping" component={ShoppingListScreen} />
-      <Tab.Screen name="Template" component={TemplateEditorScreen} />
-    </Tab.Navigator>
+      <Drawer.Screen name="Today" component={DashboardScreen} />
+      <Drawer.Screen name="Schedule" component={OverviewScreen} />
+      <Drawer.Screen name="Analytics" component={AnalyticsDashboardScreen} />
+      <Drawer.Screen name="Meal Prep" component={MealPrepScreen} />
+      <Drawer.Screen name="Recipes" component={RecipesStackScreen} />
+      <Drawer.Screen name="Shopping" component={ShoppingListScreen} />
+      <Drawer.Screen name="Template" component={TemplateEditorScreen} />
+    </Drawer.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
-  tabBarBase: {
-    backgroundColor: Colors.surface,
-    borderTopColor: Colors.border,
-    borderTopWidth: 1,
-    paddingTop: 6,
+  drawerLabel: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.medium,
+    marginLeft: -16,
   },
-  tabLabel: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
-    marginTop: 2,
+  iconContainer: { 
+    alignItems: 'center',
+    width: 24,
   },
-  iconContainer: { alignItems: 'center' },
   iconEmoji: { fontSize: 20 },
 });
