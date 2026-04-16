@@ -899,3 +899,118 @@ export async function toggleMealConsumed(id: number, is_consumed: boolean): Prom
     await db.runAsync('UPDATE weekly_meal_plan SET is_consumed = ? WHERE id = ?', [is_consumed ? 1 : 0, id]);
   });
 } 
+
+// ─────────────────────────────────────────────
+// Cooking Tasks CRUD
+// ─────────────────────────────────────────────
+
+export interface CookingTask {
+  id: number;
+  recipe_id: string;
+  servings_to_cook: number;
+}
+
+export interface CookingTaskWithRecipe extends CookingTask {
+  recipe: Recipe;
+}
+
+/**
+ * Inserts a new cooking task linked to the given recipe and serving count.
+ * Called alongside Shopping List population from RecipeDetailScreen.
+ */
+export async function insertCookingTask(
+  recipe_id: string,
+  servings_to_cook: number
+): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    'INSERT INTO cooking_tasks (recipe_id, servings_to_cook) VALUES (?, ?)',
+    [recipe_id, servings_to_cook]
+  );
+}
+
+/**
+ * Returns all cooking tasks joined with their corresponding recipe metadata.
+ */
+export async function getCookingTasks(): Promise<CookingTaskWithRecipe[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<any>(`
+    SELECT
+      ct.id,
+      ct.recipe_id,
+      ct.servings_to_cook,
+      r.title,
+      r.calories,
+      r.protein,
+      r.carbs,
+      r.fat,
+      r.instructions,
+      r.ingredients,
+      r.prepTimeMinutes,
+      r.defaultServings,
+      r.category,
+      r.freezerTips
+    FROM cooking_tasks ct
+    JOIN recipe_library r ON ct.recipe_id = r.id
+    ORDER BY ct.id ASC
+  `);
+
+  return rows.map((r) => ({
+    id: r.id,
+    recipe_id: r.recipe_id,
+    servings_to_cook: r.servings_to_cook,
+    recipe: {
+      id: r.recipe_id,
+      title: r.title,
+      category: r.category,
+      calories: r.calories,
+      protein: r.protein,
+      carbs: r.carbs,
+      fat: r.fat,
+      prepTimeMinutes: r.prepTimeMinutes,
+      defaultServings: r.defaultServings,
+      ingredients: JSON.parse(r.ingredients ?? '[]'),
+      instructions: r.instructions,
+      freezerTips: r.freezerTips ?? '',
+    } as Recipe,
+  }));
+}
+
+/**
+ * Atomic transaction that:
+ *   1. Upserts meal_inventory (adds servings_to_cook to portions_available)
+ *   2. Deletes the cooking task row
+ *
+ * Called when the user presses "Finished Cooking" on the CookingTasksScreen.
+ */
+export async function finishCooking(
+  taskId: number,
+  recipe_id: string,
+  servings_to_cook: number
+): Promise<void> {
+  const db = getDatabase();
+  const date_cooked = toISODate();
+
+  await db.withTransactionAsync(async () => {
+    // Upsert meal_inventory: increment if an active record exists, else insert
+    const existing = await db.getFirstAsync<{ id: number }>(
+      'SELECT id FROM meal_inventory WHERE recipe_id = ? AND portions_available > 0',
+      [recipe_id]
+    );
+
+    if (existing) {
+      await db.runAsync(
+        'UPDATE meal_inventory SET portions_available = portions_available + ?, date_cooked = ? WHERE id = ?',
+        [servings_to_cook, date_cooked, existing.id]
+      );
+    } else {
+      await db.runAsync(
+        'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, ?, ?)',
+        [recipe_id, servings_to_cook, date_cooked]
+      );
+    }
+
+    // Remove the completed cooking task
+    await db.runAsync('DELETE FROM cooking_tasks WHERE id = ?', [taskId]);
+  });
+}
