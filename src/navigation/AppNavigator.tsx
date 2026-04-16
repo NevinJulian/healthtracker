@@ -1,7 +1,8 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
 import DashboardScreen from '../screens/DashboardScreen';
 import OverviewScreen from '../screens/OverviewScreen';
 import AnalyticsDashboardScreen from '../screens/AnalyticsDashboardScreen';
@@ -10,7 +11,8 @@ import TemplateEditorScreen from '../screens/TemplateEditorScreen';
 import RecipesScreen from '../screens/RecipesScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 import ShoppingListScreen from '../screens/ShoppingListScreen';
-import { Colors, Typography } from '../theme/tokens';
+import CookingTasksScreen from '../screens/CookingTasksScreen';
+import { Colors, Typography, Spacing } from '../theme/tokens';
 import { createStackNavigator } from '@react-navigation/stack';
 
 const Drawer = createDrawerNavigator();
@@ -33,33 +35,56 @@ const DRAWER_ICONS: Record<string, string> = {
   Template: '✏️',
   Recipes: '🍽️',
   Shopping: '🛒',
+  'Cooking Tasks': '👨‍🍳',
 };
 
 function DrawerIcon({ label }: { label: string }) {
   return (
     <View style={styles.iconContainer}>
-      <Text style={styles.iconEmoji}>{DRAWER_ICONS[label]}</Text>
+      <Text style={styles.iconEmoji}>{DRAWER_ICONS[label] ?? '•'}</Text>
     </View>
   );
 }
 
-export default function AppNavigator() {
-  const insets = useSafeAreaInsets();
+/** Hamburger button rendered on the RIGHT side of every header. */
+function HeaderRightMenu() {
+  const navigation = useNavigation();
+  return (
+    <TouchableOpacity
+      style={styles.burgerBtn}
+      onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
+      activeOpacity={0.7}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityLabel="Open navigation menu"
+      accessibilityRole="button"
+    >
+      <View style={styles.burgerLine} />
+      <View style={styles.burgerLine} />
+      <View style={styles.burgerLine} />
+    </TouchableOpacity>
+  );
+}
 
+export default function AppNavigator() {
   return (
     <Drawer.Navigator
       screenOptions={({ route }) => ({
+        // ── Header ──────────────────────────────────────────────
         headerShown: true,
         headerStyle: {
           backgroundColor: Colors.surface,
           borderBottomWidth: 1,
           borderBottomColor: Colors.border,
-        },
+        } as any,
         headerTintColor: Colors.textPrimary,
         headerTitleStyle: {
           fontWeight: Typography.weights.bold,
           fontSize: Typography.sizes.lg,
         },
+        // Move burger to the RIGHT, suppress default left icon
+        headerLeft: () => null,
+        headerRight: () => <HeaderRightMenu />,
+        // ── Drawer ──────────────────────────────────────────────
         drawerStyle: {
           backgroundColor: Colors.background,
           width: 280,
@@ -67,6 +92,7 @@ export default function AppNavigator() {
         drawerActiveTintColor: Colors.accent,
         drawerInactiveTintColor: Colors.textSecondary,
         drawerActiveBackgroundColor: Colors.surface,
+        // Give the label a proper left gap so it doesn't touch the emoji
         drawerLabelStyle: styles.drawerLabel,
         drawerIcon: () => <DrawerIcon label={route.name} />,
       })}
@@ -77,20 +103,38 @@ export default function AppNavigator() {
       <Drawer.Screen name="Meal Prep" component={MealPrepScreen} />
       <Drawer.Screen name="Recipes" component={RecipesStackScreen} />
       <Drawer.Screen name="Shopping" component={ShoppingListScreen} />
+      <Drawer.Screen name="Cooking Tasks" component={CookingTasksScreen} />
       <Drawer.Screen name="Template" component={TemplateEditorScreen} />
     </Drawer.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
+  // Drawer label — positive marginLeft gives breathing room after the icon
   drawerLabel: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.medium,
-    marginLeft: -16,
+    marginLeft: 4,
   },
-  iconContainer: { 
+  iconContainer: {
     alignItems: 'center',
-    width: 24,
+    justifyContent: 'center',
+    width: 28,
   },
   iconEmoji: { fontSize: 20 },
+
+  // Right-side hamburger
+  burgerBtn: {
+    marginRight: Spacing.lg,
+    gap: 5,
+    paddingVertical: 4,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  burgerLine: {
+    height: 2,
+    width: 22,
+    borderRadius: 2,
+    backgroundColor: Colors.textPrimary,
+  },
 });
