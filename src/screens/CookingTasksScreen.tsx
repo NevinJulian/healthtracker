@@ -59,6 +59,11 @@ function TaskCard({
           </View>
         </View>
 
+        {/* Category chip */}
+        <View style={styles.categoryChip}>
+          <Text style={styles.categoryChipText}>{task.recipe.category}</Text>
+        </View>
+
         {/* Macros row */}
         <View style={styles.macroRow}>
           <MacroPill label="kcal" value={task.recipe.calories} color={Colors.warning} />
@@ -422,6 +427,21 @@ const styles = StyleSheet.create({
   },
 
   // ── Macros ────────────────────────────────────────────────────────────────
+  categoryChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  categoryChipText: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+    fontWeight: Typography.weights.medium,
+    textTransform: 'capitalize',
+  },
   macroRow: {
     flexDirection: 'row',
     gap: Spacing.xs,
