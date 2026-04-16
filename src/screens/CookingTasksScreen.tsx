@@ -72,10 +72,13 @@ function TaskCard({
           <MacroPill label="fat" value={`${task.recipe.fat}g`} color="#FF8A65" />
         </View>
 
-        {/* Prep time + CTA hint */}
+        {/* Prep time + ingredient count + CTA hint */}
         <View style={styles.cardFooter}>
           <Text style={styles.prepTime}>
-            ⏱ {task.recipe.prepTimeMinutes} min prep
+            ⏱ {task.recipe.prepTimeMinutes} min
+          </Text>
+          <Text style={styles.ingredientCount}>
+            🥬 {task.recipe.ingredients.length} ingredients
           </Text>
           <Text style={styles.tapHint}>Tap to cook →</Text>
         </View>
@@ -473,6 +476,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   prepTime: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+  },
+  ingredientCount: {
     fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
   },
