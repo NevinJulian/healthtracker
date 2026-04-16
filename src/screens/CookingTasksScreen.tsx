@@ -20,6 +20,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
   getCookingTasks,
@@ -254,6 +255,7 @@ function InstructionsModal({
 
 export default function CookingTasksScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [tasks, setTasks] = useState<CookingTaskWithRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -412,7 +414,10 @@ export default function CookingTasksScreen() {
         <FlatList
           data={tasks}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: Math.max(insets.bottom, Spacing.xxl) }
+          ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
