@@ -140,6 +140,8 @@ function InstructionsModal({
   onFinished: () => void;
   finishing: boolean;
 }) {
+  const insets = useSafeAreaInsets();
+  
   if (!task || !visible) return null;
 
   // Split instructions by newline so each line becomes a numbered step
@@ -231,7 +233,7 @@ function InstructionsModal({
         </ScrollView>
 
         {/* Finished Cooking button — fixed at bottom */}
-        <View style={styles.finishedContainer}>
+        <View style={[styles.finishedContainer, { paddingBottom: Math.max(insets.bottom, Spacing.xl) }]}>
           <TouchableOpacity
             style={[styles.finishedBtn, finishing && styles.finishedBtnDisabled]}
             onPress={onFinished}
