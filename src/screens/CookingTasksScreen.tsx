@@ -404,6 +404,9 @@ export default function CookingTasksScreen() {
               <Text style={styles.listHeaderSub}>
                 Tap a card to see step-by-step instructions
               </Text>
+              <Text style={styles.listHeaderServings}>
+                Total: {tasks.reduce((sum, t) => sum + t.servings_to_cook, 0)} servings queued
+              </Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -456,6 +459,12 @@ const styles = StyleSheet.create({
   listHeaderSub: {
     fontSize: Typography.sizes.sm,
     color: Colors.textSecondary,
+  },
+  listHeaderServings: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.accent,
+    fontWeight: Typography.weights.semibold,
+    marginTop: 2,
   },
 
   // ── Card ─────────────────────────────────────────────────────────────────
