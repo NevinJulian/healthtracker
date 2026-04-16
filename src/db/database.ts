@@ -1018,3 +1018,14 @@ export async function finishCooking(
     await db.runAsync('DELETE FROM cooking_tasks WHERE id = ?', [taskId]);
   });
 }
+
+/**
+ * Removes a cooking task from the queue without logging it to inventory.
+ * Used when the user cancels/dismisses a task from CookingTasksScreen.
+ *
+ * @param taskId - The primary key of the cooking_tasks row to remove.
+ */
+export async function deleteCookingTask(taskId: number): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('DELETE FROM cooking_tasks WHERE id = ?', [taskId]);
+}
