@@ -23,6 +23,7 @@ import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
   getCookingTasks,
   finishCooking,
+  deleteCookingTask,
   CookingTaskWithRecipe,
 } from '../db/database';
 
@@ -31,9 +32,11 @@ import {
 function TaskCard({
   task,
   onPress,
+  onRemove,
 }: {
   task: CookingTaskWithRecipe;
   onPress: () => void;
+  onRemove: () => void;
 }) {
   return (
     <TouchableOpacity
@@ -83,6 +86,18 @@ function TaskCard({
           <Text style={styles.tapHint}>Tap to cook →</Text>
         </View>
       </View>
+
+      {/* Remove button */}
+      <TouchableOpacity
+        style={styles.removeBtn}
+        onPress={onRemove}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`Remove ${task.recipe.title} from queue`}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Text style={styles.removeBtnText}>✕</Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
@@ -243,6 +258,29 @@ export default function CookingTasksScreen() {
     setModalVisible(true);
   };
 
+  const handleRemoveTask = (task: CookingTaskWithRecipe) => {
+    Alert.alert(
+      'Remove Task',
+      `Remove "${task.recipe.title}" from your cooking queue?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCookingTask(task.id);
+              await loadTasks();
+            } catch (err) {
+              console.error('[CookingTasksScreen] deleteCookingTask error:', err);
+              Alert.alert('Error', 'Failed to remove the task.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleCloseModal = () => {
     setModalVisible(false);
     setSelectedTask(null);
@@ -338,7 +376,11 @@ export default function CookingTasksScreen() {
             </View>
           }
           renderItem={({ item }) => (
-            <TaskCard task={item} onPress={() => handleOpenTask(item)} />
+            <TaskCard
+              task={item}
+              onPress={() => handleOpenTask(item)}
+              onRemove={() => handleRemoveTask(item)}
+            />
           )}
           ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
         />
@@ -393,6 +435,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     flexDirection: 'row',
     overflow: 'hidden',
+    alignItems: 'center',
   },
   cardAccent: {
     width: 4,
@@ -482,6 +525,17 @@ const styles = StyleSheet.create({
   ingredientCount: {
     fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
+  },
+  removeBtn: {
+    padding: Spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  removeBtnText: {
+    fontSize: 16,
+    color: Colors.textMuted,
+    fontWeight: Typography.weights.bold,
   },
   tapHint: {
     fontSize: Typography.sizes.xs,
