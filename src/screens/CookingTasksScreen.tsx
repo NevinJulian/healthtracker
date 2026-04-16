@@ -162,7 +162,7 @@ function InstructionsModal({
     >
       <View style={styles.modalContainer}>
         {/* Modal Header */}
-        <View style={styles.modalHeader}>
+        <View style={[styles.modalHeader, { paddingTop: Math.max(insets.top, Spacing.xl) }]}>
           <TouchableOpacity
             onPress={onClose}
             style={styles.modalBackBtn}
