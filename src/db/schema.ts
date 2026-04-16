@@ -12,6 +12,10 @@
  *
  * v11: ADD COLUMN exercises TEXT to weekly_template
  * v12: ADD COLUMN exercises TEXT to daily_log
+ * v24: CREATE TABLE recipe_library, recipe_ingredients, shopping_list
+ * v25: CREATE TABLE meal_inventory
+ * v26: ADD COLUMN freezerTips TEXT to recipe_library
+ * v27: CREATE TABLE cooking_tasks (bridge between shopping list and inventory)
  */
 
 // ─── Exercise type (shared between DB layer and UI) ───────────────────────────
