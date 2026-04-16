@@ -126,11 +126,13 @@ function InstructionsModal({
   visible,
   onClose,
   onFinished,
+  finishing,
 }: {
   task: CookingTaskWithRecipe | null;
   visible: boolean;
   onClose: () => void;
   onFinished: () => void;
+  finishing: boolean;
 }) {
   if (!task || !visible) return null;
 
@@ -139,6 +141,9 @@ function InstructionsModal({
     .split('\n')
     .map((s) => s.trim())
     .filter(Boolean);
+
+  // Fallback for recipes with no structured instructions
+  const hasSteps = steps.length > 0;
 
   return (
     <Modal
@@ -167,6 +172,11 @@ function InstructionsModal({
               {task.servings_to_cook} serving{task.servings_to_cook > 1 ? 's' : ''}
             </Text>
           </View>
+          {hasSteps && (
+            <Text style={styles.stepCountLabel}>
+              {steps.length} steps
+            </Text>
+          )}
         </View>
 
         {/* Scrollable instructions */}
@@ -185,14 +195,22 @@ function InstructionsModal({
 
           {/* Steps */}
           <Text style={styles.instrHeading}>Step-by-Step Instructions</Text>
-          {steps.map((step, idx) => (
-            <View key={idx} style={styles.stepRow}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>{idx + 1}</Text>
+          {hasSteps ? (
+            steps.map((step, idx) => (
+              <View key={idx} style={styles.stepRow}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>{idx + 1}</Text>
+                </View>
+                <Text style={styles.stepText}>{step}</Text>
               </View>
-              <Text style={styles.stepText}>{step}</Text>
+            ))
+          ) : (
+            <View style={styles.noStepsBox}>
+              <Text style={styles.noStepsText}>
+                No step-by-step instructions available. Follow the recipe as written.
+              </Text>
             </View>
-          ))}
+          )}
 
           {/* Freezer tips if present */}
           {task.recipe.freezerTips ? (
@@ -209,14 +227,17 @@ function InstructionsModal({
         {/* Finished Cooking button — fixed at bottom */}
         <View style={styles.finishedContainer}>
           <TouchableOpacity
-            style={styles.finishedBtn}
+            style={[styles.finishedBtn, finishing && styles.finishedBtnDisabled]}
             onPress={onFinished}
+            disabled={finishing}
             activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel="Mark cooking as finished"
           >
-            <Text style={styles.finishedBtnIcon}>✅</Text>
-            <Text style={styles.finishedBtnText}>Finished Cooking!</Text>
+            <Text style={styles.finishedBtnIcon}>{finishing ? '⏳' : '✅'}</Text>
+            <Text style={styles.finishedBtnText}>
+              {finishing ? 'Saving...' : 'Finished Cooking!'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -344,6 +365,7 @@ export default function CookingTasksScreen() {
         visible={modalVisible}
         onClose={handleCloseModal}
         onFinished={handleFinishedCooking}
+        finishing={finishing}
       />
 
       {tasks.length === 0 ? (
@@ -734,5 +756,27 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.3,
+  },
+  finishedBtnDisabled: {
+    backgroundColor: Colors.textMuted,
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  stepCountLabel: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    fontWeight: Typography.weights.medium,
+  },
+  noStepsBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  noStepsText: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    lineHeight: 20,
   },
 });
