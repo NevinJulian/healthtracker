@@ -84,6 +84,20 @@ export const CREATE_MEAL_INVENTORY_TABLE = `
   );
 `;
 
+/**
+ * v27 — Cooking Tasks queue.
+ * Rows are inserted when the user adds a recipe to the Shopping List,
+ * and deleted (with inventory update) when they press "Finished Cooking".
+ */
+export const CREATE_COOKING_TASKS_TABLE = `
+  CREATE TABLE IF NOT EXISTS cooking_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id TEXT NOT NULL,
+    servings_to_cook INTEGER NOT NULL,
+    FOREIGN KEY(recipe_id) REFERENCES recipe_library(id)
+  );
+`;
+
 export const CREATE_WEEKLY_MEAL_PLAN_TABLE = `
   CREATE TABLE IF NOT EXISTS weekly_meal_plan (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -426,4 +440,6 @@ export const MIGRATIONS: Migration[] = [
   // v25-v26: Meal Inventory and Weekly Meal Plan
   { version: 25, sql: CREATE_MEAL_INVENTORY_TABLE },
   { version: 26, sql: CREATE_WEEKLY_MEAL_PLAN_TABLE },
+  // v27: Cooking Tasks queue
+  { version: 27, sql: CREATE_COOKING_TASKS_TABLE },
 ];
