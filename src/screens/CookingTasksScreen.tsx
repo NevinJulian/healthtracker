@@ -113,7 +113,11 @@ function MacroPill({
   color: string;
 }) {
   return (
-    <View style={[styles.macroPill, { borderColor: color + '40' }]}>
+    <View 
+      style={[styles.macroPill, { borderColor: color + '40' }]}
+      accessible={true}
+      accessibilityLabel={`${value} ${label}`}
+    >
       <Text style={[styles.macroPillValue, { color }]}>{value}</Text>
       <Text style={styles.macroPillLabel}>{label}</Text>
     </View>
