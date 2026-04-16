@@ -12,6 +12,10 @@
  *
  * v11: ADD COLUMN exercises TEXT to weekly_template
  * v12: ADD COLUMN exercises TEXT to daily_log
+ * v24: CREATE TABLE recipe_library, recipe_ingredients, shopping_list
+ * v25: CREATE TABLE meal_inventory
+ * v26: ADD COLUMN freezerTips TEXT to recipe_library
+ * v27: CREATE TABLE cooking_tasks (bridge between shopping list and inventory)
  */
 
 // ─── Exercise type (shared between DB layer and UI) ───────────────────────────
@@ -80,6 +84,20 @@ export const CREATE_MEAL_INVENTORY_TABLE = `
     recipe_id TEXT NOT NULL,
     portions_available INTEGER NOT NULL CHECK(portions_available >= 0),
     date_cooked TEXT NOT NULL,
+    FOREIGN KEY(recipe_id) REFERENCES recipe_library(id)
+  );
+`;
+
+/**
+ * v27 — Cooking Tasks queue.
+ * Rows are inserted when the user adds a recipe to the Shopping List,
+ * and deleted (with inventory update) when they press "Finished Cooking".
+ */
+export const CREATE_COOKING_TASKS_TABLE = `
+  CREATE TABLE IF NOT EXISTS cooking_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id TEXT NOT NULL,
+    servings_to_cook INTEGER NOT NULL,
     FOREIGN KEY(recipe_id) REFERENCES recipe_library(id)
   );
 `;
@@ -426,4 +444,6 @@ export const MIGRATIONS: Migration[] = [
   // v25-v26: Meal Inventory and Weekly Meal Plan
   { version: 25, sql: CREATE_MEAL_INVENTORY_TABLE },
   { version: 26, sql: CREATE_WEEKLY_MEAL_PLAN_TABLE },
+  // v27: Cooking Tasks queue
+  { version: 27, sql: CREATE_COOKING_TASKS_TABLE },
 ];

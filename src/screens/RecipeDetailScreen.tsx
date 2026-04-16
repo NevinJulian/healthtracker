@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
 import { Colors, Typography } from '../theme/tokens';
-import { getRecipeById, Recipe, addShoppingListItem } from '../db/database';
+import { getRecipeById, Recipe, addShoppingListItem, insertCookingTask } from '../db/database';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -36,13 +36,23 @@ export default function RecipeDetailScreen() {
   const handleAddToShoppingList = async () => {
     if (!recipe) return;
     try {
+      // 1. Add each ingredient to the shopping list
       for (const ing of recipe.ingredients) {
         const qty = getCalculatedQuantity(ing.baseQuantity);
         await addShoppingListItem(ing.name, qty, ing.unit);
       }
-      Alert.alert("Success", "Ingredients added to Shopping List!");
+      // 2. Queue a cooking task so the user knows what to cook
+      await insertCookingTask(recipe.id, servings);
+      Alert.alert(
+        'Added!',
+        `Ingredients added to Shopping List & ${servings} serving(s) added to Cooking Queue!`,
+        [
+          { text: 'View Queue', onPress: () => navigation.navigate('Cooking Tasks') },
+          { text: 'OK', style: 'cancel' }
+        ]
+      );
     } catch (e) {
-      Alert.alert("Error", "Failed to add ingredients");
+      Alert.alert('Error', 'Failed to add ingredients');
     }
   };
 
