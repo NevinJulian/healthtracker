@@ -392,8 +392,12 @@ export default function CookingTasksScreen() {
 
       {tasks.length === 0 ? (
         /* Empty state */
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>👨‍🍳</Text>
+        <View 
+          style={styles.emptyContainer}
+          accessible={true}
+          accessibilityLabel="No cooking tasks yet. Open a recipe and add it to your shopping list to queue it for cooking."
+        >
+          <Text style={styles.emptyEmoji} importantForAccessibility="no">👨‍🍳</Text>
           <Text style={styles.emptyTitle}>No cooking tasks yet</Text>
           <Text style={styles.emptySubtitle}>
             Open a recipe and tap{' '}
