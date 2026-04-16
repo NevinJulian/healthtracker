@@ -370,7 +370,7 @@ export default function CookingTasksScreen() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <View style={styles.centred}>
         <ActivityIndicator size="large" color={Colors.accent} />
