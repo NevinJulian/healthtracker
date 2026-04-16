@@ -17,6 +17,7 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
@@ -251,6 +252,7 @@ export default function CookingTasksScreen() {
   const navigation = useNavigation<any>();
   const [tasks, setTasks] = useState<CookingTaskWithRecipe[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedTask, setSelectedTask] = useState<CookingTaskWithRecipe | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [finishing, setFinishing] = useState(false);
@@ -271,6 +273,18 @@ export default function CookingTasksScreen() {
       console.error('[CookingTasksScreen] loadTasks error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      const data = await getCookingTasks();
+      setTasks(data);
+    } catch (err) {
+      console.error('[CookingTasksScreen] handleRefresh error:', err);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -396,6 +410,14 @@ export default function CookingTasksScreen() {
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={Colors.accent}
+              colors={[Colors.accent]}
+            />
+          }
           ListHeaderComponent={
             <View style={styles.listHeader}>
               <Text style={styles.listHeaderTitle}>
