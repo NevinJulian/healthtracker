@@ -13,7 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import {
   DailyLogEntry,
   Exercise,
@@ -206,7 +206,6 @@ function HammerSection({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
-  const insets = useSafeAreaInsets();
   const [entry, setEntry] = useState<DailyLogEntry | null>(null);
   const [todaysMeals, setTodaysMeals] = useState<MealPlanWithRecipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -379,8 +378,8 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      {/* ── Date / title banner (within scroll — no duplicate inset padding) */}
+      <View style={styles.header}>
         <View>
           <Text style={styles.headerDate}>{formatDate()}</Text>
           <Text style={styles.headerTitle}>
@@ -578,12 +577,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
 
-  // Header
+  // Header — no extra paddingTop; the Drawer header above provides safe-area
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
     paddingBottom: Spacing.md,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
