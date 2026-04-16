@@ -45,7 +45,11 @@ export default function RecipeDetailScreen() {
       await insertCookingTask(recipe.id, servings);
       Alert.alert(
         'Added!',
-        `Ingredients added to Shopping List \u0026 ${servings} serving(s) added to Cooking Queue!`
+        `Ingredients added to Shopping List & ${servings} serving(s) added to Cooking Queue!`,
+        [
+          { text: 'View Queue', onPress: () => navigation.navigate('Cooking Tasks') },
+          { text: 'OK', style: 'cancel' }
+        ]
       );
     } catch (e) {
       Alert.alert('Error', 'Failed to add ingredients');
