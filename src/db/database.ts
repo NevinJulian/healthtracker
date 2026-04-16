@@ -931,6 +931,10 @@ export async function insertCookingTask(
 
 /**
  * Returns all cooking tasks joined with their corresponding recipe metadata.
+ * Results are ordered by insertion order (oldest task first) so the user
+ * cooks in the order they planned their shopping.
+ *
+ * @returns Array of cooking tasks with full recipe details embedded.
  */
 export async function getCookingTasks(): Promise<CookingTaskWithRecipe[]> {
   const db = getDatabase();
