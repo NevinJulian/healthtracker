@@ -358,6 +358,15 @@ export default function CookingTasksScreen() {
             </Text>{' '}
             to queue it for cooking.
           </Text>
+          <TouchableOpacity
+            style={styles.emptyCtaBtn}
+            onPress={() => navigation.navigate('Recipes')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Browse recipes to add a cooking task"
+          >
+            <Text style={styles.emptyCtaBtnText}>🍽 Browse Recipes</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -566,6 +575,18 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  emptyCtaBtn: {
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+  },
+  emptyCtaBtnText: {
+    color: Colors.background,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.bold,
   },
 
   // ── Instructions Modal ────────────────────────────────────────────────────
