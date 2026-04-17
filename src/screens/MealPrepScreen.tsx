@@ -10,7 +10,6 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
@@ -39,7 +38,6 @@ function addDays(date: Date, days: number): Date {
 // ─── Main Screen ─────────────────────────────────────────────
 
 export default function MealPrepScreen() {
-  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'weekly' | 'inventory'>('weekly');
 
   // State
@@ -226,7 +224,7 @@ export default function MealPrepScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: 8 }]}>
         <Text style={styles.headerTitle}>Planner & Inventory</Text>
         
         <View style={styles.tabSwitcher}>
