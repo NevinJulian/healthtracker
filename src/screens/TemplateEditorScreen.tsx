@@ -12,7 +12,6 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   WeeklyTemplateDay,
   Exercise,
@@ -378,7 +377,6 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TemplateEditorScreen() {
-  const insets = useSafeAreaInsets();
   const [template, setTemplate] = useState<WeeklyTemplateDay[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -438,7 +436,7 @@ export default function TemplateEditorScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: 8 }]}>
         <Text style={styles.headerTitle}>Template Editor</Text>
         <Text style={styles.headerSubtitle}>
           Edit the base weekly schedule. Changes apply to all future generated days.
