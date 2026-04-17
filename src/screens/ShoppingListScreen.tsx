@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Colors, Typography } from '../theme/tokens';
 import { getShoppingListItems, toggleShoppingListItem, clearCompletedShoppingList, ShoppingListItem } from '../db/database';
 import { useFocusEffect } from '@react-navigation/native';
@@ -62,7 +62,7 @@ export default function ShoppingListScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Shopping List</Text>
         {items.some(i => i.is_checked) && (
@@ -84,7 +84,7 @@ export default function ShoppingListScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 8,
     paddingBottom: 16,
   },
   headerTitle: {
