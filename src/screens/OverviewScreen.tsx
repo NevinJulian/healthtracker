@@ -9,7 +9,6 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   DailyLogEntry,
   getRollingWindow,
@@ -205,7 +204,6 @@ function DayDetailModal({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function OverviewScreen() {
-  const insets = useSafeAreaInsets();
   const [entries, setEntries] = useState<DailyLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<DailyLogEntry | null>(null);
@@ -251,7 +249,7 @@ export default function OverviewScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: 8 }]}>
         <Text style={styles.headerTitle}>Rolling Schedule</Text>
         <View style={styles.statsRow}>
           <View style={styles.statPill}>
