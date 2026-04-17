@@ -85,6 +85,7 @@ export default function AppNavigator() {
         headerLeft: () => null,
         headerRight: () => <HeaderRightMenu />,
         // ── Drawer ──────────────────────────────────────────────
+        drawerPosition: 'right',
         drawerStyle: {
           backgroundColor: Colors.background,
           width: 280,
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
   drawerLabel: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.medium,
-    marginLeft: 4,
+    marginLeft: 12,
   },
   iconContainer: {
     alignItems: 'center',
