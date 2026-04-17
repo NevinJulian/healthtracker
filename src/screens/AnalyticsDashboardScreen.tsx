@@ -1,12 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import { getRollingWindow, getWeightHistory, toISODate } from '../db/database';
 
 export default function AnalyticsDashboardScreen() {
-  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [stats7Day, setStats7Day] = useState({ walk: 0, gym: 0, extra: 0 });
   const [stats30Day, setStats30Day] = useState({ walk: 0, gym: 0, extra: 0 });
@@ -139,7 +137,7 @@ export default function AnalyticsDashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: 8 }]}>
         <Text style={styles.title}>Analytics</Text>
         <View style={styles.datePill}>
           <Text style={styles.datePillText}>Last 30 Days</Text>
