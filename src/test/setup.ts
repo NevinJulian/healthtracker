@@ -1,5 +1,3 @@
-import '@testing-library/react-native/extend-expect';
-
 // Mock expo-sqlite
 jest.mock('expo-sqlite', () => ({
   openDatabaseSync: jest.fn(() => ({
@@ -39,3 +37,9 @@ jest.mock('expo-file-system', () => ({
   readAsStringAsync: jest.fn(),
   writeAsStringAsync: jest.fn(),
 }));
+
+jest.mock('react-native-reanimated', () => {
+  const Reanimated = require('react-native-reanimated/mock');
+  Reanimated.default.call = () => {};
+  return Reanimated;
+});
