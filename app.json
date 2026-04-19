@@ -28,6 +28,12 @@
     },
     "plugins": [
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "24cb496b-6efd-4d9b-a425-c3d44e571db2"
+      }
+    },
+    "owner": "sgnaegi"
   }
 }
