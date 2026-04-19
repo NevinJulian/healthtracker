@@ -44,3 +44,13 @@ jobs:
 
       - name: Build APK Locally via EAS
         run: eas build -p android --profile preview --local --non-interactive --output app-release.apk
+
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            git log --oneline > release-notes.md
+          else
+            git log ${PREV_TAG}...HEAD --oneline > release-notes.md
+          fi
