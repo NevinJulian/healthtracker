@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import { Colors, Typography } from '../theme/tokens';
 import { getRecipes, Recipe } from '../db/database';
 import { useNavigation } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const CATEGORIES = ["All", "Fresh & Fridge", "Quick Cook", "Freezer Batch", "Freezer Sauce"];
 
 export default function RecipesScreen() {
-  const insets = useSafeAreaInsets();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [activeCategory, setActiveCategory] = useState("All");
   const navigation = useNavigation<any>();
@@ -39,7 +37,7 @@ export default function RecipesScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       <Text style={styles.headerTitle}>Recipe Library</Text>
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -60,7 +58,7 @@ export default function RecipesScreen() {
         renderItem={renderRecipe}
         contentContainerStyle={styles.listContent}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -74,7 +72,7 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.bold,
     color: Colors.textPrimary,
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 8,
     paddingBottom: 8,
   },
   filterContainer: {
