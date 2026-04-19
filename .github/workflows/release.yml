@@ -54,3 +54,11 @@ jobs:
           else
             git log ${PREV_TAG}...HEAD --oneline > release-notes.md
           fi
+          
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${{ github.run_number }}/app-release.apk"
+          QR_CODE_URL="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${DOWNLOAD_URL}"
+          
+          echo "## Download APK" >> release-notes.md
+          echo "[Direct Download Link](${DOWNLOAD_URL})" >> release-notes.md
+          echo "### Scan to Install:" >> release-notes.md
+          echo "![QR Code](${QR_CODE_URL})" >> release-notes.md
