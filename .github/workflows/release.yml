@@ -62,3 +62,13 @@ jobs:
           echo "[Direct Download Link](${DOWNLOAD_URL})" >> release-notes.md
           echo "### Scan to Install:" >> release-notes.md
           echo "![QR Code](${QR_CODE_URL})" >> release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body_path: release-notes.md
+          files: app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
