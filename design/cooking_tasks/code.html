@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kinetic Atelier - Cooking Tasks</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary": "#1d361e",
+              "on-tertiary-container": "#203921",
+              "secondary-fixed-dim": "#a9cdd2",
+              "error-container": "#93000a",
+              "on-secondary-container": "#97bbc1",
+              "primary-fixed": "#ffdad4",
+              "tertiary": "#b0cfad",
+              "on-primary": "#5e170e",
+              "surface-variant": "#333537",
+              "tertiary-container": "#86a383",
+              "on-secondary-fixed-variant": "#294c51",
+              "tertiary-fixed-dim": "#b0cfad",
+              "secondary-container": "#294c51",
+              "surface-tint": "#ffb4a8",
+              "on-primary-fixed": "#400201",
+              "inverse-on-surface": "#2f3133",
+              "surface-container-lowest": "#0c0e10",
+              "primary-container": "#e67e6e",
+              "on-error-container": "#ffdad6",
+              "surface-bright": "#37393b",
+              "surface-container-low": "#1a1c1e",
+              "on-secondary-fixed": "#001f23",
+              "on-primary-fixed-variant": "#7c2d22",
+              "secondary": "#a9cdd2",
+              "on-error": "#690005",
+              "background": "#121416",
+              "on-surface": "#e2e2e5",
+              "on-secondary": "#10353a",
+              "surface-dim": "#121416",
+              "inverse-surface": "#e2e2e5",
+              "surface-container-highest": "#333537",
+              "inverse-primary": "#9a4337",
+              "on-primary-container": "#611911",
+              "surface-container-high": "#282a2c",
+              "on-surface-variant": "#dbc1bc",
+              "primary-fixed-dim": "#ffb4a8",
+              "on-background": "#e2e2e5",
+              "tertiary-fixed": "#ccebc7",
+              "on-tertiary-fixed-variant": "#334d33",
+              "surface": "#121416",
+              "secondary-fixed": "#c4e9ee",
+              "surface-container": "#1e2022",
+              "on-tertiary-fixed": "#07200b",
+              "outline-variant": "#55423f",
+              "error": "#ffb4ab",
+              "outline": "#a38b88",
+              "primary": "#ffb4a8"
+            },
+            borderRadius: {
+              "DEFAULT": "0.125rem",
+              "lg": "0.25rem",
+              "xl": "0.5rem",
+              "full": "0.75rem"
+            },
+            fontFamily: {
+              "headline": ["Manrope", "sans-serif"],
+              "body": ["Inter", "sans-serif"],
+              "label": ["Inter", "sans-serif"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body antialiased min-h-screen overflow-x-hidden selection:bg-primary/20 selection:text-primary">
+<!-- TopAppBar -->
+<header class="bg-[#121416] fixed top-0 w-full z-50 bg-gradient-to-b from-[#121416] to-transparent">
+<div class="flex justify-between items-center px-5 h-16 w-full max-w-7xl mx-auto">
+<!-- Leading Icon -->
+<button class="text-slate-400 hover:opacity-80 transition-opacity scale-95 active:transition-transform flex items-center justify-center w-10 h-10">
+<span class="material-symbols-outlined text-2xl">menu</span>
+</button>
+<!-- Headline / Brand -->
+<h1 class="font-['Manrope'] font-bold tracking-tight text-2xl uppercase text-[#ffb4a8]">
+                KINETIC
+            </h1>
+<!-- Trailing Avatar -->
+<button class="hover:opacity-80 transition-opacity scale-95 active:transition-transform">
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-container-highest border-2 border-surface-container">
+<img alt="Profile Photo" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9TZda-P2KZLMZbmEiO52Yk6l5o9vfZ7AGnSaBw1fDMMc-fBYA51B_y6SgCome9TPjFGSQ5soJvzHPSp5znk0sHYw1hGzTpPL49Q3ad0tOWCmM5txCgsXTmyJuWM3XnVRTAHe1QNrTFoXqBOOIhVPA0S3ppEthfH4-uNZ0nAWzldzl21QFTViTb4SU-01aOPTcyq3jCx6JVLMrRYeZfX_3MtI4HdyC8PEpgooyR76GOhTKyjjUE2proPs6jxjED9uLZvV2WEel2ks"/>
+</div>
+</button>
+</div>
+</header>
+<!-- NavigationDrawer (Hidden off-screen by default to not obscure the task view, but styled per JSON) -->
+<!-- Applying translate-x-full to hide it, overriding JSON translate-x-0 for visual clarity of main task, 
+         but keeping all exact injected styles on the container elements. -->
+<aside class="bg-[#1a1c1e]/90 backdrop-blur-2xl fixed right-0 h-full w-80 z-[60] border-l border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.5)] translate-x-full transition-transform duration-300 ease-in-out md:hidden pointer-events-none">
+<div class="flex flex-col p-6 gap-4 pointer-events-auto h-full">
+<!-- Header -->
+<div class="flex items-center gap-4 mb-8">
+<img alt="User Avatar" class="w-12 h-12 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBidnyqPmMcuXE2hJSatDrI4gzjWhBrqpoBvA8KDWB5Gyx1DbdHwTZ-4cdv2Lq42ifk9H8Fw811LIbLWrPajMl0pRwa1bHb1WfD2NPMmz7vF5dfckkAPijeeKibBqblhORd8qKGPflt4UVbZUyTIzRj65BfY62GJ-0QlFq46J7Q6_lViGdMoyUBWy4EjqDOUvFDvTJxktM5AjL9ZuyFP3PXhInYNqOygtCXFHvAvfzYSherEF1KltFGoBUl712JrsFZ7e1PDzQdVEM"/>
+<div>
+<h2 class="font-headline font-bold text-lg text-on-surface">Atelier Member</h2>
+<p class="font-label text-xs tracking-widest uppercase text-on-surface-variant">Day 45 of 90</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex flex-col gap-2 flex-1">
+<a class="font-['Inter'] text-sm tracking-wide uppercase font-medium flex items-center gap-3 p-3 text-slate-300 hover:text-white hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                    Dashboard
+                </a>
+<a class="font-['Inter'] text-sm tracking-wide uppercase font-medium flex items-center gap-3 p-3 text-slate-300 hover:text-white hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined">fitness_center</span>
+                    Bio Force Workouts
+                </a>
+<a class="font-['Inter'] text-sm tracking-wide uppercase font-medium flex items-center gap-3 p-3 text-slate-300 hover:text-white hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined">insights</span>
+                    Analytics
+                </a>
+<a class="font-['Inter'] text-sm tracking-wide uppercase font-medium flex items-center gap-3 p-3 text-slate-300 hover:text-white hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+                    Planner
+                </a>
+<a class="font-['Inter'] text-sm tracking-wide uppercase font-medium flex items-center gap-3 p-3 text-slate-300 hover:text-white hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined">restaurant_menu</span>
+                    Recipes
+                </a>
+<a class="font-['Inter'] text-sm tracking-wide uppercase font-medium flex items-center gap-3 p-3 text-slate-300 hover:text-white hover:bg-white/5 transition-colors" href="#">
+<span class="material-symbols-outlined">shopping_cart</span>
+                    Shopping
+                </a>
+<!-- Active Item -->
+<a class="font-['Inter'] text-sm tracking-wide uppercase font-medium flex items-center gap-3 p-3 bg-[#ffb4a8]/10 text-[#ffb4a8] font-bold rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">outdoor_grill</span>
+                    Cooking Tasks
+                </a>
+<a class="font-['Inter'] text-sm tracking-wide uppercase font-medium flex items-center gap-3 p-3 text-slate-300 hover:text-white hover:bg-white/5 transition-colors mt-auto" href="#">
+<span class="material-symbols-outlined">edit_note</span>
+                    Template Editor
+                </a>
+</nav>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="pt-24 pb-32 px-5 max-w-3xl mx-auto w-full min-h-screen flex flex-col">
+<!-- Header Section -->
+<div class="mb-10 animate-fade-in">
+<h2 class="font-headline text-[3.5rem] leading-none font-bold tracking-tighter text-on-surface mb-2">
+                PREP<br/><span class="text-surface-variant">PROTOCOL</span>
+</h2>
+<div class="flex items-center gap-3 mt-4">
+<div class="h-1 w-8 bg-tertiary rounded-full"></div>
+<p class="font-label text-[0.6875rem] tracking-[0.05em] uppercase text-on-surface-variant">3 Tasks Remaining Today</p>
+</div>
+</div>
+<!-- Task List (Elevated Cards & Tonal Layering) -->
+<div class="flex flex-col gap-4 flex-1">
+<!-- Task 1: Active / Next Up (Glassmorphism highlight) -->
+<div class="relative bg-surface-container-highest/60 backdrop-blur-[20px] rounded-xl p-5 flex items-center gap-5 cursor-pointer group hover:bg-surface-container-highest transition-colors">
+<!-- Ambient Shadow Glow -->
+<div class="absolute inset-0 bg-primary/5 rounded-xl blur-[32px] -z-10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<!-- Status Circle -->
+<div class="w-6 h-6 rounded-full border border-primary flex items-center justify-center shrink-0">
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+</div>
+<!-- Content -->
+<div class="flex-1">
+<h3 class="font-headline font-bold text-lg text-on-surface mb-1 group-hover:text-primary transition-colors">Roasted Root Medley</h3>
+<div class="flex items-center gap-4">
+<span class="font-label text-[10px] tracking-widest text-primary flex items-center gap-1 uppercase">
+<span class="material-symbols-outlined text-[12px]">schedule</span> 45 MIN
+                        </span>
+<span class="font-label text-[10px] tracking-widest text-tertiary flex items-center gap-1 uppercase">
+<span class="material-symbols-outlined text-[12px]">local_fire_department</span> OVEN
+                        </span>
+</div>
+</div>
+<!-- Action / Chevron -->
+<div class="shrink-0 text-surface-variant group-hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-3xl">chevron_right</span>
+</div>
+</div>
+<!-- Task 2: Pending (Surface Container Low) -->
+<div class="bg-surface-container-low rounded-xl p-5 flex items-center gap-5 cursor-pointer hover:bg-surface-container transition-colors group">
+<div class="w-6 h-6 rounded-full border-2 border-surface-variant flex items-center justify-center shrink-0 group-hover:border-on-surface-variant transition-colors"></div>
+<div class="flex-1 opacity-80 group-hover:opacity-100 transition-opacity">
+<h3 class="font-headline font-semibold text-lg text-on-surface mb-1">Herb &amp; Citrus Salmon</h3>
+<div class="flex items-center gap-4">
+<span class="font-label text-[10px] tracking-widest text-on-surface-variant flex items-center gap-1 uppercase">
+<span class="material-symbols-outlined text-[12px]">schedule</span> 20 MIN
+                        </span>
+<span class="font-label text-[10px] tracking-widest text-secondary flex items-center gap-1 uppercase">
+<span class="material-symbols-outlined text-[12px]">skillet</span> SEAR
+                        </span>
+</div>
+</div>
+<div class="shrink-0 text-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-3xl">chevron_right</span>
+</div>
+</div>
+<!-- Task 3: Pending -->
+<div class="bg-surface-container-low rounded-xl p-5 flex items-center gap-5 cursor-pointer hover:bg-surface-container transition-colors group">
+<div class="w-6 h-6 rounded-full border-2 border-surface-variant flex items-center justify-center shrink-0 group-hover:border-on-surface-variant transition-colors"></div>
+<div class="flex-1 opacity-80 group-hover:opacity-100 transition-opacity">
+<h3 class="font-headline font-semibold text-lg text-on-surface mb-1">Quinoa Base Prep</h3>
+<div class="flex items-center gap-4">
+<span class="font-label text-[10px] tracking-widest text-on-surface-variant flex items-center gap-1 uppercase">
+<span class="material-symbols-outlined text-[12px]">schedule</span> 15 MIN
+                        </span>
+<span class="font-label text-[10px] tracking-widest text-on-surface-variant flex items-center gap-1 uppercase">
+<span class="material-symbols-outlined text-[12px]">water_drop</span> BOIL
+                        </span>
+</div>
+</div>
+<div class="shrink-0 text-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-3xl">chevron_right</span>
+</div>
+</div>
+<!-- Completed Task (Ghosted) -->
+<div class="bg-surface-dim rounded-xl p-5 flex items-center gap-5 opacity-40">
+<div class="w-6 h-6 rounded-full bg-tertiary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-tertiary-container text-[16px] font-bold">check</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline font-semibold text-lg text-on-surface mb-1 line-through">Morning Protein Oats</h3>
+<span class="font-label text-[10px] tracking-widest text-on-surface-variant uppercase">Completed</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Action Area -->
+<div class="fixed bottom-0 left-0 w-full p-5 z-40 bg-gradient-to-t from-background via-background to-transparent pb-safe">
+<div class="max-w-3xl mx-auto w-full pt-8">
+<button class="w-full relative group">
+<!-- Ambient Shadow -->
+<div class="absolute inset-0 bg-primary/20 blur-[24px] rounded-full z-0 group-hover:bg-primary/30 transition-colors"></div>
+<!-- Main Button Body -->
+<div class="relative z-10 w-full flex items-center justify-center gap-3 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-full py-5 px-8 font-body font-bold text-lg hover:brightness-110 active:scale-[0.98] transition-all">
+<span>Finished Cooking</span>
+<span class="material-symbols-outlined font-bold">arrow_forward</span>
+<span>Send to Inventory</span>
+</div>
+</button>
+</div>
+</div>
+</body></html>
