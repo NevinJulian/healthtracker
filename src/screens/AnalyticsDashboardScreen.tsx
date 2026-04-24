@@ -19,7 +19,6 @@ export default function AnalyticsDashboardScreen() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Helper to compute stats
       const computeStats = (days: number) => {
         const cutoff = new Date(today);
         cutoff.setDate(cutoff.getDate() - days);
@@ -32,7 +31,7 @@ export default function AnalyticsDashboardScreen() {
 
         const walkCount = relevantLogs.filter(l => l.walk_completed).length;
         const gymCount = relevantLogs.filter(l => l.hammer_completed).length;
-        const extraCount = relevantLogs.reduce((sum, l) => 
+        const extraCount = relevantLogs.reduce((sum, l) =>
           sum + (l.additional_workouts?.filter(aw => aw.completed).length || 0), 0);
 
         return {
@@ -61,17 +60,17 @@ export default function AnalyticsDashboardScreen() {
   const renderStatsCard = (title: string, stats: { walk: number, gym: number, extra: number }) => (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{title}</Text>
-      
+
       <View style={styles.statRow}>
-        <Text style={styles.statLabel}>🚶 Walking Task</Text>
+        <Text style={styles.statLabel}>Walking</Text>
         <View style={styles.progressContainer}>
-          <View style={[styles.progressBar, { width: `${stats.walk}%`, backgroundColor: Colors.accent }]} />
+          <View style={[styles.progressBar, { width: `${stats.walk}%`, backgroundColor: Colors.primary }]} />
         </View>
         <Text style={styles.statValue}>{stats.walk}%</Text>
       </View>
 
       <View style={styles.statRow}>
-        <Text style={styles.statLabel}>🏋️ Gym Task</Text>
+        <Text style={styles.statLabel}>Gym</Text>
         <View style={styles.progressContainer}>
           <View style={[styles.progressBar, { width: `${stats.gym}%`, backgroundColor: Colors.secondary }]} />
         </View>
@@ -79,7 +78,7 @@ export default function AnalyticsDashboardScreen() {
       </View>
 
       <View style={styles.statRow}>
-        <Text style={styles.statLabel}>➕ Extra Workouts</Text>
+        <Text style={styles.statLabel}>Extra Workouts</Text>
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>{stats.extra} completed</Text>
         </View>
@@ -98,35 +97,33 @@ export default function AnalyticsDashboardScreen() {
     }
 
     const weights = weightHistory.map(w => w.weight);
-    const minW = Math.min(...weights) - 2; // pad lower bound
-    const maxW = Math.max(...weights) + 2; // pad upper bound
+    const minW = Math.min(...weights) - 2;
+    const maxW = Math.max(...weights) + 2;
     const current = weights[weights.length - 1];
-    
-    // Using a simple View-based bar chart
+
     return (
       <View style={styles.card}>
         <View style={styles.chartHeader}>
           <Text style={styles.cardTitle}>Weight Trend (30 Days)</Text>
           <Text style={styles.currentWeight}>{current.toFixed(1)} kg</Text>
         </View>
-        
+
         <View style={styles.chartArea}>
           {weightHistory.map((pt, i) => {
             const heightPct = Math.max(5, ((pt.weight - minW) / (maxW - minW)) * 100);
             return (
               <View key={i} style={styles.barContainer}>
                 <View style={[styles.bar, { height: `${heightPct}%` }]} />
-                {/* Optional: Show label on first, last, and maybe midway */}
                 {(i === 0 || i === weightHistory.length - 1) && (
                   <Text style={styles.barLabel}>
-                    {pt.date.substring(8, 10)}/{pt.date.substring(5,7)}
+                    {pt.date.substring(8, 10)}/{pt.date.substring(5, 7)}
                   </Text>
                 )}
               </View>
             );
           })}
         </View>
-        
+
         <View style={styles.chartMeta}>
           <Text style={styles.chartMetaText}>Min: {(minW + 2).toFixed(1)} kg</Text>
           <Text style={styles.chartMetaText}>Max: {(maxW - 2).toFixed(1)} kg</Text>
@@ -146,64 +143,61 @@ export default function AnalyticsDashboardScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} tintColor={Colors.accent} />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} tintColor={Colors.primary} />}
       >
         {renderStatsCard('7-Day Rolling Stats', stats7Day)}
         {renderStatsCard('30-Day Rolling Stats', stats30Day)}
         {renderWeightChart()}
-        <View style={{ height: Spacing.xl }} />
+        <View style={{ height: Spacing.xxl }} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
   header: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: Colors.surfaceLow,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
   },
   title: {
-    fontSize: Typography.sizes.hero,
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.headlineL,
+    fontWeight: Typography.weights.extrabold,
+    color: Colors.onSurface,
+    letterSpacing: -1,
   },
   datePill: {
-    backgroundColor: Colors.surfaceElevated,
-    paddingHorizontal: Spacing.sm,
+    backgroundColor: Colors.surfaceHighest,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 4,
     borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   datePillText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   scrollContent: {
-    padding: Spacing.lg,
-    gap: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xxl,
+    paddingBottom: Spacing.hero,
+    gap: Spacing.md,
   },
   card: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceLow,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
   },
   cardTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.titleL,
+    fontWeight: Typography.weights.bold,
+    color: Colors.onSurface,
     marginBottom: Spacing.md,
   },
   statRow: {
@@ -212,15 +206,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   statLabel: {
-    width: 130,
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-    fontWeight: Typography.weights.medium,
+    width: 110,
+    fontSize: Typography.sizes.label,
+    color: Colors.onSurfaceVariant,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   progressContainer: {
     flex: 1,
-    height: 8,
-    backgroundColor: Colors.background,
+    height: 6,
+    backgroundColor: Colors.surfaceHighest,
     borderRadius: Radius.full,
     marginRight: Spacing.sm,
     overflow: 'hidden',
@@ -231,27 +227,27 @@ const styles = StyleSheet.create({
   },
   statValue: {
     width: 40,
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.body,
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    color: Colors.onSurface,
     textAlign: 'right',
   },
   badgeContainer: {
-    backgroundColor: Colors.accent + '20',
-    paddingHorizontal: Spacing.sm,
+    backgroundColor: `${Colors.primary}1a`,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 2,
     borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.accent + '50',
   },
   badgeText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.accent,
-    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes.label,
+    color: Colors.primary,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   emptyText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.body,
+    color: Colors.outline,
     fontStyle: 'italic',
   },
   chartHeader: {
@@ -260,9 +256,10 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   currentWeight: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    color: Colors.accent,
+    fontSize: Typography.sizes.headlineL,
+    fontWeight: Typography.weights.black,
+    color: Colors.primary,
+    letterSpacing: -1,
   },
   chartArea: {
     height: 120,
@@ -271,28 +268,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: Spacing.md,
     paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   barContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginHorizontal: 2,
+    marginHorizontal: 1,
     height: '100%',
   },
   bar: {
     width: '100%',
-    maxWidth: 12,
-    backgroundColor: Colors.accent,
+    maxWidth: 10,
+    backgroundColor: Colors.primary,
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
+    opacity: 0.85,
   },
   barLabel: {
     position: 'absolute',
     bottom: -18,
-    fontSize: Typography.sizes.xs - 2,
-    color: Colors.textMuted,
+    fontSize: 8,
+    color: Colors.outline,
   },
   chartMeta: {
     flexDirection: 'row',
@@ -301,8 +297,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   chartMetaText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.label,
+    color: Colors.onSurfaceVariant,
     fontWeight: Typography.weights.medium,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   }
 });

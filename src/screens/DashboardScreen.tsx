@@ -432,7 +432,7 @@ export default function DashboardScreen() {
             icon="🚶"
             title="Walking"
             description={entry.walking_task}
-            accentColor={Colors.accent}
+            accentColor={Colors.primary}
           />
           <Checkbox
             checked={entry.walk_completed}
@@ -454,7 +454,7 @@ export default function DashboardScreen() {
             icon="⏱️"
             title="Intermittent Fasting"
             description="16:8 protocol — eating window: 12 pm → 8 pm"
-            accentColor={Colors.warning ?? '#F6AD55'}
+            accentColor={Colors.tertiary ?? '#F6AD55'}
           />
           <Checkbox
             checked={entry.fasting_completed}
@@ -469,7 +469,7 @@ export default function DashboardScreen() {
             icon="🍽️"
             title="Today's Meal Plan"
             description="Your configured meals for today"
-            accentColor={Colors.accent}
+            accentColor={Colors.primary}
           />
           {todaysMeals.length > 0 ? (
             todaysMeals.map(meal => (
@@ -480,14 +480,14 @@ export default function DashboardScreen() {
                   onToggle={() => handleToggleMeal(meal.id, meal.is_consumed)}
                 />
                 {meal.recipe ? (
-                  <Text style={{ marginLeft: 44, marginTop: -4, color: Colors.textMuted, fontSize: Typography.sizes.xs }}>
+                  <Text style={{ marginLeft: 44, marginTop: -4, color: Colors.outline, fontSize: Typography.sizes.label }}>
                     {meal.recipe.calories} kcal • {meal.recipe.protein}g protein
                   </Text>
                 ) : null}
               </View>
             ))
           ) : (
-            <Text style={{ marginLeft: 44, color: Colors.textMuted, fontSize: Typography.sizes.sm }}>
+            <Text style={{ marginLeft: 44, color: Colors.outline, fontSize: Typography.sizes.bodyS }}>
               No meals planned for today.
             </Text>
           )}
@@ -502,7 +502,7 @@ export default function DashboardScreen() {
               <TextInput
                 style={styles.weightInput}
                 placeholder="0.0"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={Colors.outline}
                 keyboardType="numeric"
                 value={weightInput}
                 onChangeText={setWeightInput}
@@ -530,7 +530,7 @@ export default function DashboardScreen() {
                 onToggle={() => handleToggleExtraWorkout(aw.id)}
               />
               {aw.muscle_group ? (
-                <Text style={{ marginLeft: 44, marginTop: -4, color: Colors.textMuted, fontSize: Typography.sizes.xs }}>
+                <Text style={{ marginLeft: 44, marginTop: -4, color: Colors.outline, fontSize: Typography.sizes.label }}>
                   {aw.muscle_group}  •  {aw.sets} sets × {aw.reps} reps
                 </Text>
               ) : null}

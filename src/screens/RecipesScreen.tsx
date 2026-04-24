@@ -68,9 +68,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   headerTitle: {
-    fontSize: Typography.sizes.xl,
+    fontSize: Typography.sizes.headlineL,
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    color: Colors.onSurface,
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 8,
@@ -86,14 +86,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
   },
   filterBadgeActive: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   filterText: {
-    color: Colors.textSecondary,
+    color: Colors.onSurfaceVariant,
     fontWeight: Typography.weights.medium,
   },
   filterTextActive: {
@@ -110,12 +110,12 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
   },
   cardTitle: {
-    fontSize: Typography.sizes.lg,
+    fontSize: Typography.sizes.titleL,
     fontWeight: Typography.weights.semibold,
-    color: Colors.textPrimary,
+    color: Colors.onSurface,
     marginBottom: 8,
   },
   macrosRow: {
@@ -124,11 +124,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   macroText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.sm,
+    color: Colors.onSurfaceVariant,
+    fontSize: Typography.sizes.bodyS,
   },
   categoryBadge: {
-    color: Colors.textMuted,
-    fontSize: Typography.sizes.sm,
+    color: Colors.outline,
+    fontSize: Typography.sizes.bodyS,
   }
 });

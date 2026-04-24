@@ -151,7 +151,7 @@ function DayDetailModal({
               <Text style={styles.modalSectionTitle}>🚶 Walking</Text>
               <Text style={styles.modalSectionBody}>{entry.walking_task}</Text>
               {!future && (
-                <Text style={[styles.modalStatus, { color: entry.walk_completed ? Colors.accent : Colors.textMuted }]}>
+                <Text style={[styles.modalStatus, { color: entry.walk_completed ? Colors.primary : Colors.outline }]}>
                   {entry.walk_completed ? '✓ Completed' : '○ Not logged'}
                 </Text>
               )}
@@ -162,7 +162,7 @@ function DayDetailModal({
               <Text style={styles.modalSectionTitle}>🏋️ Hammer Multi-Gym</Text>
               <Text style={styles.modalSectionBody}>{entry.hammer_task}</Text>
               {!future && (
-                <Text style={[styles.modalStatus, { color: entry.hammer_completed ? Colors.accent : Colors.textMuted }]}>
+                <Text style={[styles.modalStatus, { color: entry.hammer_completed ? Colors.primary : Colors.outline }]}>
                   {entry.hammer_completed ? '✓ Completed' : '○ Not logged'}
                 </Text>
               )}
@@ -173,7 +173,7 @@ function DayDetailModal({
               <View style={styles.modalSection}>
                 <Text style={styles.modalSectionTitle}>⏱️ Intermittent Fasting</Text>
                 <Text style={styles.modalSectionBody}>16:8 — eating window 12 pm → 8 pm</Text>
-                <Text style={[styles.modalStatus, { color: entry.fasting_completed ? Colors.accent : Colors.textMuted }]}>
+                <Text style={[styles.modalStatus, { color: entry.fasting_completed ? Colors.primary : Colors.outline }]}>
                   {entry.fasting_completed ? '✓ Completed' : '○ Not logged'}
                 </Text>
               </View>
@@ -241,7 +241,7 @@ export default function OverviewScreen() {
   if (loading) {
     return (
       <View style={styles.centred}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }

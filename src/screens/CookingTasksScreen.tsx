@@ -71,8 +71,8 @@ function TaskCard({
 
         {/* Macros row */}
         <View style={styles.macroRow}>
-          <MacroPill label="kcal" value={task.recipe.calories} color={Colors.warning} />
-          <MacroPill label="protein" value={`${task.recipe.protein}g`} color={Colors.accent} />
+          <MacroPill label="kcal" value={task.recipe.calories} color={Colors.tertiary} />
+          <MacroPill label="protein" value={`${task.recipe.protein}g`} color={Colors.primary} />
           <MacroPill label="carbs" value={`${task.recipe.carbs}g`} color={Colors.secondary} />
           <MacroPill label="fat" value={`${task.recipe.fat}g`} color="#FF8A65" />
         </View>
@@ -195,8 +195,8 @@ function InstructionsModal({
         >
           {/* Quick macros banner */}
           <View style={styles.instrMacros}>
-            <MacroPill label="kcal" value={task.recipe.calories} color={Colors.warning} />
-            <MacroPill label="protein" value={`${task.recipe.protein}g`} color={Colors.accent} />
+            <MacroPill label="kcal" value={task.recipe.calories} color={Colors.tertiary} />
+            <MacroPill label="protein" value={`${task.recipe.protein}g`} color={Colors.primary} />
             <MacroPill label="carbs" value={`${task.recipe.carbs}g`} color={Colors.secondary} />
             <MacroPill label="fat" value={`${task.recipe.fat}g`} color="#FF8A65" />
           </View>
@@ -373,7 +373,7 @@ export default function CookingTasksScreen() {
   if (loading && !refreshing) {
     return (
       <View style={styles.centred}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>Loading cooking queue…</Text>
       </View>
     );
@@ -401,7 +401,7 @@ export default function CookingTasksScreen() {
           <Text style={styles.emptyTitle}>No cooking tasks yet</Text>
           <Text style={styles.emptySubtitle}>
             Open a recipe and tap{' '}
-            <Text style={{ color: Colors.accent, fontWeight: '700' }}>
+            <Text style={{ color: Colors.primary, fontWeight: '700' }}>
               "Add to Shopping List"
             </Text>{' '}
             to queue it for cooking.
@@ -429,8 +429,8 @@ export default function CookingTasksScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor={Colors.accent}
-              colors={[Colors.accent]}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
             />
           }
           ListHeaderComponent={
@@ -475,8 +475,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.md,
+    color: Colors.onSurfaceVariant,
+    fontSize: Typography.sizes.body,
   },
 
   // ── List ──────────────────────────────────────────────────────────────────
@@ -489,34 +489,34 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   listHeaderTitle: {
-    fontSize: Typography.sizes.xl,
+    fontSize: Typography.sizes.headlineL,
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    color: Colors.onSurface,
   },
   listHeaderSub: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.onSurfaceVariant,
   },
   listHeaderServings: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.accent,
+    fontSize: Typography.sizes.label,
+    color: Colors.primary,
     fontWeight: Typography.weights.semibold,
     marginTop: 2,
   },
 
   // ── Card ─────────────────────────────────────────────────────────────────
   card: {
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.surfaceHighest,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
     flexDirection: 'row',
     overflow: 'hidden',
     alignItems: 'center',
   },
   cardAccent: {
     width: 4,
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
   },
   cardBody: {
     flex: 1,
@@ -530,22 +530,22 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     flex: 1,
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.body,
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    color: Colors.onSurface,
     lineHeight: 22,
   },
   servingsBadge: {
-    backgroundColor: Colors.accent + '20',
+    backgroundColor: Colors.primary + '20',
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 3,
     borderWidth: 1,
-    borderColor: Colors.accent,
+    borderColor: Colors.primary,
   },
   servingsBadgeText: {
-    color: Colors.accent,
-    fontSize: Typography.sizes.sm,
+    color: Colors.primary,
+    fontSize: Typography.sizes.bodyS,
     fontWeight: Typography.weights.bold,
   },
 
@@ -557,11 +557,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
   },
   categoryChipText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.label,
+    color: Colors.onSurfaceVariant,
     fontWeight: Typography.weights.medium,
     textTransform: 'capitalize',
   },
@@ -580,12 +580,12 @@ const styles = StyleSheet.create({
     minWidth: 48,
   },
   macroPillValue: {
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes.label,
     fontWeight: Typography.weights.bold,
   },
   macroPillLabel: {
     fontSize: 9,
-    color: Colors.textMuted,
+    color: Colors.outline,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
@@ -596,12 +596,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   prepTime: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
   },
   ingredientCount: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
   },
   removeBtn: {
     padding: Spacing.md,
@@ -611,12 +611,12 @@ const styles = StyleSheet.create({
   },
   removeBtnText: {
     fontSize: 16,
-    color: Colors.textMuted,
+    color: Colors.outline,
     fontWeight: Typography.weights.bold,
   },
   tapHint: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.accent,
+    fontSize: Typography.sizes.label,
+    color: Colors.primary,
     fontWeight: Typography.weights.semibold,
   },
 
@@ -633,27 +633,27 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   emptyTitle: {
-    fontSize: Typography.sizes.xl,
+    fontSize: Typography.sizes.headlineL,
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    color: Colors.onSurface,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 20,
   },
   emptyCtaBtn: {
     marginTop: Spacing.sm,
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
   },
   emptyCtaBtnText: {
     color: Colors.background,
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.body,
     fontWeight: Typography.weights.bold,
   },
 
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.outlineVariant,
     gap: Spacing.xs,
   },
   modalBackBtn: {
@@ -676,14 +676,14 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   modalBackText: {
-    color: Colors.accent,
-    fontSize: Typography.sizes.md,
+    color: Colors.primary,
+    fontSize: Typography.sizes.body,
     fontWeight: Typography.weights.medium,
   },
   modalTitle: {
-    fontSize: Typography.sizes.xl,
+    fontSize: Typography.sizes.headlineL,
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    color: Colors.onSurface,
     lineHeight: 26,
   },
   servingsBadgeSm: {
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
   },
   servingsBadgeSmText: {
     color: Colors.secondary,
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes.label,
     fontWeight: Typography.weights.semibold,
   },
   modalScroll: {
@@ -714,9 +714,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   instrHeading: {
-    fontSize: Typography.sizes.lg,
+    fontSize: Typography.sizes.titleL,
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    color: Colors.onSurface,
     marginBottom: Spacing.md,
   },
 
@@ -731,23 +731,23 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: Colors.accent + '20',
+    backgroundColor: Colors.primary + '20',
     borderWidth: 1,
-    borderColor: Colors.accent,
+    borderColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
     marginTop: 1,
   },
   stepNumberText: {
-    color: Colors.accent,
-    fontSize: Typography.sizes.xs,
+    color: Colors.primary,
+    fontSize: Typography.sizes.label,
     fontWeight: Typography.weights.bold,
   },
   stepText: {
     flex: 1,
-    fontSize: Typography.sizes.md,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.body,
+    color: Colors.onSurface,
     lineHeight: 24,
   },
 
@@ -757,18 +757,18 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
     marginTop: Spacing.md,
     gap: Spacing.xs,
   },
   freezerTitle: {
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.body,
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    color: Colors.onSurface,
   },
   freezerText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.onSurfaceVariant,
     lineHeight: 20,
   },
 
@@ -778,10 +778,10 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xl,
     backgroundColor: Colors.background,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: Colors.outlineVariant,
   },
   finishedBtn: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     borderRadius: Radius.full,
     paddingVertical: Spacing.md + 2,
     flexDirection: 'row',
@@ -789,7 +789,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.sm,
     elevation: 4,
-    shadowColor: Colors.accent,
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -799,18 +799,18 @@ const styles = StyleSheet.create({
   },
   finishedBtnText: {
     color: Colors.background,
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.body,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.3,
   },
   finishedBtnDisabled: {
-    backgroundColor: Colors.textMuted,
+    backgroundColor: Colors.outline,
     elevation: 0,
     shadowOpacity: 0,
   },
   stepCountLabel: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
     fontWeight: Typography.weights.medium,
   },
   noStepsBox: {
@@ -818,11 +818,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
   },
   noStepsText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.onSurfaceVariant,
     lineHeight: 20,
   },
 });
