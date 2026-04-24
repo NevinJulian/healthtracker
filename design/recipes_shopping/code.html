@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Kinetic Atelier - Recipes &amp; Shopping</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary": "#1d361e",
+                      "on-tertiary-container": "#203921",
+                      "secondary-fixed-dim": "#a9cdd2",
+                      "error-container": "#93000a",
+                      "on-secondary-container": "#97bbc1",
+                      "primary-fixed": "#ffdad4",
+                      "tertiary": "#b0cfad",
+                      "on-primary": "#5e170e",
+                      "surface-variant": "#333537",
+                      "tertiary-container": "#86a383",
+                      "on-secondary-fixed-variant": "#294c51",
+                      "tertiary-fixed-dim": "#b0cfad",
+                      "secondary-container": "#294c51",
+                      "surface-tint": "#ffb4a8",
+                      "on-primary-fixed": "#400201",
+                      "inverse-on-surface": "#2f3133",
+                      "surface-container-lowest": "#0c0e10",
+                      "primary-container": "#e67e6e",
+                      "on-error-container": "#ffdad6",
+                      "surface-bright": "#37393b",
+                      "surface-container-low": "#1a1c1e",
+                      "on-secondary-fixed": "#001f23",
+                      "on-primary-fixed-variant": "#7c2d22",
+                      "secondary": "#a9cdd2",
+                      "on-error": "#690005",
+                      "background": "#121416",
+                      "on-surface": "#e2e2e5",
+                      "on-secondary": "#10353a",
+                      "surface-dim": "#121416",
+                      "inverse-surface": "#e2e2e5",
+                      "surface-container-highest": "#333537",
+                      "inverse-primary": "#9a4337",
+                      "on-primary-container": "#611911",
+                      "surface-container-high": "#282a2c",
+                      "on-surface-variant": "#dbc1bc",
+                      "primary-fixed-dim": "#ffb4a8",
+                      "on-background": "#e2e2e5",
+                      "tertiary-fixed": "#ccebc7",
+                      "on-tertiary-fixed-variant": "#334d33",
+                      "surface": "#121416",
+                      "secondary-fixed": "#c4e9ee",
+                      "surface-container": "#1e2022",
+                      "on-tertiary-fixed": "#07200b",
+                      "outline-variant": "#55423f",
+                      "error": "#ffb4ab",
+                      "outline": "#a38b88",
+                      "primary": "#ffb4a8"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {},
+              "fontFamily": {
+                      "headline": [
+                              "Manrope", "sans-serif"
+                      ],
+                      "body": [
+                              "Inter", "sans-serif"
+                      ],
+                      "label": [
+                              "Inter", "sans-serif"
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body min-h-screen pt-16 pb-20 md:pb-0">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-[#121416] bg-gradient-to-b from-[#121416] to-transparent flat no shadows flex justify-between items-center px-5 h-16 max-w-7xl mx-auto left-0 right-0">
+<button class="text-[#ffb4a8] hover:opacity-80 transition-opacity scale-95 active:transition-transform">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-['Manrope'] font-bold tracking-tight text-2xl uppercase text-[#ffb4a8]">KINETIC</h1>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant/15">
+<img alt="Profile Photo" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9mze-ll8BsTVrQmKLbbSkRhbSiEhEf0dGMwiyHWpCuMoJOLUlQqqSt8rDPrpvj3ySMf3-_MO7-JspJOkb5XorzIdWtxI8sR7myvfDAxZeDCEjUxNygFyKc4LsbxdCU_hQjEgI-FHMulgYOSXLSvCnKMZa3JkorzinkQZubZl5dN2Cd5PZONOnht_ruJqgpKYNE6pFC28PHosqqwq3j8OMztW4gNaMM67BEy-6dx8rR8haH1n3OKUmYL4QnTi9PFy85L9yw-AUnMA"/>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="max-w-7xl mx-auto px-5 py-8 md:flex md:gap-12">
+<!-- Left Side: Recipes Canvas -->
+<section class="flex-1 space-y-12">
+<!-- Header & Filters -->
+<div class="space-y-6">
+<h2 class="font-headline font-bold text-[2rem] leading-tight text-on-surface">Atelier Nutrition</h2>
+<div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-primary-container text-on-primary-container font-label text-[0.6875rem] uppercase tracking-[0.05em] font-bold">All</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-surface-container-highest text-on-surface font-label text-[0.6875rem] uppercase tracking-[0.05em]">Fresh</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-surface-container-highest text-on-surface font-label text-[0.6875rem] uppercase tracking-[0.05em]">Quick</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-surface-container-highest text-on-surface font-label text-[0.6875rem] uppercase tracking-[0.05em]">Freezer</button>
+</div>
+</div>
+<!-- Recipe Grid (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Card 1 -->
+<div class="bg-surface-container-low rounded-xl overflow-hidden group cursor-pointer">
+<div class="h-48 bg-surface-container-high relative">
+<img class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" data-alt="High-end culinary photography of a fresh vibrant salad bowl with dark slate background and dramatic directional lighting highlighting the textures of greens and grains" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDce58Y5t8ZjpCZuocUr7n2t_1GD9xl9Hu_vIkNEl6AplQ_DM0gBJgGROqK-HWHm-g0OmzmwZdyXfyO6771PWRXEYxub9YospFSX2JKKsNPsKNe4yzBWmwX2pmephMOq3SQSndIPbiXZ_vROZ8s_QusSUDDOULxzBLFsIpvt_WhYw0BIq7Hs12ci1lnKIecByk3qW1By_en0xaIoYqXUFK63dygW_rzl7eQulFL_zt1X6TQWjDVbMNo9g0rM40khCQyxjeHv8FdHmU"/>
+<div class="absolute top-3 right-3 bg-surface-container-highest/60 backdrop-blur-[20px] px-3 py-1 rounded-md">
+<span class="font-label text-[0.6875rem] text-on-surface uppercase tracking-[0.05em]">15 MIN</span>
+</div>
+</div>
+<div class="p-5 space-y-4">
+<h3 class="font-headline font-bold text-[1.375rem] text-on-surface">Kinetic Power Bowl</h3>
+<div class="flex justify-between items-center border-t border-outline-variant/15 pt-4">
+<div class="flex gap-4">
+<div class="flex flex-col">
+<span class="font-label text-[0.6875rem] text-on-surface-variant uppercase tracking-[0.05em]">CALS</span>
+<span class="font-body font-bold text-on-surface">450</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label text-[0.6875rem] text-on-surface-variant uppercase tracking-[0.05em]">PRO</span>
+<span class="font-body font-bold text-primary">35g</span>
+</div>
+</div>
+<button class="h-8 w-8 rounded-full bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[1.25rem]" data-icon="add">add</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-low rounded-xl overflow-hidden group cursor-pointer relative">
+<!-- Accent Bar for Cardio/Vitality meals -->
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-tertiary"></div>
+<div class="h-48 bg-surface-container-high relative">
+<img class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" data-alt="Artisanal baked salmon fillet on a dark ceramic plate with roasted asparagus, dark moody lighting creating a premium restaurant atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKS2oNBWGYFG-D1Gv2LVi4_PgWpv5jVHVRYiDSQcNdKvOgKEGz_lvmwPsaM47qdJAh7lfckETWwVK4QUye-8SyhGYWHSNRGk61tziAs_fLwlAmTdWWJhmmE7N98lw6RBHP0suGOOKWKuwBeEAWGioBeKFMApss1UjtpH-5PLNgiOtN4ULbpPhyJ5voMEYi8zAtGkRYjgdchM2ZwqS-6ttAZIIwfJPgoh0zMhhMiOW9jbnR5Enb7-rwICXWdafz78U7zUsqljeIljA"/>
+<div class="absolute top-3 right-3 bg-surface-container-highest/60 backdrop-blur-[20px] px-3 py-1 rounded-md">
+<span class="font-label text-[0.6875rem] text-on-surface uppercase tracking-[0.05em]">30 MIN</span>
+</div>
+</div>
+<div class="p-5 pl-6 space-y-4">
+<h3 class="font-headline font-bold text-[1.375rem] text-on-surface">Recovery Salmon</h3>
+<div class="flex justify-between items-center border-t border-outline-variant/15 pt-4">
+<div class="flex gap-4">
+<div class="flex flex-col">
+<span class="font-label text-[0.6875rem] text-on-surface-variant uppercase tracking-[0.05em]">CALS</span>
+<span class="font-body font-bold text-on-surface">520</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label text-[0.6875rem] text-on-surface-variant uppercase tracking-[0.05em]">PRO</span>
+<span class="font-body font-bold text-primary">42g</span>
+</div>
+</div>
+<button class="h-8 w-8 rounded-full bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[1.25rem]" data-icon="add">add</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Side: Shopping List (Hidden on mobile, visible on desktop) -->
+<aside class="hidden md:block w-80 shrink-0 space-y-8">
+<div class="sticky top-24 bg-surface-container-low rounded-xl p-6">
+<div class="flex justify-between items-end mb-6">
+<h3 class="font-headline font-bold text-[1.5rem] text-on-surface">Shopping</h3>
+<button class="text-primary text-sm font-medium hover:opacity-80">Clear</button>
+</div>
+<div class="space-y-6">
+<!-- Category 1 -->
+<div>
+<h4 class="font-label text-[0.6875rem] text-on-surface-variant uppercase tracking-[0.05em] mb-3">Produce</h4>
+<ul class="space-y-2">
+<li class="flex items-center gap-3 p-2 rounded-md hover:bg-surface-container-highest transition-colors cursor-pointer">
+<div class="h-5 w-5 rounded-md border border-outline-variant/50 flex items-center justify-center"></div>
+<span class="font-body text-[0.875rem] text-on-surface">Spinach (2 bags)</span>
+</li>
+<li class="flex items-center gap-3 p-2 rounded-md bg-surface-container-highest transition-colors cursor-pointer">
+<div class="h-5 w-5 rounded-md bg-primary/20 border border-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[1rem] text-primary" data-icon="check">check</span>
+</div>
+<span class="font-body text-[0.875rem] text-on-surface-variant line-through">Avocado (3x)</span>
+</li>
+</ul>
+</div>
+<!-- Category 2 -->
+<div>
+<h4 class="font-label text-[0.6875rem] text-on-surface-variant uppercase tracking-[0.05em] mb-3">Protein</h4>
+<ul class="space-y-2">
+<li class="flex items-center gap-3 p-2 rounded-md hover:bg-surface-container-highest transition-colors cursor-pointer">
+<div class="h-5 w-5 rounded-md border border-outline-variant/50 flex items-center justify-center"></div>
+<span class="font-body text-[0.875rem] text-on-surface">Chicken Breast (1 lb)</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</aside>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-20 pb-safe px-4 bg-[#121416]/80 backdrop-blur-md rounded-t-2xl z-50 border-t border-white/5 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-colors active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="wb_sunny">wb_sunny</span>
+<span class="font-['Inter'] text-[10px] font-bold uppercase tracking-[0.05em] mt-1">Horizon</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-colors active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="fitness_center">fitness_center</span>
+<span class="font-['Inter'] text-[10px] font-bold uppercase tracking-[0.05em] mt-1">Training</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#ffb4a8] drop-shadow-[0_0_8px_rgba(255,180,168,0.4)] active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="restaurant" data-weight="fill" style="font-variation-settings: 'FILL' 1;">restaurant</span>
+<span class="font-['Inter'] text-[10px] font-bold uppercase tracking-[0.05em] mt-1">Nutrition</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-colors active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-['Inter'] text-[10px] font-bold uppercase tracking-[0.05em] mt-1">Atelier</span>
+</a>
+</nav>
+<!-- NavigationDrawer (Hidden by default, structure provided) -->
+<aside class="hidden fixed right-0 top-0 h-full w-80 z-[60] bg-[#1a1c1e]/90 backdrop-blur-2xl border-l border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.5)] flex-col p-6 gap-4 translate-x-0 transition-transform duration-300 ease-in-out">
+<!-- Drawer content would go here -->
+</aside>
+</body></html>

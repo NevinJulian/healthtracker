@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kinetic Atelier - Planner</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary": "#1d361e",
+                        "on-tertiary-container": "#203921",
+                        "secondary-fixed-dim": "#a9cdd2",
+                        "error-container": "#93000a",
+                        "on-secondary-container": "#97bbc1",
+                        "primary-fixed": "#ffdad4",
+                        "tertiary": "#b0cfad",
+                        "on-primary": "#5e170e",
+                        "surface-variant": "#333537",
+                        "tertiary-container": "#86a383",
+                        "on-secondary-fixed-variant": "#294c51",
+                        "tertiary-fixed-dim": "#b0cfad",
+                        "secondary-container": "#294c51",
+                        "surface-tint": "#ffb4a8",
+                        "on-primary-fixed": "#400201",
+                        "inverse-on-surface": "#2f3133",
+                        "surface-container-lowest": "#0c0e10",
+                        "primary-container": "#e67e6e",
+                        "on-error-container": "#ffdad6",
+                        "surface-bright": "#37393b",
+                        "surface-container-low": "#1a1c1e",
+                        "on-secondary-fixed": "#001f23",
+                        "on-primary-fixed-variant": "#7c2d22",
+                        "secondary": "#a9cdd2",
+                        "on-error": "#690005",
+                        "background": "#121416",
+                        "on-surface": "#e2e2e5",
+                        "on-secondary": "#10353a",
+                        "surface-dim": "#121416",
+                        "inverse-surface": "#e2e2e5",
+                        "surface-container-highest": "#333537",
+                        "inverse-primary": "#9a4337",
+                        "on-primary-container": "#611911",
+                        "surface-container-high": "#282a2c",
+                        "on-surface-variant": "#dbc1bc",
+                        "primary-fixed-dim": "#ffb4a8",
+                        "on-background": "#e2e2e5",
+                        "tertiary-fixed": "#ccebc7",
+                        "on-tertiary-fixed-variant": "#334d33",
+                        "surface": "#121416",
+                        "secondary-fixed": "#c4e9ee",
+                        "surface-container": "#1e2022",
+                        "on-tertiary-fixed": "#07200b",
+                        "outline-variant": "#55423f",
+                        "error": "#ffb4ab",
+                        "outline": "#a38b88",
+                        "primary": "#ffb4a8"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {},
+                    "fontFamily": {
+                        "headline": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { background-color: #121416; color: #e2e2e5; font-family: 'Inter', sans-serif; }
+        .glass-panel { background: rgba(51, 53, 55, 0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface antialiased min-h-screen relative pb-32">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-[#121416] bg-gradient-to-b from-[#121416] to-transparent flex justify-between items-center px-5 h-16 w-full max-w-7xl mx-auto">
+<button class="text-[#ffb4a8] hover:opacity-80 transition-opacity scale-95 active:transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">menu</span>
+</button>
+<h1 class="font-['Manrope'] font-bold tracking-tight text-2xl uppercase text-2xl font-black tracking-tighter text-[#ffb4a8]">KINETIC</h1>
+<button class="text-slate-400 hover:opacity-80 transition-opacity scale-95 active:transition-transform">
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-container-highest">
+<img alt="Profile Photo" class="w-full h-full object-cover" data-alt="close up studio portrait of fit woman with dark slicked back hair looking determined against dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCL0PXYzWZzssTjvvOSBkAqJxGPu3eE5nl_CKJZWb_gaRi57KdYIUquNbXelxvG5Lu1IKHAAs6CNxXGaO9XzCz-rsthDuDHUbnE43-V-cXvORX2XzeOUkrE9BiiflQ8_hGkKg1c096XVLj0MPEtUVnkVOAJgJYyX8GYGIRjIZTmenjWb9MjRT0cd-x5_NFKRrXaaFBUfa9-SznptTh6_RPH24_9T1Ebl3BaG-t44r5sydOUIT_uo0MF8cZdJPdD4pGVt4LO5wXNcVo"/>
+</div>
+</button>
+</header>
+<main class="pt-24 px-5 max-w-4xl mx-auto">
+<!-- Top Tab Navigator (Editorial Style) -->
+<div class="flex items-baseline gap-6 mb-8">
+<h2 class="font-headline text-3xl font-bold tracking-tight text-primary">Weekly Plan</h2>
+<h2 class="font-headline text-xl font-medium tracking-tight text-on-surface-variant/50 hover:text-on-surface-variant transition-colors cursor-pointer">My Inventory</h2>
+</div>
+<!-- Horizontal 7-Day Calendar -->
+<div class="mb-10">
+<div class="flex items-center justify-between overflow-x-auto hide-scrollbar gap-2 pb-2">
+<!-- Day 1 (Past) -->
+<div class="flex flex-col items-center gap-2 min-w-[3rem]">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant/40">Mon</span>
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant/40 font-body text-sm font-medium">12</div>
+</div>
+<!-- Day 2 (Past) -->
+<div class="flex flex-col items-center gap-2 min-w-[3rem]">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant/40">Tue</span>
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant/40 font-body text-sm font-medium">13</div>
+</div>
+<!-- Day 3 (Current) -->
+<div class="flex flex-col items-center gap-2 min-w-[3rem] relative">
+<span class="font-label text-[10px] uppercase tracking-widest text-primary font-bold">Wed</span>
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary font-body text-base font-bold shadow-[0_0_16px_rgba(255,180,168,0.3)]">14</div>
+<div class="absolute -bottom-3 w-1 h-1 rounded-full bg-primary"></div>
+</div>
+<!-- Day 4 (Future) -->
+<div class="flex flex-col items-center gap-2 min-w-[3rem]">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Thu</span>
+<div class="w-10 h-10 rounded-full bg-surface-container border border-outline-variant/20 flex items-center justify-center text-on-surface font-body text-sm font-medium">15</div>
+</div>
+<!-- Day 5 (Future) -->
+<div class="flex flex-col items-center gap-2 min-w-[3rem]">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Fri</span>
+<div class="w-10 h-10 rounded-full bg-surface-container border border-outline-variant/20 flex items-center justify-center text-on-surface font-body text-sm font-medium">16</div>
+</div>
+<!-- Day 6 (Future) -->
+<div class="flex flex-col items-center gap-2 min-w-[3rem]">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Sat</span>
+<div class="w-10 h-10 rounded-full bg-surface-container border border-outline-variant/20 flex items-center justify-center text-on-surface font-body text-sm font-medium">17</div>
+</div>
+<!-- Day 7 (Future) -->
+<div class="flex flex-col items-center gap-2 min-w-[3rem]">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Sun</span>
+<div class="w-10 h-10 rounded-full bg-surface-container border border-outline-variant/20 flex items-center justify-center text-on-surface font-body text-sm font-medium">18</div>
+</div>
+</div>
+</div>
+<!-- Daily Plan Content -->
+<div class="space-y-8">
+<!-- Lunch Slot -->
+<section>
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-primary text-xl" style="font-variation-settings: 'FILL' 1;">wb_sunny</span>
+<h3 class="font-headline text-xl text-on-surface font-semibold tracking-tight">Lunch</h3>
+</div>
+<div class="bg-surface-container-low rounded-xl overflow-hidden group relative">
+<!-- Image Background -->
+<div class="absolute inset-0 z-0">
+<img alt="Lunch Meal" class="w-full h-full object-cover opacity-40 mix-blend-overlay" data-alt="top down view of healthy grain bowl with roasted sweet potato quinoa avocado and dark leafy greens on slate plate" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdOPUz_UFmRROtT7RaO490e3LkRcDAAZSEk4BhYFqMi6-lksc08Wvd0Dsglg0QhOTUy5_AYyb_BN4u9r4QHAvqnL8T3Skx1Kx6fb_FQyBFlTWb5YjnFB-Fk0UDLU75NHEOgJPQqGFK7fd0zRbGrWDEpuy1JIxfjpnz506rLoSwhlCRe4HhIgG2kzCyqnR8l7pUMbPCwIR6UcIFKzhzNyP5dZ7LkkNUxV_btNu2o88HeTM3-MMWDIaCCm-GA1GjL9JWlUgD_h2eH10"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/80 to-transparent"></div>
+</div>
+<div class="relative z-10 p-5 flex flex-col min-h-[160px] justify-end">
+<div class="flex justify-between items-end">
+<div>
+<span class="font-label text-[10px] uppercase tracking-widest text-primary mb-1 block">Prepped • High Protein</span>
+<h4 class="font-body text-lg font-medium text-on-surface mb-1">Miso Glazed Salmon Bowl</h4>
+<p class="font-body text-sm text-on-surface-variant">450 kcal • 35g P • 40g C</p>
+</div>
+<!-- Consumed Checkbox -->
+<button class="w-12 h-12 rounded-full bg-tertiary-container/20 flex items-center justify-center hover:bg-tertiary-container/40 transition-colors">
+<span class="material-symbols-outlined text-tertiary text-2xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Dinner Slot -->
+<section>
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-primary text-xl" style="font-variation-settings: 'FILL' 0;">dark_mode</span>
+<h3 class="font-headline text-xl text-on-surface font-semibold tracking-tight">Dinner</h3>
+</div>
+<div class="bg-surface-container-low rounded-xl overflow-hidden group relative">
+<!-- Empty State / Add Recipe -->
+<div class="p-6 flex flex-col items-center justify-center min-h-[160px] border border-dashed border-outline-variant/30 rounded-xl bg-surface-dim">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-on-surface-variant" style="font-variation-settings: 'FILL' 0;">add</span>
+</div>
+<p class="font-body text-sm text-on-surface-variant mb-1">No meal planned yet.</p>
+<button class="text-primary font-label text-xs uppercase tracking-wider font-semibold hover:opacity-80 transition-opacity">Select from Inventory</button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Floating Action Button (Log Cooked Meal) -->
+<button class="fixed bottom-28 right-5 z-40 glass-panel rounded-full px-5 py-4 flex items-center gap-3 shadow-[0_0_32px_rgba(226,226,229,0.04)] hover:scale-105 transition-transform active:scale-95 group">
+<div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-[0_0_12px_rgba(255,180,168,0.4)]">
+<span class="material-symbols-outlined text-on-primary text-lg" style="font-variation-settings: 'FILL' 1;">skillet</span>
+</div>
+<span class="font-label text-xs uppercase tracking-widest text-on-surface font-semibold pr-2">Log Prep</span>
+</button>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 rounded-t-2xl bg-[#121416]/80 backdrop-blur-md border-t border-white/5 shadow-[0_-4px_20px_rgba(0,0,0,0.3)] fixed bottom-0 left-0 w-full flex justify-around items-center h-20 pb-safe px-4">
+<!-- Horizon -->
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-colors active:scale-90 transition-transform cursor-pointer w-16">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">wb_sunny</span>
+<span class="font-['Inter'] text-[10px] font-bold uppercase tracking-[0.05em]">Horizon</span>
+</div>
+<!-- Training -->
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-colors active:scale-90 transition-transform cursor-pointer w-16">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">fitness_center</span>
+<span class="font-['Inter'] text-[10px] font-bold uppercase tracking-[0.05em]">Training</span>
+</div>
+<!-- Nutrition (Active) -->
+<div class="flex flex-col items-center justify-center text-[#ffb4a8] drop-shadow-[0_0_8px_rgba(255,180,168,0.4)] hover:text-slate-200 transition-colors active:scale-90 transition-transform cursor-pointer w-16">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">restaurant</span>
+<span class="font-['Inter'] text-[10px] font-bold uppercase tracking-[0.05em]">Nutrition</span>
+</div>
+<!-- Atelier -->
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-colors active:scale-90 transition-transform cursor-pointer w-16">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">person</span>
+<span class="font-['Inter'] text-[10px] font-bold uppercase tracking-[0.05em]">Atelier</span>
+</div>
+</nav>
+</body></html>
