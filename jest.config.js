@@ -1,6 +1,3 @@
 module.exports = {
-  testEnvironment: 'node',
-  transform: {
-    '^.+\\.tsx?$': 'babel-jest',
-  },
+  preset: 'jest-expo',
 };
