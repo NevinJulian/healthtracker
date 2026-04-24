@@ -1,7 +1,19 @@
+/**
+ * Kinetic Atelier — App Navigator
+ *
+ * Right-side drawer navigation styled to match the Stitch design spec:
+ * - Deep slate (#0c0e10) drawer background
+ * - Coral (#ffb4a8) primary accent for active items and hamburger icon
+ * - KINETIC wordmark as header title
+ * - Transparent gradient header (no bottom border)
+ * - No emoji icons — text-based icon labels styled with system font
+ *
+ * Issues #192, #193, #194, #195
+ */
+
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { Text, View, StyleSheet, TouchableOpacity } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import DashboardScreen from '../screens/DashboardScreen';
 import OverviewScreen from '../screens/OverviewScreen';
@@ -12,7 +24,7 @@ import RecipesScreen from '../screens/RecipesScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 import ShoppingListScreen from '../screens/ShoppingListScreen';
 import CookingTasksScreen from '../screens/CookingTasksScreen';
-import { Colors, Typography, Spacing } from '../theme/tokens';
+import { Colors, Spacing, Typography } from '../theme/tokens';
 import { createStackNavigator } from '@react-navigation/stack';
 
 const Drawer = createDrawerNavigator();
@@ -27,26 +39,42 @@ function RecipesStackScreen() {
   );
 }
 
-const DRAWER_ICONS: Record<string, string> = {
-  Today: '🏋️',
-  Schedule: '📅',
-  Analytics: '📊',
-  'Meal Prep': '🥗',
-  Template: '✏️',
-  Recipes: '🍽️',
-  Shopping: '🛒',
-  'Cooking Tasks': '👨‍🍳',
+// ---------------------------------------------------------------------------
+// Icon labels — clean Unicode symbols, no emoji, styled with design tokens
+// ---------------------------------------------------------------------------
+const DRAWER_ICON_LABELS: Record<string, string> = {
+  Today:           '◈',
+  Schedule:        '⊟',
+  Analytics:       '▲',
+  'Meal Prep':     '◉',
+  Template:        '⊞',
+  Recipes:         '◎',
+  Shopping:        '◧',
+  'Cooking Tasks': '◈',
 };
 
-function DrawerIcon({ label }: { label: string }) {
+function DrawerIcon({ label, focused }: { label: string; focused: boolean }) {
   return (
     <View style={styles.iconContainer}>
-      <Text style={styles.iconEmoji}>{DRAWER_ICONS[label] ?? '•'}</Text>
+      <Text style={[styles.iconSymbol, focused && styles.iconSymbolActive]}>
+        {DRAWER_ICON_LABELS[label] ?? '·'}
+      </Text>
     </View>
   );
 }
 
-/** Hamburger button rendered on the RIGHT side of every header. */
+// ---------------------------------------------------------------------------
+// Header — KINETIC wordmark + coral hamburger
+// ---------------------------------------------------------------------------
+
+/** KINETIC coral wordmark rendered as the header title. */
+function HeaderTitle() {
+  return (
+    <Text style={styles.headerWordmark}>KINETIC</Text>
+  );
+}
+
+/** Coral hamburger button on the RIGHT side of every header. */
 function HeaderRightMenu() {
   const navigation = useNavigation();
   return (
@@ -54,48 +82,52 @@ function HeaderRightMenu() {
       style={styles.burgerBtn}
       onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
       activeOpacity={0.7}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       accessibilityLabel="Open navigation menu"
       accessibilityRole="button"
     >
       <View style={styles.burgerLine} />
-      <View style={styles.burgerLine} />
+      <View style={[styles.burgerLine, styles.burgerLineMid]} />
       <View style={styles.burgerLine} />
     </TouchableOpacity>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Navigator
+// ---------------------------------------------------------------------------
+
 export default function AppNavigator() {
   return (
     <Drawer.Navigator
       screenOptions={({ route }) => ({
-        // ── Header ──────────────────────────────────────────────
+        // ── Header — transparent, gradient from background ───────────────────
         headerShown: true,
+        headerTransparent: true,
         headerStyle: {
-          backgroundColor: Colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          backgroundColor: 'transparent',
         } as any,
-        headerTintColor: Colors.textPrimary,
-        headerTitleStyle: {
-          fontWeight: Typography.weights.bold,
-          fontSize: Typography.sizes.lg,
-        },
-        // Move burger to the RIGHT, suppress default left icon
+        // No bottom border line — use gradient fade in each screen instead
+        headerShadowVisible: false,
         headerLeft: () => null,
+        headerTitle: () => <HeaderTitle />,
         headerRight: () => <HeaderRightMenu />,
-        // ── Drawer ──────────────────────────────────────────────
+        headerTitleAlign: 'center',
+
+        // ── Drawer — deep slate, right-side ──────────────────────────────────
         drawerPosition: 'right',
         drawerStyle: {
-          backgroundColor: Colors.background,
+          backgroundColor: Colors.surfaceLowest, // #0c0e10
           width: 280,
         },
-        drawerActiveTintColor: Colors.accent,
-        drawerInactiveTintColor: Colors.textSecondary,
-        drawerActiveBackgroundColor: Colors.surface,
-        // Give the label a proper left gap so it doesn't touch the emoji
+        // Active item: coral text + subtle coral background tint
+        drawerActiveTintColor: Colors.primary,          // #ffb4a8
+        drawerInactiveTintColor: `${Colors.onSurface}99`, // 60% opacity
+        drawerActiveBackgroundColor: `${Colors.primary}1a`, // ~10% opacity
+        // Label style — Inter system font, 11px ALL-CAPS, wide tracking
         drawerLabelStyle: styles.drawerLabel,
-        drawerIcon: () => <DrawerIcon label={route.name} />,
+        drawerItemStyle: styles.drawerItem,
+        drawerIcon: ({ focused }) => <DrawerIcon label={route.name} focused={focused} />,
       })}
     >
       <Drawer.Screen name="Today" component={DashboardScreen} />
@@ -110,23 +142,23 @@ export default function AppNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
-  // Drawer label — positive marginLeft gives breathing room after the icon
-  drawerLabel: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.medium,
-    marginLeft: 12,
-  },
-  iconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 28,
-  },
-  iconEmoji: { fontSize: 20 },
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
 
-  // Right-side hamburger
+const styles = StyleSheet.create({
+  // Header — KINETIC wordmark
+  headerWordmark: {
+    fontSize: 22,
+    fontWeight: Typography.weights.black,
+    letterSpacing: -1,
+    color: Colors.primary,          // Coral
+    textTransform: 'uppercase',
+  },
+
+  // Hamburger (right)
   burgerBtn: {
-    marginRight: Spacing.lg,
+    marginRight: Spacing.xl,        // 20px from right edge
     gap: 5,
     paddingVertical: 4,
     justifyContent: 'center',
@@ -136,6 +168,37 @@ const styles = StyleSheet.create({
     height: 2,
     width: 22,
     borderRadius: 2,
-    backgroundColor: Colors.textPrimary,
+    backgroundColor: Colors.primary, // Coral lines
+  },
+  burgerLineMid: {
+    width: 16,                        // Slightly shorter middle line for style
+  },
+
+  // Drawer items
+  drawerLabel: {
+    fontSize: Typography.sizes.label, // 11px
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginLeft: 4,
+  },
+  drawerItem: {
+    borderRadius: 8,
+    marginHorizontal: 8,
+    marginVertical: 2,
+  },
+
+  // Drawer icon symbol
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+  },
+  iconSymbol: {
+    fontSize: 16,
+    color: `${Colors.onSurface}99`,
+  },
+  iconSymbolActive: {
+    color: Colors.primary,
   },
 });
