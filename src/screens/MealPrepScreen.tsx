@@ -303,7 +303,7 @@ function LogMealModal({ visible, onClose, recipes, onSave }: any) {
           />
 
           <View style={styles.inputRow}>
-            <Text style={{ color: Colors.textPrimary }}>Portions Cooked:</Text>
+            <Text style={{ color: Colors.onSurface }}>Portions Cooked:</Text>
             <TextInput
               style={styles.numericInput}
               keyboardType="number-pad"
@@ -356,7 +356,7 @@ function AssignMealModal({ visible, onClose, inventory, onSave }: any) {
                   onPress={() => onSave(item.recipe_id)}
                 >
                   <Text style={styles.recipeSelectText}>{item.recipe.title}</Text>
-                  <Text style={{ color: Colors.accent, fontSize: 12 }}>({item.portions_available}x portions left)</Text>
+                  <Text style={{ color: Colors.primary, fontSize: 12 }}>({item.portions_available}x portions left)</Text>
                 </TouchableOpacity>
               )}
             />
@@ -376,131 +376,123 @@ function AssignMealModal({ visible, onClose, inventory, onSave }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.surfaceLow,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
     gap: Spacing.md,
   },
   headerTitle: {
-    fontSize: Typography.sizes.xl,
-    color: Colors.textPrimary,
-    fontWeight: Typography.weights.bold,
+    fontSize: Typography.sizes.headlineL,
+    color: Colors.onSurface,
+    fontWeight: Typography.weights.extrabold,
+    letterSpacing: -1,
   },
   tabSwitcher: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.full,
-    padding: 4,
-    gap: 2,
+    gap: 4,
   },
   tabPill: {
-    flex: 1,
     paddingVertical: Spacing.xs + 2,
+    paddingHorizontal: Spacing.lg,
     borderRadius: Radius.full,
     alignItems: 'center',
   },
-  tabPillActive: { backgroundColor: Colors.accent },
+  tabPillActive: { /* active is handled via text size contrast */ },
   tabPillText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes.titleL,
+    color: `${Colors.onSurface}50`,
+    fontWeight: Typography.weights.bold,
   },
-  tabPillTextActive: { color: Colors.background },
-  
-  tabContainer: { flex: 1 },
-  scrollContent: { padding: Spacing.lg, gap: Spacing.md },
+  tabPillTextActive: {
+    color: Colors.primary,
+    fontSize: Typography.sizes.headlineL,
+  },
 
-  // Inventory Card
+  tabContainer: { flex: 1 },
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.xxl, paddingBottom: Spacing.hero, gap: Spacing.md },
+
   card: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceLow,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
     gap: Spacing.xs,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: Typography.sizes.md, color: Colors.textPrimary, fontWeight: Typography.weights.bold, flex: 1 },
-  badge: { backgroundColor: Colors.accent, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.full },
-  badgeText: { color: Colors.background, fontSize: Typography.sizes.xs, fontWeight: Typography.weights.bold },
+  cardTitle: { fontSize: Typography.sizes.titleL, color: Colors.onSurface, fontWeight: Typography.weights.bold, flex: 1 },
+  badge: { backgroundColor: `${Colors.primary}1a`, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.full },
+  badgeText: { color: Colors.primary, fontSize: Typography.sizes.label, fontWeight: Typography.weights.bold, letterSpacing: 1, textTransform: 'uppercase' },
   macroRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  macroText: { fontSize: Typography.sizes.xs, color: Colors.textSecondary },
-  dateText: { fontSize: 10, color: Colors.textMuted, marginTop: 4, fontStyle: 'italic' },
+  macroText: { fontSize: Typography.sizes.label, color: Colors.onSurfaceVariant, letterSpacing: 1, textTransform: 'uppercase' },
+  dateText: { fontSize: 10, color: Colors.outline, marginTop: 4, fontStyle: 'italic' },
 
   actionButton: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     padding: Spacing.md,
     borderRadius: Radius.full,
     alignItems: 'center',
     marginBottom: Spacing.sm,
   },
-  actionButtonText: { color: Colors.background, fontSize: Typography.sizes.md, fontWeight: Typography.weights.bold },
+  actionButtonText: { color: Colors.onPrimary, fontSize: Typography.sizes.label, fontWeight: Typography.weights.bold, letterSpacing: 1.5, textTransform: 'uppercase' },
 
   emptyState: { alignItems: 'center', marginTop: 40, gap: 8 },
-  emptyStateText: { color: Colors.textPrimary, fontSize: Typography.sizes.md, fontWeight: Typography.weights.semibold },
-  emptyStateSub: { color: Colors.textSecondary, fontSize: Typography.sizes.sm },
+  emptyStateText: { color: Colors.onSurface, fontSize: Typography.sizes.body, fontWeight: Typography.weights.semibold },
+  emptyStateSub: { color: Colors.onSurfaceVariant, fontSize: Typography.sizes.bodyS },
 
-  // Weekly blocks
   dayBlock: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceLow,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
     marginBottom: Spacing.sm,
   },
-  dayTitle: { fontSize: Typography.sizes.md, color: Colors.textPrimary, fontWeight: Typography.weights.bold, marginBottom: Spacing.sm },
-  mealSlot: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  dayTitle: { fontSize: Typography.sizes.body, color: Colors.onSurface, fontWeight: Typography.weights.bold, marginBottom: Spacing.sm },
+  mealSlot: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    paddingVertical: Spacing.sm,
   },
-  mealType: { fontSize: Typography.sizes.sm, color: Colors.textSecondary, width: 60, fontWeight: Typography.weights.semibold },
-  
+  mealType: { fontSize: Typography.sizes.label, color: Colors.outline, width: 60, fontWeight: Typography.weights.bold, letterSpacing: 1.5, textTransform: 'uppercase' },
+
   assignedMeal: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  checkbox: { 
-    width: 20, height: 20, 
-    borderRadius: 4, 
-    borderWidth: 2, 
-    borderColor: Colors.accent,
+  checkbox: {
+    width: 20, height: 20,
+    borderRadius: Radius.full,
+    borderWidth: 2,
+    borderColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center'
   },
-  checkboxInner: { width: 12, height: 12, borderRadius: 2 },
-  checkboxChecked: { backgroundColor: Colors.accent },
-  assignedTitle: { fontSize: Typography.sizes.sm, color: Colors.textPrimary, flex: 1 },
-  struckText: { textDecorationLine: 'line-through', color: Colors.textMuted },
-  
-  assignButton: { 
-    paddingHorizontal: Spacing.sm, 
-    paddingVertical: 4, 
-    borderWidth: 1, 
-    borderColor: Colors.accent, 
-    borderRadius: Radius.sm 
-  },
-  assignButtonText: { color: Colors.accent, fontSize: Typography.sizes.xs },
+  checkboxInner: { width: 10, height: 10, borderRadius: Radius.full },
+  checkboxChecked: { backgroundColor: Colors.primary },
+  assignedTitle: { fontSize: Typography.sizes.body, color: Colors.onSurface, flex: 1 },
+  struckText: { textDecorationLine: 'line-through', color: Colors.outline },
 
-  // Modals
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, elevation: 5 },
-  modalTitle: { fontSize: Typography.sizes.lg, color: Colors.textPrimary, fontWeight: Typography.weights.bold, marginBottom: 4 },
-  modalSubtitle: { fontSize: Typography.sizes.sm, color: Colors.textSecondary, marginBottom: 16 },
-  
-  recipeSelectOpt: { padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  recipeSelectOptActive: { backgroundColor: Colors.surfaceElevated },
-  recipeSelectText: { color: Colors.textPrimary, fontSize: Typography.sizes.sm },
-  recipeSelectTextActive: { color: Colors.accent, fontWeight: Typography.weights.bold },
-  
+  assignButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    backgroundColor: `${Colors.primary}1a`,
+    borderRadius: Radius.full,
+  },
+  assignButtonText: { color: Colors.primary, fontSize: Typography.sizes.label, fontWeight: Typography.weights.bold, letterSpacing: 1, textTransform: 'uppercase' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '85%', backgroundColor: Colors.surfaceLow, borderRadius: Radius.xl, padding: Spacing.xl, elevation: 5 },
+  modalTitle: { fontSize: Typography.sizes.titleL, color: Colors.onSurface, fontWeight: Typography.weights.bold, marginBottom: 4 },
+  modalSubtitle: { fontSize: Typography.sizes.body, color: Colors.onSurfaceVariant, marginBottom: 16 },
+
+  recipeSelectOpt: { padding: Spacing.md, borderRadius: Radius.md, marginBottom: 4 },
+  recipeSelectOptActive: { backgroundColor: Colors.surface },
+  recipeSelectText: { color: Colors.onSurface, fontSize: Typography.sizes.body },
+  recipeSelectTextActive: { color: Colors.primary, fontWeight: Typography.weights.bold },
+
   inputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 16 },
-  numericInput: { backgroundColor: Colors.background, color: Colors.textPrimary, padding: 8, borderRadius: Radius.sm, width: 80, textAlign: 'center' },
+  numericInput: { backgroundColor: Colors.surface, color: Colors.onSurface, padding: 8, borderRadius: Radius.md, width: 80, textAlign: 'center' },
 
   modalActions: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
-  modalBtnCancel: { flex: 1, padding: Spacing.md, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },
-  modalBtnTextCancel: { color: Colors.textPrimary, fontWeight: Typography.weights.semibold },
-  modalBtnSave: { flex: 1, padding: Spacing.md, borderRadius: Radius.full, backgroundColor: Colors.accent, alignItems: 'center' },
-  modalBtnTextSave: { color: Colors.background, fontWeight: Typography.weights.bold },
+  modalBtnCancel: { flex: 1, padding: Spacing.md, borderRadius: Radius.full, borderWidth: 1, borderColor: `${Colors.outlineVariant}40`, alignItems: 'center' },
+  modalBtnTextCancel: { color: Colors.onSurface, fontWeight: Typography.weights.semibold },
+  modalBtnSave: { flex: 1, padding: Spacing.md, borderRadius: Radius.full, backgroundColor: Colors.primary, alignItems: 'center' },
+  modalBtnTextSave: { color: Colors.onPrimary, fontWeight: Typography.weights.bold },
 });
+
+
+
