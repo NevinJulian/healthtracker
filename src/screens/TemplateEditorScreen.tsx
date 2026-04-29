@@ -93,7 +93,7 @@ function ExerciseModal({ visible, initial, onSave, onClose }: ExerciseModalProps
                 value={name}
                 onChangeText={setName}
                 placeholder="e.g. Chest Press"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={Colors.outline}
                 autoFocus
               />
             </View>
@@ -107,7 +107,7 @@ function ExerciseModal({ visible, initial, onSave, onClose }: ExerciseModalProps
                   onChangeText={setSets}
                   keyboardType="numeric"
                   placeholder="3"
-                  placeholderTextColor={Colors.textMuted}
+                  placeholderTextColor={Colors.outline}
                 />
               </View>
               <View style={[styles.fieldGroup, { flex: 2 }]}>
@@ -117,7 +117,7 @@ function ExerciseModal({ visible, initial, onSave, onClose }: ExerciseModalProps
                   value={reps}
                   onChangeText={setReps}
                   placeholder="e.g. 8-10 or 45 min"
-                  placeholderTextColor={Colors.textMuted}
+                  placeholderTextColor={Colors.outline}
                 />
               </View>
             </View>
@@ -129,7 +129,7 @@ function ExerciseModal({ visible, initial, onSave, onClose }: ExerciseModalProps
                 value={videoUrl}
                 onChangeText={setVideoUrl}
                 placeholder="https://youtube.com/watch?v=…"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={Colors.outline}
                 autoCapitalize="none"
                 keyboardType="url"
               />
@@ -266,9 +266,9 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
   };
 
   const accentColor = day.is_rest_day
-    ? Colors.textMuted
+    ? Colors.outline
     : day.is_meal_prep_day
-    ? Colors.accent
+    ? Colors.primary
     : Colors.secondary;
 
   return (
@@ -298,7 +298,7 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
           onChangeText={setWalk}
           multiline
           placeholder="Enter walking task…"
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={Colors.outline}
         />
       </View>
 
@@ -311,7 +311,7 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
           onChangeText={setHammer}
           multiline
           placeholder="Enter hammer / gym task label…"
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={Colors.outline}
         />
         <Text style={styles.inputHint}>
           Weight suffix (@ Baseline + Xkg) is appended automatically based on the
@@ -425,7 +425,7 @@ export default function TemplateEditorScreen() {
   if (loading) {
     return (
       <View style={styles.centred}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
@@ -478,17 +478,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.outlineVariant,
     gap: 4,
   },
   headerTitle: {
-    fontSize: Typography.sizes.xl,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.headlineL,
+    color: Colors.onSurface,
     fontWeight: Typography.weights.bold,
   },
   headerSubtitle: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.onSurfaceVariant,
     lineHeight: 18,
   },
 
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
 
   // Card
   card: {
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.surfaceHighest,
     borderRadius: Radius.md,
     borderLeftWidth: 3,
     padding: Spacing.md,
@@ -516,25 +516,25 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   dayBadgeText: {
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes.label,
     fontWeight: Typography.weights.black,
     letterSpacing: 1,
   },
   cardHeaderInfo: { flex: 1 },
   dayLabel: {
-    fontSize: Typography.sizes.md,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.body,
+    color: Colors.onSurface,
     fontWeight: Typography.weights.semibold,
   },
   tagRow: { flexDirection: 'row', gap: Spacing.xs, marginTop: 2 },
   tagRest: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
     fontWeight: Typography.weights.medium,
   },
   tagMealPrep: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.accent,
+    fontSize: Typography.sizes.label,
+    color: Colors.primary,
     fontWeight: Typography.weights.medium,
   },
 
@@ -542,8 +542,8 @@ const styles = StyleSheet.create({
   fieldGroup: { gap: 6 },
   fieldRow: { flexDirection: 'row', gap: Spacing.sm },
   fieldLabel: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
     fontWeight: Typography.weights.semibold,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
@@ -552,25 +552,25 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    color: Colors.textPrimary,
-    fontSize: Typography.sizes.sm,
+    color: Colors.onSurface,
+    fontSize: Typography.sizes.bodyS,
     lineHeight: 20,
     minHeight: 42,
     textAlignVertical: 'top',
   },
   inputHint: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
     fontStyle: 'italic',
     lineHeight: 16,
   },
 
   // Save button
   saveBtn: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     borderRadius: Radius.md,
     paddingVertical: Spacing.sm + 2,
     alignItems: 'center',
@@ -580,11 +580,11 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: Colors.background,
     fontWeight: Typography.weights.bold,
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.bodyS,
   },
   savedConfirm: {
-    color: Colors.accent,
-    fontSize: Typography.sizes.xs,
+    color: Colors.primary,
+    fontSize: Typography.sizes.label,
     textAlign: 'center',
     fontWeight: Typography.weights.medium,
   },
@@ -606,12 +606,12 @@ const styles = StyleSheet.create({
   },
   addExBtnText: {
     color: Colors.secondary,
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes.label,
     fontWeight: Typography.weights.bold,
   },
   noExHint: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.outline,
     fontStyle: 'italic',
     textAlign: 'center',
     paddingVertical: Spacing.sm,
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
   },
 
   // Exercise item
@@ -632,17 +632,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     gap: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.outlineVariant,
   },
   exItemInfo: { flex: 1, gap: 1 },
   exItemName: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.onSurface,
     fontWeight: Typography.weights.semibold,
   },
   exItemMeta: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
   },
   exEditBtn: {
     width: 30, height: 30, alignItems: 'center', justifyContent: 'center',
@@ -650,11 +650,11 @@ const styles = StyleSheet.create({
   exEditBtnText: { fontSize: 16 },
   exDeleteBtn: {
     width: 30, height: 30, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.danger + '18', borderRadius: Radius.sm,
+    backgroundColor: Colors.error + '18', borderRadius: Radius.sm,
   },
   exDeleteBtnText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.danger,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.error,
     fontWeight: Typography.weights.bold,
   },
 
@@ -675,14 +675,14 @@ const styles = StyleSheet.create({
   },
   modalHandle: {
     width: 40, height: 4,
-    backgroundColor: Colors.border,
+    backgroundColor: Colors.outlineVariant,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: Spacing.sm,
   },
   modalTitle: {
-    fontSize: Typography.sizes.lg,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.titleL,
+    color: Colors.onSurface,
     fontWeight: Typography.weights.bold,
   },
   modalFields: { gap: Spacing.md },
@@ -693,16 +693,16 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     flex: 1,
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.surfaceHighest,
     borderRadius: Radius.md,
     paddingVertical: Spacing.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
   },
   cancelBtnText: {
-    color: Colors.textSecondary,
+    color: Colors.onSurfaceVariant,
     fontWeight: Typography.weights.semibold,
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.bodyS,
   },
 });

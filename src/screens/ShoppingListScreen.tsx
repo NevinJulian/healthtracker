@@ -102,9 +102,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerTitle: {
-    fontSize: Typography.sizes.xl,
+    fontSize: Typography.sizes.headlineL,
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    color: Colors.onSurface,
   },
   clearButton: {
     backgroundColor: Colors.surface,
@@ -112,12 +112,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
   },
   clearButtonText: {
-    color: Colors.danger,
+    color: Colors.error,
     fontWeight: Typography.weights.medium,
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.bodyS,
   },
   emptyState: {
     flex: 1,
@@ -125,8 +125,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyStateText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.md,
+    color: Colors.onSurfaceVariant,
+    fontSize: Typography.sizes.body,
   },
   listContent: {
     paddingHorizontal: 16,
@@ -140,21 +140,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
   },
   checkboxChecked: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   checkmark: {
     color: Colors.background,
@@ -168,17 +168,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   itemName: {
-    color: Colors.textPrimary,
-    fontSize: Typography.sizes.md,
+    color: Colors.onSurface,
+    fontSize: Typography.sizes.body,
     flex: 1,
     marginRight: 8,
   },
   textCrossed: {
     textDecorationLine: 'line-through',
-    color: Colors.textMuted,
+    color: Colors.outline,
   },
   itemAmount: {
-    color: Colors.textSecondary,
+    color: Colors.onSurfaceVariant,
     fontWeight: Typography.weights.semibold,
   }
 });

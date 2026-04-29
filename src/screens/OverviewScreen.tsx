@@ -36,10 +36,10 @@ function getStatus(entry: DailyLogEntry, isToday: boolean): BadgeStatus {
 }
 
 const BADGE: Record<BadgeStatus, { emoji: string; color: string; label: string }> = {
-  full:    { emoji: '✅', color: Colors.badgeComplete, label: 'Complete' },
-  partial: { emoji: '🟡', color: Colors.badgePartial, label: 'Partial' },
-  none:    { emoji: '⬜', color: Colors.badgeNone, label: 'Pending' },
-  rest:    { emoji: '💤', color: Colors.badgeRest, label: 'Rest' },
+  full:    { emoji: '✓', color: Colors.tertiary, label: 'Complete' },
+  partial: { emoji: '◑', color: Colors.secondary, label: 'Partial' },
+  none:    { emoji: '○', color: Colors.outline, label: 'Pending' },
+  rest:    { emoji: 'z', color: Colors.onSurfaceVariant, label: 'Rest' },
 };
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ function DayDetailModal({
               <Text style={styles.modalSectionTitle}>🚶 Walking</Text>
               <Text style={styles.modalSectionBody}>{entry.walking_task}</Text>
               {!future && (
-                <Text style={[styles.modalStatus, { color: entry.walk_completed ? Colors.accent : Colors.textMuted }]}>
+                <Text style={[styles.modalStatus, { color: entry.walk_completed ? Colors.primary : Colors.outline }]}>
                   {entry.walk_completed ? '✓ Completed' : '○ Not logged'}
                 </Text>
               )}
@@ -162,7 +162,7 @@ function DayDetailModal({
               <Text style={styles.modalSectionTitle}>🏋️ Hammer Multi-Gym</Text>
               <Text style={styles.modalSectionBody}>{entry.hammer_task}</Text>
               {!future && (
-                <Text style={[styles.modalStatus, { color: entry.hammer_completed ? Colors.accent : Colors.textMuted }]}>
+                <Text style={[styles.modalStatus, { color: entry.hammer_completed ? Colors.primary : Colors.outline }]}>
                   {entry.hammer_completed ? '✓ Completed' : '○ Not logged'}
                 </Text>
               )}
@@ -173,7 +173,7 @@ function DayDetailModal({
               <View style={styles.modalSection}>
                 <Text style={styles.modalSectionTitle}>⏱️ Intermittent Fasting</Text>
                 <Text style={styles.modalSectionBody}>16:8 — eating window 12 pm → 8 pm</Text>
-                <Text style={[styles.modalStatus, { color: entry.fasting_completed ? Colors.accent : Colors.textMuted }]}>
+                <Text style={[styles.modalStatus, { color: entry.fasting_completed ? Colors.primary : Colors.outline }]}>
                   {entry.fasting_completed ? '✓ Completed' : '○ Not logged'}
                 </Text>
               </View>
@@ -241,7 +241,7 @@ export default function OverviewScreen() {
   if (loading) {
     return (
       <View style={styles.centred}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
@@ -308,164 +308,168 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Header
   header: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.surfaceLow,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
     gap: Spacing.sm,
   },
   headerTitle: {
-    fontSize: Typography.sizes.xl,
-    color: Colors.textPrimary,
-    fontWeight: Typography.weights.bold,
+    fontSize: Typography.sizes.headlineL,
+    color: Colors.onSurface,
+    fontWeight: Typography.weights.extrabold,
+    letterSpacing: -1,
   },
   statsRow: { flexDirection: 'row', gap: Spacing.sm },
   statPill: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.surfaceHighest,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   statNum: {
-    fontSize: Typography.sizes.md,
-    color: Colors.accent,
+    fontSize: Typography.sizes.body,
+    color: Colors.primary,
     fontWeight: Typography.weights.bold,
   },
   statLabel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.label,
+    color: Colors.onSurfaceVariant,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 
-  // List
-  listContent: { paddingVertical: Spacing.sm },
-  separator: { height: 1, backgroundColor: Colors.border, marginLeft: 80 },
+  listContent: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.xl },
+  separator: { height: 8 },
 
-  // Row
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
     gap: Spacing.md,
+    backgroundColor: Colors.surfaceLow,
+    borderRadius: Radius.lg,
   },
-  rowToday: { backgroundColor: Colors.accentGlow },
-  rowFuture: { opacity: 0.65 },
+  rowToday: { backgroundColor: `${Colors.primary}14` },
+  rowFuture: { opacity: 0.6 },
 
-  // Date pill
   datePill: { width: 52, alignItems: 'center', gap: 2 },
   dayShort: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
     fontWeight: Typography.weights.bold,
-    letterSpacing: 0.5,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
-  dayShortToday: { color: Colors.accent },
+  dayShortToday: { color: Colors.primary },
   dateNum: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.body,
+    color: Colors.onSurfaceVariant,
     fontWeight: Typography.weights.semibold,
     textAlign: 'center',
-    lineHeight: 16,
   },
-  dateNumToday: { color: Colors.accent },
+  dateNumToday: { color: Colors.primary, fontWeight: Typography.weights.bold },
   todayDot: {
     width: 6, height: 6, borderRadius: 3,
-    backgroundColor: Colors.accent, marginTop: 2,
+    backgroundColor: Colors.primary, marginTop: 2,
   },
 
-  // Row info
   rowInfo: { flex: 1, gap: 2 },
   rowWalk: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.body,
+    color: Colors.onSurface,
     fontWeight: Typography.weights.medium,
   },
   rowHammer: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.onSurfaceVariant,
   },
-  rowTextFuture: { color: Colors.textMuted },
+  rowTextFuture: { color: Colors.outline },
   mealPrepTag: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.accent,
-    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes.label,
+    color: Colors.primary,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
     marginTop: 2,
   },
 
-  // Badge
   badge: {
     width: 36, height: 36, borderRadius: Radius.full,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.surfaceHighest,
   },
-  badgeEmoji: { fontSize: 16 },
+  badgeEmoji: { fontSize: 14, color: Colors.onSurface },
 
-  // Modal
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end',
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 24,
+    backgroundColor: Colors.surfaceLow,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: 32,
     maxHeight: '80%',
   },
   modalHandle: {
-    width: 40, height: 4, backgroundColor: Colors.border,
-    borderRadius: 2, alignSelf: 'center', marginBottom: Spacing.lg,
+    width: 40, height: 4, backgroundColor: Colors.surfaceHighest,
+    borderRadius: 2, alignSelf: 'center', marginBottom: Spacing.xl,
   },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'flex-start', marginBottom: Spacing.lg,
+    alignItems: 'flex-start', marginBottom: Spacing.xl,
   },
   modalDayLabel: {
-    fontSize: Typography.sizes.xs, color: Colors.textMuted,
-    fontWeight: Typography.weights.semibold, letterSpacing: 1.2,
+    fontSize: Typography.sizes.label, color: Colors.outline,
+    fontWeight: Typography.weights.bold, letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   modalDateValue: {
-    fontSize: Typography.sizes.hero, color: Colors.textPrimary,
-    fontWeight: Typography.weights.black,
+    fontSize: Typography.sizes.displayHero, color: Colors.onSurface,
+    fontWeight: Typography.weights.black, letterSpacing: -2,
+    lineHeight: 56,
   },
   modalTodayTag: {
-    fontSize: Typography.sizes.xs, color: Colors.accent,
-    fontWeight: Typography.weights.bold, letterSpacing: 1,
+    fontSize: Typography.sizes.label, color: Colors.primary,
+    fontWeight: Typography.weights.bold, letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   modalBadge: {
     paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs,
-    borderRadius: Radius.full, borderWidth: 1,
+    borderRadius: Radius.full, backgroundColor: Colors.surfaceHighest,
   },
   modalBadgeText: {
-    fontSize: Typography.sizes.sm, fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes.label, fontWeight: Typography.weights.bold,
+    textTransform: 'uppercase', letterSpacing: 1,
   },
   modalSection: {
-    backgroundColor: Colors.surfaceElevated, borderRadius: Radius.md,
-    padding: Spacing.md, marginBottom: Spacing.sm, gap: 4,
+    backgroundColor: Colors.surface, borderRadius: Radius.lg,
+    padding: Spacing.xl, marginBottom: Spacing.sm, gap: 4,
   },
-  modalMealPrep: { borderWidth: 1, borderColor: Colors.accent },
+  modalMealPrep: { borderLeftWidth: 4, borderLeftColor: Colors.primary },
   modalSectionTitle: {
-    fontSize: Typography.sizes.sm, color: Colors.textMuted,
-    fontWeight: Typography.weights.semibold,
-    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4,
+    fontSize: Typography.sizes.label, color: Colors.outline,
+    fontWeight: Typography.weights.bold,
+    textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4,
   },
   modalSectionBody: {
-    fontSize: Typography.sizes.md, color: Colors.textPrimary, lineHeight: 22,
+    fontSize: Typography.sizes.body, color: Colors.onSurface, lineHeight: 22,
   },
   modalStatus: {
-    fontSize: Typography.sizes.sm, fontWeight: Typography.weights.semibold, marginTop: 4,
+    fontSize: Typography.sizes.bodyS, fontWeight: Typography.weights.semibold, marginTop: 4,
   },
   modalClose: {
-    backgroundColor: Colors.surfaceElevated, borderRadius: Radius.md,
+    backgroundColor: Colors.primary, borderRadius: Radius.full,
     paddingVertical: Spacing.md, alignItems: 'center',
-    marginTop: Spacing.md, borderWidth: 1, borderColor: Colors.border,
+    marginTop: Spacing.xl,
   },
   modalCloseText: {
-    color: Colors.textPrimary, fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.semibold,
+    color: Colors.onPrimary, fontSize: Typography.sizes.label,
+    fontWeight: Typography.weights.bold, letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
 });
+
+

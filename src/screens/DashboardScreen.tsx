@@ -29,6 +29,7 @@ import {
   toggleMealConsumed,
 } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
+import { accentBarStrength, accentBarCardio, ambientShadow } from '../theme/shadows';
 import BioForceModal from '../components/BioForceModal';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -359,7 +360,7 @@ export default function DashboardScreen() {
   if (loading) {
     return (
       <View style={styles.centred}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>Syncing schedule…</Text>
       </View>
     );
@@ -401,7 +402,7 @@ export default function DashboardScreen() {
               styles.progressFill,
               {
                 width: `${Math.round(progress * 100)}%` as any,
-                backgroundColor: isAllDone ? Colors.accent : Colors.secondary,
+                backgroundColor: isAllDone ? Colors.primary : Colors.secondary,
               },
             ]}
           />
@@ -431,7 +432,7 @@ export default function DashboardScreen() {
             icon="🚶"
             title="Walking"
             description={entry.walking_task}
-            accentColor={Colors.accent}
+            accentColor={Colors.primary}
           />
           <Checkbox
             checked={entry.walk_completed}
@@ -453,7 +454,7 @@ export default function DashboardScreen() {
             icon="⏱️"
             title="Intermittent Fasting"
             description="16:8 protocol — eating window: 12 pm → 8 pm"
-            accentColor={Colors.warning ?? '#F6AD55'}
+            accentColor={Colors.tertiary ?? '#F6AD55'}
           />
           <Checkbox
             checked={entry.fasting_completed}
@@ -468,7 +469,7 @@ export default function DashboardScreen() {
             icon="🍽️"
             title="Today's Meal Plan"
             description="Your configured meals for today"
-            accentColor={Colors.accent}
+            accentColor={Colors.primary}
           />
           {todaysMeals.length > 0 ? (
             todaysMeals.map(meal => (
@@ -479,14 +480,14 @@ export default function DashboardScreen() {
                   onToggle={() => handleToggleMeal(meal.id, meal.is_consumed)}
                 />
                 {meal.recipe ? (
-                  <Text style={{ marginLeft: 44, marginTop: -4, color: Colors.textMuted, fontSize: Typography.sizes.xs }}>
+                  <Text style={{ marginLeft: 44, marginTop: -4, color: Colors.outline, fontSize: Typography.sizes.label }}>
                     {meal.recipe.calories} kcal • {meal.recipe.protein}g protein
                   </Text>
                 ) : null}
               </View>
             ))
           ) : (
-            <Text style={{ marginLeft: 44, color: Colors.textMuted, fontSize: Typography.sizes.sm }}>
+            <Text style={{ marginLeft: 44, color: Colors.outline, fontSize: Typography.sizes.bodyS }}>
               No meals planned for today.
             </Text>
           )}
@@ -501,7 +502,7 @@ export default function DashboardScreen() {
               <TextInput
                 style={styles.weightInput}
                 placeholder="0.0"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={Colors.outline}
                 keyboardType="numeric"
                 value={weightInput}
                 onChangeText={setWeightInput}
@@ -529,7 +530,7 @@ export default function DashboardScreen() {
                 onToggle={() => handleToggleExtraWorkout(aw.id)}
               />
               {aw.muscle_group ? (
-                <Text style={{ marginLeft: 44, marginTop: -4, color: Colors.textMuted, fontSize: Typography.sizes.xs }}>
+                <Text style={{ marginLeft: 44, marginTop: -4, color: Colors.outline, fontSize: Typography.sizes.label }}>
                   {aw.muscle_group}  •  {aw.sets} sets × {aw.reps} reps
                 </Text>
               ) : null}
@@ -571,59 +572,59 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.md,
+    color: Colors.onSurfaceVariant,
+    fontSize: Typography.sizes.body,
     textAlign: 'center',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
 
-  // Header — no extra paddingTop; the Drawer header above provides safe-area
+  // Header — deep slate background, no border
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: Colors.surfaceLow,
   },
   headerDate: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
     fontWeight: Typography.weights.medium,
-    marginBottom: 2,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
   headerTitle: {
-    fontSize: Typography.sizes.xl,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.headline,
+    color: Colors.onSurface,
     fontWeight: Typography.weights.bold,
   },
   mealPrepPill: {
-    backgroundColor: Colors.accent + '20',
+    backgroundColor: `${Colors.primary}1a`,
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.accent,
   },
   mealPrepPillText: {
-    color: Colors.accent,
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
+    color: Colors.primary,
+    fontSize: Typography.sizes.label,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 
   // Progress
   progressContainer: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.surfaceLow,
     gap: 6,
   },
   progressTrack: {
-    height: 6,
-    backgroundColor: Colors.border,
+    height: 4,
+    backgroundColor: Colors.surfaceHighest,
     borderRadius: Radius.full,
     overflow: 'hidden',
   },
@@ -632,62 +633,64 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
   },
   progressLabel: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
     fontWeight: Typography.weights.medium,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 
   // Rest banner
   restBanner: {
-    backgroundColor: 'rgba(74, 85, 104, 0.15)',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    paddingHorizontal: Spacing.lg,
+    backgroundColor: `${Colors.secondary}1a`,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.sm,
   },
   restBannerText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.sm,
+    color: Colors.secondary,
+    fontSize: Typography.sizes.bodyS,
     fontWeight: Typography.weights.medium,
   },
 
   // Scroll
   scroll: { flex: 1 },
   scrollContent: {
-    padding: Spacing.lg,
-    gap: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xxl,
+    paddingBottom: Spacing.hero,
+    gap: Spacing.xl,
   },
 
   // Section
   section: { gap: Spacing.sm },
 
-  // Task Card
+  // Task Card — Kinetic Atelier tonal card
   taskCard: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+    backgroundColor: Colors.surfaceLow,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.md,
-    borderLeftWidth: 3,
+    borderLeftWidth: 4,
   },
-  taskIcon: { fontSize: 22, marginTop: 2 },
+  taskIcon: { fontSize: 20, marginTop: 2 },
   taskCardContent: { flex: 1, gap: 4 },
   taskTitle: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
-    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
+    fontWeight: Typography.weights.bold,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 2,
   },
   taskDescription: {
-    fontSize: Typography.sizes.md,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.bodyL,
+    color: Colors.onSurface,
     fontWeight: Typography.weights.medium,
-    lineHeight: 22,
+    lineHeight: 24,
   },
 
-  // Checkbox
+  // Checkbox — tonal surface, no border line
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -696,46 +699,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   checkboxBox: {
     width: 24,
     height: 24,
-    borderRadius: 6,
+    borderRadius: Radius.full,
     borderWidth: 2,
-    borderColor: Colors.border,
+    borderColor: Colors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxBoxChecked: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+    backgroundColor: Colors.tertiaryContainer,
+    borderColor: Colors.tertiaryContainer,
   },
   checkmark: {
-    color: Colors.background,
-    fontSize: 14,
+    color: Colors.onTertiaryContainer,
+    fontSize: 13,
     fontWeight: Typography.weights.bold,
   },
   checkboxLabel: {
-    fontSize: Typography.sizes.md,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.body,
+    color: Colors.onSurfaceVariant,
     fontWeight: Typography.weights.medium,
   },
   checkboxLabelChecked: {
-    color: Colors.accent,
+    color: Colors.outline,
     textDecorationLine: 'line-through',
   },
 
-  // Hammer section header
+  // Hammer / Bio Force section header — strength = blue accent bar
   hammerHeader: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+    backgroundColor: Colors.surfaceLow,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    paddingLeft: Spacing.xxl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderLeftWidth: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.secondary,
     gap: Spacing.sm,
   },
   hammerHeaderLeft: {
@@ -745,52 +748,49 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   hammerSubtitle: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.onSurfaceVariant,
     lineHeight: 18,
     marginTop: 2,
     flexShrink: 1,
   },
   exProgressPill: {
-    backgroundColor: Colors.border,
+    backgroundColor: Colors.surfaceHighest,
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 3,
     minWidth: 36,
     alignItems: 'center',
   },
-  exProgressPillDone: { backgroundColor: Colors.accent + '30' },
+  exProgressPillDone: { backgroundColor: `${Colors.primary}30` },
   exProgressText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
     fontWeight: Typography.weights.bold,
   },
-  exProgressTextDone: { color: Colors.accent },
+  exProgressTextDone: { color: Colors.primary },
 
-  // Exercise list
+  // Exercise list container
   exerciseList: {
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
 
-  // Exercise row
+  // Exercise row — 3 states handled in component
   exerciseRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: Spacing.sm + 2,
     paddingHorizontal: Spacing.md,
     gap: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
-  exerciseRowDone: { backgroundColor: Colors.accent + '08' },
+  exerciseRowDone: { opacity: 0.6 },
   exCheckbox: {
     width: 22,
     height: 22,
-    borderRadius: 6,
+    borderRadius: Radius.full,
     borderWidth: 2,
     borderColor: Colors.secondary,
     alignItems: 'center',
@@ -798,91 +798,94 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   exCheckboxDone: {
-    backgroundColor: Colors.secondary,
-    borderColor: Colors.secondary,
+    backgroundColor: Colors.surfaceHighest,
+    borderColor: Colors.outlineVariant,
   },
   exCheckmark: {
-    color: Colors.background,
+    color: Colors.tertiaryContainer,
     fontSize: 12,
     fontWeight: Typography.weights.bold,
   },
-  exInfo: { flex: 1, gap: 1 },
+  exInfo: { flex: 1, gap: 2 },
   exName: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textPrimary,
+    fontSize: Typography.sizes.body,
+    color: Colors.onSurface,
     fontWeight: Typography.weights.semibold,
   },
   exNameDone: {
-    color: Colors.textMuted,
+    color: Colors.onSurfaceVariant,
     textDecorationLine: 'line-through',
   },
   exMeta: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.label,
+    color: Colors.outline,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
 
-  // Watch button
+  // Watch button — primary tint, no border
   watchBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: Colors.secondary + '25',
-    borderRadius: Radius.sm,
+    backgroundColor: 'transparent',
     paddingHorizontal: Spacing.sm,
     paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: Colors.secondary + '60',
   },
   watchBtnIcon: {
-    color: Colors.secondary,
+    color: Colors.primary,
     fontSize: 10,
   },
   watchBtnLabel: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.secondary,
+    fontSize: Typography.sizes.label,
+    color: Colors.primary,
     fontWeight: Typography.weights.semibold,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
-  watchBtnPlaceholder: { width: 58 }, // same width as watchBtn to keep alignment
+  watchBtnPlaceholder: { width: 50 },
 
   // No exercises hint
   noExercisesHint: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
+    fontSize: Typography.sizes.bodyS,
+    color: Colors.outline,
     fontStyle: 'italic',
     textAlign: 'center',
     paddingVertical: Spacing.md,
   },
 
-  // Weight Logging
+  // Weight Logging — glassmorphic pill input
   weightCard: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+    backgroundColor: Colors.surfaceHighest,
+    borderRadius: Radius.full,
+    paddingLeft: Spacing.xl,
+    paddingRight: 6,
+    paddingVertical: 6,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.accent,
+    borderWidth: 1,
+    borderColor: `${Colors.outlineVariant}26`,
   },
   weightInput: {
-    color: Colors.textPrimary,
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-    marginTop: 4,
+    color: Colors.onSurface,
+    fontSize: Typography.sizes.body,
+    fontWeight: Typography.weights.medium,
+    flex: 1,
     padding: 0,
   },
   weightSaveBtn: {
-    backgroundColor: Colors.accent + '25',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.accent + '60',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.xxl,
+    paddingVertical: Spacing.sm + 2,
+    borderRadius: Radius.full,
   },
   weightSaveBtnText: {
-    color: Colors.accent,
+    color: Colors.onPrimary,
     fontWeight: Typography.weights.bold,
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.label,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
 
   // Extra workouts
@@ -892,10 +895,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   extraWorkoutsTitle: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.label,
+    color: Colors.onSurfaceVariant,
     fontWeight: Typography.weights.bold,
     textTransform: 'uppercase',
+    letterSpacing: 2,
   },
   addExtraBtn: {
     flexDirection: 'row',
@@ -904,15 +908,15 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderColor: `${Colors.outlineVariant}4d`,
+    borderRadius: Radius.lg,
     paddingVertical: Spacing.md,
     marginTop: Spacing.sm,
   },
   addExtraBtnIcon: { fontSize: 16 },
   addExtraBtnText: {
-    fontSize: Typography.sizes.md,
-    color: Colors.textSecondary,
+    fontSize: Typography.sizes.body,
+    color: Colors.onSurfaceVariant,
     fontWeight: Typography.weights.medium,
   },
 });

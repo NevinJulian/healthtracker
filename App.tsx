@@ -24,7 +24,6 @@ export default function App() {
         setDbReady(true);
       } catch (err: any) {
         console.error('[App] DB init failed:', err);
-        // Build a readable detail string: message + first 8 stack lines  (#34)
         const stackLines = (err?.stack as string | undefined)
           ?.split('\n')
           .slice(0, 8)
@@ -38,7 +37,7 @@ export default function App() {
   if (error) {
     return (
       <View style={styles.splash}>
-        <Text style={styles.errorText}>❌ Failed to initialise database</Text>
+        <Text style={styles.errorText}>Failed to initialise database</Text>
         <Text style={styles.errorDetail} selectable>{error}</Text>
       </View>
     );
@@ -47,7 +46,7 @@ export default function App() {
   if (!dbReady) {
     return (
       <View style={styles.splash}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.splashText}>Loading your tracker…</Text>
       </View>
     );
@@ -55,17 +54,17 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.surface} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.surfaceLowest} />
       <NavigationContainer
         theme={{
           dark: true,
           colors: {
-            primary: Colors.accent,
+            primary: Colors.primary,
             background: Colors.background,
-            card: Colors.surface,
-            text: Colors.textPrimary,
-            border: Colors.border,
-            notification: Colors.accent,
+            card: Colors.surfaceLow,
+            text: Colors.onSurface,
+            border: `${Colors.outlineVariant}26`,
+            notification: Colors.primary,
           },
           fonts: {
             regular: { fontFamily: 'System', fontWeight: '400' },
@@ -90,17 +89,17 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   splashText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.md,
+    color: Colors.onSurfaceVariant,
+    fontSize: Typography.sizes.body,
   },
   errorText: {
-    color: Colors.danger,
-    fontSize: Typography.sizes.lg,
+    color: Colors.error,
+    fontSize: Typography.sizes.titleL,
     fontWeight: Typography.weights.bold,
   },
   errorDetail: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.sm,
+    color: Colors.onSurfaceVariant,
+    fontSize: Typography.sizes.bodyS,
     textAlign: 'center',
     paddingHorizontal: 32,
   },
