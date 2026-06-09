@@ -53,9 +53,16 @@ export const Colors = {
 };
 
 export const Typography = {
-  fontFamily: undefined as string | undefined, // system default until the fonts unit lands
-  display: undefined as string | undefined,     // -> Fraunces (set in fonts unit)
-  body: undefined as string | undefined,         // -> Plus Jakarta Sans (set in fonts unit)
+  // Plus Jakarta Sans 500 — base sans-serif for body text and UI
+  fontFamily: 'PlusJakartaSans_500Medium' as string,
+  // Fraunces 600 SemiBold — soft serif for display: screen titles, big numbers, recipe titles
+  display: 'Fraunces_600SemiBold' as string,
+  // Plus Jakarta Sans 500 — body copy, rows, descriptions
+  body: 'PlusJakartaSans_500Medium' as string,
+  // Plus Jakarta Sans 600 — section titles, nav labels
+  title: 'PlusJakartaSans_600SemiBold' as string,
+  // Plus Jakarta Sans 700 — micro-labels, uppercase caps (10px, +0.12em tracking, mute color)
+  label: 'PlusJakartaSans_700Bold' as string,
   sizes: {
     xs: 11,
     sm: 13,
