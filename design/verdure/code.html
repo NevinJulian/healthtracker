@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HealthTracker — Verdure design board</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+:root{
+--canvas:#F3EFE7;--canvas2:#ECE6DA;--surface:#FBF9F4;--pure:#fff;
+--ink:#2C352E;--ink2:#5E665E;--mute:#98A096;
+--sage:#7C9A85;--sage-d:#4E6B58;--sage-t:#E6ECE2;
+--clay:#C98A6B;--clay-d:#9A5E42;--clay-t:#F3E6DB;
+--sky:#8FAABF;--sky-d:#516675;--sky-t:#E4EBF0;
+--gold:#C9A86A;--gold-d:#8A7434;--gold-t:#F1E8D4;
+--line:rgba(44,53,46,.08);--line2:rgba(44,53,46,.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#E8E2D6;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;padding:34px 18px 56px}
+.board{max-width:1000px;margin:0 auto}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+
+/* system strip */
+.sys{display:flex;flex-wrap:wrap;gap:26px;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:22px 26px;margin-bottom:38px}
+.sysL .ey{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--sage-d)}
+.sysL h1{font-family:'Fraunces';font-weight:600;font-size:34px;letter-spacing:-.02em;line-height:1.05;margin:4px 0 2px}
+.sysL p{font-size:13px;color:var(--ink2);max-width:330px;line-height:1.5}
+.sw{display:flex;gap:10px;flex-wrap:wrap}
+.swatch{text-align:center}
+.swatch i{display:block;width:46px;height:46px;border-radius:14px;border:1px solid var(--line)}
+.swatch span{display:block;font-size:9.5px;color:var(--mute);font-weight:600;margin-top:5px;letter-spacing:.02em}
+.spec{font-family:'Fraunces';font-size:28px;color:var(--ink);line-height:1}
+.spec small{display:block;font-family:'Plus Jakarta Sans';font-size:11px;color:var(--mute);font-weight:600;letter-spacing:.04em;margin-top:6px}
+
+/* gallery */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,300px));gap:30px 26px;justify-content:center}
+.frame{display:flex;flex-direction:column;align-items:center;gap:12px}
+.cap{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
+
+.phone{width:300px;height:646px;background:var(--canvas);border:1px solid var(--line2);border-radius:38px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 54px -26px rgba(44,53,46,.5)}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:13px 24px 2px;font-size:12px;font-weight:700;color:var(--ink);flex:none}
+.sb .r i{margin-left:6px;font-size:15px}
+.body{flex:1;overflow:hidden;padding:8px 16px 4px}
+.tab{flex:none;display:flex;justify-content:space-around;align-items:center;padding:9px 6px 15px;background:var(--surface);border-top:1px solid var(--line)}
+.tab a{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:600;color:var(--mute);text-decoration:none;letter-spacing:.02em}
+.tab a i{font-size:21px}
+.tab a.on{color:var(--sage-d)}
+
+/* generic */
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.htitle{font-family:'Fraunces';font-weight:600;color:var(--ink);font-size:25px;line-height:1.04;letter-spacing:-.01em}
+.htitle.sm{font-size:21px}
+.scrhead{display:flex;justify-content:space-between;align-items:flex-end;padding:6px 2px 14px}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--sage-t);color:var(--sage-d);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.iconbtn{width:38px;height:38px;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:19px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:14px}
+.row{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:11px 12px;margin-bottom:9px}
+.ic{width:38px;height:38px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:19px;flex:none}
+.ic-sage{background:var(--sage-t);color:var(--sage-d)}
+.ic-clay{background:var(--clay-t);color:var(--clay-d)}
+.ic-sky{background:var(--sky-t);color:var(--sky-d)}
+.ic-gold{background:var(--gold-t);color:var(--gold-d)}
+.rc{flex:1;min-width:0}
+.rt{font-size:13px;font-weight:600;color:var(--ink);line-height:1.2}
+.rs{font-size:10.5px;color:var(--ink2);margin-top:2px;font-weight:500}
+.chk{width:24px;height:24px;border-radius:50%;border:1.6px solid var(--line2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;flex:none}
+.chk.on{background:var(--sage);border-color:var(--sage)}
+.chk.empty{color:transparent}
+.cnt{font-size:11px;font-weight:700;color:var(--clay-d);background:var(--clay-t);padding:4px 10px;border-radius:999px;flex:none}
+
+/* dashboard hero */
+.hero{background:var(--sage-d);border-radius:24px;padding:17px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}
+.hero .he{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.62)}
+.hero .hn{font-family:'Fraunces';font-weight:600;color:#fff;font-size:42px;line-height:1;margin-top:3px}
+.hero .hn span{font-size:19px;color:rgba(255,255,255,.6)}
+.hero .hsub{font-size:11px;color:rgba(255,255,255,.78);margin-top:5px;font-weight:500}
+.ring{position:relative;width:74px;height:74px;flex:none}
+.ring .rl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}
+.ring .rl b{font-family:'Fraunces';font-size:18px;font-weight:600;line-height:1}
+.ring .rl em{font-style:normal;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.65);margin-top:2px}
+.sectlbl{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:14px 2px 9px;display:flex;justify-content:space-between;align-items:center}
+.sectlbl a{color:var(--sage-d);text-decoration:none;font-size:9.5px}
+
+/* meals strip */
+.meal{display:flex;align-items:center;gap:10px;padding:9px 4px}
+.meal+.meal{border-top:1px solid var(--line)}
+.mname{flex:1;font-size:12.5px;font-weight:600;color:var(--ink)}
+.mkcal{font-size:10.5px;color:var(--ink2);font-weight:600}
+
+/* weight */
+.weight{display:flex;align-items:center;gap:12px}
+.weight .wv{font-family:'Fraunces';font-size:30px;font-weight:600;color:var(--ink);line-height:1}
+.weight .wv span{font-size:14px;color:var(--mute)}
+.trend{font-size:10.5px;font-weight:700;color:var(--sage-d);background:var(--sage-t);padding:3px 8px;border-radius:999px;display:inline-flex;align-items:center;gap:3px}
+.btn{border:none;border-radius:13px;font-family:inherit;font-weight:700;font-size:13px;padding:11px 14px;background:var(--sage);color:#fff;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+.btn.ghost{background:var(--surface);color:var(--sage-d);border:1px solid var(--line2)}
+.btn.sm{padding:9px 16px;font-size:12px;border-radius:11px}
+
+/* search + chips */
+.search{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;color:var(--mute);font-size:13px;font-weight:500;margin-bottom:12px}
+.chips{display:flex;gap:7px;overflow:hidden;margin-bottom:13px}
+.chip{font-size:11px;font-weight:600;color:var(--ink2);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 13px;white-space:nowrap;flex:none}
+.chip.on{background:var(--sage);color:#fff;border-color:var(--sage)}
+
+/* recipe grid */
+.rg{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.rcard{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.rcImg{height:66px;display:flex;align-items:center;justify-content:center;font-size:28px}
+.rcB{padding:9px 10px 11px}
+.rcT{font-size:12px;font-weight:600;color:var(--ink);line-height:1.22}
+.rcM{font-size:10px;color:var(--clay-d);font-weight:700;margin-top:5px}
+.rcTime{font-size:9.5px;color:var(--mute);font-weight:600;margin-top:3px;display:flex;align-items:center;gap:3px}
+
+/* recipe detail */
+.hero2{height:158px;border-radius:0;margin:-8px -16px 0;display:flex;align-items:flex-start;justify-content:space-between;padding:14px 16px;position:relative;overflow:hidden}
+.hero2 .big{position:absolute;right:-6px;bottom:-18px;font-size:120px;opacity:.32}
+.rbtn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.82);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:18px;z-index:1}
+.stats4{display:flex;gap:7px;margin:14px 0 13px}
+.stat{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:9px 4px;text-align:center}
+.stat b{font-family:'Fraunces';font-size:17px;font-weight:600;color:var(--ink);display:block;line-height:1}
+.stat span{font-size:8.5px;color:var(--mute);font-weight:700;letter-spacing:.08em;text-transform:uppercase;display:block;margin-top:4px}
+.ing{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--ink);padding:6px 2px;font-weight:500}
+.ing .d{width:6px;height:6px;border-radius:50%;background:var(--sage);flex:none}
+.step{display:flex;gap:10px;padding:6px 2px}
+.step b{width:20px;height:20px;border-radius:50%;background:var(--sage-t);color:var(--sage-d);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.step p{font-size:11.5px;color:var(--ink2);line-height:1.45;font-weight:500}
+
+/* meal prep day selector */
+.days{display:flex;gap:6px;margin-bottom:14px}
+.day{flex:1;text-align:center;padding:9px 0;border-radius:14px;background:var(--surface);border:1px solid var(--line);position:relative}
+.day b{font-size:13px;font-weight:700;color:var(--ink);display:block;font-family:'Fraunces'}
+.day span{font-size:8.5px;color:var(--mute);font-weight:600;display:block;margin-top:1px}
+.day.on{background:var(--sage-d);border-color:var(--sage-d)}
+.day.on b,.day.on span{color:#fff}
+.day .dot{position:absolute;top:5px;right:6px;width:5px;height:5px;border-radius:50%;background:var(--clay)}
+.banner{display:flex;align-items:center;gap:10px;background:var(--clay-t);border-radius:16px;padding:11px 13px;margin-bottom:12px}
+.banner .bt{font-size:12px;font-weight:700;color:var(--clay-d)}
+.banner .bs{font-size:10px;color:var(--clay-d);opacity:.8;font-weight:500}
+.mealcard{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px 11px;margin-bottom:9px}
+.mealcard .mc1{flex:1}
+.mealcard .me{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.mealcard .mr{font-size:12.5px;font-weight:600;color:var(--ink);margin-top:2px}
+
+/* progress bar */
+.pbar{height:7px;background:var(--canvas2);border-radius:999px;overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--sage);border-radius:999px}
+.plabel{display:flex;justify-content:space-between;font-size:10.5px;font-weight:600;color:var(--ink2);margin-bottom:7px}
+
+/* cooking active */
+.active{background:var(--sage-d);border-radius:20px;padding:15px;color:#fff;margin-bottom:13px}
+.active .ae{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.6)}
+.active .an{font-size:15px;font-weight:700;margin-top:4px}
+.active .timer{font-family:'Fraunces';font-size:34px;font-weight:600;margin-top:8px;display:flex;align-items:center;gap:8px}
+.tchip{font-size:9.5px;font-weight:700;color:var(--ink2);background:var(--canvas2);padding:3px 8px;border-radius:999px;flex:none}
+
+/* shopping */
+.cathead{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:13px 2px 7px;display:flex;align-items:center;gap:6px}
+.item{display:flex;align-items:center;gap:11px;padding:8px 2px}
+.item+.item{border-top:1px solid var(--line)}
+.iname{flex:1;font-size:12.5px;font-weight:500;color:var(--ink)}
+.iname.done{color:var(--mute);text-decoration:line-through}
+.qty{font-size:10.5px;color:var(--mute);font-weight:600}
+
+/* analytics */
+.metrics{display:flex;gap:8px;margin-bottom:13px}
+.metric{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:11px 10px}
+.metric b{font-family:'Fraunces';font-size:21px;font-weight:600;color:var(--ink);display:block;line-height:1}
+.metric .ml{font-size:8.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
+.metric .mt{font-size:9px;font-weight:700;color:var(--sage-d);margin-top:4px}
+.ctitle{font-size:11px;font-weight:700;color:var(--ink);margin-bottom:11px;display:flex;justify-content:space-between;align-items:center}
+.dotgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.dotgrid i{aspect-ratio:1;border-radius:6px;background:var(--sage)}
+.dotgrid i.p{background:var(--gold)}
+.dotgrid i.n{background:var(--canvas2)}
+.legend{display:flex;gap:13px;margin-top:11px;flex-wrap:wrap}
+.legend span{font-size:10px;font-weight:600;color:var(--ink2);display:flex;align-items:center;gap:5px}
+.legend i{width:9px;height:9px;border-radius:3px}
+</style>
+</head>
+<body>
+<h2 class="sr-only">Verdure: a calm-wellness redesign of the HealthTracker app, shown across seven mobile screens with a soft sage, clay and linen palette.</h2>
+<div class="board">
+
+  <div class="sys">
+    <div class="sysL">
+      <div class="ey">Verdure · calm wellness</div>
+      <h1>HealthTracker, reimagined</h1>
+      <p>Soft botanical tones, generous space and a gentle serif — wellness over hard-edged fitness. Sage leads, clay warms the food, blue rests.</p>
+    </div>
+    <div class="sw">
+      <div class="swatch"><i style="background:#F3EFE7"></i><span>Linen</span></div>
+      <div class="swatch"><i style="background:#7C9A85"></i><span>Sage</span></div>
+      <div class="swatch"><i style="background:#4E6B58"></i><span>Pine</span></div>
+      <div class="swatch"><i style="background:#C98A6B"></i><span>Clay</span></div>
+      <div class="swatch"><i style="background:#8FAABF"></i><span>Sky</span></div>
+      <div class="swatch"><i style="background:#C9A86A"></i><span>Gold</span></div>
+    </div>
+    <div class="spec">Aa<small>Fraunces · Jakarta Sans</small></div>
+  </div>
+
+  <div class="grid">
+
+    <!-- 1 DASHBOARD -->
+    <div class="frame">
+      <div class="phone">
+        <div class="sb"><span>8:42</span><span class="r"><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body">
+          <div class="scrhead">
+            <div><div class="eyebrow">Monday · 8 June</div><div class="htitle" style="margin-top:3px">Good morning,<br>Nevin</div></div>
+            <div class="avatar">N</div>
+          </div>
+          <div class="hero">
+            <div>
+              <div class="he">Day</div>
+              <div class="hn">45<span>/90</span></div>
+              <div class="hsub">Halfway to your goal</div>
+            </div>
+            <div class="ring">
+              <svg width="74" height="74" viewBox="0 0 74 74"><circle cx="37" cy="37" r="31" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="7"/><circle cx="37" cy="37" r="31" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-dasharray="194.8" stroke-dashoffset="64.9" transform="rotate(-90 37 37)"/></svg>
+              <div class="rl"><b>2/3</b><em>tasks</em></div>
+            </div>
+          </div>
+          <div class="sectlbl">Today's focus</div>
+          <div class="row"><span class="ic ic-sage"><i class="ti ti-walk"></i></span><div class="rc"><div class="rt">Morning walk</div><div class="rs">6,000 steps · 45 min</div></div><span class="chk on"><i class="ti ti-check"></i></span></div>
+          <div class="row"><span class="ic ic-clay"><i class="ti ti-barbell"></i></span><div class="rc"><div class="rt">Hammer multi-gym</div><div class="rs">Push day · 4 of 6 done</div></div><span class="cnt">4/6</span></div>
+          <div class="row"><span class="ic ic-sky"><i class="ti ti-hourglass"></i></span><div class="rc"><div class="rt">Intermittent fasting</div><div class="rs">16:8 · window 12–8pm</div></div><span class="chk empty"></span></div>
+          <div class="sectlbl">Today's meals <a href="#">See plan</a></div>
+          <div class="card" style="padding:6px 13px">
+            <div class="meal"><span class="ic ic-sage" style="width:30px;height:30px;font-size:15px;border-radius:10px"><i class="ti ti-bowl"></i></span><span class="mname">Greek yogurt bowl</span><span class="mkcal">320</span></div>
+            <div class="meal"><span class="ic ic-clay" style="width:30px;height:30px;font-size:15px;border-radius:10px"><i class="ti ti-salad"></i></span><span class="mname">Chicken & quinoa</span><span class="mkcal">540</span></div>
+            <div class="meal"><span class="ic ic-sky" style="width:30px;height:30px;font-size:15px;border-radius:10px"><i class="ti ti-fish"></i></span><span class="mname">Salmon & greens</span><span class="mkcal">610</span></div>
+          </div>
+        </div>
+        <div class="tab"><a class="on"><i class="ti ti-home"></i>Today</a><a><i class="ti ti-book"></i>Recipes</a><a><i class="ti ti-calendar"></i>Plan</a><a><i class="ti ti-shopping-cart"></i>Shop</a><a><i class="ti ti-activity"></i>Stats</a></div>
+      </div>
+      <div class="cap">Today</div>
+    </div>
+
+    <!-- 2 RECIPES -->
+    <div class="frame">
+      <div class="phone">
+        <div class="sb"><span>8:42</span><span class="r"><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body">
+          <div class="scrhead"><div><div class="eyebrow">42 saved</div><div class="htitle" style="margin-top:3px">Recipes</div></div><span class="iconbtn"><i class="ti ti-plus"></i></span></div>
+          <div class="search"><i class="ti ti-search"></i>Search recipes & ingredients</div>
+          <div class="chips"><span class="chip on">All</span><span class="chip">High-protein</span><span class="chip">Low-carb</span><span class="chip">Quick</span></div>
+          <div class="rg">
+            <div class="rcard"><div class="rcImg ic-clay"><i class="ti ti-fish"></i></div><div class="rcB"><div class="rcT">Grilled salmon & greens</div><div class="rcM">610 kcal · 42g protein</div><div class="rcTime"><i class="ti ti-clock"></i>25 min</div></div></div>
+            <div class="rcard"><div class="rcImg ic-sage"><i class="ti ti-salad"></i></div><div class="rcB"><div class="rcT">Chicken quinoa bowl</div><div class="rcM">540 kcal · 38g protein</div><div class="rcTime"><i class="ti ti-clock"></i>20 min</div></div></div>
+            <div class="rcard"><div class="rcImg ic-gold"><i class="ti ti-bowl"></i></div><div class="rcB"><div class="rcT">Greek yogurt & berries</div><div class="rcM">320 kcal · 24g protein</div><div class="rcTime"><i class="ti ti-clock"></i>5 min</div></div></div>
+            <div class="rcard"><div class="rcImg ic-sky"><i class="ti ti-egg"></i></div><div class="rcB"><div class="rcT">Veggie egg muffins</div><div class="rcM">210 kcal · 18g protein</div><div class="rcTime"><i class="ti ti-clock"></i>30 min</div></div></div>
+          </div>
+        </div>
+        <div class="tab"><a><i class="ti ti-home"></i>Today</a><a class="on"><i class="ti ti-book"></i>Recipes</a><a><i class="ti ti-calendar"></i>Plan</a><a><i class="ti ti-shopping-cart"></i>Shop</a><a><i class="ti ti-activity"></i>Stats</a></div>
+      </div>
+      <div class="cap">Recipes</div>
+    </div>
+
+    <!-- 3 RECIPE DETAIL -->
+    <div class="frame">
+      <div class="phone">
+        <div class="sb"><span>8:42</span><span class="r"><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body" style="padding-top:8px">
+          <div class="hero2 ic-clay"><span class="rbtn"><i class="ti ti-chevron-left"></i></span><span class="rbtn"><i class="ti ti-heart"></i></span><i class="ti ti-fish big"></i></div>
+          <div style="padding-top:14px"><div class="eyebrow">Dinner · high protein</div><div class="htitle sm" style="margin-top:4px">Grilled salmon & greens</div></div>
+          <div class="stats4">
+            <div class="stat"><b>610</b><span>kcal</span></div>
+            <div class="stat"><b>42g</b><span>protein</span></div>
+            <div class="stat"><b>25m</b><span>time</span></div>
+            <div class="stat"><b>2</b><span>serves</span></div>
+          </div>
+          <div class="sectlbl" style="margin-top:2px">Ingredients</div>
+          <div class="ing"><span class="d"></span>2 salmon fillets</div>
+          <div class="ing"><span class="d"></span>200g tenderstem broccoli</div>
+          <div class="ing"><span class="d"></span>1 tbsp olive oil · lemon · garlic</div>
+          <div class="sectlbl">Method</div>
+          <div class="step"><b>1</b><p>Heat a griddle. Toss broccoli in oil, char 4 min.</p></div>
+          <div class="step"><b>2</b><p>Grill salmon skin-side down 4 min, flip 3 min.</p></div>
+        </div>
+        <div style="flex:none;display:flex;gap:9px;padding:11px 16px 16px;background:var(--surface);border-top:1px solid var(--line)">
+          <button class="btn" style="flex:1"><i class="ti ti-calendar-plus"></i>Add to plan</button>
+          <button class="btn ghost" style="flex:none;width:50px"><i class="ti ti-shopping-cart"></i></button>
+        </div>
+      </div>
+      <div class="cap">Recipe detail</div>
+    </div>
+
+    <!-- 4 MEAL PREP -->
+    <div class="frame">
+      <div class="phone">
+        <div class="sb"><span>8:42</span><span class="r"><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body">
+          <div class="scrhead"><div><div class="eyebrow">This week</div><div class="htitle">Meal plan</div></div><span class="iconbtn"><i class="ti ti-chevron-right"></i></span></div>
+          <div class="days">
+            <div class="day on"><b>M</b><span>8</span></div>
+            <div class="day"><b>T</b><span>9</span></div>
+            <div class="day"><b>W</b><span>10</span></div>
+            <div class="day"><b>T</b><span>11</span></div>
+            <div class="day"><b>F</b><span>12</span></div>
+            <div class="day"><b>S</b><span>13</span></div>
+            <div class="day"><b>S</b><span>14</span><span class="dot"></span></div>
+          </div>
+          <div class="banner"><span class="ic ic-clay" style="width:32px;height:32px;font-size:16px"><i class="ti ti-tools-kitchen-2"></i></span><div><div class="bt">Prep day Sunday</div><div class="bs">Batch-cook 6 meals ahead</div></div></div>
+          <div class="mealcard"><span class="ic ic-sage" style="border-radius:12px"><i class="ti ti-bowl"></i></span><div class="mc1"><div class="me">Breakfast</div><div class="mr">Greek yogurt bowl</div></div><span class="mkcal">320</span></div>
+          <div class="mealcard"><span class="ic ic-clay" style="border-radius:12px"><i class="ti ti-salad"></i></span><div class="mc1"><div class="me">Lunch</div><div class="mr">Chicken quinoa bowl</div></div><span class="mkcal">540</span></div>
+          <div class="mealcard"><span class="ic ic-sky" style="border-radius:12px"><i class="ti ti-fish"></i></span><div class="mc1"><div class="me">Dinner</div><div class="mr">Salmon & greens</div></div><span class="mkcal">610</span></div>
+          <div class="plabel" style="margin-top:13px"><span>Daily total</span><span style="color:var(--sage-d)">1,470 / 1,900 kcal</span></div>
+          <div class="pbar"><i style="width:77%"></i></div>
+        </div>
+        <div class="tab"><a><i class="ti ti-home"></i>Today</a><a><i class="ti ti-book"></i>Recipes</a><a class="on"><i class="ti ti-calendar"></i>Plan</a><a><i class="ti ti-shopping-cart"></i>Shop</a><a><i class="ti ti-activity"></i>Stats</a></div>
+      </div>
+      <div class="cap">Meal plan</div>
+    </div>
+
+    <!-- 5 COOKING TASKS -->
+    <div class="frame">
+      <div class="phone">
+        <div class="sb"><span>8:42</span><span class="r"><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body">
+          <div class="scrhead"><div><div class="eyebrow">Sunday · 6 tasks · ~90 min</div><div class="htitle sm" style="margin-top:3px">Batch prep</div></div><span class="iconbtn"><i class="ti ti-chevron-left"></i></span></div>
+          <div class="plabel"><span>2 of 6 done</span><span>33%</span></div>
+          <div class="pbar" style="margin-bottom:14px"><i style="width:33%"></i></div>
+          <div class="active">
+            <div class="ae">In progress</div>
+            <div class="an">Grill chicken breast</div>
+            <div class="timer"><i class="ti ti-flame"></i>12:00</div>
+          </div>
+          <div class="row"><span class="chk on"><i class="ti ti-check"></i></span><div class="rc"><div class="rt" style="color:var(--mute);text-decoration:line-through">Cook quinoa & rice</div></div><span class="tchip">15 min</span></div>
+          <div class="row"><span class="chk on"><i class="ti ti-check"></i></span><div class="rc"><div class="rt" style="color:var(--mute);text-decoration:line-through">Roast vegetables</div></div><span class="tchip">25 min</span></div>
+          <div class="row"><span class="chk empty"></span><div class="rc"><div class="rt">Portion into containers</div></div><span class="tchip">10 min</span></div>
+          <div class="row"><span class="chk empty"></span><div class="rc"><div class="rt">Make overnight oats</div></div><span class="tchip">8 min</span></div>
+        </div>
+        <div class="tab"><a><i class="ti ti-home"></i>Today</a><a><i class="ti ti-book"></i>Recipes</a><a class="on"><i class="ti ti-calendar"></i>Plan</a><a><i class="ti ti-shopping-cart"></i>Shop</a><a><i class="ti ti-activity"></i>Stats</a></div>
+      </div>
+      <div class="cap">Cooking tasks</div>
+    </div>
+
+    <!-- 6 SHOPPING -->
+    <div class="frame">
+      <div class="phone">
+        <div class="sb"><span>8:42</span><span class="r"><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body">
+          <div class="scrhead"><div><div class="eyebrow">12 items · 4 done</div><div class="htitle">Shopping</div></div><span class="iconbtn"><i class="ti ti-plus"></i></span></div>
+          <div class="pbar" style="margin-bottom:4px"><i style="width:33%"></i></div>
+          <div class="cathead"><i class="ti ti-leaf" style="color:var(--sage)"></i>Produce</div>
+          <div class="item"><span class="chk empty"></span><span class="iname">Tenderstem broccoli</span><span class="qty">200g</span></div>
+          <div class="item"><span class="chk empty"></span><span class="iname">Baby spinach</span><span class="qty">1 bag</span></div>
+          <div class="item"><span class="chk on"><i class="ti ti-check"></i></span><span class="iname done">Avocado</span><span class="qty">2</span></div>
+          <div class="cathead"><i class="ti ti-meat" style="color:var(--clay)"></i>Protein</div>
+          <div class="item"><span class="chk empty"></span><span class="iname">Salmon fillets</span><span class="qty">4</span></div>
+          <div class="item"><span class="chk empty"></span><span class="iname">Chicken breast</span><span class="qty">800g</span></div>
+          <div class="item"><span class="chk on"><i class="ti ti-check"></i></span><span class="iname done">Free-range eggs</span><span class="qty">12</span></div>
+          <div class="cathead"><i class="ti ti-bread" style="color:var(--gold)"></i>Pantry</div>
+          <div class="item"><span class="chk empty"></span><span class="iname">Quinoa</span><span class="qty">500g</span></div>
+        </div>
+        <div class="tab"><a><i class="ti ti-home"></i>Today</a><a><i class="ti ti-book"></i>Recipes</a><a><i class="ti ti-calendar"></i>Plan</a><a class="on"><i class="ti ti-shopping-cart"></i>Shop</a><a><i class="ti ti-activity"></i>Stats</a></div>
+      </div>
+      <div class="cap">Shopping list</div>
+    </div>
+
+    <!-- 7 ANALYTICS -->
+    <div class="frame">
+      <div class="phone">
+        <div class="sb"><span>8:42</span><span class="r"><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body">
+          <div class="scrhead"><div><div class="eyebrow">Last 30 days</div><div class="htitle">Progress</div></div><span class="iconbtn"><i class="ti ti-calendar"></i></span></div>
+          <div class="metrics">
+            <div class="metric"><div class="ml">Weight</div><b>−2.1</b><div class="mt">kg this month</div></div>
+            <div class="metric"><div class="ml">Workouts</div><b>38</b><div class="mt">of 45 days</div></div>
+            <div class="metric"><div class="ml">Fasting</div><b>12</b><div class="mt">day streak</div></div>
+          </div>
+          <div class="card" style="margin-bottom:12px">
+            <div class="ctitle">Body weight<span style="color:var(--sage-d);font-family:'Fraunces';font-size:15px">82.4 kg</span></div>
+            <svg width="100%" height="92" viewBox="0 0 268 92" preserveAspectRatio="none" role="img" aria-label="Body weight trending gently down over the month"><polyline points="6,84 6,20 44,26 80,32 116,28 152,40 188,46 224,54 260,58 260,84" fill="var(--sage-t)" stroke="none"/><polyline points="6,20 44,26 80,32 116,28 152,40 188,46 224,54 260,58" fill="none" stroke="var(--sage)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="260" cy="58" r="4.5" fill="var(--sage-d)"/></svg>
+          </div>
+          <div class="card" style="margin-bottom:12px">
+            <div class="ctitle">Consistency<span style="color:var(--mute);font-weight:600">Last 14 days</span></div>
+            <div class="dotgrid"><i></i><i></i><i class="p"></i><i></i><i></i><i></i><i></i><i></i><i class="n"></i><i></i><i></i><i class="p"></i><i></i><i></i></div>
+            <div class="legend"><span><i style="background:var(--sage)"></i>Complete</span><span><i style="background:var(--gold)"></i>Partial</span><span><i style="background:var(--canvas2)"></i>Missed</span></div>
+          </div>
+        </div>
+        <div class="tab"><a><i class="ti ti-home"></i>Today</a><a><i class="ti ti-book"></i>Recipes</a><a><i class="ti ti-calendar"></i>Plan</a><a><i class="ti ti-shopping-cart"></i>Shop</a><a class="on"><i class="ti ti-activity"></i>Stats</a></div>
+      </div>
+      <div class="cap">Analytics</div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
