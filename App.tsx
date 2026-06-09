@@ -9,6 +9,15 @@ import {
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
+import {
+  Fraunces_600SemiBold,
+} from '@expo-google-fonts/fraunces';
+import {
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { initDatabase } from './src/db/database';
 import AppNavigator from './src/navigation/AppNavigator';
 import { Colors, Typography } from './src/theme/tokens';
@@ -16,6 +25,13 @@ import { Colors, Typography } from './src/theme/tokens';
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [fontsLoaded, fontError] = useFonts({
+    Fraunces_600SemiBold,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+  });
 
   useEffect(() => {
     (async () => {
@@ -35,16 +51,17 @@ export default function App() {
     })();
   }, []);
 
-  if (error) {
+  if (error || fontError) {
+    const displayError = error ?? fontError?.message ?? 'Unknown font loading error';
     return (
       <View style={styles.splash}>
-        <Text style={styles.errorText}>❌ Failed to initialise database</Text>
-        <Text style={styles.errorDetail} selectable>{error}</Text>
+        <Text style={styles.errorText}>Failed to initialise app</Text>
+        <Text style={styles.errorDetail} selectable>{displayError}</Text>
       </View>
     );
   }
 
-  if (!dbReady) {
+  if (!dbReady || !fontsLoaded) {
     return (
       <View style={styles.splash}>
         <ActivityIndicator size="large" color={Colors.accent} />
@@ -68,10 +85,10 @@ export default function App() {
             notification: Colors.accent,
           },
           fonts: {
-            regular: { fontFamily: 'System', fontWeight: '400' },
-            medium: { fontFamily: 'System', fontWeight: '500' },
-            bold: { fontFamily: 'System', fontWeight: '700' },
-            heavy: { fontFamily: 'System', fontWeight: '900' },
+            regular: { fontFamily: Typography.body, fontWeight: '400' },
+            medium: { fontFamily: Typography.title, fontWeight: '500' },
+            bold: { fontFamily: Typography.title, fontWeight: '700' },
+            heavy: { fontFamily: Typography.label, fontWeight: '900' },
           },
         }}
       >
