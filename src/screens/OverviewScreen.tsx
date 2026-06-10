@@ -9,6 +9,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import {
   DailyLogEntry,
   getRollingWindow,
@@ -24,6 +25,7 @@ import {
   Button,
   ScreenHeader,
 } from '../components';
+import { iconChipIconColor } from '../components/IconChip';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,11 +60,13 @@ const BADGE_LABEL: Record<BadgeStatus, string> = {
   rest:    'Rest',
 };
 
-const BADGE_EMOJI: Record<BadgeStatus, string> = {
-  full:    '✅',
-  partial: '🟡',
-  none:    '⬜',
-  rest:    '💤',
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+const BADGE_ICON: Record<BadgeStatus, IoniconsName> = {
+  full:    'checkmark-circle-outline',
+  partial: 'ellipse-outline',
+  none:    'ellipse-outline',
+  rest:    'moon-outline',
 };
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -105,9 +109,14 @@ function DayRow({
   );
 
   // Status IconChip as Row's trailing slot
+  const statusIconName: IoniconsName = future ? 'time-outline' : BADGE_ICON[status];
+  const statusIconColor = future ? Colors.skyDeep : (
+    accent === 'sage' ? Colors.sageDeep :
+    accent === 'gold' ? Colors.goldDeep : Colors.skyDeep
+  );
   const statusChip = (
     <IconChip
-      icon={<Text style={styles.chipEmoji}>{future ? '🕐' : BADGE_EMOJI[status]}</Text>}
+      icon={<Ionicons name={statusIconName} size={18} color={statusIconColor} />}
       accent={future ? 'sky' : accent}
       size={36}
     />
@@ -122,8 +131,8 @@ function DayRow({
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
       <Row
         leading={dateColumn}
-        title={`🏋️ ${entry.hammer_task}`}
-        subtitle={`🚶 ${subtitle}`}
+        title={entry.hammer_task}
+        subtitle={subtitle}
         trailing={statusChip}
         style={[
           styles.dayRow,
@@ -158,7 +167,13 @@ function DayDetailModal({
   function CompletionChip({ done }: { done: boolean }) {
     return (
       <IconChip
-        icon={<Text style={styles.chipEmoji}>{done ? '✓' : '○'}</Text>}
+        icon={
+          <Ionicons
+            name={done ? 'checkmark-circle-outline' : 'ellipse-outline'}
+            size={16}
+            color={iconChipIconColor(done ? 'sage' : 'sky')}
+          />
+        }
         accent={done ? 'sage' : 'sky'}
         size={32}
       />
@@ -183,7 +198,7 @@ function DayDetailModal({
                 )}
               </View>
               <Pill
-                label={future ? '🕐 Upcoming' : `${BADGE_EMOJI[status]} ${BADGE_LABEL[status]}`}
+                label={future ? 'Upcoming' : BADGE_LABEL[status]}
                 accent={future ? 'sky' : accent}
               />
             </View>
@@ -195,7 +210,7 @@ function DayDetailModal({
                 <Row
                   leading={
                     <IconChip
-                      icon={<Text style={styles.chipEmoji}>🚶</Text>}
+                      icon={<Ionicons name="walk-outline" size={18} color={iconChipIconColor('sky')} />}
                       accent="sky"
                       size={36}
                     />
@@ -215,7 +230,7 @@ function DayDetailModal({
                 <Row
                   leading={
                     <IconChip
-                      icon={<Text style={styles.chipEmoji}>🏋️</Text>}
+                      icon={<Ionicons name="barbell-outline" size={18} color={iconChipIconColor('sage')} />}
                       accent="sage"
                       size={36}
                     />
@@ -236,7 +251,7 @@ function DayDetailModal({
                   <Row
                     leading={
                       <IconChip
-                        icon={<Text style={styles.chipEmoji}>⏱️</Text>}
+                        icon={<Ionicons name="time-outline" size={18} color={iconChipIconColor('gold')} />}
                         accent="gold"
                         size={36}
                       />
@@ -258,7 +273,7 @@ function DayDetailModal({
                   <Row
                     leading={
                       <IconChip
-                        icon={<Text style={styles.chipEmoji}>🥗</Text>}
+                        icon={<Ionicons name="nutrition-outline" size={18} color={iconChipIconColor('clay')} />}
                         accent="clay"
                         size={36}
                       />
@@ -453,9 +468,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.sage,
     marginTop: 2,
   },
-
-  // Emoji inside IconChip
-  chipEmoji: { fontSize: 16 },
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   modalOverlay: {
