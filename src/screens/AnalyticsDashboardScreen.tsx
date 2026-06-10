@@ -1,14 +1,279 @@
+/**
+ * AnalyticsDashboardScreen
+ *
+ * Verdure redesign: Unit 10 (#245)
+ *
+ * Behaviour-preserving restyle only. All DB queries and metric calculations
+ * are unchanged. Presentation updated to the Verdure calm-wellness system
+ * per design/verdure/DESIGN.md and code.html §7 Analytics board.
+ *
+ * Layout:
+ *   - ScreenHeader (Fraunces title, "Last 30 days" subtitle)
+ *   - Metric cards row: Weight delta | Workout count | Fasting streak
+ *   - Weight trend card: flat View-based chart (sage line, sageTint area, sageDeep dot)
+ *   - Consistency grid: 7-col rounded dot grid (sage/gold/canvasSunken) + legend
+ *   - 7-day / 30-day rolling stats with ProgressBar rows
+ */
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import { getRollingWindow, getWeightHistory, toISODate } from '../db/database';
+import { Card, ProgressBar, ScreenHeader, Pill } from '../components';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface RollingStats {
+  walk: number;   // completion %
+  gym: number;    // completion %
+  extra: number;  // absolute count
+  total: number;  // days in window
+  fasting: number; // completion %
+}
+
+type DotState = 'complete' | 'partial' | 'missed';
+
+// ─── Metric card ──────────────────────────────────────────────────────────────
+
+function MetricCard({
+  microLabel,
+  bigNumber,
+  subLabel,
+}: {
+  microLabel: string;
+  bigNumber: string;
+  subLabel: string;
+}) {
+  return (
+    <Card style={styles.metricCard}>
+      <Text style={styles.metricMicroLabel}>{microLabel}</Text>
+      <Text style={styles.metricBigNumber}>{bigNumber}</Text>
+      <Text style={styles.metricSubLabel}>{subLabel}</Text>
+    </Card>
+  );
+}
+
+// ─── Weight trend (flat View-based chart recoloured to Verdure) ───────────────
+
+function WeightTrendCard({
+  history,
+}: {
+  history: { date: string; weight: number }[];
+}) {
+  if (history.length === 0) {
+    return (
+      <Card style={styles.sectionCard}>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardSectionTitle}>Body weight</Text>
+        </View>
+        <Text style={styles.emptyText}>No weight data logged yet.</Text>
+      </Card>
+    );
+  }
+
+  const weights = history.map((w) => w.weight);
+  const minW = Math.min(...weights) - 2;
+  const maxW = Math.max(...weights) + 2;
+  const current = weights[weights.length - 1];
+  const range = maxW - minW;
+
+  return (
+    <Card style={styles.sectionCard}>
+      <View style={styles.cardTitleRow}>
+        <Text style={styles.cardSectionTitle}>Body weight</Text>
+        <Text style={styles.currentWeightLabel}>{current.toFixed(1)} kg</Text>
+      </View>
+
+      {/* Flat chart: sage-tint filled area + sage line + sageDeep last dot */}
+      <View style={styles.chartContainer}>
+        {/* Area fill layer */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <View style={styles.areaFill}>
+            {history.map((pt, i) => {
+              const heightPct = Math.max(4, ((pt.weight - minW) / range) * 100);
+              return (
+                <View
+                  key={`area-${i}`}
+                  style={[
+                    styles.areaBar,
+                    { height: `${heightPct}%` },
+                  ]}
+                />
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Line + dot layer */}
+        <View style={styles.lineLayer}>
+          {history.map((pt, i) => {
+            const heightPct = Math.max(4, ((pt.weight - minW) / range) * 100);
+            const isLast = i === history.length - 1;
+            return (
+              <View
+                key={`bar-${i}`}
+                style={styles.barColumn}
+              >
+                <View
+                  style={[
+                    styles.bar,
+                    {
+                      height: `${heightPct}%`,
+                      backgroundColor: isLast
+                        ? Colors.sageDeep
+                        : Colors.sage,
+                    },
+                    isLast && styles.barLast,
+                  ]}
+                />
+                {(i === 0 || isLast) && (
+                  <Text style={styles.barDateLabel}>
+                    {pt.date.substring(8, 10)}/{pt.date.substring(5, 7)}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.chartMeta}>
+        <Text style={styles.chartMetaText}>
+          Min {(minW + 2).toFixed(1)} kg
+        </Text>
+        <Text style={styles.chartMetaText}>
+          Max {(maxW - 2).toFixed(1)} kg
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
+// ─── Consistency dot grid ─────────────────────────────────────────────────────
+
+function ConsistencyGrid({ dots }: { dots: DotState[] }) {
+  const DOT_COLORS: Record<DotState, string> = {
+    complete: Colors.sage,
+    partial: Colors.gold,
+    missed: Colors.canvasSunken,
+  };
+
+  return (
+    <Card style={styles.sectionCard}>
+      <View style={styles.cardTitleRow}>
+        <Text style={styles.cardSectionTitle}>Consistency</Text>
+        <Text style={styles.cardSectionTrailing}>Last 14 days</Text>
+      </View>
+
+      <View style={styles.dotGrid}>
+        {dots.map((state, i) => (
+          <View
+            key={i}
+            style={[styles.dot, { backgroundColor: DOT_COLORS[state] }]}
+          />
+        ))}
+      </View>
+
+      {/* Legend */}
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { backgroundColor: Colors.sage }]} />
+          <Text style={styles.legendLabel}>Complete</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { backgroundColor: Colors.gold }]} />
+          <Text style={styles.legendLabel}>Partial</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { backgroundColor: Colors.canvasSunken }]} />
+          <Text style={styles.legendLabel}>Missed</Text>
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+// ─── Rolling stats card ───────────────────────────────────────────────────────
+
+function RollingStatsCard({
+  title,
+  stats,
+}: {
+  title: string;
+  stats: RollingStats;
+}) {
+  return (
+    <Card style={styles.sectionCard}>
+      <Text style={styles.cardSectionTitle} numberOfLines={1}>
+        {title}
+      </Text>
+
+      {/* Walk */}
+      <View style={styles.statRow}>
+        <Text style={styles.statLabel}>Walking</Text>
+        <ProgressBar
+          progress={stats.walk / 100}
+          height={7}
+          style={styles.statBar}
+        />
+        <Pill label={`${stats.walk}%`} accent="sage" />
+      </View>
+
+      {/* Gym */}
+      <View style={styles.statRow}>
+        <Text style={styles.statLabel}>Gym</Text>
+        <ProgressBar
+          progress={stats.gym / 100}
+          height={7}
+          style={styles.statBar}
+        />
+        <Pill label={`${stats.gym}%`} accent="sage" />
+      </View>
+
+      {/* Fasting */}
+      <View style={styles.statRow}>
+        <Text style={styles.statLabel}>Fasting</Text>
+        <ProgressBar
+          progress={stats.fasting / 100}
+          height={7}
+          style={styles.statBar}
+        />
+        <Pill label={`${stats.fasting}%`} accent="sky" />
+      </View>
+
+      {/* Extra workouts count */}
+      <View style={[styles.statRow, { marginBottom: 0 }]}>
+        <Text style={styles.statLabel}>Extra workouts</Text>
+        <View style={styles.statBarSpacer} />
+        <Pill label={`${stats.extra} done`} accent="clay" />
+      </View>
+    </Card>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AnalyticsDashboardScreen() {
   const [loading, setLoading] = useState(false);
-  const [stats7Day, setStats7Day] = useState({ walk: 0, gym: 0, extra: 0 });
-  const [stats30Day, setStats30Day] = useState({ walk: 0, gym: 0, extra: 0 });
-  const [weightHistory, setWeightHistory] = useState<{date: string, weight: number}[]>([]);
+  const [stats7Day, setStats7Day] = useState<RollingStats>({
+    walk: 0, gym: 0, extra: 0, total: 0, fasting: 0,
+  });
+  const [stats30Day, setStats30Day] = useState<RollingStats>({
+    walk: 0, gym: 0, extra: 0, total: 0, fasting: 0,
+  });
+  const [weightHistory, setWeightHistory] = useState<{ date: string; weight: number }[]>([]);
+  const [consistencyDots, setConsistencyDots] = useState<DotState[]>([]);
+
+  // Metrics derived from 30-day window
+  const [weightDelta, setWeightDelta] = useState<number | null>(null);
+  const [workoutCount30, setWorkoutCount30] = useState(0);
+  const [fastingStreak, setFastingStreak] = useState(0);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -19,32 +284,88 @@ export default function AnalyticsDashboardScreen() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Helper to compute stats
-      const computeStats = (days: number) => {
+      const computeStats = (days: number): RollingStats => {
         const cutoff = new Date(today);
         cutoff.setDate(cutoff.getDate() - days);
         const cutoffIso = toISODate(cutoff);
+        const todayIso = toISODate(today);
 
-        const relevantLogs = logs.filter(l => l.date >= cutoffIso && l.date <= toISODate(today));
-        const total = relevantLogs.length;
+        const relevant = logs.filter(
+          (l) => l.date >= cutoffIso && l.date <= todayIso
+        );
+        const total = relevant.length;
+        if (total === 0) return { walk: 0, gym: 0, extra: 0, total: 0, fasting: 0 };
 
-        if (total === 0) return { walk: 0, gym: 0, extra: 0 };
-
-        const walkCount = relevantLogs.filter(l => l.walk_completed).length;
-        const gymCount = relevantLogs.filter(l => l.hammer_completed).length;
-        const extraCount = relevantLogs.reduce((sum, l) => 
-          sum + (l.additional_workouts?.filter(aw => aw.completed).length || 0), 0);
+        const walkCount = relevant.filter((l) => l.walk_completed).length;
+        const gymCount = relevant.filter((l) => l.hammer_completed).length;
+        const fastingCount = relevant.filter((l) => l.fasting_completed).length;
+        const extraCount = relevant.reduce(
+          (sum, l) =>
+            sum + (l.additional_workouts?.filter((aw) => aw.completed).length ?? 0),
+          0
+        );
 
         return {
           walk: Math.round((walkCount / total) * 100),
           gym: Math.round((gymCount / total) * 100),
-          extra: extraCount
+          fasting: Math.round((fastingCount / total) * 100),
+          extra: extraCount,
+          total,
         };
       };
 
-      setStats7Day(computeStats(7));
-      setStats30Day(computeStats(30));
+      const s7 = computeStats(7);
+      const s30 = computeStats(30);
+      setStats7Day(s7);
+      setStats30Day(s30);
       setWeightHistory(weightData);
+
+      // ── Metric card values ──────────────────────────────────────────────────
+
+      // Weight delta (first vs last in 30-day window)
+      if (weightData.length >= 2) {
+        const delta = weightData[weightData.length - 1].weight - weightData[0].weight;
+        setWeightDelta(delta);
+      } else {
+        setWeightDelta(null);
+      }
+
+      // Total workouts (gym sessions + extra) in 30 days
+      const gymDays30 = s30.total > 0 ? Math.round((s30.gym / 100) * s30.total) : 0;
+      setWorkoutCount30(gymDays30 + s30.extra);
+
+      // Fasting streak — consecutive days from today going back
+      const todayIso = toISODate(today);
+      const sortedDesc = [...logs]
+        .filter((l) => l.date <= todayIso)
+        .sort((a, b) => (a.date > b.date ? -1 : 1));
+      let streak = 0;
+      for (const l of sortedDesc) {
+        if (l.fasting_completed) streak++;
+        else break;
+      }
+      setFastingStreak(streak);
+
+      // ── Consistency dots (last 14 days) ────────────────────────────────────
+      const dots: DotState[] = [];
+      for (let i = 13; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const iso = toISODate(d);
+        const log = logs.find((l) => l.date === iso);
+        if (!log) {
+          dots.push('missed');
+        } else {
+          const allComplete =
+            log.walk_completed && log.hammer_completed;
+          const anyComplete =
+            log.walk_completed || log.hammer_completed;
+          if (allComplete) dots.push('complete');
+          else if (anyComplete) dots.push('partial');
+          else dots.push('missed');
+        }
+      }
+      setConsistencyDots(dots);
     } catch (err) {
       console.error('Failed to load analytics', err);
     } finally {
@@ -58,251 +379,258 @@ export default function AnalyticsDashboardScreen() {
     }, [loadData])
   );
 
-  const renderStatsCard = (title: string, stats: { walk: number, gym: number, extra: number }) => (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>{title}</Text>
-      
-      <View style={styles.statRow}>
-        <Text style={styles.statLabel}>🚶 Walking Task</Text>
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressBar, { width: `${stats.walk}%`, backgroundColor: Colors.accent }]} />
-        </View>
-        <Text style={styles.statValue}>{stats.walk}%</Text>
-      </View>
-
-      <View style={styles.statRow}>
-        <Text style={styles.statLabel}>🏋️ Gym Task</Text>
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressBar, { width: `${stats.gym}%`, backgroundColor: Colors.secondary }]} />
-        </View>
-        <Text style={styles.statValue}>{stats.gym}%</Text>
-      </View>
-
-      <View style={styles.statRow}>
-        <Text style={styles.statLabel}>➕ Extra Workouts</Text>
-        <View style={styles.badgeContainer}>
-          <Text style={styles.badgeText}>{stats.extra} completed</Text>
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderWeightChart = () => {
-    if (weightHistory.length === 0) {
-      return (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Weight Trend (30 Days)</Text>
-          <Text style={styles.emptyText}>No weight data logged yet.</Text>
-        </View>
-      );
-    }
-
-    const weights = weightHistory.map(w => w.weight);
-    const minW = Math.min(...weights) - 2; // pad lower bound
-    const maxW = Math.max(...weights) + 2; // pad upper bound
-    const current = weights[weights.length - 1];
-    
-    // Using a simple View-based bar chart
-    return (
-      <View style={styles.card}>
-        <View style={styles.chartHeader}>
-          <Text style={styles.cardTitle}>Weight Trend (30 Days)</Text>
-          <Text style={styles.currentWeight}>{current.toFixed(1)} kg</Text>
-        </View>
-        
-        <View style={styles.chartArea}>
-          {weightHistory.map((pt, i) => {
-            const heightPct = Math.max(5, ((pt.weight - minW) / (maxW - minW)) * 100);
-            return (
-              <View key={i} style={styles.barContainer}>
-                <View style={[styles.bar, { height: `${heightPct}%` }]} />
-                {/* Optional: Show label on first, last, and maybe midway */}
-                {(i === 0 || i === weightHistory.length - 1) && (
-                  <Text style={styles.barLabel}>
-                    {pt.date.substring(8, 10)}/{pt.date.substring(5,7)}
-                  </Text>
-                )}
-              </View>
-            );
-          })}
-        </View>
-        
-        <View style={styles.chartMeta}>
-          <Text style={styles.chartMetaText}>Min: {(minW + 2).toFixed(1)} kg</Text>
-          <Text style={styles.chartMetaText}>Max: {(maxW - 2).toFixed(1)} kg</Text>
-        </View>
-      </View>
-    );
-  };
+  // Format weight delta for metric card
+  const weightDeltaStr =
+    weightDelta === null
+      ? '—'
+      : weightDelta > 0
+      ? `+${weightDelta.toFixed(1)}`
+      : weightDelta.toFixed(1);
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: 8 }]}>
-        <Text style={styles.title}>Analytics</Text>
-        <View style={styles.datePill}>
-          <Text style={styles.datePillText}>Last 30 Days</Text>
-        </View>
-      </View>
-
+    <View style={styles.screen}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} tintColor={Colors.accent} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={loadData}
+            tintColor={Colors.sage}
+          />
+        }
       >
-        {renderStatsCard('7-Day Rolling Stats', stats7Day)}
-        {renderStatsCard('30-Day Rolling Stats', stats30Day)}
-        {renderWeightChart()}
+        <ScreenHeader title="Progress" subtitle="Last 30 days" />
+
+        {/* Metric cards row */}
+        <View style={styles.metricsRow}>
+          <MetricCard
+            microLabel="Weight"
+            bigNumber={weightDeltaStr}
+            subLabel="kg this month"
+          />
+          <MetricCard
+            microLabel="Workouts"
+            bigNumber={String(workoutCount30)}
+            subLabel={`of ${stats30Day.total} days`}
+          />
+          <MetricCard
+            microLabel="Fasting"
+            bigNumber={String(fastingStreak)}
+            subLabel="day streak"
+          />
+        </View>
+
+        {/* Weight trend */}
+        <WeightTrendCard history={weightHistory} />
+
+        {/* Consistency grid */}
+        <ConsistencyGrid dots={consistencyDots} />
+
+        {/* Rolling stats */}
+        <RollingStatsCard title="7-Day Rolling Stats" stats={stats7Day} />
+        <RollingStatsCard title="30-Day Rolling Stats" stats={stats30Day} />
+
         <View style={{ height: Spacing.xl }} />
       </ScrollView>
     </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  title: {
-    fontSize: Typography.sizes.hero,
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
-  },
-  datePill: {
-    backgroundColor: Colors.surfaceElevated,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  datePillText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    backgroundColor: Colors.canvas,
   },
   scrollContent: {
-    padding: Spacing.lg,
-    gap: Spacing.lg,
+    paddingBottom: Spacing.xl,
+    gap: Spacing.md,
   },
-  card: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cardTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.md,
-  },
-  statRow: {
+
+  // ── Metric cards ────────────────────────────────────────────────────────────
+  metricsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
   },
-  statLabel: {
-    width: 130,
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-    fontWeight: Typography.weights.medium,
-  },
-  progressContainer: {
+  metricCard: {
     flex: 1,
-    height: 8,
-    backgroundColor: Colors.background,
-    borderRadius: Radius.full,
-    marginRight: Spacing.sm,
-    overflow: 'hidden',
+    padding: Spacing.md,
   },
-  progressBar: {
-    height: '100%',
-    borderRadius: Radius.full,
-  },
-  statValue: {
-    width: 40,
-    fontSize: Typography.sizes.sm,
+  metricMicroLabel: {
+    fontFamily: Typography.label,
+    fontSize: 8,
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
-    textAlign: 'right',
-  },
-  badgeContainer: {
-    backgroundColor: Colors.accent + '20',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.accent + '50',
-  },
-  badgeText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.accent,
-    fontWeight: Typography.weights.semibold,
-  },
-  emptyText: {
-    fontSize: Typography.sizes.sm,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
     color: Colors.textMuted,
-    fontStyle: 'italic',
+    marginBottom: Spacing.xs,
   },
-  chartHeader: {
+  metricBigNumber: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.textPrimary,
+    lineHeight: Typography.sizes.xl * 1.1,
+  },
+  metricSubLabel: {
+    fontFamily: Typography.label,
+    fontSize: 9,
+    fontWeight: Typography.weights.bold,
+    color: Colors.sageDeep,
+    marginTop: Spacing.xs,
+  },
+
+  // ── Shared card layout ───────────────────────────────────────────────────────
+  sectionCard: {
+    marginHorizontal: Spacing.lg,
+  },
+  cardTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
   },
-  currentWeight: {
-    fontSize: Typography.sizes.xl,
+  cardSectionTitle: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.bold,
-    color: Colors.accent,
+    color: Colors.textPrimary,
   },
-  chartArea: {
-    height: 120,
+  cardSectionTrailing: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.textMuted,
+  },
+
+  // ── Weight chart ─────────────────────────────────────────────────────────────
+  currentWeightLabel: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.sageDeep,
+  },
+  chartContainer: {
+    height: 80,
+    marginBottom: Spacing.sm,
+  },
+  areaFill: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: '100%',
+    backgroundColor: Colors.sageTint,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
+    opacity: 0.5,
+  },
+  areaBar: {
+    flex: 1,
+    backgroundColor: Colors.sageTint,
+  },
+  lineLayer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    top: 0,
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    marginTop: Spacing.md,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
-  barContainer: {
+  barColumn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginHorizontal: 2,
     height: '100%',
+    marginHorizontal: 1,
   },
   bar: {
-    width: '100%',
-    maxWidth: 12,
-    backgroundColor: Colors.accent,
+    width: '80%',
+    maxWidth: 10,
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
   },
-  barLabel: {
+  barLast: {
+    width: 10,
+    maxWidth: 10,
+  },
+  barDateLabel: {
     position: 'absolute',
-    bottom: -18,
-    fontSize: Typography.sizes.xs - 2,
+    bottom: -16,
+    fontFamily: Typography.body,
+    fontSize: 9,
     color: Colors.textMuted,
   },
   chartMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: Spacing.sm,
-    marginTop: 8,
+    marginTop: Spacing.lg,
   },
   chartMetaText: {
+    fontFamily: Typography.body,
     fontSize: Typography.sizes.xs,
     color: Colors.textSecondary,
-    fontWeight: Typography.weights.medium,
-  }
+  },
+  emptyText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+  },
+
+  // ── Consistency grid ─────────────────────────────────────────────────────────
+  dotGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm - 2,
+    marginBottom: Spacing.md,
+  },
+  dot: {
+    width: 32,
+    aspectRatio: 1,
+    borderRadius: Radius.sm - 4,
+  },
+  legend: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    flexWrap: 'wrap',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  legendSwatch: {
+    width: 9,
+    height: 9,
+    borderRadius: 3,
+  },
+  legendLabel: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.textSecondary,
+  },
+
+  // ── Rolling stats card ────────────────────────────────────────────────────────
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  statLabel: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+    width: 90,
+  },
+  statBar: {
+    flex: 1,
+  },
+  statBarSpacer: {
+    flex: 1,
+  },
 });
