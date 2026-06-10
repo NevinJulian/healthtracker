@@ -87,6 +87,17 @@ export default function RecipeDetailScreen() {
     );
   }
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  // Split instructions into numbered steps if they contain newlines; otherwise
+  // show as a single paragraph.
+  const instructionSteps: string[] = recipe.instructions
+    ? recipe.instructions
+        .split('\n')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+    : [];
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -177,21 +188,43 @@ export default function RecipeDetailScreen() {
           </Card>
         </View>
 
-        {/* ── Instructions (placeholder) ───────────────────────────────── */}
+        {/* ── Instructions ──────────────────────────────────────────────── */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>INSTRUCTIONS</Text>
           <Card style={styles.methodCard}>
-            <Text style={styles.bodyText}>{recipe.instructions}</Text>
+            {instructionSteps.length > 1 ? (
+              instructionSteps.map((step, idx) => (
+                <View key={idx} style={styles.stepRow}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>{idx + 1}</Text>
+                  </View>
+                  <Text style={styles.stepText}>{step}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.bodyText}>{recipe.instructions}</Text>
+            )}
           </Card>
         </View>
 
+        {/* ── Freezer Tips ──────────────────────────────────────────────── */}
         {recipe.freezerTips ? (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>FREEZER TIPS</Text>
-            <Text style={styles.bodyText}>{recipe.freezerTips}</Text>
+            <Card style={styles.tipCard}>
+              <View style={styles.tipInner}>
+                <IconChip
+                  icon={<Text style={styles.tipEmoji}>{'❄'}</Text>}
+                  accent="sky"
+                  size={36}
+                />
+                <Text style={styles.tipText}>{recipe.freezerTips}</Text>
+              </View>
+            </Card>
           </View>
         ) : null}
 
+        {/* ── Action buttons ────────────────────────────────────────────── */}
         <View style={styles.actionsSection}>
           <Button
             title="Add to Shopping List"
@@ -374,12 +407,62 @@ const styles = StyleSheet.create({
   // ── Method / instructions ─────────────────────────────────────────────────
   methodCard: {
     padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
+  },
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.sageTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+    flexShrink: 0,
+  },
+  stepNumberText: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    color: Colors.sageDeep,
+    fontWeight: Typography.weights.bold,
+  },
+  stepText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    lineHeight: Typography.sizes.sm * 1.55,
+    flex: 1,
   },
   bodyText: {
     fontFamily: Typography.body,
     fontSize: Typography.sizes.sm,
     color: Colors.textSecondary,
     lineHeight: Typography.sizes.sm * 1.55,
+  },
+
+  // ── Freezer tips ──────────────────────────────────────────────────────────
+  tipCard: {
+    backgroundColor: Colors.skyTint,
+    padding: Spacing.lg,
+  },
+  tipInner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
+  },
+  tipEmoji: {
+    fontSize: 18,
+  },
+  tipText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.skyDeep,
+    lineHeight: Typography.sizes.sm * 1.55,
+    flex: 1,
   },
 
   // ── Action buttons ────────────────────────────────────────────────────────
