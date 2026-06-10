@@ -1,14 +1,112 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
-import { Colors, Typography } from '../theme/tokens';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+} from 'react-native';
+import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import { getRecipes, Recipe } from '../db/database';
 import { useNavigation } from '@react-navigation/native';
+import { Card, IconChip, ScreenHeader } from '../components';
 
-const CATEGORIES = ["All", "Fresh & Fridge", "Quick Cook", "Freezer Batch", "Freezer Sauce"];
+// ─── Category → accent family mapping ────────────────────────────────────────
+
+type AccentKey = 'clay' | 'sage' | 'gold' | 'sky';
+
+const CATEGORY_ACCENT: Record<string, AccentKey> = {
+  'All':            'sage',
+  'Fresh & Fridge': 'sage',
+  'Quick Cook':     'gold',
+  'Freezer Batch':  'sky',
+  'Freezer Sauce':  'clay',
+};
+
+function categoryAccent(category: string): AccentKey {
+  return CATEGORY_ACCENT[category] ?? 'clay';
+}
+
+const ACCENT_IMG_BG: Record<AccentKey, string> = {
+  sage: Colors.sageTint,
+  clay: Colors.clayTint,
+  gold: Colors.goldTint,
+  sky:  Colors.skyTint,
+};
+
+const ACCENT_META_COLOR: Record<AccentKey, string> = {
+  sage: Colors.sageDeep,
+  clay: Colors.clayDeep,
+  gold: Colors.goldDeep,
+  sky:  Colors.skyDeep,
+};
+
+// Category emoji stand-ins (no new native deps)
+const CATEGORY_EMOJI: Record<string, string> = {
+  'All':            '🍽',
+  'Fresh & Fridge': '🥗',
+  'Quick Cook':     '⚡',
+  'Freezer Batch':  '❄',
+  'Freezer Sauce':  '🫙',
+};
+
+const CATEGORIES = ['All', 'Fresh & Fridge', 'Quick Cook', 'Freezer Batch', 'Freezer Sauce'];
+
+// ─── Recipe Card ─────────────────────────────────────────────────────────────
+
+function RecipeCard({
+  item,
+  onPress,
+}: {
+  item: Recipe;
+  onPress: () => void;
+}) {
+  const accent = categoryAccent(item.category);
+  const metaColor = ACCENT_META_COLOR[accent];
+  const imgBg = ACCENT_IMG_BG[accent];
+  const emoji = CATEGORY_EMOJI[item.category] ?? '🍽';
+
+  return (
+    <TouchableOpacity
+      style={styles.cardWrapper}
+      onPress={onPress}
+      activeOpacity={0.78}
+    >
+      <Card style={styles.recipeCard}>
+        {/* Tinted icon band */}
+        <View style={[styles.cardImgBand, { backgroundColor: imgBg }]}>
+          <IconChip
+            icon={<Text style={styles.cardEmoji}>{emoji}</Text>}
+            accent={accent}
+            size={44}
+          />
+        </View>
+
+        {/* Card body */}
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={[styles.cardMeta, { color: metaColor }]} numberOfLines={1}>
+            {item.calories} kcal · {item.protein}g protein
+          </Text>
+          <Text style={styles.cardTime}>
+            {item.prepTimeMinutes} min
+          </Text>
+        </View>
+      </Card>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function RecipesScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const navigation = useNavigation<any>();
 
   useEffect(() => {
@@ -20,115 +118,225 @@ export default function RecipesScreen() {
     setRecipes(data);
   };
 
-  const renderRecipe = ({ item }: { item: Recipe }) => (
-    <TouchableOpacity 
-      style={styles.card} 
+  // Client-side search filter on already-loaded recipes
+  const filteredRecipes = searchQuery.trim()
+    ? recipes.filter(r =>
+        r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.category.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : recipes;
+
+  const renderRecipe = ({ item, index }: { item: Recipe; index: number }) => (
+    <RecipeCard
+      item={item}
       onPress={() => navigation.navigate('RecipeDetail', { recipeId: item.id })}
-    >
-      <Text style={styles.cardTitle}>{item.title}</Text>
-      <View style={styles.macrosRow}>
-        <Text style={styles.macroText}>🔥 {item.calories} kcal</Text>
-        <Text style={styles.macroText}>🥩 {item.protein}g</Text>
-        <Text style={styles.macroText}>🍚 {item.carbs}g</Text>
-        <Text style={styles.macroText}>🥑 {item.fat}g</Text>
-      </View>
-      <Text style={styles.categoryBadge}>{item.category} • ⏱️ {item.prepTimeMinutes}m</Text>
-    </TouchableOpacity>
+    />
+  );
+
+  // Spacer item so the last row in a 2-column grid fills correctly
+  const renderColumnWrapper = (props: { style?: object; children: React.ReactNode }) => (
+    <View style={[styles.columnWrapper, props.style]}>
+      {props.children}
+    </View>
   );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>Recipe Library</Text>
-      <View style={styles.filterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {CATEGORIES.map(cat => (
-            <TouchableOpacity 
-              key={cat} 
-              style={[styles.filterBadge, activeCategory === cat && styles.filterBadgeActive]}
-              onPress={() => setActiveCategory(cat)}
-            >
-              <Text style={[styles.filterText, activeCategory === cat && styles.filterTextActive]}>{cat}</Text>
-            </TouchableOpacity>
-          ))}
+      {/* Screen header — Fraunces display title */}
+      <ScreenHeader
+        title="Recipe Library"
+        subtitle={`${filteredRecipes.length} recipe${filteredRecipes.length === 1 ? '' : 's'}`}
+        style={styles.screenHeader}
+      />
+
+      {/* Search bar */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>&#128269;</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search recipes &amp; ingredients"
+            placeholderTextColor={Colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        </View>
+      </View>
+
+      {/* Filter chips */}
+      <View style={styles.chipsContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsContent}
+        >
+          {CATEGORIES.map(cat => {
+            const isActive = cat === activeCategory;
+            return (
+              <TouchableOpacity
+                key={cat}
+                style={[styles.chip, isActive && styles.chipActive]}
+                onPress={() => setActiveCategory(cat)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
+
+      {/* Recipe grid */}
       <FlatList
-        data={recipes}
+        data={filteredRecipes}
         keyExtractor={item => item.id}
         renderItem={renderRecipe}
+        numColumns={2}
+        columnWrapperStyle={styles.columnWrapper}
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No recipes found.</Text>
+          </View>
+        }
       />
     </View>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
   },
-  headerTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
+
+  // ── Screen header ─────────────────────────────────────────────────────────
+  screenHeader: {
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+  },
+
+  // ── Search bar ────────────────────────────────────────────────────────────
+  searchRow: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  searchIcon: {
+    fontSize: 16,
+    color: Colors.textMuted,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
     color: Colors.textPrimary,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
+    padding: 0,
   },
-  filterContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+
+  // ── Filter chips ──────────────────────────────────────────────────────────
+  chipsContainer: {
+    paddingBottom: Spacing.md,
   },
-  filterBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  chipsContent: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  chip: {
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
     backgroundColor: Colors.surface,
-    marginRight: 8,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  filterBadgeActive: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+  chipActive: {
+    backgroundColor: Colors.sage,
+    borderColor: Colors.sage,
   },
-  filterText: {
+  chipText: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.xs,
     color: Colors.textSecondary,
-    fontWeight: Typography.weights.medium,
   },
-  filterTextActive: {
-    color: Colors.background,
-    fontWeight: Typography.weights.bold,
+  chipTextActive: {
+    color: Colors.surface,
   },
+
+  // ── Recipe grid ───────────────────────────────────────────────────────────
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xxl,
+    gap: Spacing.md,
   },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  columnWrapper: {
+    gap: Spacing.md,
+  },
+  cardWrapper: {
+    flex: 1,
+  },
+
+  // ── Recipe card ───────────────────────────────────────────────────────────
+  recipeCard: {
+    padding: 0,
+    overflow: 'hidden',
+  },
+  cardImgBand: {
+    height: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardEmoji: {
+    fontSize: 24,
+  },
+  cardBody: {
+    padding: Spacing.md,
+    gap: Spacing.xs,
   },
   cardTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.semibold,
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.sm,
     color: Colors.textPrimary,
-    marginBottom: 8,
+    lineHeight: Typography.sizes.sm * 1.22,
+    letterSpacing: -0.2,
   },
-  macrosRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+  cardMeta: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs - 1,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 0.1,
   },
-  macroText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.sm,
-  },
-  categoryBadge: {
+  cardTime: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs - 1,
     color: Colors.textMuted,
+  },
+
+  // ── Empty state ───────────────────────────────────────────────────────────
+  emptyContainer: {
+    paddingTop: Spacing.xxl,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontFamily: Typography.body,
     fontSize: Typography.sizes.sm,
-  }
+    color: Colors.textMuted,
+  },
 });
