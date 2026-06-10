@@ -135,6 +135,8 @@ export default function MealPrepScreen() {
   };
 
   // ─── Tab Switcher ─────────────────────────────────────────────
+  // Pill track: canvasSunken bg, sage-fill active pill, white text on active.
+  // Follows the same pattern as DashboardScreen segment controls.
 
   const renderTabSwitcher = () => (
     <View style={styles.tabTrack}>
@@ -397,13 +399,15 @@ function MealSlot({
           />
         </View>
       ) : (
-        <TouchableOpacity
-          style={styles.assignBtn}
-          onPress={onAssign}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.assignBtnText}>Assign</Text>
-        </TouchableOpacity>
+        <View style={styles.assignBtnWrap}>
+          <TouchableOpacity
+            style={styles.assignBtn}
+            onPress={onAssign}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.assignBtnText}>Assign</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -703,13 +707,16 @@ const styles = StyleSheet.create({
   assignedMetaConsumed: {
     color: Colors.textMuted,
   },
+  assignBtnWrap: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
   assignBtn: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs + 2,
     borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: Colors.sage,
-    marginLeft: 'auto' as any,
   },
   assignBtnText: {
     fontFamily: Typography.title,
