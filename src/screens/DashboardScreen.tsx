@@ -42,24 +42,42 @@ import {
 // ─── Verdure circle checkbox ──────────────────────────────────────────────────
 // Replaces old square Checkbox: 24px circle, empty = line2 ring, done = sage fill
 
+/**
+ * CircleCheck — Verdure 24px circle checkbox (DESIGN.md §5).
+ * When `label` is provided renders as a full tappable row (used for walk/fasting/session toggles).
+ * When `label` is omitted renders as the bare circle only (for use as Row leading slot).
+ */
 function CircleCheck({
   checked,
   label,
   onToggle,
 }: {
   checked: boolean;
-  label: string;
+  label?: string;
   onToggle: () => void;
 }) {
+  const circle = (
+    <View style={[styles.circleCheck, checked && styles.circleCheckDone]}>
+      {checked && <Text style={styles.circleCheckMark}>✓</Text>}
+    </View>
+  );
+
+  if (!label) {
+    return (
+      <TouchableOpacity onPress={onToggle} activeOpacity={0.7}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        {circle}
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
       style={styles.checkboxRow}
       onPress={onToggle}
       activeOpacity={0.7}
     >
-      <View style={[styles.circleCheck, checked && styles.circleCheckDone]}>
-        {checked && <Text style={styles.circleCheckMark}>✓</Text>}
-      </View>
+      {circle}
       <Text style={[styles.checkboxLabel, checked && styles.checkboxLabelChecked]}>
         {label}
       </Text>
@@ -99,16 +117,7 @@ function ExerciseRow({
   return (
     <Row
       leading={
-        <View style={[styles.exCheckbox, exercise.completed && styles.exCheckboxDone]}>
-          <TouchableOpacity
-            onPress={onToggle}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
-          >
-            {exercise.completed && <Text style={styles.exCheckmark}>✓</Text>}
-          </TouchableOpacity>
-        </View>
+        <CircleCheck checked={exercise.completed} onToggle={onToggle} />
       }
       title={exercise.name}
       subtitle={`${exercise.sets} sets × ${exercise.reps} reps`}
@@ -470,15 +479,25 @@ export default function DashboardScreen() {
           </Card>
           {todaysMeals.length > 0 ? (
             todaysMeals.map((meal) => (
-              <CircleCheck
+              <Row
                 key={meal.id}
-                checked={meal.is_consumed}
-                label={
+                leading={
+                  <CircleCheck
+                    checked={meal.is_consumed}
+                    onToggle={() => handleToggleMeal(meal.id, meal.is_consumed)}
+                  />
+                }
+                title={
                   meal.recipe?.title
                     ? `${meal.meal_type}: ${meal.recipe.title}`
                     : `${meal.meal_type}: Unknown`
                 }
-                onToggle={() => handleToggleMeal(meal.id, meal.is_consumed)}
+                subtitle={
+                  meal.recipe
+                    ? `${meal.recipe.calories} kcal · ${meal.recipe.protein}g protein`
+                    : undefined
+                }
+                style={meal.is_consumed ? styles.rowConsumed : undefined}
               />
             ))
           ) : (
@@ -523,15 +542,21 @@ export default function DashboardScreen() {
           <Text style={styles.extraWorkoutsTitle}>Bonuses / Ad-hoc</Text>
 
           {(entry.additional_workouts || []).map((aw) => (
-            <CircleCheck
+            <Row
               key={aw.id}
-              checked={aw.completed}
-              label={
-                aw.muscle_group
-                  ? `${aw.name} · ${aw.muscle_group} · ${aw.sets}×${aw.reps}`
-                  : aw.name
+              leading={
+                <CircleCheck
+                  checked={aw.completed}
+                  onToggle={() => handleToggleExtraWorkout(aw.id)}
+                />
               }
-              onToggle={() => handleToggleExtraWorkout(aw.id)}
+              title={aw.name}
+              subtitle={
+                aw.muscle_group
+                  ? `${aw.muscle_group} · ${aw.sets} sets × ${aw.reps} reps`
+                  : undefined
+              }
+              style={aw.completed ? styles.rowConsumed : undefined}
             />
           ))}
 
@@ -767,25 +792,9 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
   },
 
-  // ── Exercise circle checkbox ──────────────────────────────────────────────
-  exCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: Radius.full,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surface,
-  },
-  exCheckboxDone: {
-    backgroundColor: Colors.sage,
-    borderColor: Colors.sage,
-  },
-  exCheckmark: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: Typography.title,
+  // ── Consumed / done row dimming ───────────────────────────────────────────
+  rowConsumed: {
+    opacity: 0.6,
   },
 
   // ── Watch tutorial button ─────────────────────────────────────────────────
