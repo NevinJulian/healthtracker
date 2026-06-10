@@ -757,7 +757,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.sage,
   },
   circleCheckMark: {
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
     fontSize: 13,
     fontFamily: Typography.title,
     lineHeight: 16,
