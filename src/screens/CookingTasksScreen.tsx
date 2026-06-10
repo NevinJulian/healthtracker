@@ -5,6 +5,8 @@
  * Issue #10: task list UI
  * Issue #11: step-by-step instructions on tap
  * Issue #12: "Finished Cooking" button → inventory update + navigation
+ *
+ * Verdure redesign: Unit 8 (#241)
  */
 import React, { useState, useCallback } from 'react';
 import {
@@ -28,6 +30,15 @@ import {
   deleteCookingTask,
   CookingTaskWithRecipe,
 } from '../db/database';
+import {
+  Card,
+  Row,
+  IconChip,
+  Pill,
+  ProgressBar,
+  Button,
+  ScreenHeader,
+} from '../components';
 
 // ─── Task Card ───────────────────────────────────────────────────────────────
 
@@ -40,88 +51,68 @@ function TaskCard({
   onPress: () => void;
   onRemove: () => void;
 }) {
+  const cookIcon = (
+    <Text style={{ fontSize: 18, color: Colors.clayDeep }}>{'🍳'}</Text>
+  );
+
   return (
     <TouchableOpacity
-      style={styles.card}
       onPress={onPress}
       activeOpacity={0.8}
       accessibilityRole="button"
       accessibilityLabel={`Cook ${task.recipe.title}`}
     >
-      {/* Left accent strip */}
-      <View style={styles.cardAccent} />
+      <Card style={styles.card}>
+        <View style={styles.cardInner}>
+          {/* Leading icon chip */}
+          <IconChip icon={cookIcon} accent="clay" size={44} style={styles.cardIcon} />
 
-      <View style={styles.cardBody}>
-        {/* Recipe name + servings badge */}
-        <View style={styles.cardTop}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
-            {task.recipe.title}
-          </Text>
-          <View style={styles.servingsBadge}>
-            <Text style={styles.servingsBadgeText}>
-              {task.servings_to_cook}×
-            </Text>
+          {/* Main content */}
+          <View style={styles.cardBody}>
+            {/* Title row */}
+            <View style={styles.cardTitleRow}>
+              <Text style={styles.cardTitle} numberOfLines={2}>
+                {task.recipe.title}
+              </Text>
+              {/* Remove button */}
+              <TouchableOpacity
+                style={styles.removeBtn}
+                onPress={onRemove}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${task.recipe.title} from queue`}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.removeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Chips row: category, servings, prep time */}
+            <View style={styles.chipsRow}>
+              <Pill label={task.recipe.category} accent="clay" />
+              <Pill label={`${task.servings_to_cook}×`} accent="sage" />
+              <Pill label={`${task.recipe.prepTimeMinutes} min`} accent="sky" />
+            </View>
+
+            {/* Macros row */}
+            <View style={styles.macroRow}>
+              <Pill label={`${task.recipe.calories} kcal`} accent="gold" />
+              <Pill label={`${task.recipe.protein}g protein`} accent="sage" />
+              <Pill label={`${task.recipe.carbs}g carbs`} accent="clay" />
+              <Pill label={`${task.recipe.fat}g fat`} accent="sky" />
+            </View>
+
+            {/* Footer */}
+            <View style={styles.cardFooter}>
+              <Text style={styles.ingredientCount}>
+                {task.recipe.ingredients.length} ingredients
+              </Text>
+              <Text style={styles.tapHint}>Tap to cook</Text>
+            </View>
           </View>
         </View>
-
-        {/* Category chip */}
-        <View style={styles.categoryChip}>
-          <Text style={styles.categoryChipText}>{task.recipe.category}</Text>
-        </View>
-
-        {/* Macros row */}
-        <View style={styles.macroRow}>
-          <MacroPill label="kcal" value={task.recipe.calories} color={Colors.warning} />
-          <MacroPill label="protein" value={`${task.recipe.protein}g`} color={Colors.accent} />
-          <MacroPill label="carbs" value={`${task.recipe.carbs}g`} color={Colors.secondary} />
-          <MacroPill label="fat" value={`${task.recipe.fat}g`} color="#FF8A65" />
-        </View>
-
-        {/* Prep time + ingredient count + CTA hint */}
-        <View style={styles.cardFooter}>
-          <Text style={styles.prepTime}>
-            ⏱ {task.recipe.prepTimeMinutes} min
-          </Text>
-          <Text style={styles.ingredientCount}>
-            🥬 {task.recipe.ingredients.length} ingredients
-          </Text>
-          <Text style={styles.tapHint}>Tap to cook →</Text>
-        </View>
-      </View>
-
-      {/* Remove button */}
-      <TouchableOpacity
-        style={styles.removeBtn}
-        onPress={onRemove}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel={`Remove ${task.recipe.title} from queue`}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Text style={styles.removeBtnText}>✕</Text>
-      </TouchableOpacity>
+      </Card>
     </TouchableOpacity>
-  );
-}
-
-function MacroPill({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string | number;
-  color: string;
-}) {
-  return (
-    <View 
-      style={[styles.macroPill, { borderColor: color + '40' }]}
-      accessible={true}
-      accessibilityLabel={`${value} ${label}`}
-    >
-      <Text style={[styles.macroPillValue, { color }]}>{value}</Text>
-      <Text style={styles.macroPillLabel}>{label}</Text>
-    </View>
   );
 }
 
@@ -141,7 +132,7 @@ function InstructionsModal({
   finishing: boolean;
 }) {
   const insets = useSafeAreaInsets();
-  
+
   if (!task || !visible) return null;
 
   // Split instructions by newline so each line becomes a numbered step
@@ -150,7 +141,6 @@ function InstructionsModal({
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // Fallback for recipes with no structured instructions
   const hasSteps = steps.length > 0;
 
   return (
@@ -161,7 +151,7 @@ function InstructionsModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalContainer}>
-        {/* Modal Header */}
+        {/* Hero header — deep sage-d panel per DESIGN.md §5 */}
         <View style={[styles.modalHeader, { paddingTop: Math.max(insets.top, Spacing.xl) }]}>
           <TouchableOpacity
             onPress={onClose}
@@ -175,16 +165,18 @@ function InstructionsModal({
           <Text style={styles.modalTitle} numberOfLines={2}>
             {task.recipe.title}
           </Text>
-          <View style={styles.servingsBadgeSm}>
-            <Text style={styles.servingsBadgeSmText}>
-              {task.servings_to_cook} serving{task.servings_to_cook > 1 ? 's' : ''}
-            </Text>
+          <View style={styles.modalServingsRow}>
+            <View style={styles.servingsBadge}>
+              <Text style={styles.servingsBadgeText}>
+                {task.servings_to_cook} serving{task.servings_to_cook > 1 ? 's' : ''}
+              </Text>
+            </View>
+            {hasSteps && (
+              <Text style={styles.stepCountLabel}>
+                {steps.length} steps
+              </Text>
+            )}
           </View>
-          {hasSteps && (
-            <Text style={styles.stepCountLabel}>
-              {steps.length} steps
-            </Text>
-          )}
         </View>
 
         {/* Scrollable instructions */}
@@ -195,14 +187,15 @@ function InstructionsModal({
         >
           {/* Quick macros banner */}
           <View style={styles.instrMacros}>
-            <MacroPill label="kcal" value={task.recipe.calories} color={Colors.warning} />
-            <MacroPill label="protein" value={`${task.recipe.protein}g`} color={Colors.accent} />
-            <MacroPill label="carbs" value={`${task.recipe.carbs}g`} color={Colors.secondary} />
-            <MacroPill label="fat" value={`${task.recipe.fat}g`} color="#FF8A65" />
+            <Pill label={`${task.recipe.calories} kcal`} accent="gold" />
+            <Pill label={`${task.recipe.protein}g protein`} accent="sage" />
+            <Pill label={`${task.recipe.carbs}g carbs`} accent="clay" />
+            <Pill label={`${task.recipe.fat}g fat`} accent="sky" />
           </View>
 
-          {/* Steps */}
+          {/* Steps heading */}
           <Text style={styles.instrHeading}>Step-by-Step Instructions</Text>
+
           {hasSteps ? (
             steps.map((step, idx) => (
               <View key={idx} style={styles.stepRow}>
@@ -213,17 +206,17 @@ function InstructionsModal({
               </View>
             ))
           ) : (
-            <View style={styles.noStepsBox}>
+            <Card style={styles.noStepsBox}>
               <Text style={styles.noStepsText}>
-                No step-by-step instructions available. Follow the recipe as written.
+                No step-by-step instructions available. Follow the recipe as written.
               </Text>
-            </View>
+            </Card>
           )}
 
           {/* Freezer tips if present */}
           {task.recipe.freezerTips ? (
             <View style={styles.freezerBox}>
-              <Text style={styles.freezerTitle}>❄️ Freezer Tips</Text>
+              <Text style={styles.freezerTitle}>Freezer Tips</Text>
               <Text style={styles.freezerText}>{task.recipe.freezerTips}</Text>
             </View>
           ) : null}
@@ -234,19 +227,12 @@ function InstructionsModal({
 
         {/* Finished Cooking button — fixed at bottom */}
         <View style={[styles.finishedContainer, { paddingBottom: Math.max(insets.bottom, Spacing.xl) }]}>
-          <TouchableOpacity
-            style={[styles.finishedBtn, finishing && styles.finishedBtnDisabled]}
+          <Button
+            title={finishing ? 'Saving…' : 'Finished Cooking'}
             onPress={onFinished}
             disabled={finishing}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Mark cooking as finished"
-          >
-            <Text style={styles.finishedBtnIcon}>{finishing ? '⏳' : '✅'}</Text>
-            <Text style={styles.finishedBtnText}>
-              {finishing ? 'Saving...' : 'Finished Cooking!'}
-            </Text>
-          </TouchableOpacity>
+            variant="primary"
+          />
         </View>
       </View>
     </Modal>
@@ -350,7 +336,7 @@ export default function CookingTasksScreen() {
       await loadTasks();
       // Navigate to My Inventory
       Alert.alert(
-        '🎉 Well done!',
+        'Well done!',
         `${selectedTask.servings_to_cook} portion(s) of "${selectedTask.recipe.title}" added to your inventory.`,
         [
           {
@@ -373,11 +359,13 @@ export default function CookingTasksScreen() {
   if (loading && !refreshing) {
     return (
       <View style={styles.centred}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <ActivityIndicator size="large" color={Colors.sage} />
         <Text style={styles.loadingText}>Loading cooking queue…</Text>
       </View>
     );
   }
+
+  const totalServings = tasks.reduce((sum, t) => sum + t.servings_to_cook, 0);
 
   return (
     <View style={styles.container}>
@@ -392,29 +380,25 @@ export default function CookingTasksScreen() {
 
       {tasks.length === 0 ? (
         /* Empty state */
-        <View 
+        <View
           style={styles.emptyContainer}
           accessible={true}
           accessibilityLabel="No cooking tasks yet. Open a recipe and add it to your shopping list to queue it for cooking."
         >
-          <Text style={styles.emptyEmoji} importantForAccessibility="no">👨‍🍳</Text>
           <Text style={styles.emptyTitle}>No cooking tasks yet</Text>
           <Text style={styles.emptySubtitle}>
             Open a recipe and tap{' '}
-            <Text style={{ color: Colors.accent, fontWeight: '700' }}>
+            <Text style={styles.emptyAccent}>
               "Add to Shopping List"
             </Text>{' '}
             to queue it for cooking.
           </Text>
-          <TouchableOpacity
-            style={styles.emptyCtaBtn}
+          <Button
+            title="Browse Recipes"
             onPress={() => navigation.navigate('Recipes')}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Browse recipes to add a cooking task"
-          >
-            <Text style={styles.emptyCtaBtnText}>🍽 Browse Recipes</Text>
-          </TouchableOpacity>
+            variant="primary"
+            style={styles.emptyCtaBtn}
+          />
         </View>
       ) : (
         <FlatList
@@ -422,28 +406,31 @@ export default function CookingTasksScreen() {
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: Math.max(insets.bottom, Spacing.xxl) }
+            { paddingBottom: Math.max(insets.bottom, Spacing.xxl) },
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor={Colors.accent}
-              colors={[Colors.accent]}
+              tintColor={Colors.sage}
+              colors={[Colors.sage]}
             />
           }
           ListHeaderComponent={
             <View style={styles.listHeader}>
-              <Text style={styles.listHeaderTitle}>
-                {tasks.length} meal{tasks.length !== 1 ? 's' : ''} to cook
-              </Text>
-              <Text style={styles.listHeaderSub}>
-                Tap a card to see step-by-step instructions
-              </Text>
-              <Text style={styles.listHeaderServings}>
-                Total: {tasks.reduce((sum, t) => sum + t.servings_to_cook, 0)} servings queued
-              </Text>
+              <ScreenHeader
+                title="Cooking Queue"
+                subtitle={`${tasks.length} meal${tasks.length !== 1 ? 's' : ''} · ${totalServings} serving${totalServings !== 1 ? 's' : ''} queued`}
+              />
+              {/* Progress bar — progress is always 0 here since these are all pending */}
+              <View style={styles.progressSection}>
+                <View style={styles.progressLabelRow}>
+                  <Text style={styles.progressLabel}>READY TO COOK</Text>
+                  <Text style={styles.progressValue}>{tasks.length} queued</Text>
+                </View>
+                <ProgressBar progress={0} height={6} />
+              </View>
             </View>
           }
           renderItem={({ item }) => (
@@ -465,158 +452,118 @@ export default function CookingTasksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.canvas,
   },
   centred: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.canvas,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
   loadingText: {
+    fontFamily: Typography.body,
     color: Colors.textSecondary,
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.sm,
   },
 
   // ── List ──────────────────────────────────────────────────────────────────
   listContent: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xxl,
   },
   listHeader: {
     marginBottom: Spacing.lg,
-    gap: 4,
   },
-  listHeaderTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+  progressSection: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+    gap: Spacing.xs,
   },
-  listHeaderSub: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  listHeaderServings: {
+  progressLabel: {
+    fontFamily: Typography.label,
     fontSize: Typography.sizes.xs,
-    color: Colors.accent,
-    fontWeight: Typography.weights.semibold,
-    marginTop: 2,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  progressValue: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
   },
 
   // ── Card ─────────────────────────────────────────────────────────────────
   card: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    alignItems: 'center',
+    padding: 0,
   },
-  cardAccent: {
-    width: 4,
-    backgroundColor: Colors.accent,
+  cardInner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  cardIcon: {
+    flexShrink: 0,
+    marginTop: 2,
   },
   cardBody: {
     flex: 1,
-    padding: Spacing.md,
     gap: Spacing.sm,
   },
-  cardTop: {
+  cardTitleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.sm,
   },
   cardTitle: {
     flex: 1,
+    fontFamily: Typography.title,
     fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
     color: Colors.textPrimary,
-    lineHeight: 22,
+    lineHeight: Typography.sizes.md * 1.35,
   },
-  servingsBadge: {
-    backgroundColor: Colors.accent + '20',
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: Colors.accent,
+  removeBtn: {
+    paddingLeft: Spacing.sm,
+    paddingTop: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  servingsBadgeText: {
-    color: Colors.accent,
+  removeBtnText: {
     fontSize: Typography.sizes.sm,
+    color: Colors.textMuted,
     fontWeight: Typography.weights.bold,
   },
-
-  // ── Macros ────────────────────────────────────────────────────────────────
-  categoryChip: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  categoryChipText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textSecondary,
-    fontWeight: Typography.weights.medium,
-    textTransform: 'capitalize',
+  chipsRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    flexWrap: 'wrap',
   },
   macroRow: {
     flexDirection: 'row',
     gap: Spacing.xs,
     flexWrap: 'wrap',
   },
-  macroPill: {
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderWidth: 1,
-    minWidth: 48,
-  },
-  macroPillValue: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.bold,
-  },
-  macroPillLabel: {
-    fontSize: 9,
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  prepTime: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    marginTop: Spacing.xs,
   },
   ingredientCount: {
+    fontFamily: Typography.body,
     fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
-  },
-  removeBtn: {
-    padding: Spacing.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'stretch',
-  },
-  removeBtnText: {
-    fontSize: 16,
-    color: Colors.textMuted,
-    fontWeight: Typography.weights.bold,
   },
   tapHint: {
+    fontFamily: Typography.body,
     fontSize: Typography.sizes.xs,
-    color: Colors.accent,
+    color: Colors.sageDeep,
     fontWeight: Typography.weights.semibold,
   },
 
@@ -628,47 +575,40 @@ const styles = StyleSheet.create({
     padding: Spacing.xxl,
     gap: Spacing.md,
   },
-  emptyEmoji: {
-    fontSize: 64,
-    marginBottom: Spacing.sm,
-  },
   emptyTitle: {
+    fontFamily: Typography.display,
     fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
     color: Colors.textPrimary,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
   emptySubtitle: {
+    fontFamily: Typography.body,
     fontSize: Typography.sizes.sm,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: Typography.sizes.sm * 1.5,
+  },
+  emptyAccent: {
+    color: Colors.sageDeep,
+    fontWeight: Typography.weights.bold,
   },
   emptyCtaBtn: {
     marginTop: Spacing.sm,
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-  },
-  emptyCtaBtnText: {
-    color: Colors.background,
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
+    alignSelf: 'stretch',
   },
 
   // ── Instructions Modal ────────────────────────────────────────────────────
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.canvas,
   },
+  // Hero header — deep sage-d fill per DESIGN.md §5
   modalHeader: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.sageDeep,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.xl,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingBottom: Spacing.lg,
     gap: Spacing.xs,
   },
   modalBackBtn: {
@@ -676,29 +616,42 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   modalBackText: {
-    color: Colors.accent,
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.medium,
+    fontFamily: Typography.title,
+    color: Colors.surface,
+    fontSize: Typography.sizes.sm,
+    opacity: 0.9,
   },
   modalTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
-    lineHeight: 26,
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xxl,
+    color: Colors.surface,
+    lineHeight: Typography.sizes.xxl * 1.15,
+    letterSpacing: -0.5,
   },
-  servingsBadgeSm: {
-    backgroundColor: Colors.secondary + '20',
-    borderRadius: Radius.sm,
+  modalServingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
+  },
+  servingsBadge: {
+    backgroundColor: Colors.sageTint,
+    borderRadius: Radius.full,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: Spacing.xs - 1,
     alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: Colors.secondary,
   },
-  servingsBadgeSmText: {
-    color: Colors.secondary,
+  servingsBadgeText: {
+    fontFamily: Typography.label,
+    color: Colors.sageDeep,
     fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
+    fontWeight: Typography.weights.bold,
+  },
+  stepCountLabel: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.surface,
+    opacity: 0.75,
   },
   modalScroll: {
     flex: 1,
@@ -706,7 +659,6 @@ const styles = StyleSheet.create({
   modalScrollContent: {
     padding: Spacing.lg,
   },
-
   instrMacros: {
     flexDirection: 'row',
     gap: Spacing.xs,
@@ -714,8 +666,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   instrHeading: {
+    fontFamily: Typography.title,
     fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
     color: Colors.textPrimary,
     marginBottom: Spacing.md,
   },
@@ -731,98 +683,63 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: Colors.accent + '20',
-    borderWidth: 1,
-    borderColor: Colors.accent,
+    backgroundColor: Colors.sageTint,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
     marginTop: 1,
   },
   stepNumberText: {
-    color: Colors.accent,
+    fontFamily: Typography.label,
+    color: Colors.sageDeep,
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.bold,
   },
   stepText: {
     flex: 1,
+    fontFamily: Typography.body,
     fontSize: Typography.sizes.md,
     color: Colors.textPrimary,
-    lineHeight: 24,
+    lineHeight: Typography.sizes.md * 1.55,
   },
 
   // Freezer tips box
   freezerBox: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.clayTint,
     borderRadius: Radius.md,
     padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
     marginTop: Spacing.md,
     gap: Spacing.xs,
   },
   freezerTitle: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.clayDeep,
   },
   freezerText: {
+    fontFamily: Typography.body,
     fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-    lineHeight: 20,
+    color: Colors.clayDeep,
+    lineHeight: Typography.sizes.sm * 1.5,
   },
 
-  // Finished Cooking button
+  // No steps fallback
+  noStepsBox: {
+    // Card component handles surface + radius
+  },
+  noStepsText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    lineHeight: Typography.sizes.sm * 1.5,
+  },
+
+  // Finished Cooking button area
   finishedContainer: {
     padding: Spacing.lg,
     paddingBottom: Spacing.xl,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.canvas,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-  },
-  finishedBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.full,
-    paddingVertical: Spacing.md + 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    elevation: 4,
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-  },
-  finishedBtnIcon: {
-    fontSize: 20,
-  },
-  finishedBtnText: {
-    color: Colors.background,
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
-    letterSpacing: 0.3,
-  },
-  finishedBtnDisabled: {
-    backgroundColor: Colors.textMuted,
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  stepCountLabel: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
-    fontWeight: Typography.weights.medium,
-  },
-  noStepsBox: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  noStepsText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-    lineHeight: 20,
   },
 });
