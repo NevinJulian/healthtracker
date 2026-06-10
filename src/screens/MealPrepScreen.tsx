@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   Modal,
   FlatList,
   TextInput,
-  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
@@ -24,8 +23,16 @@ import {
   WeeklyMealPlanItem,
   toISODate,
 } from '../db/database';
+import {
+  Card,
+  Row,
+  IconChip,
+  Pill,
+  Button,
+  ScreenHeader,
+} from '../components';
 
-// ─── Component Helpers ────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────
 
 const logDbError = (err: any) => console.error('[MealPrepScreen] DB Error:', err);
 
@@ -35,24 +42,41 @@ function addDays(date: Date, days: number): Date {
   return result;
 }
 
-// ─── Main Screen ─────────────────────────────────────────────
+// ─── Verdure circle checkbox (24px, sage when done) ───────────
+
+function CircleCheck({
+  checked,
+  onToggle,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onToggle}
+      activeOpacity={0.7}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    >
+      <View style={[styles.circle, checked && styles.circleDone]}>
+        {checked && <Text style={styles.circleMark}>✓</Text>}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────
 
 export default function MealPrepScreen() {
   const [activeTab, setActiveTab] = useState<'weekly' | 'inventory'>('weekly');
 
-  // State
   const [inventory, setInventory] = useState<MealInventoryWithRecipe[]>([]);
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyMealPlanItem[]>([]);
-  
-  // Loading
   const [loading, setLoading] = useState(true);
 
-  // Modals state
   const [logModalVisible, setLogModalVisible] = useState(false);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ date: string; meal_type: string } | null>(null);
 
-  // Recipes cache for logging
   const [recipes, setRecipes] = useState<Recipe[]>([]);
 
   useFocusEffect(
@@ -77,7 +101,7 @@ export default function MealPrepScreen() {
     }
   };
 
-  // ─── Actions ───────────────────────────────────────────────
+  // ─── Actions ─────────────────────────────────────────────────
 
   const handleLogCookedMeal = async (recipe_id: string, portions: number) => {
     if (portions <= 0) return;
@@ -110,154 +134,203 @@ export default function MealPrepScreen() {
     }
   };
 
-  // ─── Renders ───────────────────────────────────────────────
+  // ─── Tab Switcher ─────────────────────────────────────────────
+
+  const renderTabSwitcher = () => (
+    <View style={styles.tabTrack}>
+      {(['weekly', 'inventory'] as const).map((tab) => {
+        const active = activeTab === tab;
+        const label = tab === 'weekly' ? 'Weekly Plan' : 'My Inventory';
+        return (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tabPill, active && styles.tabPillActive]}
+            onPress={() => setActiveTab(tab)}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  // ─── Inventory Tab ────────────────────────────────────────────
 
   const renderInventoryTab = () => (
-    <ScrollView style={styles.tabContainer} contentContainerStyle={styles.scrollContent}>
-      <TouchableOpacity style={styles.actionButton} onPress={() => setLogModalVisible(true)}>
-        <Text style={styles.actionButtonText}>+ Log Cooked Meal</Text>
-      </TouchableOpacity>
+    <ScrollView
+      style={styles.scrollFlex}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <Button
+        title="+ Log Cooked Meal"
+        onPress={() => setLogModalVisible(true)}
+        variant="primary"
+        style={styles.logButton}
+      />
 
       {inventory.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>Your inventory is empty.</Text>
-          <Text style={styles.emptyStateSub}>Cook and log a meal to see it here!</Text>
+          <Text style={styles.emptyTitle}>Your inventory is empty</Text>
+          <Text style={styles.emptySub}>Cook and log a meal to see it here.</Text>
         </View>
       ) : (
         inventory.map((item) => (
-          <View key={item.id} style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{item.recipe.title}</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.portions_available}x portions</Text>
+          <Card key={item.id} style={styles.inventoryCard}>
+            {/* Header row: icon chip + title + portions pill */}
+            <View style={styles.invCardHeader}>
+              <IconChip
+                icon={<Text style={styles.chipIcon}>🍲</Text>}
+                accent="clay"
+                size={40}
+              />
+              <View style={styles.invTitleBlock}>
+                <Text style={styles.invTitle} numberOfLines={1}>
+                  {item.recipe.title}
+                </Text>
+                <Text style={styles.invDate}>Cooked {item.date_cooked}</Text>
               </View>
+              <Pill
+                label={`${item.portions_available}x`}
+                accent="clay"
+              />
             </View>
+
+            {/* Macro row */}
             <View style={styles.macroRow}>
-              <Text style={styles.macroText}>Calories: {item.recipe.calories}</Text>
-              <Text style={styles.macroText}>Protein: {item.recipe.protein}g</Text>
-              <Text style={styles.macroText}>Carbs: {item.recipe.carbs}g</Text>
-              <Text style={styles.macroText}>Fat: {item.recipe.fat}g</Text>
+              <MacroChip label="kcal" value={String(item.recipe.calories)} />
+              <MacroChip label="protein" value={`${item.recipe.protein}g`} />
+              <MacroChip label="carbs" value={`${item.recipe.carbs}g`} />
+              <MacroChip label="fat" value={`${item.recipe.fat}g`} />
             </View>
-            <Text style={styles.dateText}>Cooked on {item.date_cooked}</Text>
-          </View>
+          </Card>
         ))
       )}
     </ScrollView>
   );
 
+  // ─── Weekly Tab ───────────────────────────────────────────────
+
   const renderWeeklyTab = () => {
     const today = new Date();
+    const todayStr = toISODate(today);
     const days = Array.from({ length: 7 }).map((_, i) => addDays(today, i));
 
     return (
-      <ScrollView style={styles.tabContainer} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollFlex}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {days.map((dateObj) => {
           const dateStr = toISODate(dateObj);
+          const isToday = dateStr === todayStr;
+
           const lunchPlan = weeklyPlan.find(p => p.date === dateStr && p.meal_type === 'Lunch');
           const dinnerPlan = weeklyPlan.find(p => p.date === dateStr && p.meal_type === 'Dinner');
 
-          // Mapping recipe info
           const lunchRecipe = lunchPlan ? recipes.find(r => r.id === lunchPlan.recipe_id) : null;
           const dinnerRecipe = dinnerPlan ? recipes.find(r => r.id === dinnerPlan.recipe_id) : null;
 
+          // Daily totals
+          const consumed = [
+            lunchPlan?.is_consumed && lunchRecipe,
+            dinnerPlan?.is_consumed && dinnerRecipe,
+          ].filter(Boolean) as Recipe[];
+          const totalKcal = consumed.reduce((s, r) => s + (r.calories || 0), 0);
+          const totalProtein = consumed.reduce((s, r) => s + (r.protein || 0), 0);
+
           return (
-            <View key={dateStr} style={styles.dayBlock}>
-              <Text style={styles.dayTitle}>
-                {dateObj.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-              </Text>
-
-              {/* Lunch Slot */}
-              <View style={styles.mealSlot}>
-                <Text style={styles.mealType}>Lunch</Text>
-                {lunchPlan ? (
-                  <View style={styles.assignedMeal}>
-                    <TouchableOpacity
-                      style={styles.checkbox}
-                      onPress={() => handleToggleConsumed(lunchPlan.id, lunchPlan.is_consumed)}
-                    >
-                      <View style={[styles.checkboxInner, lunchPlan.is_consumed && styles.checkboxChecked]} />
-                    </TouchableOpacity>
-                    <Text style={[styles.assignedTitle, lunchPlan.is_consumed && styles.struckText]}>
-                      {lunchRecipe?.title || 'Unknown Recipe'}
-                    </Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.assignButton}
-                    onPress={() => { setAssignTarget({ date: dateStr, meal_type: 'Lunch' }); setAssignModalVisible(true); }}
-                  >
-                    <Text style={styles.assignButtonText}>Assign Meal</Text>
-                  </TouchableOpacity>
+            <Card
+              key={dateStr}
+              style={[styles.dayCard, isToday && styles.dayCardToday]}
+            >
+              {/* Day header */}
+              <View style={styles.dayHeader}>
+                <View style={[styles.dayBadge, isToday && styles.dayBadgeToday]}>
+                  <Text style={[styles.dayBadgeDay, isToday && styles.dayBadgeDayToday]}>
+                    {dateObj.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()}
+                  </Text>
+                  <Text style={[styles.dayBadgeNum, isToday && styles.dayBadgeNumToday]}>
+                    {dateObj.getDate()}
+                  </Text>
+                </View>
+                <Text style={styles.dayLongLabel}>
+                  {dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  {isToday ? ' — Today' : ''}
+                </Text>
+                {totalKcal > 0 && (
+                  <Pill label={`${totalKcal} kcal`} accent="clay" />
                 )}
               </View>
 
-              {/* Dinner Slot */}
-              <View style={styles.mealSlot}>
-                <Text style={styles.mealType}>Dinner</Text>
-                {dinnerPlan ? (
-                  <View style={styles.assignedMeal}>
-                    <TouchableOpacity
-                      style={styles.checkbox}
-                      onPress={() => handleToggleConsumed(dinnerPlan.id, dinnerPlan.is_consumed)}
-                    >
-                      <View style={[styles.checkboxInner, dinnerPlan.is_consumed && styles.checkboxChecked]} />
-                    </TouchableOpacity>
-                    <Text style={[styles.assignedTitle, dinnerPlan.is_consumed && styles.struckText]}>
-                      {dinnerRecipe?.title || 'Unknown Recipe'}
-                    </Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.assignButton}
-                    onPress={() => { setAssignTarget({ date: dateStr, meal_type: 'Dinner' }); setAssignModalVisible(true); }}
-                  >
-                    <Text style={styles.assignButtonText}>Assign Meal</Text>
-                  </TouchableOpacity>
-                )}
+              {/* Meal slots */}
+              <View style={styles.mealSlotList}>
+                <MealSlot
+                  label="Lunch"
+                  plan={lunchPlan}
+                  recipe={lunchRecipe ?? null}
+                  onToggleConsumed={(id, val) => handleToggleConsumed(id, val)}
+                  onAssign={() => {
+                    setAssignTarget({ date: dateStr, meal_type: 'Lunch' });
+                    setAssignModalVisible(true);
+                  }}
+                />
+                <View style={styles.slotDivider} />
+                <MealSlot
+                  label="Dinner"
+                  plan={dinnerPlan}
+                  recipe={dinnerRecipe ?? null}
+                  onToggleConsumed={(id, val) => handleToggleConsumed(id, val)}
+                  onAssign={() => {
+                    setAssignTarget({ date: dateStr, meal_type: 'Dinner' });
+                    setAssignModalVisible(true);
+                  }}
+                />
               </View>
-            </View>
+
+              {/* Daily total footer — only when something is consumed */}
+              {(totalKcal > 0 || totalProtein > 0) && (
+                <View style={styles.dailyTotal}>
+                  <Text style={styles.dailyTotalLabel}>CONSUMED TODAY</Text>
+                  <Text style={styles.dailyTotalValues}>
+                    {totalKcal} kcal · {totalProtein}g protein
+                  </Text>
+                </View>
+              )}
+            </Card>
           );
         })}
       </ScrollView>
     );
   };
 
+  // ─── Render ───────────────────────────────────────────────────
+
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: 8 }]}>
-        <Text style={styles.headerTitle}>Planner & Inventory</Text>
-        
-        <View style={styles.tabSwitcher}>
-          <TouchableOpacity
-            style={[styles.tabPill, activeTab === 'weekly' && styles.tabPillActive]}
-            onPress={() => setActiveTab('weekly')}
-          >
-            <Text style={[styles.tabPillText, activeTab === 'weekly' && styles.tabPillTextActive]}>
-              📅 Weekly Plan
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabPill, activeTab === 'inventory' && styles.tabPillActive]}
-            onPress={() => setActiveTab('inventory')}
-          >
-            <Text style={[styles.tabPillText, activeTab === 'inventory' && styles.tabPillTextActive]}>
-              📦 My Inventory
-            </Text>
-          </TouchableOpacity>
-        </View>
+      <ScreenHeader
+        title="Meal Plan"
+        subtitle="Plan, track & inventory your meals"
+        style={styles.screenHeader}
+      />
+
+      <View style={styles.tabRow}>
+        {renderTabSwitcher()}
       </View>
 
       {activeTab === 'weekly' ? renderWeeklyTab() : renderInventoryTab()}
 
-      {/* Log Modal */}
-      <LogMealModal 
-        visible={logModalVisible} 
-        onClose={() => setLogModalVisible(false)} 
+      <LogMealModal
+        visible={logModalVisible}
+        onClose={() => setLogModalVisible(false)}
         recipes={recipes}
         onSave={handleLogCookedMeal}
       />
 
-      {/* Assign Modal */}
       <AssignMealModal
         visible={assignModalVisible}
         onClose={() => setAssignModalVisible(false)}
@@ -268,9 +341,93 @@ export default function MealPrepScreen() {
   );
 }
 
-// ─── Log Meal Modal ──────────────────────────────────────────
+// ─── MealSlot sub-component ───────────────────────────────────
 
-function LogMealModal({ visible, onClose, recipes, onSave }: any) {
+function MealSlot({
+  label,
+  plan,
+  recipe,
+  onToggleConsumed,
+  onAssign,
+}: {
+  label: string;
+  plan: WeeklyMealPlanItem | undefined;
+  recipe: Recipe | null;
+  onToggleConsumed: (id: number, current: boolean) => void;
+  onAssign: () => void;
+}) {
+  const subtitle = recipe
+    ? `${recipe.calories} kcal · ${recipe.protein}g protein`
+    : undefined;
+
+  return (
+    <View style={styles.mealSlot}>
+      <Text style={styles.mealTypeLabel}>{label}</Text>
+      {plan ? (
+        <View style={styles.assignedRow}>
+          <IconChip
+            icon={<Text style={styles.chipIcon}>{label === 'Lunch' ? '🥗' : '🍽'}</Text>}
+            accent="clay"
+            size={36}
+          />
+          <View style={styles.assignedText}>
+            <Text
+              style={[
+                styles.assignedTitle,
+                plan.is_consumed && styles.assignedTitleConsumed,
+              ]}
+              numberOfLines={1}
+            >
+              {recipe?.title ?? 'Unknown Recipe'}
+            </Text>
+            {subtitle && (
+              <Text
+                style={[
+                  styles.assignedMeta,
+                  plan.is_consumed && styles.assignedMetaConsumed,
+                ]}
+              >
+                {subtitle}
+              </Text>
+            )}
+          </View>
+          <CircleCheck
+            checked={plan.is_consumed}
+            onToggle={() => onToggleConsumed(plan.id, plan.is_consumed)}
+          />
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.assignBtn}
+          onPress={onAssign}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.assignBtnText}>Assign</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// ─── MacroChip helper ─────────────────────────────────────────
+
+function MacroChip({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.macroChip}>
+      <Text style={styles.macroValue}>{value}</Text>
+      <Text style={styles.macroLabel}>{label.toUpperCase()}</Text>
+    </View>
+  );
+}
+
+// ─── Log Meal Modal ───────────────────────────────────────────
+
+function LogMealModal({ visible, onClose, recipes, onSave }: {
+  visible: boolean;
+  onClose: () => void;
+  recipes: Recipe[];
+  onSave: (recipe_id: string, portions: number) => void;
+}) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [portions, setPortions] = useState('4');
 
@@ -279,50 +436,59 @@ function LogMealModal({ visible, onClose, recipes, onSave }: any) {
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={styles.modalSheet}>
           <Text style={styles.modalTitle}>Log Cooked Meal</Text>
-          <Text style={styles.modalSubtitle}>Select what you just cooked:</Text>
+          <Text style={styles.modalSub}>Select what you just cooked:</Text>
 
           <FlatList
-            style={{ maxHeight: 250, marginBottom: 16 }}
+            style={styles.modalList}
             data={recipes}
-            keyExtractor={(r: any) => r.id}
+            keyExtractor={(r) => r.id}
             renderItem={({ item }) => {
               const isSelected = selectedRecipeId === item.id;
               return (
                 <TouchableOpacity
-                  style={[styles.recipeSelectOpt, isSelected && styles.recipeSelectOptActive]}
+                  style={[styles.recipeOpt, isSelected && styles.recipeOptSelected]}
                   onPress={() => setSelectedRecipeId(item.id)}
+                  activeOpacity={0.75}
                 >
-                  <Text style={[styles.recipeSelectText, isSelected && styles.recipeSelectTextActive]}>
+                  <Text style={[styles.recipeOptText, isSelected && styles.recipeOptTextSelected]}>
                     {item.title}
                   </Text>
+                  {isSelected && (
+                    <View style={styles.recipeCheckDot} />
+                  )}
                 </TouchableOpacity>
               );
             }}
           />
 
-          <View style={styles.inputRow}>
-            <Text style={{ color: Colors.textPrimary }}>Portions Cooked:</Text>
+          <View style={styles.portionsRow}>
+            <Text style={styles.portionsLabel}>Portions cooked</Text>
             <TextInput
-              style={styles.numericInput}
+              style={styles.portionsInput}
               keyboardType="number-pad"
               value={portions}
               onChangeText={setPortions}
             />
           </View>
 
-          <View style={styles.modalActions}>
-            <TouchableOpacity style={styles.modalBtnCancel} onPress={onClose}>
-              <Text style={styles.modalBtnTextCancel}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.modalBtnSave, !selectedRecipeId && { opacity: 0.5 }]} 
-              onPress={() => selectedRecipeId && onSave(selectedRecipeId, parseInt(portions, 10) || 0)}
+          <View style={styles.modalBtnRow}>
+            <Button
+              title="Cancel"
+              variant="ghost"
+              onPress={onClose}
+              style={styles.modalBtnHalf}
+            />
+            <Button
+              title="Save"
+              variant="primary"
+              onPress={() =>
+                selectedRecipeId && onSave(selectedRecipeId, parseInt(portions, 10) || 0)
+              }
               disabled={!selectedRecipeId}
-            >
-              <Text style={styles.modalBtnTextSave}>Save Logs</Text>
-            </TouchableOpacity>
+              style={styles.modalBtnHalf}
+            />
           </View>
         </View>
       </View>
@@ -330,70 +496,81 @@ function LogMealModal({ visible, onClose, recipes, onSave }: any) {
   );
 }
 
-// ─── Assign Meal Modal ───────────────────────────────────────
+// ─── Assign Meal Modal ────────────────────────────────────────
 
-function AssignMealModal({ visible, onClose, inventory, onSave }: any) {
+function AssignMealModal({ visible, onClose, inventory, onSave }: {
+  visible: boolean;
+  onClose: () => void;
+  inventory: MealInventoryWithRecipe[];
+  onSave: (recipe_id: string) => void;
+}) {
   if (!visible) return null;
 
-  const validInventory = inventory.filter((item: any) => item.portions_available > 0);
+  const validInventory = inventory.filter((item) => item.portions_available > 0);
 
   return (
     <Modal visible={visible} animationType="fade" transparent>
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Assign Meal from Inventory</Text>
-          
+        <View style={styles.modalSheet}>
+          <Text style={styles.modalTitle}>Assign from Inventory</Text>
+
           {validInventory.length === 0 ? (
-            <Text style={styles.emptyStateText}>No inventory. Please cook first!</Text>
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No inventory available</Text>
+              <Text style={styles.emptySub}>Cook and log a meal first.</Text>
+            </View>
           ) : (
             <FlatList
-              style={{ maxHeight: 300, marginVertical: 16 }}
+              style={styles.modalList}
               data={validInventory}
-              keyExtractor={(r: any) => r.id.toString()}
+              keyExtractor={(r) => r.id.toString()}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.recipeSelectOpt}
+                  style={styles.recipeOpt}
                   onPress={() => onSave(item.recipe_id)}
+                  activeOpacity={0.75}
                 >
-                  <Text style={styles.recipeSelectText}>{item.recipe.title}</Text>
-                  <Text style={{ color: Colors.accent, fontSize: 12 }}>({item.portions_available}x portions left)</Text>
+                  <Text style={styles.recipeOptText}>{item.recipe.title}</Text>
+                  <Pill label={`${item.portions_available}x`} accent="clay" />
                 </TouchableOpacity>
               )}
             />
           )}
 
-          <TouchableOpacity style={styles.modalBtnCancel} onPress={onClose}>
-            <Text style={styles.modalBtnTextCancel}>Close</Text>
-          </TouchableOpacity>
+          <Button
+            title="Close"
+            variant="ghost"
+            onPress={onClose}
+            style={styles.modalBtnFull}
+          />
         </View>
       </View>
     </Modal>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    backgroundColor: Colors.surface,
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  screenHeader: {
+    paddingTop: Spacing.lg,
+  },
+  tabRow: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: Spacing.md,
   },
-  headerTitle: {
-    fontSize: Typography.sizes.xl,
-    color: Colors.textPrimary,
-    fontWeight: Typography.weights.bold,
-  },
-  tabSwitcher: {
+
+  // Tab switcher
+  tabTrack: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.canvasSunken,
     borderRadius: Radius.full,
     padding: 4,
-    gap: 2,
+    gap: Spacing.xs,
   },
   tabPill: {
     flex: 1,
@@ -401,106 +578,363 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     alignItems: 'center',
   },
-  tabPillActive: { backgroundColor: Colors.accent },
+  tabPillActive: {
+    backgroundColor: Colors.sage,
+  },
   tabPillText: {
+    fontFamily: Typography.title,
     fontSize: Typography.sizes.sm,
     color: Colors.textSecondary,
     fontWeight: Typography.weights.semibold,
   },
-  tabPillTextActive: { color: Colors.background },
-  
-  tabContainer: { flex: 1 },
-  scrollContent: { padding: Spacing.lg, gap: Spacing.md },
-
-  // Inventory Card
-  card: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: Spacing.xs,
+  tabPillTextActive: {
+    color: Colors.surface,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: Typography.sizes.md, color: Colors.textPrimary, fontWeight: Typography.weights.bold, flex: 1 },
-  badge: { backgroundColor: Colors.accent, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.full },
-  badgeText: { color: Colors.background, fontSize: Typography.sizes.xs, fontWeight: Typography.weights.bold },
-  macroRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  macroText: { fontSize: Typography.sizes.xs, color: Colors.textSecondary },
-  dateText: { fontSize: 10, color: Colors.textMuted, marginTop: 4, fontStyle: 'italic' },
 
-  actionButton: {
-    backgroundColor: Colors.accent,
-    padding: Spacing.md,
-    borderRadius: Radius.full,
+  scrollFlex: { flex: 1 },
+  scrollContent: {
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    paddingBottom: Spacing.xxl,
+  },
+
+  // ── Weekly day card ────────────────────────────────────────
+  dayCard: {
+    gap: Spacing.md,
+  },
+  dayCardToday: {
+    borderWidth: 1.5,
+    borderColor: Colors.sageTint,
+  },
+  dayHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
   },
-  actionButtonText: { color: Colors.background, fontSize: Typography.sizes.md, fontWeight: Typography.weights.bold },
+  dayBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.canvasSunken,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayBadgeToday: {
+    backgroundColor: Colors.sage,
+  },
+  dayBadgeDay: {
+    fontFamily: Typography.label,
+    fontSize: 9,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 0.5,
+    color: Colors.textMuted,
+  },
+  dayBadgeDayToday: {
+    color: Colors.surface,
+  },
+  dayBadgeNum: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.md,
+    color: Colors.textPrimary,
+    lineHeight: Typography.sizes.md * 1.2,
+  },
+  dayBadgeNumToday: {
+    color: Colors.surface,
+  },
+  dayLongLabel: {
+    flex: 1,
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textPrimary,
+    fontWeight: Typography.weights.semibold,
+  },
 
-  emptyState: { alignItems: 'center', marginTop: 40, gap: 8 },
-  emptyStateText: { color: Colors.textPrimary, fontSize: Typography.sizes.md, fontWeight: Typography.weights.semibold },
-  emptyStateSub: { color: Colors.textSecondary, fontSize: Typography.sizes.sm },
-
-  // Weekly blocks
-  dayBlock: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+  // ── Meal slots ─────────────────────────────────────────────
+  mealSlotList: {
+    gap: 0,
+  },
+  slotDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: -Spacing.xs,
+    opacity: 0.6,
+  },
+  mealSlot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
+    minHeight: 52,
+  },
+  mealTypeLabel: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.bold,
+    color: Colors.textMuted,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    width: 48,
+  },
+  assignedRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  assignedText: {
+    flex: 1,
+  },
+  assignedTitle: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textPrimary,
+    fontWeight: Typography.weights.semibold,
+  },
+  assignedTitleConsumed: {
+    textDecorationLine: 'line-through',
+    color: Colors.textMuted,
+  },
+  assignedMeta: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.clayDeep,
+    marginTop: 2,
+  },
+  assignedMetaConsumed: {
+    color: Colors.textMuted,
+  },
+  assignBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: Spacing.sm,
+    borderColor: Colors.sage,
+    marginLeft: 'auto' as any,
   },
-  dayTitle: { fontSize: Typography.sizes.md, color: Colors.textPrimary, fontWeight: Typography.weights.bold, marginBottom: Spacing.sm },
-  mealSlot: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  assignBtnText: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.xs,
+    color: Colors.sageDeep,
+    fontWeight: Typography.weights.semibold,
+  },
+
+  // ── Daily total footer ─────────────────────────────────────
+  dailyTotal: {
+    backgroundColor: Colors.sageTint,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  dailyTotalLabel: {
+    fontFamily: Typography.label,
+    fontSize: 10,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: Colors.sageDeep,
+  },
+  dailyTotalValues: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.sageDeep,
+  },
+
+  // ── Verdure circle checkbox ────────────────────────────────
+  circle: {
+    width: 24,
+    height: 24,
+    borderRadius: Radius.full,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleDone: {
+    backgroundColor: Colors.sage,
+    borderColor: Colors.sage,
+  },
+  circleMark: {
+    color: Colors.surface,
+    fontSize: 13,
+    fontWeight: Typography.weights.bold,
+    lineHeight: 16,
+  },
+
+  // ── Chip icon text ─────────────────────────────────────────
+  chipIcon: {
+    fontSize: 18,
+  },
+
+  // ── Inventory card ─────────────────────────────────────────
+  inventoryCard: {
+    gap: Spacing.md,
+  },
+  invCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  invTitleBlock: {
+    flex: 1,
+  },
+  invTitle: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textPrimary,
+    fontWeight: Typography.weights.semibold,
+  },
+  invDate: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  macroRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    flexWrap: 'wrap',
+  },
+  macroChip: {
+    backgroundColor: Colors.clayTint,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    alignItems: 'center',
+    minWidth: 56,
   },
-  mealType: { fontSize: Typography.sizes.sm, color: Colors.textSecondary, width: 60, fontWeight: Typography.weights.semibold },
-  
-  assignedMeal: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  checkbox: { 
-    width: 20, height: 20, 
-    borderRadius: 4, 
-    borderWidth: 2, 
-    borderColor: Colors.accent,
-    alignItems: 'center', justifyContent: 'center'
+  macroValue: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.xs,
+    color: Colors.clayDeep,
+    fontWeight: Typography.weights.bold,
   },
-  checkboxInner: { width: 12, height: 12, borderRadius: 2 },
-  checkboxChecked: { backgroundColor: Colors.accent },
-  assignedTitle: { fontSize: Typography.sizes.sm, color: Colors.textPrimary, flex: 1 },
-  struckText: { textDecorationLine: 'line-through', color: Colors.textMuted },
-  
-  assignButton: { 
-    paddingHorizontal: Spacing.sm, 
-    paddingVertical: 4, 
-    borderWidth: 1, 
-    borderColor: Colors.accent, 
-    borderRadius: Radius.sm 
+  macroLabel: {
+    fontFamily: Typography.label,
+    fontSize: 9,
+    color: Colors.clayDeep,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginTop: 1,
   },
-  assignButtonText: { color: Colors.accent, fontSize: Typography.sizes.xs },
 
-  // Modals
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, elevation: 5 },
-  modalTitle: { fontSize: Typography.sizes.lg, color: Colors.textPrimary, fontWeight: Typography.weights.bold, marginBottom: 4 },
-  modalSubtitle: { fontSize: Typography.sizes.sm, color: Colors.textSecondary, marginBottom: 16 },
-  
-  recipeSelectOpt: { padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  recipeSelectOptActive: { backgroundColor: Colors.surfaceElevated },
-  recipeSelectText: { color: Colors.textPrimary, fontSize: Typography.sizes.sm },
-  recipeSelectTextActive: { color: Colors.accent, fontWeight: Typography.weights.bold },
-  
-  inputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 16 },
-  numericInput: { backgroundColor: Colors.background, color: Colors.textPrimary, padding: 8, borderRadius: Radius.sm, width: 80, textAlign: 'center' },
+  logButton: {
+    marginBottom: Spacing.xs,
+  },
 
-  modalActions: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
-  modalBtnCancel: { flex: 1, padding: Spacing.md, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },
-  modalBtnTextCancel: { color: Colors.textPrimary, fontWeight: Typography.weights.semibold },
-  modalBtnSave: { flex: 1, padding: Spacing.md, borderRadius: Radius.full, backgroundColor: Colors.accent, alignItems: 'center' },
-  modalBtnTextSave: { color: Colors.background, fontWeight: Typography.weights.bold },
+  // ── Empty states ───────────────────────────────────────────
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xxl,
+    gap: Spacing.sm,
+  },
+  emptyTitle: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.md,
+    color: Colors.textPrimary,
+    fontWeight: Typography.weights.semibold,
+  },
+  emptySub: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+
+  // ── Modals ─────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(44,53,46,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.xxl,
+    gap: Spacing.md,
+  },
+  modalTitle: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xl,
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
+  },
+  modalSub: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+  },
+  modalList: {
+    maxHeight: 260,
+  },
+  recipeOpt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  recipeOptSelected: {
+    backgroundColor: Colors.sageTint,
+    marginHorizontal: -Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+  },
+  recipeOptText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textPrimary,
+    flex: 1,
+  },
+  recipeOptTextSelected: {
+    fontFamily: Typography.title,
+    color: Colors.sageDeep,
+    fontWeight: Typography.weights.semibold,
+  },
+  recipeCheckDot: {
+    width: 10,
+    height: 10,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.sage,
+    marginLeft: Spacing.sm,
+  },
+  portionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.sm,
+  },
+  portionsLabel: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textPrimary,
+  },
+  portionsInput: {
+    backgroundColor: Colors.canvasSunken,
+    color: Colors.textPrimary,
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.sm,
+    width: 72,
+    textAlign: 'center',
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
+  },
+  modalBtnHalf: {
+    flex: 1,
+  },
+  modalBtnFull: {
+    marginTop: Spacing.xs,
+  },
 });
