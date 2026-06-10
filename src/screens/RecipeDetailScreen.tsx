@@ -125,46 +125,64 @@ export default function RecipeDetailScreen() {
           </View>
         </Card>
 
-        {/* ── Servings stepper (placeholder) ──────────────────────────── */}
+        {/* ── Servings stepper ───────────────────────────────────────────── */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>SERVINGS TO COOK</Text>
-          <View style={styles.stepperContainer}>
-            <TouchableOpacity
-              style={styles.stepperButton}
-              onPress={() => setServings(Math.max(1, servings - 1))}
-            >
-              <Text style={styles.stepperButtonText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.stepperValue}>{servings}</Text>
-            <TouchableOpacity
-              style={styles.stepperButton}
-              onPress={() => setServings(servings + 1)}
-            >
-              <Text style={styles.stepperButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
+          <Card style={styles.stepperCard}>
+            <View style={styles.stepperRow}>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => setServings(Math.max(1, servings - 1))}
+                activeOpacity={0.75}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.stepperBtnText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.stepperValue}>{servings}</Text>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => setServings(servings + 1)}
+                activeOpacity={0.75}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.stepperBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </Card>
         </View>
 
-        {/* ── Ingredients (placeholder) ────────────────────────────────── */}
+        {/* ── Ingredients ───────────────────────────────────────────────── */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>INGREDIENTS</Text>
-          {recipe.ingredients.map((ing, idx) => (
-            <View key={idx} style={styles.ingredientRow}>
-              <Text style={styles.ingredientName}>• {ing.name}</Text>
-              <Text style={styles.ingredientAmount}>
-                {getCalculatedQuantity(ing.baseQuantity).toFixed(1).replace(/\.0$/, '')} {ing.unit}
-              </Text>
-            </View>
-          ))}
-          <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToShoppingList}>
-            <Text style={styles.addToCartButtonText}>Add to Shopping List</Text>
-          </TouchableOpacity>
+          <Card style={styles.listCard}>
+            {recipe.ingredients.map((ing, idx) => (
+              <React.Fragment key={idx}>
+                <Row
+                  title={ing.name}
+                  trailing={
+                    <Text style={styles.qtyText}>
+                      {getCalculatedQuantity(ing.baseQuantity)
+                        .toFixed(1)
+                        .replace(/\.0$/, '')}{' '}
+                      {ing.unit}
+                    </Text>
+                  }
+                  style={styles.ingredientRow}
+                />
+                {idx < recipe.ingredients.length - 1 && (
+                  <View style={styles.rowDivider} />
+                )}
+              </React.Fragment>
+            ))}
+          </Card>
         </View>
 
         {/* ── Instructions (placeholder) ───────────────────────────────── */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>INSTRUCTIONS</Text>
-          <Text style={styles.bodyText}>{recipe.instructions}</Text>
+          <Card style={styles.methodCard}>
+            <Text style={styles.bodyText}>{recipe.instructions}</Text>
+          </Card>
         </View>
 
         {recipe.freezerTips ? (
@@ -173,6 +191,19 @@ export default function RecipeDetailScreen() {
             <Text style={styles.bodyText}>{recipe.freezerTips}</Text>
           </View>
         ) : null}
+
+        <View style={styles.actionsSection}>
+          <Button
+            title="Add to Shopping List"
+            variant="primary"
+            onPress={handleAddToShoppingList}
+          />
+          <Button
+            title="View Cooking Queue"
+            variant="ghost"
+            onPress={() => navigation.navigate('Cooking Tasks')}
+          />
+        </View>
 
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
@@ -286,28 +317,27 @@ const styles = StyleSheet.create({
     gap: 0,
   },
 
-  // ── Placeholder styles (will be replaced) ────────────────────────────────
-  stepperContainer: {
+  // ── Servings stepper ──────────────────────────────────────────────────────
+  stepperCard: {
+    padding: Spacing.md,
+  },
+  stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    gap: Spacing.xxl,
   },
-  stepperButton: {
+  stepperBtn: {
     width: 40,
     height: 40,
-    backgroundColor: Colors.sageTint,
     borderRadius: Radius.full,
+    backgroundColor: Colors.sageTint,
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepperButtonText: {
+  stepperBtnText: {
     fontFamily: Typography.title,
     fontSize: Typography.sizes.xl,
     color: Colors.sageDeep,
@@ -320,42 +350,40 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     minWidth: 32,
     textAlign: 'center',
-    marginHorizontal: Spacing.xxl,
+  },
+
+  // ── Ingredients list ──────────────────────────────────────────────────────
+  listCard: {
+    padding: 0,
+    overflow: 'hidden',
   },
   ingredientRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-    paddingHorizontal: Spacing.xs,
+    borderRadius: 0,
   },
-  ingredientName: {
-    fontFamily: Typography.body,
-    fontSize: Typography.sizes.sm,
-    color: Colors.textPrimary,
-    flex: 1,
+  rowDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: Spacing.lg,
   },
-  ingredientAmount: {
+  qtyText: {
     fontFamily: Typography.body,
     fontSize: Typography.sizes.sm,
     color: Colors.textMuted,
   },
-  addToCartButton: {
-    backgroundColor: Colors.sage,
+
+  // ── Method / instructions ─────────────────────────────────────────────────
+  methodCard: {
     padding: Spacing.lg,
-    borderRadius: 13,
-    alignItems: 'center',
-    marginTop: Spacing.lg,
-  },
-  addToCartButtonText: {
-    fontFamily: Typography.title,
-    color: Colors.surface,
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
   },
   bodyText: {
     fontFamily: Typography.body,
     fontSize: Typography.sizes.sm,
     color: Colors.textSecondary,
     lineHeight: Typography.sizes.sm * 1.55,
+  },
+
+  // ── Action buttons ────────────────────────────────────────────────────────
+  actionsSection: {
+    gap: Spacing.md,
   },
 });
