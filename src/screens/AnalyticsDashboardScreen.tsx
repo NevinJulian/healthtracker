@@ -443,6 +443,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.md,
   },
+  /** DESIGN.md §3 micro-label: Jakarta 700, 10px, uppercase, +0.12em tracking, mute */
   metricMicroLabel: {
     fontFamily: Typography.label,
     fontSize: 8,
@@ -450,15 +451,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     textTransform: 'uppercase',
     color: Colors.textMuted,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.xs + 2,
   },
+  /** Fraunces 600 21px — matches code.html .metric b spec */
   metricBigNumber: {
     fontFamily: Typography.display,
-    fontSize: Typography.sizes.xl,
+    fontSize: 21,
     fontWeight: Typography.weights.semibold,
     color: Colors.textPrimary,
-    lineHeight: Typography.sizes.xl * 1.1,
+    lineHeight: 21,
   },
+  /** sageDeep sub-caption: 9px bold per code.html .metric .mt */
   metricSubLabel: {
     fontFamily: Typography.label,
     fontSize: 9,
