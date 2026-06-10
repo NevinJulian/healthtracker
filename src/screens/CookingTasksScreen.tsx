@@ -185,6 +185,12 @@ function InstructionsModal({
           contentContainerStyle={styles.modalScrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* Prep time + ingredient count summary */}
+          <View style={styles.instrSummaryRow}>
+            <Pill label={`${task.recipe.prepTimeMinutes} min`} accent="sky" />
+            <Pill label={`${task.recipe.ingredients.length} ingredients`} accent="sage" />
+          </View>
+
           {/* Quick macros banner */}
           <View style={styles.instrMacros}>
             <Pill label={`${task.recipe.calories} kcal`} accent="gold" />
@@ -658,6 +664,12 @@ const styles = StyleSheet.create({
   },
   modalScrollContent: {
     padding: Spacing.lg,
+  },
+  instrSummaryRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    flexWrap: 'wrap',
+    marginBottom: Spacing.md,
   },
   instrMacros: {
     flexDirection: 'row',
