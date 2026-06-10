@@ -16,6 +16,14 @@ import {
   toISODate,
 } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
+import {
+  Card,
+  Row,
+  IconChip,
+  Pill,
+  Button,
+  ScreenHeader,
+} from '../components';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,11 +43,26 @@ function getStatus(entry: DailyLogEntry, isToday: boolean): BadgeStatus {
   return 'none';
 }
 
-const BADGE: Record<BadgeStatus, { emoji: string; color: string; label: string }> = {
-  full:    { emoji: '✅', color: Colors.badgeComplete, label: 'Complete' },
-  partial: { emoji: '🟡', color: Colors.badgePartial, label: 'Partial' },
-  none:    { emoji: '⬜', color: Colors.badgeNone, label: 'Pending' },
-  rest:    { emoji: '💤', color: Colors.badgeRest, label: 'Rest' },
+// Verdure accent mapping: complete=sage, partial=gold, pending/rest=sky
+const BADGE_ACCENT: Record<BadgeStatus, 'sage' | 'gold' | 'sky'> = {
+  full:    'sage',
+  partial: 'gold',
+  none:    'sky',
+  rest:    'sky',
+};
+
+const BADGE_LABEL: Record<BadgeStatus, string> = {
+  full:    'Complete',
+  partial: 'Partial',
+  none:    'Pending',
+  rest:    'Rest',
+};
+
+const BADGE_EMOJI: Record<BadgeStatus, string> = {
+  full:    '✅',
+  partial: '🟡',
+  none:    '⬜',
+  rest:    '💤',
 };
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -56,7 +79,7 @@ function isFuture(iso: string): boolean {
   return iso > toISODate();
 }
 
-// ─── Row component ────────────────────────────────────────────────────────────
+// ─── Day Row ──────────────────────────────────────────────────────────────────
 
 function DayRow({
   entry,
@@ -68,40 +91,46 @@ function DayRow({
   onPress: () => void;
 }) {
   const status = getStatus(entry, isToday);
-  const badge = BADGE[status];
   const future = isFuture(entry.date);
   const { day, date } = formatShortDate(entry.date);
+  const accent = BADGE_ACCENT[status];
+
+  // Date column rendered as Row's leading slot
+  const dateColumn = (
+    <View style={styles.dateColumn}>
+      <Text style={[styles.dayAbbr, isToday && styles.dayAbbrToday]}>{day}</Text>
+      <Text style={[styles.dateStr, isToday && styles.dateStrToday]}>{date}</Text>
+      {isToday && <View style={styles.todayDot} />}
+    </View>
+  );
+
+  // Status IconChip as Row's trailing slot
+  const statusChip = (
+    <IconChip
+      icon={<Text style={styles.chipEmoji}>{future ? '🕐' : BADGE_EMOJI[status]}</Text>}
+      accent={future ? 'sky' : accent}
+      size={36}
+    />
+  );
+
+  // Subtitle combines walking task + optional meal prep flag
+  const subtitleParts = [entry.walking_task];
+  if (entry.is_meal_prep_day) subtitleParts.push('Meal Prep');
+  const subtitle = subtitleParts.join(' · ');
 
   return (
-    <TouchableOpacity
-      style={[styles.row, isToday && styles.rowToday, future && styles.rowFuture]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      {/* Date pill */}
-      <View style={styles.datePill}>
-        <Text style={[styles.dayShort, isToday && styles.dayShortToday]}>{day}</Text>
-        <Text style={[styles.dateNum, isToday && styles.dateNumToday]}>{date}</Text>
-        {isToday && <View style={styles.todayDot} />}
-      </View>
-
-      {/* Summary */}
-      <View style={styles.rowInfo}>
-        <Text style={[styles.rowWalk, future && styles.rowTextFuture]} numberOfLines={1}>
-          🚶 {entry.walking_task}
-        </Text>
-        <Text style={[styles.rowHammer, future && styles.rowTextFuture]} numberOfLines={1}>
-          🏋️ {entry.hammer_task}
-        </Text>
-        {entry.is_meal_prep_day && (
-          <Text style={styles.mealPrepTag}>🥗 Meal Prep</Text>
-        )}
-      </View>
-
-      {/* Badge — future days show clock */}
-      <View style={[styles.badge, { backgroundColor: badge.color + '22', borderColor: badge.color }]}>
-        <Text style={styles.badgeEmoji}>{future ? '🕐' : badge.emoji}</Text>
-      </View>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+      <Row
+        leading={dateColumn}
+        title={`🏋️ ${entry.hammer_task}`}
+        subtitle={`🚶 ${subtitle}`}
+        trailing={statusChip}
+        style={[
+          styles.dayRow,
+          isToday && styles.dayRowToday,
+          future && styles.dayRowFuture,
+        ]}
+      />
     </TouchableOpacity>
   );
 }
@@ -122,79 +151,133 @@ function DayDetailModal({
   if (!entry) return null;
   const { day, date } = formatShortDate(entry.date);
   const status = getStatus(entry, isToday);
-  const badge = BADGE[status];
   const future = isFuture(entry.date);
+  const accent = BADGE_ACCENT[status];
+
+  // Small completion chip for trailing slot of each activity Row
+  function CompletionChip({ done }: { done: boolean }) {
+    return (
+      <IconChip
+        icon={<Text style={styles.chipEmoji}>{done ? '✓' : '○'}</Text>}
+        accent={done ? 'sage' : 'sky'}
+        size={32}
+      />
+    );
+  }
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalSheet}>
+          {/* Handle */}
           <View style={styles.modalHandle} />
 
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalDayLabel}>{day}</Text>
-                <Text style={styles.modalDateValue}>{date}</Text>
-                {isToday && <Text style={styles.modalTodayTag}>TODAY</Text>}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+            {/* Modal header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={styles.modalTitleBlock}>
+                <Text style={styles.modalDayAbbr}>{day}</Text>
+                <Text style={styles.modalDateLarge}>{date}</Text>
+                {isToday && (
+                  <Pill label="TODAY" accent="sage" style={styles.modalTodayPill} />
+                )}
               </View>
-              <View style={[styles.modalBadge, { backgroundColor: badge.color + '22', borderColor: badge.color }]}>
-                <Text style={[styles.modalBadgeText, { color: badge.color }]}>
-                  {future ? '🕐 Upcoming' : `${badge.emoji} ${badge.label}`}
-                </Text>
-              </View>
+              <Pill
+                label={future ? '🕐 Upcoming' : `${BADGE_EMOJI[status]} ${BADGE_LABEL[status]}`}
+                accent={future ? 'sky' : accent}
+              />
             </View>
 
             {/* Walking */}
-            <View style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>🚶 Walking</Text>
-              <Text style={styles.modalSectionBody}>{entry.walking_task}</Text>
-              {!future && (
-                <Text style={[styles.modalStatus, { color: entry.walk_completed ? Colors.accent : Colors.textMuted }]}>
-                  {entry.walk_completed ? '✓ Completed' : '○ Not logged'}
-                </Text>
-              )}
+            <View style={styles.modalSectionGap}>
+              <Text style={styles.modalSectionLabel}>WALKING</Text>
+              <Card style={styles.modalCard}>
+                <Row
+                  leading={
+                    <IconChip
+                      icon={<Text style={styles.chipEmoji}>🚶</Text>}
+                      accent="sky"
+                      size={36}
+                    />
+                  }
+                  title={entry.walking_task}
+                  subtitle={future ? undefined : (entry.walk_completed ? 'Completed' : 'Not logged')}
+                  trailing={!future ? <CompletionChip done={entry.walk_completed} /> : undefined}
+                  style={styles.modalCardRow}
+                />
+              </Card>
             </View>
 
             {/* Hammer */}
-            <View style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>🏋️ Hammer Multi-Gym</Text>
-              <Text style={styles.modalSectionBody}>{entry.hammer_task}</Text>
-              {!future && (
-                <Text style={[styles.modalStatus, { color: entry.hammer_completed ? Colors.accent : Colors.textMuted }]}>
-                  {entry.hammer_completed ? '✓ Completed' : '○ Not logged'}
-                </Text>
-              )}
+            <View style={styles.modalSectionGap}>
+              <Text style={styles.modalSectionLabel}>HAMMER MULTI-GYM</Text>
+              <Card style={styles.modalCard}>
+                <Row
+                  leading={
+                    <IconChip
+                      icon={<Text style={styles.chipEmoji}>🏋️</Text>}
+                      accent="sage"
+                      size={36}
+                    />
+                  }
+                  title={entry.hammer_task}
+                  subtitle={future ? undefined : (entry.hammer_completed ? 'Completed' : 'Not logged')}
+                  trailing={!future ? <CompletionChip done={entry.hammer_completed} /> : undefined}
+                  style={styles.modalCardRow}
+                />
+              </Card>
             </View>
 
-            {/* Fasting */}
+            {/* Fasting — past/today only */}
             {!future && (
-              <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>⏱️ Intermittent Fasting</Text>
-                <Text style={styles.modalSectionBody}>16:8 — eating window 12 pm → 8 pm</Text>
-                <Text style={[styles.modalStatus, { color: entry.fasting_completed ? Colors.accent : Colors.textMuted }]}>
-                  {entry.fasting_completed ? '✓ Completed' : '○ Not logged'}
-                </Text>
+              <View style={styles.modalSectionGap}>
+                <Text style={styles.modalSectionLabel}>INTERMITTENT FASTING</Text>
+                <Card style={styles.modalCard}>
+                  <Row
+                    leading={
+                      <IconChip
+                        icon={<Text style={styles.chipEmoji}>⏱️</Text>}
+                        accent="gold"
+                        size={36}
+                      />
+                    }
+                    title="16:8 — eating window 12 pm → 8 pm"
+                    subtitle={entry.fasting_completed ? 'Completed' : 'Not logged'}
+                    trailing={<CompletionChip done={entry.fasting_completed} />}
+                    style={styles.modalCardRow}
+                  />
+                </Card>
               </View>
             )}
 
             {/* Meal Prep */}
             {entry.is_meal_prep_day && (
-              <View style={[styles.modalSection, styles.modalMealPrep]}>
-                <Text style={styles.modalSectionTitle}>🥗 Meal Prep Day</Text>
-                <Text style={styles.modalSectionBody}>
-                  Check the Meal Prep tab for your grocery list and recipes.
-                </Text>
+              <View style={styles.modalSectionGap}>
+                <Text style={styles.modalSectionLabel}>MEAL PREP</Text>
+                <Card style={styles.modalCard}>
+                  <Row
+                    leading={
+                      <IconChip
+                        icon={<Text style={styles.chipEmoji}>🥗</Text>}
+                        accent="clay"
+                        size={36}
+                      />
+                    }
+                    title="Meal Prep Day"
+                    subtitle="Check the Meal Prep tab for your grocery list and recipes."
+                    style={styles.modalCardRow}
+                  />
+                </Card>
               </View>
             )}
 
-            <View style={{ height: 32 }} />
+            <View style={{ height: Spacing.md }} />
           </ScrollView>
 
-          <TouchableOpacity style={styles.modalClose} onPress={onClose}>
-            <Text style={styles.modalCloseText}>Close</Text>
-          </TouchableOpacity>
+          {/* Close button */}
+          <View style={styles.modalFooter}>
+            <Button title="Close" variant="ghost" onPress={onClose} />
+          </View>
         </View>
       </View>
     </Modal>
@@ -241,30 +324,26 @@ export default function OverviewScreen() {
   if (loading) {
     return (
       <View style={styles.centred}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <ActivityIndicator size="large" color={Colors.sage} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: 8 }]}>
-        <Text style={styles.headerTitle}>Rolling Schedule</Text>
-        <View style={styles.statsRow}>
-          <View style={styles.statPill}>
-            <Text style={styles.statNum}>{completedCount}</Text>
-            <Text style={styles.statLabel}> done</Text>
-          </View>
-          <View style={styles.statPill}>
-            <Text style={styles.statNum}>{pastEntries + 1}</Text>
-            <Text style={styles.statLabel}> tracked</Text>
-          </View>
-          <View style={styles.statPill}>
-            <Text style={styles.statNum}>{futureEntries}</Text>
-            <Text style={styles.statLabel}> upcoming</Text>
-          </View>
-        </View>
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <View style={styles.headerBlock}>
+        <ScreenHeader
+          title="Rolling Schedule"
+          subtitle="7-day training window"
+          trailing={
+            <View style={styles.statRow}>
+              <Pill label={`${completedCount} done`} accent="sage" />
+              <Pill label={`${pastEntries + 1} tracked`} accent="gold" />
+              <Pill label={`${futureEntries} ahead`} accent="sky" />
+            </View>
+          }
+        />
       </View>
 
       <FlatList
@@ -308,164 +387,158 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Header
-  header: {
+  // ── Header block ──────────────────────────────────────────────────────────
+  headerBlock: {
     backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
+    paddingTop: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: Spacing.sm,
+    borderBottomColor: Colors.line,
   },
-  headerTitle: {
-    fontSize: Typography.sizes.xl,
-    color: Colors.textPrimary,
-    fontWeight: Typography.weights.bold,
-  },
-  statsRow: { flexDirection: 'row', gap: Spacing.sm },
-  statPill: {
+  statRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    backgroundColor: Colors.surfaceElevated,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  statNum: {
-    fontSize: Typography.sizes.md,
-    color: Colors.accent,
-    fontWeight: Typography.weights.bold,
-  },
-  statLabel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    gap: Spacing.xs,
+    flexWrap: 'wrap',
   },
 
-  // List
-  listContent: { paddingVertical: Spacing.sm },
-  separator: { height: 1, backgroundColor: Colors.border, marginLeft: 80 },
-
-  // Row
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // ── List ──────────────────────────────────────────────────────────────────
+  listContent: {
+    paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    gap: Spacing.md,
+    gap: Spacing.xs,
   },
-  rowToday: { backgroundColor: Colors.accentGlow },
-  rowFuture: { opacity: 0.65 },
+  separator: { height: 0 },
 
-  // Date pill
-  datePill: { width: 52, alignItems: 'center', gap: 2 },
-  dayShort: {
+  // ── Day row ───────────────────────────────────────────────────────────────
+  dayRow: {
+    borderRadius: Radius.md,
+  },
+  dayRowToday: {
+    backgroundColor: Colors.sageTint,
+    borderWidth: 1,
+    borderColor: Colors.sage,
+  },
+  dayRowFuture: {
+    opacity: 0.6,
+  },
+
+  // Date column (Row leading slot)
+  dateColumn: {
+    width: 44,
+    alignItems: 'center',
+    gap: 1,
+  },
+  dayAbbr: {
+    fontFamily: Typography.label,
     fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
-    fontWeight: Typography.weights.bold,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  dayShortToday: { color: Colors.accent },
-  dateNum: {
-    fontSize: Typography.sizes.sm,
+  dayAbbrToday: {
+    color: Colors.sageDeep,
+  },
+  dateStr: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.xs,
     color: Colors.textSecondary,
-    fontWeight: Typography.weights.semibold,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 15,
   },
-  dateNumToday: { color: Colors.accent },
+  dateStrToday: {
+    color: Colors.sageDeep,
+  },
   todayDot: {
-    width: 6, height: 6, borderRadius: 3,
-    backgroundColor: Colors.accent, marginTop: 2,
-  },
-
-  // Row info
-  rowInfo: { flex: 1, gap: 2 },
-  rowWalk: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textPrimary,
-    fontWeight: Typography.weights.medium,
-  },
-  rowHammer: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textSecondary,
-  },
-  rowTextFuture: { color: Colors.textMuted },
-  mealPrepTag: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.accent,
-    fontWeight: Typography.weights.semibold,
+    width: 5,
+    height: 5,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.sage,
     marginTop: 2,
   },
 
-  // Badge
-  badge: {
-    width: 36, height: 36, borderRadius: Radius.full,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1,
-  },
-  badgeEmoji: { fontSize: 16 },
+  // Emoji inside IconChip
+  chipEmoji: { fontSize: 16 },
 
-  // Modal
+  // ── Modal ─────────────────────────────────────────────────────────────────
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end',
+    flex: 1,
+    backgroundColor: 'rgba(44,53,46,0.55)',
+    justifyContent: 'flex-end',
   },
   modalSheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 24,
-    maxHeight: '80%',
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: 0,
+    maxHeight: '85%',
   },
   modalHandle: {
-    width: 40, height: 4, backgroundColor: Colors.border,
-    borderRadius: 2, alignSelf: 'center', marginBottom: Spacing.lg,
+    width: 36,
+    height: 4,
+    backgroundColor: Colors.line2,
+    borderRadius: Radius.full,
+    alignSelf: 'center',
+    marginBottom: Spacing.lg,
   },
-  modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'flex-start', marginBottom: Spacing.lg,
+  modalScroll: {
+    paddingBottom: Spacing.md,
   },
-  modalDayLabel: {
-    fontSize: Typography.sizes.xs, color: Colors.textMuted,
-    fontWeight: Typography.weights.semibold, letterSpacing: 1.2,
+
+  // Modal header
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.xl,
   },
-  modalDateValue: {
-    fontSize: Typography.sizes.hero, color: Colors.textPrimary,
-    fontWeight: Typography.weights.black,
+  modalTitleBlock: {
+    flex: 1,
+    gap: Spacing.xs,
   },
-  modalTodayTag: {
-    fontSize: Typography.sizes.xs, color: Colors.accent,
-    fontWeight: Typography.weights.bold, letterSpacing: 1,
+  modalDayAbbr: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
-  modalBadge: {
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs,
-    borderRadius: Radius.full, borderWidth: 1,
+  modalDateLarge: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.hero,
+    color: Colors.textPrimary,
+    letterSpacing: -1,
+    lineHeight: Typography.sizes.hero * 1.1,
   },
-  modalBadgeText: {
-    fontSize: Typography.sizes.sm, fontWeight: Typography.weights.semibold,
+  modalTodayPill: {
+    marginTop: Spacing.xs,
   },
-  modalSection: {
-    backgroundColor: Colors.surfaceElevated, borderRadius: Radius.md,
-    padding: Spacing.md, marginBottom: Spacing.sm, gap: 4,
+
+  // Section label + card
+  modalSectionGap: {
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
-  modalMealPrep: { borderWidth: 1, borderColor: Colors.accent },
-  modalSectionTitle: {
-    fontSize: Typography.sizes.sm, color: Colors.textMuted,
-    fontWeight: Typography.weights.semibold,
-    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4,
+  modalSectionLabel: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    paddingHorizontal: Spacing.xs,
   },
-  modalSectionBody: {
-    fontSize: Typography.sizes.md, color: Colors.textPrimary, lineHeight: 22,
+  modalCard: {
+    padding: 0,
+    overflow: 'hidden',
   },
-  modalStatus: {
-    fontSize: Typography.sizes.sm, fontWeight: Typography.weights.semibold, marginTop: 4,
+  modalCardRow: {
+    borderRadius: Radius.md,
+    minHeight: 52,
   },
-  modalClose: {
-    backgroundColor: Colors.surfaceElevated, borderRadius: Radius.md,
-    paddingVertical: Spacing.md, alignItems: 'center',
-    marginTop: Spacing.md, borderWidth: 1, borderColor: Colors.border,
-  },
-  modalCloseText: {
-    color: Colors.textPrimary, fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.semibold,
+
+  // Footer with close button
+  modalFooter: {
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.line,
   },
 });
