@@ -16,6 +16,14 @@ import {
   toISODate,
 } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
+import {
+  Card,
+  Row,
+  IconChip,
+  Pill,
+  Button,
+  ScreenHeader,
+} from '../components';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,11 +43,26 @@ function getStatus(entry: DailyLogEntry, isToday: boolean): BadgeStatus {
   return 'none';
 }
 
-const BADGE: Record<BadgeStatus, { emoji: string; color: string; label: string }> = {
-  full:    { emoji: '✅', color: Colors.badgeComplete, label: 'Complete' },
-  partial: { emoji: '🟡', color: Colors.badgePartial, label: 'Partial' },
-  none:    { emoji: '⬜', color: Colors.badgeNone, label: 'Pending' },
-  rest:    { emoji: '💤', color: Colors.badgeRest, label: 'Rest' },
+// Verdure accent mapping: complete=sage, partial=gold, pending/rest=sky
+const BADGE_ACCENT: Record<BadgeStatus, 'sage' | 'gold' | 'sky'> = {
+  full:    'sage',
+  partial: 'gold',
+  none:    'sky',
+  rest:    'sky',
+};
+
+const BADGE_LABEL: Record<BadgeStatus, string> = {
+  full:    'Complete',
+  partial: 'Partial',
+  none:    'Pending',
+  rest:    'Rest',
+};
+
+const BADGE_EMOJI: Record<BadgeStatus, string> = {
+  full:    '✅',
+  partial: '🟡',
+  none:    '⬜',
+  rest:    '💤',
 };
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
