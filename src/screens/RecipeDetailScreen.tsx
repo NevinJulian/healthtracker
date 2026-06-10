@@ -1,14 +1,37 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
-import { Colors, Typography } from '../theme/tokens';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
+import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import { getRecipeById, Recipe, addShoppingListItem, insertCookingTask } from '../db/database';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Card, Row, IconChip, Button } from '../components';
+
+// ─── Stat Chip ────────────────────────────────────────────────────────────────
+
+/**
+ * StatChip — a single macro/stat cell in the clay-tint accent row.
+ * Value in Fraunces display, label in micro uppercase.
+ */
+function StatChip({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.statChip}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function RecipeDetailScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  const insets = useSafeAreaInsets();
   const { recipeId } = route.params || {};
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
@@ -36,19 +59,17 @@ export default function RecipeDetailScreen() {
   const handleAddToShoppingList = async () => {
     if (!recipe) return;
     try {
-      // 1. Add each ingredient to the shopping list
       for (const ing of recipe.ingredients) {
         const qty = getCalculatedQuantity(ing.baseQuantity);
         await addShoppingListItem(ing.name, qty, ing.unit);
       }
-      // 2. Queue a cooking task so the user knows what to cook
       await insertCookingTask(recipe.id, servings);
       Alert.alert(
         'Added!',
         `Ingredients added to Shopping List & ${servings} serving(s) added to Cooking Queue!`,
         [
           { text: 'View Queue', onPress: () => navigation.navigate('Cooking Tasks') },
-          { text: 'OK', style: 'cancel' }
+          { text: 'OK', style: 'cancel' },
         ]
       );
     } catch (e) {
@@ -56,210 +77,396 @@ export default function RecipeDetailScreen() {
     }
   };
 
-  if (!recipe) return <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}><Text>Loading...</Text></SafeAreaView>;
+  // ── Loading state ──────────────────────────────────────────────────────────
+
+  if (!recipe) {
+    return (
+      <View style={styles.centred}>
+        <Text style={styles.loadingText}>Loading…</Text>
+      </View>
+    );
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  // Split instructions into numbered steps if they contain newlines; otherwise
+  // show as a single paragraph.
+  const instructionSteps: string[] = recipe.instructions
+    ? recipe.instructions
+        .split('\n')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+    : [];
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{recipe.title}</Text>
-      </View>
-      
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.macrosContainer}>
-          <View style={styles.macroBox}>
-            <Text style={styles.macroValue}>{recipe.calories}</Text>
-            <Text style={styles.macroLabel}>kcal</Text>
-          </View>
-          <View style={styles.macroBox}>
-            <Text style={styles.macroValue}>{recipe.protein}g</Text>
-            <Text style={styles.macroLabel}>Protein</Text>
-          </View>
-          <View style={styles.macroBox}>
-            <Text style={styles.macroValue}>{recipe.carbs}g</Text>
-            <Text style={styles.macroLabel}>Carbs</Text>
-          </View>
-          <View style={styles.macroBox}>
-            <Text style={styles.macroValue}>{recipe.fat}g</Text>
-            <Text style={styles.macroLabel}>Fat</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Servings to Cook</Text>
-          <View style={styles.stepperContainer}>
-            <TouchableOpacity 
-              style={styles.stepperButton} 
-              onPress={() => setServings(Math.max(1, servings - 1))}
-            >
-              <Text style={styles.stepperButtonText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.stepperValue}>{servings}</Text>
-            <TouchableOpacity 
-              style={styles.stepperButton} 
-              onPress={() => setServings(servings + 1)}
-            >
-              <Text style={styles.stepperButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ingredients</Text>
-          {recipe.ingredients.map((ing, idx) => (
-            <View key={idx} style={styles.ingredientRow}>
-              <Text style={styles.ingredientName}>• {ing.name}</Text>
-              <Text style={styles.ingredientAmount}>
-                {getCalculatedQuantity(ing.baseQuantity).toFixed(1).replace(/\.0$/, '')} {ing.unit}
-              </Text>
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Hero block ─────────────────────────────────────────────────── */}
+        <Card style={styles.heroCard}>
+          <View style={styles.heroInner}>
+            <IconChip
+              icon={<Text style={styles.heroEmoji}>{'🍽'}</Text>}
+              accent="clay"
+              size={48}
+            />
+            <View style={styles.heroTextBlock}>
+              <Text style={styles.heroTitle}>{recipe.title}</Text>
+              <Text style={styles.heroCategory}>{recipe.category}</Text>
             </View>
-          ))}
-          <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToShoppingList}>
-            <Text style={styles.addToCartButtonText}>🛒 Add to Shopping List</Text>
-          </TouchableOpacity>
-        </View>
+          </View>
 
+          {/* ── Stat row ───────────────────────────────────────────────── */}
+          <View style={styles.statRow}>
+            <StatChip value={String(recipe.calories)} label="kcal" />
+            <View style={styles.statDivider} />
+            <StatChip value={`${recipe.protein}g`} label="Protein" />
+            <View style={styles.statDivider} />
+            <StatChip value={`${recipe.carbs}g`} label="Carbs" />
+            <View style={styles.statDivider} />
+            <StatChip value={`${recipe.fat}g`} label="Fat" />
+            {recipe.prepTimeMinutes ? (
+              <>
+                <View style={styles.statDivider} />
+                <StatChip value={`${recipe.prepTimeMinutes}`} label="min" />
+              </>
+            ) : null}
+          </View>
+        </Card>
+
+        {/* ── Servings stepper ───────────────────────────────────────────── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Instructions</Text>
-          <Text style={styles.bodyText}>{recipe.instructions}</Text>
+          <Text style={styles.sectionLabel}>SERVINGS TO COOK</Text>
+          <Card style={styles.stepperCard}>
+            <View style={styles.stepperRow}>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => setServings(Math.max(1, servings - 1))}
+                activeOpacity={0.75}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.stepperBtnText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.stepperValue}>{servings}</Text>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => setServings(servings + 1)}
+                activeOpacity={0.75}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.stepperBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </Card>
         </View>
 
+        {/* ── Ingredients ───────────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>INGREDIENTS</Text>
+          <Card style={styles.listCard}>
+            {recipe.ingredients.map((ing, idx) => (
+              <React.Fragment key={idx}>
+                <Row
+                  title={ing.name}
+                  trailing={
+                    <Text style={styles.qtyText}>
+                      {getCalculatedQuantity(ing.baseQuantity)
+                        .toFixed(1)
+                        .replace(/\.0$/, '')}{' '}
+                      {ing.unit}
+                    </Text>
+                  }
+                  style={styles.ingredientRow}
+                />
+                {idx < recipe.ingredients.length - 1 && (
+                  <View style={styles.rowDivider} />
+                )}
+              </React.Fragment>
+            ))}
+          </Card>
+        </View>
+
+        {/* ── Instructions ──────────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>INSTRUCTIONS</Text>
+          <Card style={styles.methodCard}>
+            {instructionSteps.length > 1 ? (
+              instructionSteps.map((step, idx) => (
+                <View key={idx} style={styles.stepRow}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>{idx + 1}</Text>
+                  </View>
+                  <Text style={styles.stepText}>{step}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.bodyText}>{recipe.instructions}</Text>
+            )}
+          </Card>
+        </View>
+
+        {/* ── Freezer Tips ──────────────────────────────────────────────── */}
         {recipe.freezerTips ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Freezer Tips</Text>
-            <Text style={styles.bodyText}>{recipe.freezerTips}</Text>
+            <Text style={styles.sectionLabel}>FREEZER TIPS</Text>
+            <Card style={styles.tipCard}>
+              <View style={styles.tipInner}>
+                <IconChip
+                  icon={<Text style={styles.tipEmoji}>{'❄'}</Text>}
+                  accent="sky"
+                  size={36}
+                />
+                <Text style={styles.tipText}>{recipe.freezerTips}</Text>
+              </View>
+            </Card>
           </View>
         ) : null}
 
+        {/* ── Action buttons ────────────────────────────────────────────── */}
+        <View style={styles.actionsSection}>
+          <Button
+            title="Add to Shopping List"
+            variant="primary"
+            onPress={handleAddToShoppingList}
+          />
+          <Button
+            title="View Cooking Queue"
+            variant="ghost"
+            onPress={() => navigation.navigate('Cooking Tasks')}
+          />
+        </View>
+
+        <View style={{ height: Spacing.xxl }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
   },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  backButtonText: {
-    color: Colors.accent,
-    fontSize: Typography.sizes.md,
-  },
-  headerTitle: {
+
+  centred: {
     flex: 1,
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  macrosContainer: {
+  loadingText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.md,
+    color: Colors.textMuted,
+  },
+
+  scrollContent: {
+    padding: Spacing.lg,
+    gap: Spacing.xl,
+  },
+
+  // ── Hero card ─────────────────────────────────────────────────────────────
+  heroCard: {
+    backgroundColor: Colors.clayTint,
+    padding: Spacing.lg,
+    gap: Spacing.lg,
+  },
+  heroInner: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
+    alignItems: 'flex-start',
+    gap: Spacing.md,
   },
-  macroBox: {
+  heroEmoji: {
+    fontSize: 22,
+  },
+  heroTextBlock: {
+    flex: 1,
+    gap: Spacing.xs,
+    justifyContent: 'center',
+  },
+  heroTitle: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xl,
+    color: Colors.clayDeep,
+    letterSpacing: -0.5,
+    lineHeight: Typography.sizes.xl * 1.2,
+  },
+  heroCategory: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    color: Colors.clay,
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
+  },
+
+  // ── Stat row ──────────────────────────────────────────────────────────────
+  statRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    padding: 12,
-    borderRadius: 8,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+  },
+  statChip: {
     flex: 1,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    alignItems: 'center',
+    gap: Spacing.xs,
   },
-  macroValue: {
+  statValue: {
+    fontFamily: Typography.display,
     fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    color: Colors.clayDeep,
+    letterSpacing: -0.3,
   },
-  macroLabel: {
+  statLabel: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs - 1,
+    color: Colors.clay,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  statDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: Colors.border,
+  },
+
+  // ── Section label ─────────────────────────────────────────────────────────
+  sectionLabel: {
+    fontFamily: Typography.label,
     fontSize: Typography.sizes.xs,
-    color: Colors.textSecondary,
-    marginTop: 4,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    paddingHorizontal: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   section: {
-    marginBottom: 24,
+    gap: 0,
   },
-  sectionTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
-    marginBottom: 12,
+
+  // ── Servings stepper ──────────────────────────────────────────────────────
+  stepperCard: {
+    padding: Spacing.md,
   },
-  stepperContainer: {
+  stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 8,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    gap: Spacing.xxl,
   },
-  stepperButton: {
+  stepperBtn: {
     width: 40,
     height: 40,
-    backgroundColor: Colors.border,
-    borderRadius: 20,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.sageTint,
+    borderWidth: 1,
+    borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepperButtonText: {
+  stepperBtnText: {
+    fontFamily: Typography.title,
     fontSize: Typography.sizes.xl,
-    color: Colors.textPrimary,
-    lineHeight: 24,
+    color: Colors.sageDeep,
+    lineHeight: Typography.sizes.xl,
   },
   stepperValue: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xxl,
     color: Colors.textPrimary,
-    marginHorizontal: 32,
+    letterSpacing: -0.5,
+    minWidth: 32,
+    textAlign: 'center',
+  },
+
+  // ── Ingredients list ──────────────────────────────────────────────────────
+  listCard: {
+    padding: 0,
+    overflow: 'hidden',
   },
   ingredientRow: {
+    borderRadius: 0,
+  },
+  rowDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: Spacing.lg,
+  },
+  qtyText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textMuted,
+  },
+
+  // ── Method / instructions ─────────────────────────────────────────────────
+  methodCard: {
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  stepRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    gap: Spacing.md,
   },
-  ingredientName: {
-    color: Colors.textPrimary,
-    flex: 1,
-    fontSize: Typography.sizes.md,
-  },
-  ingredientAmount: {
-    color: Colors.textSecondary,
-    fontWeight: Typography.weights.semibold,
-    fontSize: Typography.sizes.md,
-  },
-  addToCartButton: {
-    backgroundColor: Colors.accent,
-    padding: 16,
-    borderRadius: 8,
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.sageTint,
     alignItems: 'center',
-    marginTop: 16,
+    justifyContent: 'center',
+    marginTop: 1,
+    flexShrink: 0,
   },
-  addToCartButtonText: {
-    color: Colors.background,
-    fontSize: Typography.sizes.md,
+  stepNumberText: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    color: Colors.sageDeep,
     fontWeight: Typography.weights.bold,
   },
-  bodyText: {
+  stepText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
     color: Colors.textSecondary,
-    fontSize: Typography.sizes.md,
-    lineHeight: 24,
-  }
+    lineHeight: Typography.sizes.sm * 1.55,
+    flex: 1,
+  },
+  bodyText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    lineHeight: Typography.sizes.sm * 1.55,
+  },
+
+  // ── Freezer tips ──────────────────────────────────────────────────────────
+  tipCard: {
+    backgroundColor: Colors.skyTint,
+    padding: Spacing.lg,
+  },
+  tipInner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
+  },
+  tipEmoji: {
+    fontSize: 18,
+  },
+  tipText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.skyDeep,
+    lineHeight: Typography.sizes.sm * 1.55,
+    flex: 1,
+  },
+
+  // ── Action buttons ────────────────────────────────────────────────────────
+  actionsSection: {
+    gap: Spacing.md,
+  },
 });
