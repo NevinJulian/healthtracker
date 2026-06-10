@@ -12,7 +12,7 @@ import RecipesScreen from '../screens/RecipesScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 import ShoppingListScreen from '../screens/ShoppingListScreen';
 import CookingTasksScreen from '../screens/CookingTasksScreen';
-import { Colors, Typography, Spacing } from '../theme/tokens';
+import { Colors, Typography, Spacing, Radius } from '../theme/tokens';
 import { createStackNavigator } from '@react-navigation/stack';
 
 const Drawer = createDrawerNavigator();
@@ -73,13 +73,14 @@ export default function AppNavigator() {
         headerShown: true,
         headerStyle: {
           backgroundColor: Colors.surface,
+          // Hairline bottom border — depth via tone, not hard lines
           borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          borderBottomColor: Colors.line,
         } as any,
         headerTintColor: Colors.textPrimary,
         headerTitleStyle: {
-          fontWeight: Typography.weights.bold,
-          fontSize: Typography.sizes.lg,
+          fontFamily: Typography.display,
+          fontSize: Typography.sizes.xl,
         },
         // Move burger to the RIGHT, suppress default left icon
         headerLeft: () => null,
@@ -90,11 +91,14 @@ export default function AppNavigator() {
           backgroundColor: Colors.background,
           width: 280,
         },
-        drawerActiveTintColor: Colors.accent,
+        // Active item: sage-deep text on sage tint background
+        drawerActiveTintColor: Colors.sageDeep,
         drawerInactiveTintColor: Colors.textSecondary,
-        drawerActiveBackgroundColor: Colors.surface,
-        // Give the label a proper left gap so it doesn't touch the emoji
+        drawerActiveBackgroundColor: Colors.sageTint,
+        // Label: Plus Jakarta Sans 600, medium size
         drawerLabelStyle: styles.drawerLabel,
+        // Rounded active item background per Verdure shape language
+        drawerItemStyle: styles.drawerItem,
         drawerIcon: () => <DrawerIcon label={route.name} />,
       })}
     >
@@ -111,11 +115,17 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  // Drawer label — positive marginLeft gives breathing room after the icon
+  // Drawer label — Plus Jakarta Sans 600 SemiBold, breathing room after emoji icon
   drawerLabel: {
+    fontFamily: Typography.title,
     fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.medium,
-    marginLeft: 12,
+    marginLeft: Spacing.sm,
+  },
+  // Rounded item background — Verdure shape language (cards/rows are soft + rounded)
+  drawerItem: {
+    borderRadius: Radius.md,
+    marginHorizontal: Spacing.sm,
+    marginVertical: 2,
   },
   iconContainer: {
     alignItems: 'center',
@@ -124,7 +134,7 @@ const styles = StyleSheet.create({
   },
   iconEmoji: { fontSize: 20 },
 
-  // Right-side hamburger
+  // Right-side hamburger — token color, no raw hex
   burgerBtn: {
     marginRight: Spacing.lg,
     gap: 5,
@@ -135,7 +145,7 @@ const styles = StyleSheet.create({
   burgerLine: {
     height: 2,
     width: 22,
-    borderRadius: 2,
+    borderRadius: Radius.sm / 5,
     backgroundColor: Colors.textPrimary,
   },
 });

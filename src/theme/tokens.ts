@@ -50,6 +50,10 @@ export const Colors = {
   goldTint: '#F1E8D4',
   canvas: '#F3EFE7',
   canvasSunken: '#ECE6DA',
+
+  // Hairline border tokens (from DESIGN.md §2)
+  line: 'rgba(44,53,46,0.08)',   // subtle hairline — depth via tone, not hard lines
+  line2: 'rgba(44,53,46,0.15)',  // stronger border, empty checkbox ring
 };
 
 export const Typography = {
