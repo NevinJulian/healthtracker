@@ -20,6 +20,7 @@ import {
   updateTemplateExercises,
 } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
+import { Card, IconChip, Pill, Button, ScreenHeader, Row } from '../components';
 
 // ─── Day label maps ───────────────────────────────────────────────────────────
 
@@ -137,14 +138,18 @@ function ExerciseModal({ visible, initial, onSave, onClose }: ExerciseModalProps
           </View>
 
           <View style={styles.modalActions}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>
-                {initial ? 'Save Changes' : 'Add Exercise'}
-              </Text>
-            </TouchableOpacity>
+            <Button
+              title="Cancel"
+              variant="ghost"
+              onPress={onClose}
+              style={{ flex: 1 }}
+            />
+            <Button
+              title={initial ? 'Save Changes' : 'Add Exercise'}
+              variant="primary"
+              onPress={handleSave}
+              style={{ flex: 1 }}
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -163,22 +168,31 @@ function ExerciseItem({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const meta = `${exercise.sets}×${exercise.reps}${exercise.videoUrl ? '  · 📹 Video' : ''}`;
   return (
-    <View style={styles.exItem}>
-      <View style={styles.exItemInfo}>
-        <Text style={styles.exItemName}>{exercise.name}</Text>
-        <Text style={styles.exItemMeta}>
-          {exercise.sets}×{exercise.reps}
-          {exercise.videoUrl ? '  · 📹 Video' : ''}
-        </Text>
-      </View>
-      <TouchableOpacity style={styles.exEditBtn} onPress={onEdit}>
-        <Text style={styles.exEditBtnText}>✏️</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.exDeleteBtn} onPress={onDelete}>
-        <Text style={styles.exDeleteBtnText}>✕</Text>
-      </TouchableOpacity>
-    </View>
+    <Row
+      title={exercise.name}
+      subtitle={meta}
+      style={styles.exRow}
+      trailing={
+        <View style={styles.exActions}>
+          <TouchableOpacity
+            style={styles.exEditBtn}
+            onPress={onEdit}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Text style={styles.exEditBtnText}>✏️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.exDeleteBtn}
+            onPress={onDelete}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Text style={styles.exDeleteBtnText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      }
+    />
   );
 }
 
@@ -265,26 +279,37 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
     ]);
   };
 
-  const accentColor = day.is_rest_day
-    ? Colors.textMuted
+  // Accent family: rest = sky, meal-prep = clay, normal = sage
+  const chipAccent = day.is_rest_day ? 'sky' : day.is_meal_prep_day ? 'clay' : 'sage';
+
+  const chipTextColor = day.is_rest_day
+    ? Colors.skyDeep
     : day.is_meal_prep_day
-    ? Colors.accent
-    : Colors.secondary;
+    ? Colors.clayDeep
+    : Colors.sageDeep;
 
   return (
-    <View style={[styles.card, { borderLeftColor: accentColor }]}>
+    <Card style={styles.card}>
       {/* Day header */}
       <View style={styles.cardHeader}>
-        <View style={[styles.dayBadge, { backgroundColor: accentColor + '20' }]}>
-          <Text style={[styles.dayBadgeText, { color: accentColor }]}>
-            {DAY_SHORT[day.day_of_week]}
-          </Text>
-        </View>
+        <IconChip
+          icon={
+            <Text style={[styles.dayChipText, { color: chipTextColor }]}>
+              {DAY_SHORT[day.day_of_week]}
+            </Text>
+          }
+          accent={chipAccent}
+          size={48}
+        />
         <View style={styles.cardHeaderInfo}>
           <Text style={styles.dayLabel}>{DAY_LABELS[day.day_of_week]}</Text>
           <View style={styles.tagRow}>
-            {day.is_rest_day && <Text style={styles.tagRest}>💤 Rest Day</Text>}
-            {day.is_meal_prep_day && <Text style={styles.tagMealPrep}>🥗 Meal Prep</Text>}
+            {day.is_rest_day && (
+              <Pill label="💤 Rest Day" accent="sky" />
+            )}
+            {day.is_meal_prep_day && (
+              <Pill label="🥗 Meal Prep" accent="clay" />
+            )}
           </View>
         </View>
       </View>
@@ -321,17 +346,13 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
 
       {/* Save button for walk/hammer label edits */}
       {isDirty && (
-        <TouchableOpacity
-          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+        <Button
+          title={saving ? 'Saving…' : 'Save label changes'}
+          variant="primary"
           onPress={handleSave}
           disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color={Colors.background} />
-          ) : (
-            <Text style={styles.saveBtnText}>Save label changes</Text>
-          )}
-        </TouchableOpacity>
+          style={styles.saveLabelBtn}
+        />
       )}
 
       {saved && !isDirty && (
@@ -342,22 +363,29 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
       <View style={styles.exSection}>
         <View style={styles.exSectionHeader}>
           <Text style={styles.fieldLabel}>💪 EXERCISES ({exercises.length})</Text>
-          <TouchableOpacity style={styles.addExBtn} onPress={openAddModal}>
-            <Text style={styles.addExBtnText}>+ Add</Text>
-          </TouchableOpacity>
+          <Button
+            title="+ Add"
+            variant="ghost"
+            onPress={openAddModal}
+            style={styles.addExBtn}
+          />
         </View>
 
         {exercises.length === 0 ? (
           <Text style={styles.noExHint}>No exercises yet. Tap + Add to create one.</Text>
         ) : (
           <View style={styles.exList}>
-            {exercises.map((ex) => (
-              <ExerciseItem
-                key={ex.id}
-                exercise={ex}
-                onEdit={() => openEditModal(ex)}
-                onDelete={() => handleDeleteExercise(ex.id)}
-              />
+            {exercises.map((ex, idx) => (
+              <React.Fragment key={ex.id}>
+                <ExerciseItem
+                  exercise={ex}
+                  onEdit={() => openEditModal(ex)}
+                  onDelete={() => handleDeleteExercise(ex.id)}
+                />
+                {idx < exercises.length - 1 && (
+                  <View style={styles.exDivider} />
+                )}
+              </React.Fragment>
             ))}
           </View>
         )}
@@ -370,7 +398,7 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
         onSave={handleExerciseSave}
         onClose={() => setModalVisible(false)}
       />
-    </View>
+    </Card>
   );
 }
 
@@ -425,7 +453,7 @@ export default function TemplateEditorScreen() {
   if (loading) {
     return (
       <View style={styles.centred}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <ActivityIndicator size="large" color={Colors.sage} />
       </View>
     );
   }
@@ -435,13 +463,11 @@ export default function TemplateEditorScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: 8 }]}>
-        <Text style={styles.headerTitle}>Template Editor</Text>
-        <Text style={styles.headerSubtitle}>
-          Edit the base weekly schedule. Changes apply to all future generated days.
-        </Text>
-      </View>
+      <ScreenHeader
+        title="Template Editor"
+        subtitle="Edit the base weekly schedule. Changes apply to all future generated days."
+        style={styles.screenHeader}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -457,7 +483,7 @@ export default function TemplateEditorScreen() {
             onExercisesChange={handleExercisesChange}
           />
         ))}
-        <View style={{ height: 32 }} />
+        <View style={{ height: Spacing.xxl }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -466,150 +492,110 @@ export default function TemplateEditorScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: Colors.canvas },
   centred: {
-    flex: 1, backgroundColor: Colors.background,
+    flex: 1, backgroundColor: Colors.canvas,
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // Header
-  header: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
+  // Screen header
+  screenHeader: {
+    paddingTop: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: 4,
-  },
-  headerTitle: {
-    fontSize: Typography.sizes.xl,
-    color: Colors.textPrimary,
-    fontWeight: Typography.weights.bold,
-  },
-  headerSubtitle: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-    lineHeight: 18,
+    borderBottomColor: Colors.line,
+    paddingBottom: Spacing.md,
+    backgroundColor: Colors.surface,
   },
 
   // Scroll
   scroll: { flex: 1 },
-  scrollContent: { padding: Spacing.lg, gap: Spacing.md },
+  scrollContent: { padding: Spacing.lg, gap: Spacing.lg },
 
-  // Card
+  // Card — uses shared Card component, override just gap/padding additions
   card: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    borderLeftWidth: 3,
-    padding: Spacing.md,
-    gap: Spacing.sm,
+    gap: Spacing.md,
+    padding: Spacing.lg,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
-  dayBadge: {
-    width: 48, height: 48,
-    borderRadius: Radius.sm,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  dayBadgeText: {
+  dayChipText: {
+    fontFamily: Typography.label,
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.black,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
+    color: Colors.sageDeep, // overridden per card but text inherits from parent for rest/clay/sage
   },
   cardHeaderInfo: { flex: 1 },
   dayLabel: {
+    fontFamily: Typography.title,
     fontSize: Typography.sizes.md,
     color: Colors.textPrimary,
-    fontWeight: Typography.weights.semibold,
   },
-  tagRow: { flexDirection: 'row', gap: Spacing.xs, marginTop: 2 },
-  tagRest: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
-    fontWeight: Typography.weights.medium,
-  },
-  tagMealPrep: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.accent,
-    fontWeight: Typography.weights.medium,
-  },
+  tagRow: { flexDirection: 'row', gap: Spacing.xs, marginTop: Spacing.xs },
 
   // Fields
-  fieldGroup: { gap: 6 },
+  fieldGroup: { gap: Spacing.xs },
   fieldRow: { flexDirection: 'row', gap: Spacing.sm },
   fieldLabel: {
+    fontFamily: Typography.label,
     fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
-    fontWeight: Typography.weights.semibold,
-    letterSpacing: 0.8,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
   input: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.line2,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     color: Colors.textPrimary,
+    fontFamily: Typography.body,
     fontSize: Typography.sizes.sm,
     lineHeight: 20,
-    minHeight: 42,
+    minHeight: 44,
     textAlignVertical: 'top',
   },
   inputHint: {
+    fontFamily: Typography.body,
     fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
     fontStyle: 'italic',
     lineHeight: 16,
   },
 
-  // Save button
-  saveBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.sm + 2,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: {
-    color: Colors.background,
-    fontWeight: Typography.weights.bold,
-    fontSize: Typography.sizes.sm,
+  // Save-label button
+  saveLabelBtn: {
+    marginTop: Spacing.xs,
   },
   savedConfirm: {
-    color: Colors.accent,
+    fontFamily: Typography.body,
+    color: Colors.sageDeep,
     fontSize: Typography.sizes.xs,
     textAlign: 'center',
     fontWeight: Typography.weights.medium,
   },
 
   // Exercise section
-  exSection: { gap: Spacing.sm, marginTop: 4 },
+  exSection: { gap: Spacing.sm, marginTop: Spacing.xs },
   exSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   addExBtn: {
-    backgroundColor: Colors.secondary + '25',
-    borderRadius: Radius.sm,
+    paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: Colors.secondary + '60',
-  },
-  addExBtnText: {
-    color: Colors.secondary,
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.bold,
+    minHeight: 34,
   },
   noExHint: {
+    fontFamily: Typography.body,
     fontSize: Typography.sizes.sm,
     color: Colors.textMuted,
     fontStyle: 'italic',
@@ -617,40 +603,39 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   exList: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.line,
+  },
+  exRow: {
+    borderRadius: 0,
+    backgroundColor: Colors.surface,
+  },
+  exDivider: {
+    height: 1,
+    backgroundColor: Colors.line,
+    marginHorizontal: Spacing.lg,
   },
 
-  // Exercise item
-  exItem: {
+  // Exercise item trailing actions
+  exActions: {
     flexDirection: 'row',
+    gap: Spacing.xs,
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    gap: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  exItemInfo: { flex: 1, gap: 1 },
-  exItemName: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textPrimary,
-    fontWeight: Typography.weights.semibold,
-  },
-  exItemMeta: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
   },
   exEditBtn: {
-    width: 30, height: 30, alignItems: 'center', justifyContent: 'center',
+    width: 32, height: 32,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.sageTint,
+    borderRadius: Radius.sm,
   },
-  exEditBtnText: { fontSize: 16 },
+  exEditBtnText: { fontSize: 15 },
   exDeleteBtn: {
-    width: 30, height: 30, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.danger + '18', borderRadius: Radius.sm,
+    width: 32, height: 32,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.canvasSunken,
+    borderRadius: Radius.sm,
   },
   exDeleteBtnText: {
     fontSize: Typography.sizes.sm,
@@ -661,48 +646,35 @@ const styles = StyleSheet.create({
   // Exercise modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(44,53,46,0.55)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    paddingBottom: 32,
+    paddingBottom: Spacing.xxl,
     gap: Spacing.md,
   },
   modalHandle: {
     width: 40, height: 4,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
+    backgroundColor: Colors.line2,
+    borderRadius: Radius.full,
     alignSelf: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   modalTitle: {
-    fontSize: Typography.sizes.lg,
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xl,
     color: Colors.textPrimary,
-    fontWeight: Typography.weights.bold,
+    letterSpacing: -0.4,
   },
   modalFields: { gap: Spacing.md },
   modalActions: {
     flexDirection: 'row',
     gap: Spacing.sm,
-    marginTop: 4,
-  },
-  cancelBtn: {
-    flex: 1,
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cancelBtnText: {
-    color: Colors.textSecondary,
-    fontWeight: Typography.weights.semibold,
-    fontSize: Typography.sizes.sm,
+    marginTop: Spacing.xs,
   },
 });
