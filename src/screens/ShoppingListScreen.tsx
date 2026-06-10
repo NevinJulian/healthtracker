@@ -92,7 +92,7 @@ const PANTRY_KEYWORDS = [
   'breadcrumb', 'wrap', 'bread', 'tortilla', 'cracker', 'cereal', 'granola',
 ];
 
-export function inferCategory(ingredientName: string): CategoryKey {
+function inferCategory(ingredientName: string): CategoryKey {
   const lower = ingredientName.toLowerCase();
 
   if (DRINKS_KEYWORDS.some((kw) => lower.includes(kw))) return 'Drinks';
@@ -104,10 +104,6 @@ export function inferCategory(ingredientName: string): CategoryKey {
   return 'Other';
 }
 
-function categoryMeta(key: CategoryKey): CategoryMeta {
-  return CATEGORIES.find((c) => c.label === key) ?? CATEGORIES[CATEGORIES.length - 1];
-}
-
 // ─── Group items by category ──────────────────────────────────────────────────
 
 interface CategoryGroup {
@@ -115,7 +111,7 @@ interface CategoryGroup {
   items: ShoppingListItem[];
 }
 
-export function groupByCategory(items: ShoppingListItem[]): CategoryGroup[] {
+function groupByCategory(items: ShoppingListItem[]): CategoryGroup[] {
   const map = new Map<CategoryKey, ShoppingListItem[]>();
 
   for (const item of items) {
