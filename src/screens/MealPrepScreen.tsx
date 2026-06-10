@@ -9,6 +9,7 @@ import {
   FlatList,
   TextInput,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
@@ -31,6 +32,7 @@ import {
   Button,
   ScreenHeader,
 } from '../components';
+import { iconChipIconColor } from '../components/IconChip';
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -185,7 +187,7 @@ export default function MealPrepScreen() {
             {/* Header row: icon chip + title + portions pill */}
             <View style={styles.invCardHeader}>
               <IconChip
-                icon={<Text style={styles.chipIcon}>🍲</Text>}
+                icon={<Ionicons name="restaurant-outline" size={20} color={iconChipIconColor('clay')} />}
                 accent="clay"
                 size={40}
               />
@@ -372,7 +374,13 @@ function MealSlot({
       {plan ? (
         <View style={styles.assignedRow}>
           <IconChip
-            icon={<Text style={styles.chipIcon}>{label === 'Lunch' ? '🥗' : '🍽'}</Text>}
+            icon={
+              <Ionicons
+                name={label === 'Lunch' ? 'nutrition-outline' : 'restaurant-outline'}
+                size={18}
+                color={iconChipIconColor('clay')}
+              />
+            }
             accent="clay"
             size={36}
           />
@@ -774,10 +782,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  // ── Chip icon text ─────────────────────────────────────────
-  chipIcon: {
-    fontSize: 18,
-  },
 
   // ── Inventory card ─────────────────────────────────────────
   inventoryCard: {

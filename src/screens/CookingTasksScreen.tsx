@@ -21,6 +21,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
@@ -39,6 +40,7 @@ import {
   Button,
   ScreenHeader,
 } from '../components';
+import { iconChipIconColor } from '../components/IconChip';
 
 // ─── Task Card ───────────────────────────────────────────────────────────────
 
@@ -52,7 +54,7 @@ function TaskCard({
   onRemove: () => void;
 }) {
   const cookIcon = (
-    <Text style={{ fontSize: 18, color: Colors.clayDeep }}>{'🍳'}</Text>
+    <Ionicons name="flame-outline" size={20} color={iconChipIconColor('clay')} />
   );
 
   return (

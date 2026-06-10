@@ -10,5 +10,6 @@ module.exports = {
     '^expo/src/winter(/.*)?$': '<rootDir>/__mocks__/expo-winter.js',
     '^expo-sqlite(/.*)?$': '<rootDir>/__mocks__/expo-sqlite.js',
     '^expo-asset(/.*)?$': '<rootDir>/__mocks__/expo-asset.js',
+    '^@expo/vector-icons(/.*)?$': '<rootDir>/__mocks__/@expo/vector-icons.js',
   },
 };

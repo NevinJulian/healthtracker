@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
@@ -31,26 +32,29 @@ import {
   Button,
   ScreenHeader,
 } from '../components';
+import { iconChipIconColor } from '../components/IconChip';
 
 // ─── Category inference ───────────────────────────────────────────────────────
 
 type CategoryKey = 'Produce' | 'Protein' | 'Dairy' | 'Pantry' | 'Drinks' | 'Other';
 
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
 interface CategoryMeta {
   label: CategoryKey;
   /** Accent family for IconChip + header tint */
   accent: 'sage' | 'clay' | 'sky' | 'gold';
-  /** Unicode symbol rendered inside the IconChip */
-  icon: string;
+  /** Ionicons outline icon name for the category */
+  icon: IoniconsName;
 }
 
 const CATEGORIES: CategoryMeta[] = [
-  { label: 'Produce',  accent: 'sage', icon: '🥦' },
-  { label: 'Protein',  accent: 'clay', icon: '🥩' },
-  { label: 'Dairy',    accent: 'sky',  icon: '🥛' },
-  { label: 'Pantry',   accent: 'gold', icon: '🌾' },
-  { label: 'Drinks',   accent: 'sky',  icon: '💧' },
-  { label: 'Other',    accent: 'sage', icon: '🛒' },
+  { label: 'Produce',  accent: 'sage', icon: 'leaf-outline' },
+  { label: 'Protein',  accent: 'clay', icon: 'barbell-outline' },
+  { label: 'Dairy',    accent: 'sky',  icon: 'water-outline' },
+  { label: 'Pantry',   accent: 'gold', icon: 'archive-outline' },
+  { label: 'Drinks',   accent: 'sky',  icon: 'cafe-outline' },
+  { label: 'Other',    accent: 'sage', icon: 'cart-outline' },
 ];
 
 const PRODUCE_KEYWORDS = [
@@ -189,7 +193,7 @@ function CategorySection({
   const { meta, items } = group;
 
   const iconNode = (
-    <Text style={{ fontSize: 16 }}>{meta.icon}</Text>
+    <Ionicons name={meta.icon} size={14} color={iconChipIconColor(meta.accent)} />
   );
 
   return (
@@ -308,7 +312,7 @@ export default function ShoppingListScreen() {
         {totalCount === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconWrap}>
-              <Text style={styles.emptyIcon}>🛒</Text>
+              <Ionicons name="cart-outline" size={32} color={Colors.sageDeep} />
             </View>
             <Text style={styles.emptyTitle}>Nothing here yet</Text>
             <Text style={styles.emptySubtitle}>
@@ -470,9 +474,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.sm,
-  },
-  emptyIcon: {
-    fontSize: 32,
   },
   emptyTitle: {
     fontFamily: Typography.display,

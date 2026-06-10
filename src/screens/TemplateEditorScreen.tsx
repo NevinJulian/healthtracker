@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import {
   WeeklyTemplateDay,
   Exercise,
@@ -168,7 +169,7 @@ function ExerciseItem({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const meta = `${exercise.sets}×${exercise.reps}${exercise.videoUrl ? '  · 📹 Video' : ''}`;
+  const meta = `${exercise.sets}×${exercise.reps}${exercise.videoUrl ? '  · Video' : ''}`;
   return (
     <Row
       title={exercise.name}
@@ -181,7 +182,7 @@ function ExerciseItem({
             onPress={onEdit}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
-            <Text style={styles.exEditBtnText}>✏️</Text>
+            <Ionicons name="create-outline" size={16} color={Colors.sageDeep} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.exDeleteBtn}
@@ -305,10 +306,10 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
           <Text style={styles.dayLabel}>{DAY_LABELS[day.day_of_week]}</Text>
           <View style={styles.tagRow}>
             {day.is_rest_day && (
-              <Pill label="💤 Rest Day" accent="sky" />
+              <Pill label="Rest Day" accent="sky" />
             )}
             {day.is_meal_prep_day && (
-              <Pill label="🥗 Meal Prep" accent="clay" />
+              <Pill label="Meal Prep" accent="clay" />
             )}
           </View>
         </View>
@@ -316,7 +317,7 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
 
       {/* Walking Task */}
       <View style={styles.fieldGroup}>
-        <Text style={styles.fieldLabel}>🚶 WALKING TASK</Text>
+        <Text style={styles.fieldLabel}>WALKING TASK</Text>
         <TextInput
           style={styles.input}
           value={walk}
@@ -329,7 +330,7 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
 
       {/* Hammer Task label */}
       <View style={styles.fieldGroup}>
-        <Text style={styles.fieldLabel}>🏋️ HAMMER TASK (base label)</Text>
+        <Text style={styles.fieldLabel}>HAMMER TASK (base label)</Text>
         <TextInput
           style={styles.input}
           value={hammer}
@@ -362,7 +363,7 @@ function TemplateCard({ day, onSave, onExercisesChange }: TemplateCardProps) {
       {/* ── Exercises ────────────────────────────────────────────────── */}
       <View style={styles.exSection}>
         <View style={styles.exSectionHeader}>
-          <Text style={styles.fieldLabel}>💪 EXERCISES ({exercises.length})</Text>
+          <Text style={styles.fieldLabel}>EXERCISES ({exercises.length})</Text>
           <Button
             title="+ Add"
             variant="ghost"
@@ -630,7 +631,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.sageTint,
     borderRadius: Radius.sm,
   },
-  exEditBtnText: { fontSize: 15 },
   exDeleteBtn: {
     width: 32, height: 32,
     alignItems: 'center', justifyContent: 'center',

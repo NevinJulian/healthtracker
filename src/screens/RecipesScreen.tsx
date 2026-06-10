@@ -8,10 +8,12 @@ import {
   ScrollView,
   TextInput,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import { getRecipes, Recipe } from '../db/database';
 import { useNavigation } from '@react-navigation/native';
 import { Card, IconChip, ScreenHeader } from '../components';
+import { iconChipIconColor } from '../components/IconChip';
 
 // ─── Category → accent family mapping ────────────────────────────────────────
 
@@ -43,13 +45,14 @@ const ACCENT_META_COLOR: Record<AccentKey, string> = {
   sky:  Colors.skyDeep,
 };
 
-// Category emoji stand-ins (no new native deps)
-const CATEGORY_EMOJI: Record<string, string> = {
-  'All':            '🍽',
-  'Fresh & Fridge': '🥗',
-  'Quick Cook':     '⚡',
-  'Freezer Batch':  '❄',
-  'Freezer Sauce':  '🫙',
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+const CATEGORY_ICON: Record<string, IoniconsName> = {
+  'All':            'restaurant-outline',
+  'Fresh & Fridge': 'nutrition-outline',
+  'Quick Cook':     'flash-outline',
+  'Freezer Batch':  'snow-outline',
+  'Freezer Sauce':  'flask-outline',
 };
 
 const CATEGORIES = ['All', 'Fresh & Fridge', 'Quick Cook', 'Freezer Batch', 'Freezer Sauce'];
@@ -66,7 +69,7 @@ function RecipeCard({
   const accent = categoryAccent(item.category);
   const metaColor = ACCENT_META_COLOR[accent];
   const imgBg = ACCENT_IMG_BG[accent];
-  const emoji = CATEGORY_EMOJI[item.category] ?? '🍽';
+  const iconName: IoniconsName = CATEGORY_ICON[item.category] ?? 'restaurant-outline';
 
   return (
     <TouchableOpacity
@@ -78,7 +81,7 @@ function RecipeCard({
         {/* Tinted icon band */}
         <View style={[styles.cardImgBand, { backgroundColor: imgBg }]}>
           <IconChip
-            icon={<Text style={styles.cardEmoji}>{emoji}</Text>}
+            icon={<Ionicons name={iconName} size={22} color={iconChipIconColor(accent)} />}
             accent={accent}
             size={44}
           />
@@ -145,7 +148,7 @@ export default function RecipesScreen() {
       {/* Search bar */}
       <View style={styles.searchRow}>
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>{'🔍'}</Text>
+          <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search recipes & ingredients"
@@ -232,10 +235,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     gap: Spacing.sm,
   },
-  searchIcon: {
-    fontSize: 16,
-    color: Colors.textMuted,
-  },
   searchInput: {
     flex: 1,
     fontFamily: Typography.body,
@@ -295,9 +294,6 @@ const styles = StyleSheet.create({
     height: 72,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  cardEmoji: {
-    fontSize: 24,
   },
   cardBody: {
     padding: Spacing.md,

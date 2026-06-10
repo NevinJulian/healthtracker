@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import {
   DailyLogEntry,
@@ -38,6 +39,7 @@ import {
   Button,
   BioForceModal,
 } from '../components';
+import { iconChipIconColor } from '../components/IconChip';
 
 // ─── Verdure circle checkbox ──────────────────────────────────────────────────
 // Replaces old square Checkbox: 24px circle, empty = line2 ring, done = sage fill
@@ -151,7 +153,7 @@ function HammerSection({
       <Card style={styles.sectionHeaderCard}>
         <View style={styles.sectionHeaderRow}>
           <IconChip
-            icon={<Text style={styles.chipIcon}>🏋️</Text>}
+            icon={<Ionicons name="barbell-outline" size={20} color={iconChipIconColor('sage')} />}
             accent="sage"
           />
           <View style={styles.sectionHeaderText}>
@@ -417,7 +419,7 @@ export default function DashboardScreen() {
           <Card style={styles.sectionHeaderCard}>
             <View style={styles.sectionHeaderRow}>
               <IconChip
-                icon={<Text style={styles.chipIcon}>🚶</Text>}
+                icon={<Ionicons name="walk-outline" size={20} color={iconChipIconColor('sky')} />}
                 accent="sky"
               />
               <View style={styles.sectionHeaderText}>
@@ -445,7 +447,7 @@ export default function DashboardScreen() {
           <Card style={styles.sectionHeaderCard}>
             <View style={styles.sectionHeaderRow}>
               <IconChip
-                icon={<Text style={styles.chipIcon}>⏱</Text>}
+                icon={<Ionicons name="time-outline" size={20} color={iconChipIconColor('gold')} />}
                 accent="gold"
               />
               <View style={styles.sectionHeaderText}>
@@ -468,7 +470,7 @@ export default function DashboardScreen() {
           <Card style={styles.sectionHeaderCard}>
             <View style={styles.sectionHeaderRow}>
               <IconChip
-                icon={<Text style={styles.chipIcon}>🍽</Text>}
+                icon={<Ionicons name="restaurant-outline" size={20} color={iconChipIconColor('clay')} />}
                 accent="clay"
               />
               <View style={styles.sectionHeaderText}>
@@ -510,7 +512,7 @@ export default function DashboardScreen() {
           <Card style={styles.weightCard}>
             <View style={styles.sectionHeaderRow}>
               <IconChip
-                icon={<Text style={styles.chipIcon}>⚖</Text>}
+                icon={<Ionicons name="scale-outline" size={20} color={iconChipIconColor('sage')} />}
                 accent="sage"
               />
               <View style={styles.weightContent}>
@@ -621,7 +623,7 @@ const styles = StyleSheet.create({
   heroCount: {
     fontFamily: Typography.display,
     fontSize: Typography.sizes.hero,
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
     lineHeight: Typography.sizes.hero,
     letterSpacing: -1,
   },
@@ -642,7 +644,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: Typography.display,
     fontSize: Typography.sizes.xl,
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
     letterSpacing: -0.5,
     lineHeight: Typography.sizes.xl * 1.2,
   },
@@ -657,7 +659,7 @@ const styles = StyleSheet.create({
   mealPrepPillText: {
     fontFamily: Typography.label,
     fontSize: Typography.sizes.xs,
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
     letterSpacing: 0.5,
   },
 
@@ -728,9 +730,6 @@ const styles = StyleSheet.create({
     lineHeight: Typography.sizes.sm * 1.45,
   },
 
-  // ── Chip icon ─────────────────────────────────────────────────────────────
-  chipIcon: { fontSize: 18 },
-
   // ── Verdure circle checkbox ───────────────────────────────────────────────
   checkboxRow: {
     flexDirection: 'row',
@@ -758,7 +757,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.sage,
   },
   circleCheckMark: {
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
     fontSize: 13,
     fontFamily: Typography.title,
     lineHeight: 16,

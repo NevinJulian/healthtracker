@@ -54,6 +54,9 @@ export const Colors = {
   // Hairline border tokens (from DESIGN.md §2)
   line: 'rgba(44,53,46,0.08)',   // subtle hairline — depth via tone, not hard lines
   line2: 'rgba(44,53,46,0.15)',  // stronger border, empty checkbox ring
+
+  // White text on deep-accent fills (hero block, deep-sage panel)
+  textOnAccent: '#FFFFFF',
 };
 
 export const Typography = {

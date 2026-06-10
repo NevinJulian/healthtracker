@@ -1,8 +1,9 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import { Text, View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import DashboardScreen from '../screens/DashboardScreen';
 import OverviewScreen from '../screens/OverviewScreen';
 import AnalyticsDashboardScreen from '../screens/AnalyticsDashboardScreen';
@@ -27,21 +28,25 @@ function RecipesStackScreen() {
   );
 }
 
-const DRAWER_ICONS: Record<string, string> = {
-  Today: '🏋️',
-  Schedule: '📅',
-  Analytics: '📊',
-  'Meal Prep': '🥗',
-  Template: '✏️',
-  Recipes: '🍽️',
-  Shopping: '🛒',
-  'Cooking Tasks': '👨‍🍳',
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+const DRAWER_ICONS: Record<string, IoniconsName> = {
+  Today: 'barbell-outline',
+  Schedule: 'calendar-outline',
+  Analytics: 'stats-chart-outline',
+  'Meal Prep': 'nutrition-outline',
+  Template: 'create-outline',
+  Recipes: 'restaurant-outline',
+  Shopping: 'cart-outline',
+  'Cooking Tasks': 'flame-outline',
 };
 
-function DrawerIcon({ label }: { label: string }) {
+function DrawerIcon({ label, focused }: { label: string; focused?: boolean }) {
+  const iconName: IoniconsName = DRAWER_ICONS[label] ?? 'ellipse-outline';
+  const color = focused ? Colors.sageDeep : Colors.textSecondary;
   return (
     <View style={styles.iconContainer}>
-      <Text style={styles.iconEmoji}>{DRAWER_ICONS[label] ?? '•'}</Text>
+      <Ionicons name={iconName} size={20} color={color} />
     </View>
   );
 }
@@ -99,7 +104,9 @@ export default function AppNavigator() {
         drawerLabelStyle: styles.drawerLabel,
         // Rounded active item background per Verdure shape language
         drawerItemStyle: styles.drawerItem,
-        drawerIcon: () => <DrawerIcon label={route.name} />,
+        drawerIcon: ({ focused }: { focused: boolean }) => (
+          <DrawerIcon label={route.name} focused={focused} />
+        ),
       })}
     >
       <Drawer.Screen name="Today" component={DashboardScreen} />
@@ -132,7 +139,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 28,
   },
-  iconEmoji: { fontSize: 20 },
 
   // Right-side hamburger — token color, no raw hex
   burgerBtn: {
