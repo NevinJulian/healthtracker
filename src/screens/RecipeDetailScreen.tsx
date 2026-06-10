@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import { getRecipeById, Recipe, addShoppingListItem, insertCookingTask } from '../db/database';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Card, Row, IconChip, Button } from '../components';
+import { iconChipIconColor } from '../components/IconChip';
 
 // ─── Stat Chip ────────────────────────────────────────────────────────────────
 
@@ -108,7 +110,7 @@ export default function RecipeDetailScreen() {
         <Card style={styles.heroCard}>
           <View style={styles.heroInner}>
             <IconChip
-              icon={<Text style={styles.heroEmoji}>{'🍽'}</Text>}
+              icon={<Ionicons name="restaurant-outline" size={24} color={iconChipIconColor('clay')} />}
               accent="clay"
               size={48}
             />
@@ -214,7 +216,7 @@ export default function RecipeDetailScreen() {
             <Card style={styles.tipCard}>
               <View style={styles.tipInner}>
                 <IconChip
-                  icon={<Text style={styles.tipEmoji}>{'❄'}</Text>}
+                  icon={<Ionicons name="snow-outline" size={18} color={iconChipIconColor('sky')} />}
                   accent="sky"
                   size={36}
                 />
@@ -279,9 +281,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.md,
-  },
-  heroEmoji: {
-    fontSize: 22,
   },
   heroTextBlock: {
     flex: 1,
@@ -453,9 +452,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.md,
-  },
-  tipEmoji: {
-    fontSize: 18,
   },
   tipText: {
     fontFamily: Typography.body,
