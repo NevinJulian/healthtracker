@@ -145,7 +145,7 @@ export default function RecipesScreen() {
       {/* Search bar */}
       <View style={styles.searchRow}>
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>&#128269;</Text>
+          <Text style={styles.searchIcon}>{'🔍'}</Text>
           <TextInput
             style={styles.searchInput}
             placeholder="Search recipes & ingredients"
