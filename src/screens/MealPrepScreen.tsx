@@ -324,7 +324,11 @@ export default function MealPrepScreen() {
         {renderTabSwitcher()}
       </View>
 
-      {activeTab === 'weekly' ? renderWeeklyTab() : renderInventoryTab()}
+      {loading ? (
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingText}>Loading meals…</Text>
+        </View>
+      ) : activeTab === 'weekly' ? renderWeeklyTab() : renderInventoryTab()}
 
       <LogMealModal
         visible={logModalVisible}
@@ -830,6 +834,19 @@ const styles = StyleSheet.create({
 
   logButton: {
     marginBottom: Spacing.xs,
+  },
+
+  // ── Loading state ──────────────────────────────────────────
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: Spacing.xxl,
+  },
+  loadingText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textMuted,
   },
 
   // ── Empty states ───────────────────────────────────────────
