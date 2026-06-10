@@ -90,48 +90,33 @@ function WeightTrendCard({
         <Text style={styles.currentWeightLabel}>{current.toFixed(1)} kg</Text>
       </View>
 
-      {/* Flat chart: sage-tint filled area + sage line + sageDeep last dot */}
+      {/* Flat chart: sage-tint area fill + sage bars + sageDeep dot on last point.
+          Uses View-based rendering (no new chart dependency) per DESIGN.md §5. */}
       <View style={styles.chartContainer}>
-        {/* Area fill layer */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <View style={styles.areaFill}>
-            {history.map((pt, i) => {
-              const heightPct = Math.max(4, ((pt.weight - minW) / range) * 100);
-              return (
-                <View
-                  key={`area-${i}`}
-                  style={[
-                    styles.areaBar,
-                    { height: `${heightPct}%` },
-                  ]}
-                />
-              );
-            })}
-          </View>
-        </View>
+        {/* sageTint area spans the full chart width at half-opacity */}
+        <View style={styles.areaBackground} />
 
-        {/* Line + dot layer */}
+        {/* Bars + last-point dot */}
         <View style={styles.lineLayer}>
           {history.map((pt, i) => {
             const heightPct = Math.max(4, ((pt.weight - minW) / range) * 100);
             const isLast = i === history.length - 1;
             return (
-              <View
-                key={`bar-${i}`}
-                style={styles.barColumn}
-              >
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      height: `${heightPct}%`,
-                      backgroundColor: isLast
-                        ? Colors.sageDeep
-                        : Colors.sage,
-                    },
-                    isLast && styles.barLast,
-                  ]}
-                />
+              <View key={`bar-${i}`} style={styles.barColumn}>
+                {isLast ? (
+                  /* sageDeep dot for the most-recent data point */
+                  <View style={styles.lastDot} />
+                ) : (
+                  <View
+                    style={[
+                      styles.bar,
+                      {
+                        height: `${heightPct}%`,
+                        backgroundColor: Colors.sage,
+                      },
+                    ]}
+                  />
+                )}
                 {(i === 0 || isLast) && (
                   <Text style={styles.barDateLabel}>
                     {pt.date.substring(8, 10)}/{pt.date.substring(5, 7)}
@@ -514,20 +499,14 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     height: 80,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
-  areaFill: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: '100%',
+  /** Full-width sage-tint background — represents the area fill under the line */
+  areaBackground: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.sageTint,
     borderRadius: Radius.sm,
-    overflow: 'hidden',
-    opacity: 0.5,
-  },
-  areaBar: {
-    flex: 1,
-    backgroundColor: Colors.sageTint,
+    opacity: 0.55,
   },
   lineLayer: {
     position: 'absolute',
@@ -548,13 +527,17 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: '80%',
-    maxWidth: 10,
+    maxWidth: 8,
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
   },
-  barLast: {
-    width: 10,
-    maxWidth: 10,
+  /** sageDeep circle — the last/current data point dot per DESIGN.md §5 */
+  lastDot: {
+    width: 9,
+    height: 9,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.sageDeep,
+    marginBottom: Spacing.xs,
   },
   barDateLabel: {
     position: 'absolute',
