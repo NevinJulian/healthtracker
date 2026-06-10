@@ -126,18 +126,11 @@ export default function RecipesScreen() {
       )
     : recipes;
 
-  const renderRecipe = ({ item, index }: { item: Recipe; index: number }) => (
+  const renderRecipe = ({ item }: { item: Recipe }) => (
     <RecipeCard
       item={item}
       onPress={() => navigation.navigate('RecipeDetail', { recipeId: item.id })}
     />
-  );
-
-  // Spacer item so the last row in a 2-column grid fills correctly
-  const renderColumnWrapper = (props: { style?: object; children: React.ReactNode }) => (
-    <View style={[styles.columnWrapper, props.style]}>
-      {props.children}
-    </View>
   );
 
   return (
@@ -155,7 +148,7 @@ export default function RecipesScreen() {
           <Text style={styles.searchIcon}>&#128269;</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search recipes &amp; ingredients"
+            placeholder="Search recipes & ingredients"
             placeholderTextColor={Colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
