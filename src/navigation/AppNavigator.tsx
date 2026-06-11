@@ -11,6 +11,8 @@ import MealPrepScreen from '../screens/MealPrepScreen';
 import TemplateEditorScreen from '../screens/TemplateEditorScreen';
 import RecipesScreen from '../screens/RecipesScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
+import DiscoverScreen from '../screens/DiscoverScreen';
+import DiscoverDetailScreen from '../screens/DiscoverDetailScreen';
 import ShoppingListScreen from '../screens/ShoppingListScreen';
 import CookingTasksScreen from '../screens/CookingTasksScreen';
 import { Colors, Typography, Spacing, Radius } from '../theme/tokens';
@@ -18,6 +20,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 
 const Drawer = createDrawerNavigator();
 const RecipeStack = createStackNavigator();
+const DiscoverStack = createStackNavigator();
 
 function RecipesStackScreen() {
   return (
@@ -25,6 +28,15 @@ function RecipesStackScreen() {
       <RecipeStack.Screen name="RecipesMain" component={RecipesScreen} />
       <RecipeStack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
     </RecipeStack.Navigator>
+  );
+}
+
+function DiscoverStackScreen() {
+  return (
+    <DiscoverStack.Navigator screenOptions={{ headerShown: false }}>
+      <DiscoverStack.Screen name="DiscoverMain" component={DiscoverScreen} />
+      <DiscoverStack.Screen name="DiscoverDetail" component={DiscoverDetailScreen} />
+    </DiscoverStack.Navigator>
   );
 }
 
@@ -37,6 +49,7 @@ const DRAWER_ICONS: Record<string, IoniconsName> = {
   'Meal Prep': 'nutrition-outline',
   Template: 'create-outline',
   Recipes: 'restaurant-outline',
+  Discover: 'compass-outline',
   Shopping: 'cart-outline',
   'Cooking Tasks': 'flame-outline',
 };
@@ -114,6 +127,7 @@ export default function AppNavigator() {
       <Drawer.Screen name="Analytics" component={AnalyticsDashboardScreen} />
       <Drawer.Screen name="Meal Prep" component={MealPrepScreen} />
       <Drawer.Screen name="Recipes" component={RecipesStackScreen} />
+      <Drawer.Screen name="Discover" component={DiscoverStackScreen} />
       <Drawer.Screen name="Shopping" component={ShoppingListScreen} />
       <Drawer.Screen name="Cooking Tasks" component={CookingTasksScreen} />
       <Drawer.Screen name="Template" component={TemplateEditorScreen} />
