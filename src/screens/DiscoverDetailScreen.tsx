@@ -7,12 +7,15 @@ import {
   ActivityIndicator,
   Image,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import { fetchMealById, MealDetail } from '../api/mealdb';
 import { useRoute } from '@react-navigation/native';
 import { Card, Row, Pill } from '../components';
+import { importRecipe as dbImportRecipe } from '../db/database';
+import { buildImportResult, mealDbRecipeId } from '../nutrition/importRecipe';
 
 // ─── Section label ────────────────────────────────────────────────────────────
 
@@ -53,6 +56,11 @@ export default function DiscoverDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  // Import state
+  const [importing, setImporting] = useState(false);
+  const [importDone, setImportDone] = useState(false);
+  const [importEstimated, setImportEstimated] = useState<string[]>([]);
+
   const load = async (id: string) => {
     setLoading(true);
     setError(false);
@@ -66,9 +74,56 @@ export default function DiscoverDetailScreen() {
     }
   };
 
+  const handleImport = async () => {
+    if (!meal || importing || importDone) return;
+    setImporting(true);
+    try {
+      const result = await buildImportResult(meal);
+      const wasNew = await dbImportRecipe(result.recipe);
+      if (!wasNew) {
+        Alert.alert(
+          'Already in your library',
+          `"${meal.name}" is already in your recipe library.`,
+        );
+        setImportDone(true);
+        return;
+      }
+      setImportEstimated(result.estimatedIngredients);
+      setImportDone(true);
+      const macros = result.recipe;
+      const estimatedNote =
+        result.estimatedIngredients.length > 0
+          ? `\n\nNote: macros are estimated — ${result.estimatedIngredients.length} ingredient(s) had no nutritional data.`
+          : '';
+      Alert.alert(
+        'Imported!',
+        `"${meal.name}" has been added to your recipe library.\n\n${macros.calories} kcal · ${macros.protein}g protein · ${macros.carbs}g carbs · ${macros.fat}g fat (per serving)${estimatedNote}`,
+      );
+    } catch {
+      Alert.alert('Import failed', 'Something went wrong. Please try again.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   useEffect(() => {
     if (mealId) load(mealId);
   }, [mealId]);
+
+  // When a meal loads, check if it is already in the library
+  useEffect(() => {
+    if (!meal) return;
+    const checkAlreadyImported = async () => {
+      try {
+        const { getRecipeById } = await import('../db/database');
+        const existing = await getRecipeById(mealDbRecipeId(meal.id));
+        if (existing) setImportDone(true);
+      } catch {
+        // Non-fatal — worst case the button shows and the user gets the "already imported" alert
+      }
+    };
+    checkAlreadyImported();
+  }, [meal]);
 
   if (loading) return <LoadingView />;
   if (error) return <ErrorView onRetry={() => load(mealId)} />;
@@ -165,17 +220,65 @@ export default function DiscoverDetailScreen() {
           </View>
         )}
 
-        {/* ── "Import coming soon" placeholder ───────────────────────────── */}
+        {/* ── Import action ────────────────────────────────────────────────── */}
         <View style={styles.section}>
-          <Card style={styles.importPlaceholderCard}>
-            <View style={styles.importPlaceholderRow}>
-              <Ionicons name="cloud-download-outline" size={20} color={Colors.textMuted} />
-              <View style={styles.importPlaceholderText}>
-                <Text style={styles.importPlaceholderTitle}>Import to my recipes</Text>
-                <Text style={styles.importPlaceholderSubtitle}>Coming soon — import to your recipe library</Text>
+          {importDone ? (
+            <Card style={styles.importSuccessCard}>
+              <View style={styles.importRow}>
+                <View style={styles.importIconChip}>
+                  <Ionicons name="checkmark-outline" size={18} color={Colors.sageDeep} />
+                </View>
+                <View style={styles.importText}>
+                  <Text style={styles.importTitle}>Added to your library</Text>
+                  {importEstimated.length > 0 ? (
+                    <Text style={styles.importSubtitle}>
+                      Macros estimated — {importEstimated.length} ingredient
+                      {importEstimated.length === 1 ? '' : 's'} had no nutritional data
+                    </Text>
+                  ) : (
+                    <Text style={styles.importSubtitle}>Macros computed from local data</Text>
+                  )}
+                </View>
               </View>
-            </View>
-          </Card>
+            </Card>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.78}
+              onPress={handleImport}
+              disabled={importing}
+              accessibilityRole="button"
+              accessibilityLabel="Import to my recipes"
+            >
+              <Card style={[styles.importCard, importing && styles.importCardBusy]}>
+                <View style={styles.importRow}>
+                  {importing ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={Colors.sageDeep}
+                      style={styles.importSpinner}
+                    />
+                  ) : (
+                    <View style={styles.importIconChip}>
+                      <Ionicons name="download-outline" size={18} color={Colors.sageDeep} />
+                    </View>
+                  )}
+                  <View style={styles.importText}>
+                    <Text style={styles.importTitle}>
+                      {importing ? 'Importing…' : 'Import to my recipes'}
+                    </Text>
+                    <Text style={styles.importSubtitle}>
+                      {importing
+                        ? 'Computing macros and saving…'
+                        : 'Adds this meal to your recipe library'}
+                    </Text>
+                  </View>
+                  {!importing && (
+                    <Ionicons name="chevron-forward-outline" size={16} color={Colors.textMuted} />
+                  )}
+                </View>
+              </Card>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={{ height: Spacing.xxl }} />
@@ -346,29 +449,51 @@ const styles = StyleSheet.create({
     lineHeight: Typography.sizes.sm * 1.55,
   },
 
-  // ── Import placeholder ────────────────────────────────────────────────────
-  importPlaceholderCard: {
-    backgroundColor: Colors.canvasSunken,
-    borderWidth: 1,
-    borderColor: Colors.line2,
+  // ── Import action card ────────────────────────────────────────────────────
+  importCard: {
     padding: Spacing.lg,
-    opacity: 0.6,
+    borderWidth: 1,
+    borderColor: Colors.sageTint,
+    backgroundColor: Colors.surface,
   },
-  importPlaceholderRow: {
+  importCardBusy: {
+    opacity: 0.7,
+  },
+  importSuccessCard: {
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.sageTint,
+    backgroundColor: Colors.sageTint,
+  },
+  importRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
   },
-  importPlaceholderText: {
+  importIconChip: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.sageTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  importSpinner: {
+    width: 36,
+    height: 36,
+    flexShrink: 0,
+  },
+  importText: {
     flex: 1,
     gap: Spacing.xs,
   },
-  importPlaceholderTitle: {
+  importTitle: {
     fontFamily: Typography.title,
     fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
+    color: Colors.sageDeep,
   },
-  importPlaceholderSubtitle: {
+  importSubtitle: {
     fontFamily: Typography.body,
     fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
