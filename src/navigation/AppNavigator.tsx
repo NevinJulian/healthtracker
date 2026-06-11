@@ -16,6 +16,7 @@ import DiscoverScreen from '../screens/DiscoverScreen';
 import DiscoverDetailScreen from '../screens/DiscoverDetailScreen';
 import ShoppingListScreen from '../screens/ShoppingListScreen';
 import CookingTasksScreen from '../screens/CookingTasksScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import { Colors, Typography, Spacing, Radius } from '../theme/tokens';
 import { createStackNavigator } from '@react-navigation/stack';
 
@@ -54,6 +55,7 @@ const DRAWER_ICONS: Record<string, IoniconsName> = {
   Discover: 'compass-outline',
   Shopping: 'cart-outline',
   'Cooking Tasks': 'flame-outline',
+  Settings: 'settings-outline',
 };
 
 function DrawerIcon({ label, focused }: { label: string; focused?: boolean }) {
@@ -133,6 +135,7 @@ export default function AppNavigator() {
       <Drawer.Screen name="Shopping" component={ShoppingListScreen} />
       <Drawer.Screen name="Cooking Tasks" component={CookingTasksScreen} />
       <Drawer.Screen name="Template" component={TemplateEditorScreen} />
+      <Drawer.Screen name="Settings" component={SettingsScreen} />
     </Drawer.Navigator>
   );
 }
