@@ -1,11 +1,12 @@
 /**
  * Unit tests for pure helper functions in the notification service.
  *
- * parseTimeString and formatTimeString are stateless and have no native
- * dependencies, so they can be tested directly in Jest's node environment.
+ * parseTimeString, formatTimeString, mapWeekdayToExpo, and shouldNotifyEmpty
+ * are all stateless and have no native dependencies, so they can be tested
+ * directly in Jest's node environment.
  */
 
-import { parseTimeString, formatTimeString } from '../notifications';
+import { parseTimeString, formatTimeString, mapWeekdayToExpo, shouldNotifyEmpty } from '../notifications';
 
 describe('parseTimeString', () => {
   it('parses a standard HH:MM string', () => {
@@ -44,5 +45,49 @@ describe('formatTimeString', () => {
       const { hour, minute } = parseTimeString(t);
       expect(formatTimeString(hour, minute)).toBe(t);
     }
+  });
+});
+
+describe('mapWeekdayToExpo', () => {
+  it('maps Sunday (JS 0) to expo 1', () => {
+    expect(mapWeekdayToExpo(0)).toBe(1);
+  });
+
+  it('maps Saturday (JS 6) to expo 7', () => {
+    expect(mapWeekdayToExpo(6)).toBe(7);
+  });
+
+  it('maps all JS weekdays to expo weekdays (offset by 1)', () => {
+    for (let day = 0; day <= 6; day++) {
+      expect(mapWeekdayToExpo(day)).toBe(day + 1);
+    }
+  });
+
+  it('produces values in the expo range 1–7', () => {
+    for (let day = 0; day <= 6; day++) {
+      const expo = mapWeekdayToExpo(day);
+      expect(expo).toBeGreaterThanOrEqual(1);
+      expect(expo).toBeLessThanOrEqual(7);
+    }
+  });
+});
+
+describe('shouldNotifyEmpty', () => {
+  it('returns true when portions are 0 and not yet notified', () => {
+    expect(shouldNotifyEmpty(0, false)).toBe(true);
+  });
+
+  it('returns false when portions are 0 but already notified (debounce)', () => {
+    expect(shouldNotifyEmpty(0, true)).toBe(false);
+  });
+
+  it('returns false when portions are positive (inventory not empty)', () => {
+    expect(shouldNotifyEmpty(1, false)).toBe(false);
+    expect(shouldNotifyEmpty(5, false)).toBe(false);
+    expect(shouldNotifyEmpty(100, false)).toBe(false);
+  });
+
+  it('returns false when portions are positive even if notified flag is false', () => {
+    expect(shouldNotifyEmpty(3, false)).toBe(false);
   });
 });
