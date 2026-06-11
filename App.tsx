@@ -21,6 +21,11 @@ import {
 import { initDatabase } from './src/db/database';
 import AppNavigator from './src/navigation/AppNavigator';
 import { Colors, Typography } from './src/theme/tokens';
+import {
+  configureNotificationHandler,
+  ensureAndroidChannel,
+  reconcileScheduledNotifications,
+} from './src/services/notifications';
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -34,9 +39,17 @@ export default function App() {
   });
 
   useEffect(() => {
+    // Configure the foreground notification handler immediately (synchronous).
+    configureNotificationHandler();
+
     (async () => {
       try {
         await initDatabase();
+        // Ensure the Android notification channel exists and reconcile any
+        // persisted reminder settings with the OS scheduler. Both are
+        // fire-and-forget: failures are logged but must not block startup.
+        await ensureAndroidChannel();
+        await reconcileScheduledNotifications();
         setDbReady(true);
       } catch (err: any) {
         console.error('[App] DB init failed:', err);

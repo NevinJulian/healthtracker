@@ -11,5 +11,8 @@ module.exports = {
     '^expo-sqlite(/.*)?$': '<rootDir>/__mocks__/expo-sqlite.js',
     '^expo-asset(/.*)?$': '<rootDir>/__mocks__/expo-asset.js',
     '^@expo/vector-icons(/.*)?$': '<rootDir>/__mocks__/@expo/vector-icons.js',
+    // expo-notifications pulls in native channel/permission modules unavailable
+    // in Jest's node testEnvironment. Stub the whole package.
+    '^expo-notifications$': '<rootDir>/__mocks__/expo-notifications.js',
   },
 };

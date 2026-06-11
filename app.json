@@ -29,7 +29,17 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#7C9A85",
+          "defaultChannel": "reminders",
+          "androidMode": "default",
+          "sounds": []
+        }
+      ]
     ],
     "extra": {
       "eas": {
