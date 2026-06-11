@@ -948,22 +948,31 @@ export async function getMealInventory(): Promise<MealInventoryWithRecipe[]> {
 export async function logCookedMeal(recipe_id: string, portions: number): Promise<void> {
   const db = getDatabase();
   const date_cooked = toISODate();
-  // Check if active stock exists
-  const existing = await db.getFirstAsync<any>(
-    'SELECT * FROM meal_inventory WHERE recipe_id = ? AND portions_available > 0', 
-    [recipe_id]
-  );
-  if (existing) {
-    await db.runAsync(
-      'UPDATE meal_inventory SET portions_available = portions_available + ?, date_cooked = ? WHERE id = ?',
-      [portions, date_cooked, existing.id]
+
+  await db.withTransactionAsync(async () => {
+    // Check if active stock exists
+    const existing = await db.getFirstAsync<any>(
+      'SELECT * FROM meal_inventory WHERE recipe_id = ? AND portions_available > 0',
+      [recipe_id]
     );
-  } else {
+    if (existing) {
+      await db.runAsync(
+        'UPDATE meal_inventory SET portions_available = portions_available + ?, date_cooked = ? WHERE id = ?',
+        [portions, date_cooked, existing.id]
+      );
+    } else {
+      await db.runAsync(
+        'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, ?, ?)',
+        [recipe_id, portions, date_cooked]
+      );
+    }
+
+    // Persist cook event to cook_log so history accumulates for analytics (#267 v30)
     await db.runAsync(
-      'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, ?, ?)',
+      'INSERT INTO cook_log (recipe_id, portions, date) VALUES (?, ?, ?)',
       [recipe_id, portions, date_cooked]
     );
-  }
+  });
 }
 
 export async function getWeeklyMealPlan(): Promise<WeeklyMealPlanItem[]> {
@@ -1193,4 +1202,266 @@ export async function finishCooking(
 export async function deleteCookingTask(taskId: number): Promise<void> {
   const db = getDatabase();
   await db.runAsync('DELETE FROM cooking_tasks WHERE id = ?', [taskId]);
+}
+
+// ─────────────────────────────────────────────
+// Nutrition Analytics Queries (#267)
+// ─────────────────────────────────────────────
+
+export interface DailyMacroTotals {
+  date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  /** Number of consumed meals that contributed to this day's totals. */
+  mealCount: number;
+}
+
+/**
+ * Return per-day macro totals (calories, protein, carbs, fat) from meals
+ * that were marked as consumed in weekly_meal_plan, joined to recipe_library
+ * for macro values. Only days that have at least one consumed meal appear.
+ *
+ * @param days - How many calendar days back to look (default 30).
+ */
+export async function getConsumedMacrosByDay(days: number = 30): Promise<DailyMacroTotals[]> {
+  const db = getDatabase();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffISO = toISODate(cutoff);
+
+  const rows = await db.getAllAsync<{
+    date: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    meal_count: number;
+  }>(
+    `SELECT
+       p.date,
+       SUM(r.calories) AS calories,
+       SUM(r.protein)  AS protein,
+       SUM(r.carbs)    AS carbs,
+       SUM(r.fat)      AS fat,
+       COUNT(*)        AS meal_count
+     FROM weekly_meal_plan p
+     JOIN recipe_library r ON p.recipe_id = r.id
+     WHERE p.is_consumed = 1
+       AND p.date >= ?
+     GROUP BY p.date
+     ORDER BY p.date ASC`,
+    [cutoffISO]
+  );
+
+  return rows.map((r) => ({
+    date: r.date,
+    calories: r.calories ?? 0,
+    protein: r.protein ?? 0,
+    carbs: r.carbs ?? 0,
+    fat: r.fat ?? 0,
+    mealCount: r.meal_count ?? 0,
+  }));
+}
+
+export interface MealAdherenceSummary {
+  /** Total meals that were planned (all weekly_meal_plan rows in window). */
+  planned: number;
+  /** Total meals that were consumed (is_consumed = 1) in the same window. */
+  consumed: number;
+  /** consumed / planned as a 0–1 fraction; 0 when planned = 0. */
+  adherenceRatio: number;
+}
+
+/**
+ * Compute meal plan adherence: how many planned meals were actually consumed
+ * over the past `days` calendar days.
+ *
+ * @param days - Window size in days (default 30).
+ */
+export async function getMealAdherence(days: number = 30): Promise<MealAdherenceSummary> {
+  const db = getDatabase();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffISO = toISODate(cutoff);
+
+  const row = await db.getFirstAsync<{ planned: number; consumed: number }>(
+    `SELECT
+       COUNT(*) AS planned,
+       SUM(CASE WHEN is_consumed = 1 THEN 1 ELSE 0 END) AS consumed
+     FROM weekly_meal_plan
+     WHERE date >= ?`,
+    [cutoffISO]
+  );
+
+  const planned = row?.planned ?? 0;
+  const consumed = row?.consumed ?? 0;
+  return {
+    planned,
+    consumed,
+    adherenceRatio: planned > 0 ? consumed / planned : 0,
+  };
+}
+
+export interface EatenRecipeRow {
+  recipe_id: string;
+  title: string;
+  count: number;
+}
+
+/**
+ * Return the top `limit` most-consumed recipes from weekly_meal_plan history,
+ * ordered by consumed count descending.
+ *
+ * @param limit - Maximum number of recipes to return (default 5).
+ */
+export async function getMostEatenRecipes(limit: number = 5): Promise<EatenRecipeRow[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{ recipe_id: string; title: string; count: number }>(
+    `SELECT p.recipe_id, r.title, COUNT(*) AS count
+     FROM weekly_meal_plan p
+     JOIN recipe_library r ON p.recipe_id = r.id
+     WHERE p.is_consumed = 1
+     GROUP BY p.recipe_id
+     ORDER BY count DESC
+     LIMIT ?`,
+    [limit]
+  );
+
+  return rows.map((r) => ({
+    recipe_id: r.recipe_id,
+    title: r.title,
+    count: r.count,
+  }));
+}
+
+export interface AverageConsumedMacros {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  /** Total number of consumed meal rows used in the average. */
+  sampleSize: number;
+}
+
+/**
+ * Compute average per-meal macros (calories, protein, carbs, fat) across all
+ * meals that have been marked consumed in weekly_meal_plan.
+ *
+ * Returns zeros with sampleSize = 0 when no consumed meals exist.
+ */
+export async function getAverageConsumedMacros(): Promise<AverageConsumedMacros> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{
+    calories: number | null;
+    protein: number | null;
+    carbs: number | null;
+    fat: number | null;
+    sample_size: number;
+  }>(
+    `SELECT
+       AVG(r.calories) AS calories,
+       AVG(r.protein)  AS protein,
+       AVG(r.carbs)    AS carbs,
+       AVG(r.fat)      AS fat,
+       COUNT(*)        AS sample_size
+     FROM weekly_meal_plan p
+     JOIN recipe_library r ON p.recipe_id = r.id
+     WHERE p.is_consumed = 1`
+  );
+
+  return {
+    calories: Math.round(row?.calories ?? 0),
+    protein: Math.round(row?.protein ?? 0),
+    carbs: Math.round(row?.carbs ?? 0),
+    fat: Math.round(row?.fat ?? 0),
+    sampleSize: row?.sample_size ?? 0,
+  };
+}
+
+export interface CookedRecipeRow {
+  recipe_id: string;
+  title: string;
+  totalPortions: number;
+  cookEvents: number;
+}
+
+/**
+ * Return the top `limit` most-cooked recipes from cook_log (v30), ordered by
+ * total portions cooked descending. Returns an empty array when cook_log has
+ * no rows yet (the table is new — data accumulates as the user cooks).
+ *
+ * @param limit - Maximum number of recipes to return (default 5).
+ */
+export async function getMostCookedRecipes(limit: number = 5): Promise<CookedRecipeRow[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{
+    recipe_id: string;
+    title: string;
+    total_portions: number;
+    cook_events: number;
+  }>(
+    `SELECT cl.recipe_id, r.title,
+            SUM(cl.portions) AS total_portions,
+            COUNT(*)          AS cook_events
+     FROM cook_log cl
+     JOIN recipe_library r ON cl.recipe_id = r.id
+     GROUP BY cl.recipe_id
+     ORDER BY total_portions DESC
+     LIMIT ?`,
+    [limit]
+  );
+
+  return rows.map((r) => ({
+    recipe_id: r.recipe_id,
+    title: r.title,
+    totalPortions: r.total_portions ?? 0,
+    cookEvents: r.cook_events ?? 0,
+  }));
+}
+
+export interface InventorySnapshot {
+  /** Total number of distinct recipes currently in stock. */
+  recipesInStock: number;
+  /** Sum of portions_available across all in-stock recipes. */
+  totalPortions: number;
+  /** Per-recipe rows for display. */
+  items: Array<{
+    recipe_id: string;
+    title: string;
+    portionsAvailable: number;
+  }>;
+}
+
+/**
+ * Return a snapshot of the current meal inventory: how many recipes are in
+ * stock and their available portion counts. Uses meal_inventory joined to
+ * recipe_library. Empty when no meals are currently prepared.
+ */
+export async function getInventorySnapshot(): Promise<InventorySnapshot> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{
+    recipe_id: string;
+    title: string;
+    portions_available: number;
+  }>(
+    `SELECT m.recipe_id, r.title, m.portions_available
+     FROM meal_inventory m
+     JOIN recipe_library r ON m.recipe_id = r.id
+     WHERE m.portions_available > 0
+     ORDER BY m.portions_available DESC`
+  );
+
+  const totalPortions = rows.reduce((sum, r) => sum + (r.portions_available ?? 0), 0);
+
+  return {
+    recipesInStock: rows.length,
+    totalPortions,
+    items: rows.map((r) => ({
+      recipe_id: r.recipe_id,
+      title: r.title,
+      portionsAvailable: r.portions_available,
+    })),
+  };
 }
