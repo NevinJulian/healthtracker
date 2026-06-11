@@ -30,6 +30,7 @@ import {
   finishCooking,
   deleteCookingTask,
   CookingTaskWithRecipe,
+  resetCookEmptyNotified,
 } from '../db/database';
 import {
   Card,
@@ -338,6 +339,9 @@ export default function CookingTasksScreen() {
         selectedTask.recipe_id,
         selectedTask.servings_to_cook
       );
+      // Inventory just grew — reset the debounce so a fresh empty episode
+      // can trigger a cook-when-empty notification again.
+      await resetCookEmptyNotified();
       setModalVisible(false);
       setSelectedTask(null);
       // Reload the list
