@@ -560,4 +560,16 @@ export const MIGRATIONS: Migration[] = [
     fetched_at TEXT NOT NULL
   );
 ` },
+  // v30: Cook log — persistent record of every cook event (recipe_id, portions, date).
+  // Populated by logCookedMeal() going forward. Enables cook-history analytics
+  // (most-cooked recipes, inventory turnover) that cannot be derived from meal_inventory
+  // alone (which only tracks current stock).
+  { version: 30, sql: `
+  CREATE TABLE IF NOT EXISTS cook_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id TEXT NOT NULL,
+    portions INTEGER NOT NULL,
+    date TEXT NOT NULL
+  );
+` },
 ];
