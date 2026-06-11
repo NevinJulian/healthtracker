@@ -11,6 +11,7 @@ import MealPrepScreen from '../screens/MealPrepScreen';
 import TemplateEditorScreen from '../screens/TemplateEditorScreen';
 import RecipesScreen from '../screens/RecipesScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
+import RecipeEditorScreen from '../screens/RecipeEditorScreen';
 import DiscoverScreen from '../screens/DiscoverScreen';
 import DiscoverDetailScreen from '../screens/DiscoverDetailScreen';
 import ShoppingListScreen from '../screens/ShoppingListScreen';
@@ -27,6 +28,7 @@ function RecipesStackScreen() {
     <RecipeStack.Navigator screenOptions={{ headerShown: false }}>
       <RecipeStack.Screen name="RecipesMain" component={RecipesScreen} />
       <RecipeStack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
+      <RecipeStack.Screen name="RecipeEditor" component={RecipeEditorScreen} />
     </RecipeStack.Navigator>
   );
 }
