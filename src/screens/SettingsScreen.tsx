@@ -25,6 +25,14 @@ import {
   getWorkoutReminderTime,
   setWorkoutReminderEnabled,
   setWorkoutReminderTime,
+  getCookWhenEmptyEnabled,
+  setCookWhenEmptyEnabled,
+  getWeeklyCookDayEnabled,
+  setWeeklyCookDayEnabled,
+  getWeeklyCookDay,
+  setWeeklyCookDay,
+  getWeeklyCookDayTime,
+  setWeeklyCookDayTime,
 } from '../db/database';
 import {
   ensurePermissions,
@@ -43,6 +51,17 @@ interface ReminderState {
   time: string;
   permissionDenied: boolean;
 }
+
+interface CookingReminderState {
+  cookWhenEmptyEnabled: boolean;
+  weeklyCookDayEnabled: boolean;
+  weeklyCookDay: number;       // 0–6 (0 = Sunday)
+  weeklyCookDayTime: string;   // "HH:MM"
+  permissionDenied: boolean;
+}
+
+// Day labels for the weekday chip selector (index = JS weekday 0–6)
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 // ─── Time stepper helpers ────────────────────────────────────────────────────
 
@@ -141,24 +160,53 @@ export default function SettingsScreen() {
     permissionDenied: false,
   });
 
+  const [cooking, setCooking] = useState<CookingReminderState>({
+    cookWhenEmptyEnabled: false,
+    weeklyCookDayEnabled: false,
+    weeklyCookDay: 0,
+    weeklyCookDayTime: '10:00',
+    permissionDenied: false,
+  });
+
   // Load persisted settings on focus (same pattern as other screens using useFocusEffect)
   useFocusEffect(
     useCallback(() => {
       let active = true;
       (async () => {
-        const enabled = await getWorkoutReminderEnabled();
-        const time = await getWorkoutReminderTime();
+        const [
+          workoutEnabled,
+          workoutTime,
+          cookWhenEmptyEnabled,
+          weeklyCookDayEnabled,
+          weeklyCookDay,
+          weeklyCookDayTime,
+        ] = await Promise.all([
+          getWorkoutReminderEnabled(),
+          getWorkoutReminderTime(),
+          getCookWhenEmptyEnabled(),
+          getWeeklyCookDayEnabled(),
+          getWeeklyCookDay(),
+          getWeeklyCookDayTime(),
+        ]);
         if (active) {
-          setReminder((prev) => ({ ...prev, enabled, time, permissionDenied: false }));
+          setReminder((prev) => ({ ...prev, enabled: workoutEnabled, time: workoutTime, permissionDenied: false }));
+          setCooking((prev) => ({
+            ...prev,
+            cookWhenEmptyEnabled,
+            weeklyCookDayEnabled,
+            weeklyCookDay,
+            weeklyCookDayTime,
+            permissionDenied: false,
+          }));
         }
       })();
       return () => { active = false; };
     }, [])
   );
 
-  // ── Toggle ──────────────────────────────────────────────────────────────
+  // ── Workout: Toggle ─────────────────────────────────────────────────────
 
-  async function handleToggle(value: boolean) {
+  async function handleWorkoutToggle(value: boolean) {
     if (value) {
       const granted = await ensurePermissions();
       if (!granted) {
@@ -171,9 +219,9 @@ export default function SettingsScreen() {
     await reconcileScheduledNotifications();
   }
 
-  // ── Time adjustments ────────────────────────────────────────────────────
+  // ── Workout: Time adjustments ───────────────────────────────────────────
 
-  async function adjustTime(hourDelta: number, minuteDelta: number) {
+  async function adjustWorkoutTime(hourDelta: number, minuteDelta: number) {
     const { hour, minute } = parseTimeString(reminder.time);
     const newHour = stepHour(hour, hourDelta);
     const newMinute = stepMinute(minute, minuteDelta);
@@ -185,7 +233,61 @@ export default function SettingsScreen() {
     }
   }
 
-  const { hour, minute } = parseTimeString(reminder.time);
+  // ── Cooking: Cook-when-empty toggle ────────────────────────────────────
+
+  async function handleCookWhenEmptyToggle(value: boolean) {
+    if (value) {
+      const granted = await ensurePermissions();
+      if (!granted) {
+        setCooking((prev) => ({ ...prev, permissionDenied: true }));
+        return;
+      }
+    }
+    await setCookWhenEmptyEnabled(value);
+    setCooking((prev) => ({ ...prev, cookWhenEmptyEnabled: value, permissionDenied: false }));
+  }
+
+  // ── Cooking: Weekly cook-day toggle ────────────────────────────────────
+
+  async function handleWeeklyCookDayToggle(value: boolean) {
+    if (value) {
+      const granted = await ensurePermissions();
+      if (!granted) {
+        setCooking((prev) => ({ ...prev, permissionDenied: true }));
+        return;
+      }
+    }
+    await setWeeklyCookDayEnabled(value);
+    setCooking((prev) => ({ ...prev, weeklyCookDayEnabled: value, permissionDenied: false }));
+    await reconcileScheduledNotifications();
+  }
+
+  // ── Cooking: Weekday chip selection ────────────────────────────────────
+
+  async function handleWeekdaySelect(day: number) {
+    await setWeeklyCookDay(day);
+    setCooking((prev) => ({ ...prev, weeklyCookDay: day }));
+    if (cooking.weeklyCookDayEnabled) {
+      await reconcileScheduledNotifications();
+    }
+  }
+
+  // ── Cooking: Cook-day time adjustments ─────────────────────────────────
+
+  async function adjustCookDayTime(hourDelta: number, minuteDelta: number) {
+    const { hour, minute } = parseTimeString(cooking.weeklyCookDayTime);
+    const newHour = stepHour(hour, hourDelta);
+    const newMinute = stepMinute(minute, minuteDelta);
+    const newTime = formatTimeString(newHour, newMinute);
+    await setWeeklyCookDayTime(newTime);
+    setCooking((prev) => ({ ...prev, weeklyCookDayTime: newTime }));
+    if (cooking.weeklyCookDayEnabled) {
+      await reconcileScheduledNotifications();
+    }
+  }
+
+  const { hour: workoutHour, minute: workoutMinute } = parseTimeString(reminder.time);
+  const { hour: cookHour, minute: cookMinute } = parseTimeString(cooking.weeklyCookDayTime);
 
   return (
     <ScrollView
@@ -216,7 +318,7 @@ export default function SettingsScreen() {
           </View>
           <Switch
             value={reminder.enabled}
-            onValueChange={handleToggle}
+            onValueChange={handleWorkoutToggle}
             trackColor={{ false: Colors.canvasSunken, true: Colors.sage }}
             thumbColor={reminder.enabled ? Colors.surface : Colors.textMuted}
             ios_backgroundColor={Colors.canvasSunken}
@@ -242,30 +344,130 @@ export default function SettingsScreen() {
             <View style={styles.timeStepperRow}>
               <TimeStepper
                 label="Hour"
-                value={String(hour).padStart(2, '0')}
-                onDecrement={() => adjustTime(-1, 0)}
-                onIncrement={() => adjustTime(1, 0)}
+                value={String(workoutHour).padStart(2, '0')}
+                onDecrement={() => adjustWorkoutTime(-1, 0)}
+                onIncrement={() => adjustWorkoutTime(1, 0)}
               />
               <Text style={styles.timeSeparator}>:</Text>
               <TimeStepper
                 label="Minute"
-                value={String(minute).padStart(2, '0')}
-                onDecrement={() => adjustTime(0, -1)}
-                onIncrement={() => adjustTime(0, 1)}
+                value={String(workoutMinute).padStart(2, '0')}
+                onDecrement={() => adjustWorkoutTime(0, -1)}
+                onIncrement={() => adjustWorkoutTime(0, 1)}
               />
             </View>
             <Text style={styles.timePreview}>
-              Reminder set for {formatTimeString(hour, minute)}
+              Reminder set for {formatTimeString(workoutHour, workoutMinute)}
             </Text>
           </View>
         )}
       </Card>
 
-      {/*
-       * ── Unit 3b placeholder ───────────────────────────────────────────
-       * Add a cooking-reminder Card here with the same toggle + time-stepper
-       * pattern. Keys: cookingReminderEnabled / cookingReminderTime.
-       */}
+      {/* ── Cooking reminders section (Unit 3b) ─────────────────────── */}
+      <Card style={styles.card}>
+        <View style={styles.sectionLabelRow}>
+          <Ionicons name="restaurant-outline" size={16} color={Colors.clayDeep} />
+          <Text style={[styles.sectionLabel, styles.sectionLabelCooking]}>Cooking reminders</Text>
+        </View>
+
+        {/* Cooking permission denied notice (shared) */}
+        {cooking.permissionDenied && (
+          <View style={styles.noticeRow}>
+            <Ionicons name="information-circle-outline" size={16} color={Colors.clayDeep} />
+            <Text style={styles.noticeText}>
+              Enable notifications in your device settings to receive reminders.
+            </Text>
+          </View>
+        )}
+
+        {/* Cook-when-empty toggle */}
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleTextBlock}>
+            <Text style={styles.toggleTitle}>Cook when stock is empty</Text>
+            <Text style={styles.toggleSubtitle}>
+              Get a nudge when you run out of prepped meals
+            </Text>
+          </View>
+          <Switch
+            value={cooking.cookWhenEmptyEnabled}
+            onValueChange={handleCookWhenEmptyToggle}
+            trackColor={{ false: Colors.canvasSunken, true: Colors.clay }}
+            thumbColor={cooking.cookWhenEmptyEnabled ? Colors.surface : Colors.textMuted}
+            ios_backgroundColor={Colors.canvasSunken}
+            accessibilityLabel="Enable cook-when-empty reminder"
+          />
+        </View>
+
+        <View style={styles.sectionDivider} />
+
+        {/* Weekly cook-day toggle */}
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleTextBlock}>
+            <Text style={styles.toggleTitle}>Weekly cook day</Text>
+            <Text style={styles.toggleSubtitle}>
+              Recurring reminder on your chosen day and time
+            </Text>
+          </View>
+          <Switch
+            value={cooking.weeklyCookDayEnabled}
+            onValueChange={handleWeeklyCookDayToggle}
+            trackColor={{ false: Colors.canvasSunken, true: Colors.clay }}
+            thumbColor={cooking.weeklyCookDayEnabled ? Colors.surface : Colors.textMuted}
+            ios_backgroundColor={Colors.canvasSunken}
+            accessibilityLabel="Enable weekly cook-day reminder"
+          />
+        </View>
+
+        {/* Weekday + time chooser (visible only when weekly cook-day is enabled) */}
+        {cooking.weeklyCookDayEnabled && (
+          <View style={styles.timePicker}>
+            <View style={styles.timePickerDivider} />
+
+            {/* Weekday chip selector */}
+            <Text style={styles.timePickerHeading}>Cook day</Text>
+            <View style={styles.weekdayRow}>
+              {DAY_LABELS.map((label, idx) => {
+                const selected = cooking.weeklyCookDay === idx;
+                return (
+                  <TouchableOpacity
+                    key={label}
+                    style={[styles.weekdayChip, selected && styles.weekdayChipSelected]}
+                    onPress={() => handleWeekdaySelect(idx)}
+                    accessibilityLabel={`Select ${label}`}
+                    accessibilityRole="button"
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.weekdayChipLabel, selected && styles.weekdayChipLabelSelected]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Time stepper */}
+            <Text style={[styles.timePickerHeading, styles.timePickerHeadingSpaced]}>Reminder time</Text>
+            <View style={styles.timeStepperRow}>
+              <TimeStepper
+                label="Hour"
+                value={String(cookHour).padStart(2, '0')}
+                onDecrement={() => adjustCookDayTime(-1, 0)}
+                onIncrement={() => adjustCookDayTime(1, 0)}
+              />
+              <Text style={styles.timeSeparator}>:</Text>
+              <TimeStepper
+                label="Minute"
+                value={String(cookMinute).padStart(2, '0')}
+                onDecrement={() => adjustCookDayTime(0, -1)}
+                onIncrement={() => adjustCookDayTime(0, 1)}
+              />
+            </View>
+            <Text style={styles.timePreview}>
+              Reminder every {DAY_LABELS[cooking.weeklyCookDay]} at {formatTimeString(cookHour, cookMinute)}
+            </Text>
+          </View>
+        )}
+      </Card>
     </ScrollView>
   );
 }
@@ -379,5 +581,46 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: 'center',
     marginTop: Spacing.lg,
+  },
+
+  // Cooking section overrides
+  sectionLabelCooking: {
+    color: Colors.clayDeep,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: Colors.line,
+    marginVertical: Spacing.md,
+  },
+
+  // Weekday chip selector
+  weekdayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  weekdayChip: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.canvasSunken,
+    alignItems: 'center',
+  },
+  weekdayChipSelected: {
+    backgroundColor: Colors.clayTint,
+  },
+  weekdayChipLabel: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  weekdayChipLabelSelected: {
+    color: Colors.clayDeep,
+  },
+  timePickerHeadingSpaced: {
+    marginTop: Spacing.md,
   },
 });

@@ -23,7 +23,9 @@ import {
   MealInventoryWithRecipe,
   WeeklyMealPlanItem,
   toISODate,
+  resetCookEmptyNotified,
 } from '../db/database';
+import { checkAndNotifyEmptyInventory } from '../services/notifications';
 import {
   Card,
   Row,
@@ -84,6 +86,10 @@ export default function MealPrepScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData();
+      // Check on focus in case inventory emptied while the screen was away
+      checkAndNotifyEmptyInventory().catch((err) =>
+        console.warn('[MealPrepScreen] checkAndNotifyEmptyInventory failed:', err)
+      );
     }, [])
   );
 
@@ -109,6 +115,9 @@ export default function MealPrepScreen() {
     if (portions <= 0) return;
     try {
       await logCookedMeal(recipe_id, portions);
+      // Inventory just grew — clear the empty-episode debounce flag so the
+      // next time it empties again the user gets a fresh notification.
+      await resetCookEmptyNotified();
       setLogModalVisible(false);
       loadData();
     } catch (err) {
@@ -130,6 +139,9 @@ export default function MealPrepScreen() {
   const handleToggleConsumed = async (planId: number, currentVal: boolean) => {
     try {
       await toggleMealConsumed(planId, !currentVal);
+      // After consuming a meal, check whether inventory is now empty
+      // and nudge the user to cook if so (debounced per empty episode).
+      await checkAndNotifyEmptyInventory();
       loadData();
     } catch (err) {
       logDbError(err);

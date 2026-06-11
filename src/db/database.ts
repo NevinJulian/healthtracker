@@ -1518,3 +1518,76 @@ export async function getWorkoutReminderTime(): Promise<string> {
 export async function setWorkoutReminderTime(time: string): Promise<void> {
   await setSetting(SETTING_WORKOUT_REMINDER_TIME, time);
 }
+
+// ── Cooking reminder settings (Unit 3b) ──────────
+
+const SETTING_COOK_WHEN_EMPTY_ENABLED = 'cookWhenEmptyEnabled';
+const SETTING_WEEKLY_COOK_DAY_ENABLED = 'weeklyCookDayEnabled';
+const SETTING_WEEKLY_COOK_DAY = 'weeklyCookDay';
+const SETTING_WEEKLY_COOK_DAY_TIME = 'weeklyCookDayTime';
+const SETTING_COOK_EMPTY_NOTIFIED = 'cookEmptyNotified';
+
+const DEFAULT_WEEKLY_COOK_DAY = 0;        // Sunday
+const DEFAULT_WEEKLY_COOK_DAY_TIME = '10:00';
+
+export async function getCookWhenEmptyEnabled(): Promise<boolean> {
+  const raw = await getSetting(SETTING_COOK_WHEN_EMPTY_ENABLED);
+  return raw === 'true';
+}
+
+export async function setCookWhenEmptyEnabled(enabled: boolean): Promise<void> {
+  await setSetting(SETTING_COOK_WHEN_EMPTY_ENABLED, enabled ? 'true' : 'false');
+}
+
+export async function getWeeklyCookDayEnabled(): Promise<boolean> {
+  const raw = await getSetting(SETTING_WEEKLY_COOK_DAY_ENABLED);
+  return raw === 'true';
+}
+
+export async function setWeeklyCookDayEnabled(enabled: boolean): Promise<void> {
+  await setSetting(SETTING_WEEKLY_COOK_DAY_ENABLED, enabled ? 'true' : 'false');
+}
+
+/** Returns the cook day as 0–6 (0 = Sunday). */
+export async function getWeeklyCookDay(): Promise<number> {
+  const raw = await getSetting(SETTING_WEEKLY_COOK_DAY);
+  if (raw === null) return DEFAULT_WEEKLY_COOK_DAY;
+  const parsed = parseInt(raw, 10);
+  return isNaN(parsed) ? DEFAULT_WEEKLY_COOK_DAY : parsed;
+}
+
+export async function setWeeklyCookDay(day: number): Promise<void> {
+  await setSetting(SETTING_WEEKLY_COOK_DAY, String(day));
+}
+
+export async function getWeeklyCookDayTime(): Promise<string> {
+  const raw = await getSetting(SETTING_WEEKLY_COOK_DAY_TIME);
+  return raw ?? DEFAULT_WEEKLY_COOK_DAY_TIME;
+}
+
+export async function setWeeklyCookDayTime(time: string): Promise<void> {
+  await setSetting(SETTING_WEEKLY_COOK_DAY_TIME, time);
+}
+
+/**
+ * Returns true when the cook-empty notification has already been sent for
+ * the current empty episode (debounce). Reset this via resetCookEmptyNotified()
+ * whenever cooking finishes and inventory is replenished.
+ */
+export async function getCookEmptyNotified(): Promise<boolean> {
+  const raw = await getSetting(SETTING_COOK_EMPTY_NOTIFIED);
+  return raw === 'true';
+}
+
+export async function setCookEmptyNotified(notified: boolean): Promise<void> {
+  await setSetting(SETTING_COOK_EMPTY_NOTIFIED, notified ? 'true' : 'false');
+}
+
+/**
+ * Reset the cook-empty debounce flag so the next inventory-empty episode
+ * can trigger a notification again. Call this after finishCooking() or
+ * logCookedMeal() to mark inventory as replenished.
+ */
+export async function resetCookEmptyNotified(): Promise<void> {
+  await setCookEmptyNotified(false);
+}
