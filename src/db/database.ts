@@ -715,16 +715,19 @@ export async function getRecipeById(id: string): Promise<Recipe | null> {
   };
 }
 
+// ─── Private insert helper ────────────────────────────────────────────────────
+
 /**
- * Import a recipe into the library.  Uses INSERT OR IGNORE so calling it
- * twice with the same id is safe (duplicate guard returns false).
- *
- * @returns true when the recipe was newly inserted, false when it already existed.
+ * Shared INSERT helper used by both importRecipe and createRecipe.
+ * Callers choose the conflict strategy: IGNORE (import) or REPLACE (create).
  */
-export async function importRecipe(recipe: Recipe): Promise<boolean> {
-  const db = getDatabase();
-  const result = await db.runAsync(
-    `INSERT OR IGNORE INTO recipe_library
+async function _insertRecipe(
+  db: SQLite.SQLiteDatabase,
+  recipe: Recipe,
+  conflict: 'IGNORE' | 'REPLACE',
+): Promise<SQLite.SQLiteRunResult> {
+  return db.runAsync(
+    `INSERT OR ${conflict} INTO recipe_library
        (id, title, category, calories, protein, carbs, fat, prepTimeMinutes,
         defaultServings, ingredients, instructions, freezerTips)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -743,8 +746,98 @@ export async function importRecipe(recipe: Recipe): Promise<boolean> {
       recipe.freezerTips ?? '',
     ],
   );
+}
+
+/**
+ * Import a recipe into the library.  Uses INSERT OR IGNORE so calling it
+ * twice with the same id is safe (duplicate guard returns false).
+ *
+ * @returns true when the recipe was newly inserted, false when it already existed.
+ */
+export async function importRecipe(recipe: Recipe): Promise<boolean> {
+  const db = getDatabase();
+  const result = await _insertRecipe(db, recipe, 'IGNORE');
   // lastInsertRowId > 0 means a row was actually inserted
   return (result.changes ?? 0) > 0;
+}
+
+/**
+ * Returns true when the recipe id belongs to the 100 seeded ground-stock
+ * recipes (ids matching /^r\d{3}$/, i.e. r001–r100).  These recipes are
+ * protected from deletion — derive the guard from the id pattern so no
+ * schema migration or extra column is needed.
+ */
+export function isSeededRecipe(id: string): boolean {
+  return /^r\d{3}$/.test(id);
+}
+
+/**
+ * Insert a user-created recipe into recipe_library.
+ * Assigns a stable `custom-<timestamp>` id so the recipe participates in
+ * the shopping/cooking/meal-plan pipeline identically to seeded recipes.
+ * Caller should set recipe.id = `custom-${Date.now()}` before passing in,
+ * OR pass the recipe without an id and let this function generate one.
+ *
+ * If recipe.id is already set (e.g. to a custom-* value from a prior call),
+ * it is used as-is (INSERT OR REPLACE so re-saves are idempotent).
+ */
+export async function createRecipe(recipe: Recipe): Promise<void> {
+  const db = getDatabase();
+  const recipeWithId: Recipe = recipe.id
+    ? recipe
+    : { ...recipe, id: `custom-${Date.now()}` };
+  await _insertRecipe(db, recipeWithId, 'REPLACE');
+}
+
+/**
+ * Update an existing recipe_library row by id.
+ * All fields including recomputed macros and the ingredients JSON are replaced.
+ */
+export async function updateRecipe(recipe: Recipe): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    `UPDATE recipe_library
+     SET title = ?, category = ?, calories = ?, protein = ?, carbs = ?, fat = ?,
+         prepTimeMinutes = ?, defaultServings = ?, ingredients = ?,
+         instructions = ?, freezerTips = ?
+     WHERE id = ?`,
+    [
+      recipe.title,
+      recipe.category,
+      recipe.calories,
+      recipe.protein,
+      recipe.carbs,
+      recipe.fat,
+      recipe.prepTimeMinutes,
+      recipe.defaultServings,
+      JSON.stringify(recipe.ingredients),
+      recipe.instructions,
+      recipe.freezerTips ?? '',
+      recipe.id,
+    ],
+  );
+}
+
+/**
+ * Delete a recipe from recipe_library by id.
+ * Callers should check isSeededRecipe(id) before calling this and refuse
+ * to delete protected seed recipes (r001–r100).
+ */
+export async function deleteRecipe(id: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('DELETE FROM recipe_library WHERE id = ?', [id]);
+}
+
+/**
+ * Return all distinct category strings present in recipe_library,
+ * sorted alphabetically.  Used by the editor to populate the category picker.
+ */
+export async function getRecipeCategories(): Promise<string[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{ category: string }>(
+    'SELECT DISTINCT category FROM recipe_library ORDER BY category ASC',
+  );
+  return rows.map((r) => r.category);
 }
 
 // ─────────────────────────────────────────────
