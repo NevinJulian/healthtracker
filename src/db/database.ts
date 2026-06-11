@@ -1465,3 +1465,56 @@ export async function getInventorySnapshot(): Promise<InventorySnapshot> {
     })),
   };
 }
+
+// ─────────────────────────────────────────────
+// App Settings helpers (backed by app_state)
+// ─────────────────────────────────────────────
+
+/**
+ * Read a value from app_state by key. Returns null when the key is absent.
+ * Use the typed wrappers (getWorkoutReminderEnabled etc.) rather than calling
+ * this directly where possible.
+ */
+export async function getSetting(key: string): Promise<string | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM app_state WHERE key = ?',
+    [key]
+  );
+  return row?.value ?? null;
+}
+
+/**
+ * Persist a string value in app_state. Upserts so repeated calls are safe.
+ */
+export async function setSetting(key: string, value: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    'INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    [key, value]
+  );
+}
+
+// ── Typed setting keys ────────────────────────
+
+const SETTING_WORKOUT_REMINDER_ENABLED = 'workoutReminderEnabled';
+const SETTING_WORKOUT_REMINDER_TIME = 'workoutReminderTime';
+const DEFAULT_WORKOUT_REMINDER_TIME = '08:00';
+
+export async function getWorkoutReminderEnabled(): Promise<boolean> {
+  const raw = await getSetting(SETTING_WORKOUT_REMINDER_ENABLED);
+  return raw === 'true';
+}
+
+export async function setWorkoutReminderEnabled(enabled: boolean): Promise<void> {
+  await setSetting(SETTING_WORKOUT_REMINDER_ENABLED, enabled ? 'true' : 'false');
+}
+
+export async function getWorkoutReminderTime(): Promise<string> {
+  const raw = await getSetting(SETTING_WORKOUT_REMINDER_TIME);
+  return raw ?? DEFAULT_WORKOUT_REMINDER_TIME;
+}
+
+export async function setWorkoutReminderTime(time: string): Promise<void> {
+  await setSetting(SETTING_WORKOUT_REMINDER_TIME, time);
+}
