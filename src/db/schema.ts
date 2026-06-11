@@ -549,4 +549,15 @@ export const MIGRATIONS: Migration[] = [
   UPDATE recipe_library SET calories=112, protein=13, carbs=12, fat=1 WHERE id='r099';
   UPDATE recipe_library SET calories=134, protein=11, carbs=4, fat=8 WHERE id='r100';
 ` },
+  // v29: Open Food Facts cache table (used by recipe import flow)
+  { version: 29, sql: `
+  CREATE TABLE IF NOT EXISTS off_cache (
+    ingredient_name TEXT PRIMARY KEY NOT NULL,
+    kcal REAL NOT NULL,
+    protein REAL NOT NULL,
+    carbs REAL NOT NULL,
+    fat REAL NOT NULL,
+    fetched_at TEXT NOT NULL
+  );
+` },
 ];

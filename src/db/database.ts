@@ -715,6 +715,78 @@ export async function getRecipeById(id: string): Promise<Recipe | null> {
   };
 }
 
+/**
+ * Import a recipe into the library.  Uses INSERT OR IGNORE so calling it
+ * twice with the same id is safe (duplicate guard returns false).
+ *
+ * @returns true when the recipe was newly inserted, false when it already existed.
+ */
+export async function importRecipe(recipe: Recipe): Promise<boolean> {
+  const db = getDatabase();
+  const result = await db.runAsync(
+    `INSERT OR IGNORE INTO recipe_library
+       (id, title, category, calories, protein, carbs, fat, prepTimeMinutes,
+        defaultServings, ingredients, instructions, freezerTips)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      recipe.id,
+      recipe.title,
+      recipe.category,
+      recipe.calories,
+      recipe.protein,
+      recipe.carbs,
+      recipe.fat,
+      recipe.prepTimeMinutes,
+      recipe.defaultServings,
+      JSON.stringify(recipe.ingredients),
+      recipe.instructions,
+      recipe.freezerTips ?? '',
+    ],
+  );
+  // lastInsertRowId > 0 means a row was actually inserted
+  return (result.changes ?? 0) > 0;
+}
+
+// ─────────────────────────────────────────────
+// Open Food Facts cache CRUD
+// ─────────────────────────────────────────────
+
+export interface OFFCacheEntry {
+  ingredient_name: string;
+  kcal: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fetched_at: string;
+}
+
+/** Read a cached OFF entry by normalised ingredient name. */
+export async function getOFFCache(name: string): Promise<OFFCacheEntry | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<OFFCacheEntry>(
+    'SELECT * FROM off_cache WHERE ingredient_name = ?',
+    [name.toLowerCase()],
+  );
+  return row ?? null;
+}
+
+/** Write (or overwrite) a cached OFF entry. */
+export async function putOFFCache(
+  name: string,
+  kcal: number,
+  protein: number,
+  carbs: number,
+  fat: number,
+): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO off_cache
+       (ingredient_name, kcal, protein, carbs, fat, fetched_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [name.toLowerCase(), kcal, protein, carbs, fat, new Date().toISOString()],
+  );
+}
+
 // ─────────────────────────────────────────────
 // Shopping List CRUD
 // ─────────────────────────────────────────────
