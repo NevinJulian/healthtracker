@@ -1,6 +1,7 @@
 /**
  * Unit tests for analyticsHelpers.ts — pure functions, no DB required.
  * Issue #265 — Analytics · strength progression + longer trends & streaks
+ * Issue #267 — Analytics · nutrition adherence + meal & recipe insights
  */
 
 import {
@@ -9,6 +10,10 @@ import {
   progressionSteps,
   KG_PER_CYCLE,
   CYCLE_DAYS,
+  computeGoalAdherenceDays,
+  normaliseMacroSeries,
+  macroChartDateLabel,
+  rollingAverage,
 } from '../analyticsHelpers';
 
 // ─── computeStreaks ───────────────────────────────────────────────────────────
@@ -198,6 +203,129 @@ describe('progressionSteps', () => {
     const steps = progressionSteps(pts);
     expect(steps[0]).toEqual(pts[0]);
     expect(steps[steps.length - 1]).toEqual(pts[pts.length - 1]);
+  });
+});
+
+// ─── computeGoalAdherenceDays ─────────────────────────────────────────────────
+
+describe('computeGoalAdherenceDays', () => {
+  it('returns zeros for empty input', () => {
+    const result = computeGoalAdherenceDays([], 1800, 150);
+    expect(result.calorieAdherence).toBe(0);
+    expect(result.proteinAdherence).toBe(0);
+  });
+
+  it('returns 1 when all days meet both goals', () => {
+    const days = [
+      { date: '2024-01-01', calories: 1900, protein: 160 },
+      { date: '2024-01-02', calories: 2000, protein: 155 },
+    ];
+    const result = computeGoalAdherenceDays(days, 1800, 150);
+    expect(result.calorieAdherence).toBe(1);
+    expect(result.proteinAdherence).toBe(1);
+  });
+
+  it('correctly handles partial adherence', () => {
+    const days = [
+      { date: '2024-01-01', calories: 1900, protein: 160 }, // meets both
+      { date: '2024-01-02', calories: 1500, protein: 160 }, // fails calorie
+      { date: '2024-01-03', calories: 1900, protein: 100 }, // fails protein
+      { date: '2024-01-04', calories: 1500, protein: 100 }, // fails both
+    ];
+    const result = computeGoalAdherenceDays(days, 1800, 150);
+    // 2 out of 4 days meet calorie goal
+    expect(result.calorieAdherence).toBeCloseTo(0.5);
+    // 2 out of 4 days meet protein goal
+    expect(result.proteinAdherence).toBeCloseTo(0.5);
+  });
+
+  it('treats exact goal value as meeting the goal', () => {
+    const days = [{ date: '2024-01-01', calories: 1800, protein: 150 }];
+    const result = computeGoalAdherenceDays(days, 1800, 150);
+    expect(result.calorieAdherence).toBe(1);
+    expect(result.proteinAdherence).toBe(1);
+  });
+});
+
+// ─── normaliseMacroSeries ─────────────────────────────────────────────────────
+
+describe('normaliseMacroSeries', () => {
+  const days = [
+    { date: '2024-01-01', calories: 900, protein: 75 },
+    { date: '2024-01-02', calories: 1800, protein: 150 },
+    { date: '2024-01-03', calories: 2700, protein: 225 }, // exceeds goal
+  ];
+
+  it('normalises calories to [0, 1] relative to goal', () => {
+    const result = normaliseMacroSeries(days, 'calories', 1800);
+    expect(result[0]).toBeCloseTo(0.5);
+    expect(result[1]).toBeCloseTo(1.0);
+    expect(result[2]).toBeCloseTo(1.0); // capped at 1
+  });
+
+  it('normalises protein to [0, 1] relative to goal', () => {
+    const result = normaliseMacroSeries(days, 'protein', 150);
+    expect(result[0]).toBeCloseTo(0.5);
+    expect(result[1]).toBeCloseTo(1.0);
+    expect(result[2]).toBeCloseTo(1.0); // capped at 1
+  });
+
+  it('returns all zeros for goalValue = 0', () => {
+    const result = normaliseMacroSeries(days, 'calories', 0);
+    expect(result).toEqual([0, 0, 0]);
+  });
+
+  it('returns empty array for empty input', () => {
+    expect(normaliseMacroSeries([], 'calories', 1800)).toEqual([]);
+  });
+});
+
+// ─── macroChartDateLabel ──────────────────────────────────────────────────────
+
+describe('macroChartDateLabel', () => {
+  it('returns label for first item (index 0)', () => {
+    expect(macroChartDateLabel(0, 10, '2024-01-15')).toBe('15/01');
+  });
+
+  it('returns label for last item', () => {
+    expect(macroChartDateLabel(9, 10, '2024-03-31')).toBe('31/03');
+  });
+
+  it('returns empty string for middle items', () => {
+    expect(macroChartDateLabel(5, 10, '2024-02-14')).toBe('');
+  });
+
+  it('returns label for single-item series', () => {
+    expect(macroChartDateLabel(0, 1, '2024-06-01')).toBe('01/06');
+  });
+});
+
+// ─── rollingAverage ───────────────────────────────────────────────────────────
+
+describe('rollingAverage', () => {
+  it('returns empty for empty input', () => {
+    expect(rollingAverage([], 7)).toEqual([]);
+  });
+
+  it('single value is its own average', () => {
+    expect(rollingAverage([42], 7)).toEqual([42]);
+  });
+
+  it('first window uses shorter window', () => {
+    // For a 7-day window, the first value has only 1 element (itself)
+    const result = rollingAverage([10, 20, 30], 7);
+    expect(result[0]).toBeCloseTo(10);
+    expect(result[1]).toBeCloseTo(15);   // (10+20)/2
+    expect(result[2]).toBeCloseTo(20);   // (10+20+30)/3
+  });
+
+  it('full window average is computed correctly', () => {
+    const values = [1, 2, 3, 4, 5, 6, 7, 8];
+    const result = rollingAverage(values, 7);
+    // Index 6: average of values[0..6] = (1+2+3+4+5+6+7)/7 = 4
+    expect(result[6]).toBeCloseTo(4);
+    // Index 7: average of values[1..7] = (2+3+4+5+6+7+8)/7 ≈ 5
+    expect(result[7]).toBeCloseTo(5);
   });
 });
 
