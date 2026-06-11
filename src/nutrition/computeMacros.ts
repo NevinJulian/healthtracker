@@ -49,10 +49,16 @@ export interface ComputeResult {
  *
  * @param ingredients     - Array of recipe ingredients with name/baseQuantity/unit
  * @param defaultServings - Number of servings the baseQuantity totals produce
+ * @param overrides       - Optional map of normalised ingredient name → per-100g
+ *                          macro data (e.g. resolved from Open Food Facts).
+ *                          Entries here take precedence over NUTRITION_TABLE for
+ *                          the named ingredient.  Backward-compatible: callers
+ *                          that do not pass this param behave identically to before.
  */
 export function computeRecipeMacros(
   ingredients: ComputeIngredient[],
   defaultServings: number,
+  overrides?: Record<string, { kcal: number; protein: number; carbs: number; fat: number }>,
 ): ComputeResult {
   let totalProtein = 0;
   let totalCarbs = 0;
@@ -63,7 +69,12 @@ export function computeRecipeMacros(
 
   for (const ing of ingredients) {
     const key = normaliseIngredientName(ing.name);
-    const entry = NUTRITION_TABLE[key];
+
+    // Check overrides first (e.g. Open Food Facts results), then local table
+    const override = overrides?.[key] ?? overrides?.[ing.name.toLowerCase()];
+    const entry = override
+      ? { protein: override.protein, carbs: override.carbs, fat: override.fat, gramsPerUnit: undefined }
+      : NUTRITION_TABLE[key];
 
     if (!entry) {
       unmatchedIngredients.push(ing.name);
@@ -71,7 +82,11 @@ export function computeRecipeMacros(
       continue;
     }
 
-    const grams = convertToGrams(ing.baseQuantity, ing.unit, entry.gramsPerUnit);
+    const grams = convertToGrams(
+      ing.baseQuantity,
+      ing.unit,
+      'gramsPerUnit' in entry ? entry.gramsPerUnit : undefined,
+    );
     const factor = grams / 100;
 
     totalProtein += entry.protein * factor;
