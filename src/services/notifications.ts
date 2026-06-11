@@ -278,12 +278,23 @@ export async function checkAndNotifyEmptyInventory(): Promise<void> {
 
     if (!shouldNotifyEmpty(totalPortions, alreadyNotified)) return;
 
-    await Notifications.presentNotificationAsync({
-      title: 'Meal stock empty',
-      body: "You're out of prepped meals — time to cook a batch.",
-      sound: false,
-      ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
-    } as any);
+    // Use a 1-second interval trigger to present an immediate notification.
+    // expo-notifications does not expose a "present now" API directly; the
+    // shortest repeatable trigger is TIME_INTERVAL with seconds >= 1 and
+    // repeats: false.
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Meal stock empty',
+        body: "You're out of prepped meals — time to cook a batch.",
+        sound: false,
+        ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 1,
+        repeats: false,
+      },
+    });
 
     await setCookEmptyNotified(true);
     console.log('[Notifications] Cook-when-empty notification presented.');
