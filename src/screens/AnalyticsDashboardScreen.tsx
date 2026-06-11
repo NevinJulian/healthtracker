@@ -3,6 +3,7 @@
  *
  * Verdure redesign: Unit 10 (#245)
  * Extended with strength progression + longer trends & streaks: #265
+ * Extended with nutrition adherence + meal & recipe insights: #267
  *
  * Behaviour-preserving restyle only. All DB queries and metric calculations
  * are unchanged. Presentation updated to the Verdure calm-wellness system
@@ -17,6 +18,12 @@
  *   - Streaks card: current + longest for gym, walk, fasting
  *   - Consistency grid: 7-col rounded dot grid (sage/gold/canvasSunken) 30-day + legend
  *   - 7-day / 30-day rolling stats with ProgressBar rows
+ *   - Nutrition section:
+ *       · Daily calorie + protein trend (View-based chart, goal reference line)
+ *       · Plan adherence ProgressBar
+ *       · Most-eaten recipes ranked list
+ *       · Average macros stat card
+ *       · Most-cooked recipes (cook_log, builds over time) + inventory snapshot
  */
 import React, { useState, useCallback } from 'react';
 import {
@@ -34,6 +41,18 @@ import {
   getWeightHistory,
   getStartDate,
   toISODate,
+  getConsumedMacrosByDay,
+  getMealAdherence,
+  getMostEatenRecipes,
+  getAverageConsumedMacros,
+  getMostCookedRecipes,
+  getInventorySnapshot,
+  type DailyMacroTotals,
+  type MealAdherenceSummary,
+  type EatenRecipeRow,
+  type AverageConsumedMacros,
+  type CookedRecipeRow,
+  type InventorySnapshot,
 } from '../db/database';
 import { Card, ProgressBar, ScreenHeader, Pill } from '../components';
 import {
@@ -42,7 +61,10 @@ import {
   progressionSteps,
   StreakSet,
   KG_PER_CYCLE,
+  normaliseMacroSeries,
+  macroChartDateLabel,
 } from './analyticsHelpers';
+import { NUTRITION_GOALS } from '../nutrition/goals';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -499,6 +521,298 @@ function RollingStatsCard({
   );
 }
 
+// ─── Nutrition: Daily macro trend chart ───────────────────────────────────────
+
+function MacroTrendChart({
+  macros,
+  macroKey,
+  goal,
+  label,
+  accentColor,
+}: {
+  macros: DailyMacroTotals[];
+  macroKey: 'calories' | 'protein';
+  goal: number;
+  label: string;
+  accentColor: string;
+}) {
+  if (macros.length === 0) return null;
+
+  const normalised = normaliseMacroSeries(
+    macros.map((m) => ({ date: m.date, calories: m.calories, protein: m.protein })),
+    macroKey,
+    goal
+  );
+  const total = macros.length;
+  const latest = macros[total - 1][macroKey];
+
+  return (
+    <View style={styles.macroChartBlock}>
+      <View style={styles.macroChartHeader}>
+        <Text style={styles.macroChartLabel}>{label}</Text>
+        <Text style={styles.macroChartValue}>
+          {latest} {macroKey === 'calories' ? 'kcal' : 'g'} today
+        </Text>
+      </View>
+
+      {/* Bar chart area */}
+      <View style={styles.macroChartContainer}>
+        {/* Soft tint background */}
+        <View style={[styles.macroChartBg, { backgroundColor: accentColor + '18' }]} />
+
+        {/* Goal reference line — positioned at 100% height (top) */}
+        <View style={styles.macroGoalLine} />
+
+        {/* Bars */}
+        <View style={styles.macroBarsLayer}>
+          {normalised.map((ratio, i) => {
+            const heightPct = Math.max(4, ratio * 100);
+            const isLast = i === total - 1;
+            const dateLabel = macroChartDateLabel(i, total, macros[i].date);
+            return (
+              <View key={`mbar-${macroKey}-${i}`} style={styles.macroBarCol}>
+                <View
+                  style={[
+                    styles.macroBar,
+                    {
+                      height: `${heightPct}%`,
+                      backgroundColor: isLast ? accentColor : accentColor + 'AA',
+                    },
+                  ]}
+                />
+                {dateLabel !== '' && (
+                  <Text style={styles.macroBarDateLabel}>{dateLabel}</Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Goal annotation */}
+      <Text style={styles.macroGoalAnnotation}>
+        Goal: {goal} {macroKey === 'calories' ? 'kcal' : 'g'}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Nutrition: Section card ──────────────────────────────────────────────────
+
+function NutritionSectionCard({
+  macros,
+  adherence,
+  mostEaten,
+  avgMacros,
+  mostCooked,
+  inventory,
+}: {
+  macros: DailyMacroTotals[];
+  adherence: MealAdherenceSummary;
+  mostEaten: EatenRecipeRow[];
+  avgMacros: AverageConsumedMacros;
+  mostCooked: CookedRecipeRow[];
+  inventory: InventorySnapshot;
+}) {
+  const hasConsumedHistory = macros.length > 0;
+  const hasMostEaten = mostEaten.length > 0;
+  const hasCookLog = mostCooked.length > 0;
+
+  return (
+    <>
+      {/* Section divider header */}
+      <View style={styles.sectionDivider}>
+        <Text style={styles.sectionDividerText}>Nutrition</Text>
+      </View>
+
+      {/* 1. Nutrition adherence card */}
+      <Card style={styles.sectionCard}>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardSectionTitle}>Nutrition adherence</Text>
+          <Text style={styles.cardSectionTrailing}>Last 30 days</Text>
+        </View>
+
+        {!hasConsumedHistory ? (
+          <Text style={styles.emptyText}>
+            Log meals as consumed to see adherence.
+          </Text>
+        ) : (
+          <>
+            {/* Calorie trend chart */}
+            <MacroTrendChart
+              macros={macros}
+              macroKey="calories"
+              goal={NUTRITION_GOALS.calories}
+              label="Calories"
+              accentColor={Colors.clay}
+            />
+
+            {/* Protein trend chart */}
+            <MacroTrendChart
+              macros={macros}
+              macroKey="protein"
+              goal={NUTRITION_GOALS.protein}
+              label="Protein"
+              accentColor={Colors.sage}
+            />
+          </>
+        )}
+
+        {/* Plan adherence bar — available whenever there are any planned meals */}
+        {adherence.planned > 0 ? (
+          <View style={styles.adherenceRow}>
+            <Text style={styles.adherenceLabel}>Plan adherence</Text>
+            <ProgressBar
+              progress={adherence.adherenceRatio}
+              height={7}
+              style={styles.adherenceBar}
+            />
+            <Pill
+              label={`${Math.round(adherence.adherenceRatio * 100)}%`}
+              accent="clay"
+            />
+          </View>
+        ) : (
+          <Text style={[styles.emptyText, hasConsumedHistory ? { marginTop: Spacing.md } : {}]}>
+            Plan meals to track adherence.
+          </Text>
+        )}
+      </Card>
+
+      {/* 2. Recipe insights card */}
+      <Card style={styles.sectionCard}>
+        <Text style={styles.cardSectionTitle}>Meal insights</Text>
+
+        {/* Most-eaten recipes */}
+        <Text style={styles.insightSubheading}>Most eaten</Text>
+        {!hasMostEaten ? (
+          <Text style={styles.emptyText}>
+            Mark meals as consumed to see your top recipes.
+          </Text>
+        ) : (
+          <View style={styles.recipeRankList}>
+            {mostEaten.map((r, i) => (
+              <View key={r.recipe_id} style={styles.recipeRankRow}>
+                <View style={styles.recipeRankBadge}>
+                  <Text style={styles.recipeRankNum}>{i + 1}</Text>
+                </View>
+                <Text style={styles.recipeRankTitle} numberOfLines={1}>
+                  {r.title}
+                </Text>
+                <Pill label={`${r.count}x`} accent="clay" />
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Average macros */}
+        {avgMacros.sampleSize > 0 && (
+          <>
+            <Text style={[styles.insightSubheading, { marginTop: Spacing.md }]}>
+              Average per meal
+            </Text>
+            <View style={styles.avgMacrosRow}>
+              <View style={styles.avgMacroCell}>
+                <Text style={styles.avgMacroValue}>{avgMacros.calories}</Text>
+                <Text style={styles.avgMacroUnit}>kcal</Text>
+              </View>
+              <View style={styles.avgMacroCell}>
+                <Text style={[styles.avgMacroValue, { color: Colors.sage }]}>
+                  {avgMacros.protein}g
+                </Text>
+                <Text style={styles.avgMacroUnit}>protein</Text>
+              </View>
+              <View style={styles.avgMacroCell}>
+                <Text style={[styles.avgMacroValue, { color: Colors.gold }]}>
+                  {avgMacros.carbs}g
+                </Text>
+                <Text style={styles.avgMacroUnit}>carbs</Text>
+              </View>
+              <View style={styles.avgMacroCell}>
+                <Text style={[styles.avgMacroValue, { color: Colors.sky }]}>
+                  {avgMacros.fat}g
+                </Text>
+                <Text style={styles.avgMacroUnit}>fat</Text>
+              </View>
+            </View>
+            <Text style={styles.avgMacroSample}>
+              Based on {avgMacros.sampleSize} consumed{' '}
+              {avgMacros.sampleSize === 1 ? 'meal' : 'meals'}
+            </Text>
+          </>
+        )}
+      </Card>
+
+      {/* 3. Cook history & inventory card */}
+      <Card style={styles.sectionCard}>
+        <Text style={styles.cardSectionTitle}>Cook history & stock</Text>
+
+        {/* Most cooked — only once cook_log has data */}
+        <Text style={styles.insightSubheading}>Most cooked</Text>
+        {!hasCookLog ? (
+          <Text style={styles.emptyText}>
+            Builds as you cook — finish cooking tasks to start tracking.
+          </Text>
+        ) : (
+          <View style={styles.recipeRankList}>
+            {mostCooked.map((r, i) => (
+              <View key={r.recipe_id} style={styles.recipeRankRow}>
+                <View style={[styles.recipeRankBadge, styles.recipeRankBadgeSage]}>
+                  <Text style={[styles.recipeRankNum, styles.recipeRankNumSage]}>
+                    {i + 1}
+                  </Text>
+                </View>
+                <Text style={styles.recipeRankTitle} numberOfLines={1}>
+                  {r.title}
+                </Text>
+                <Pill label={`${r.totalPortions}p`} accent="sage" />
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Current inventory snapshot — always shown */}
+        <Text style={[styles.insightSubheading, { marginTop: Spacing.md }]}>
+          Current stock
+        </Text>
+        {inventory.recipesInStock === 0 ? (
+          <Text style={styles.emptyText}>No meals in stock right now.</Text>
+        ) : (
+          <>
+            <View style={styles.inventorySummaryRow}>
+              <View style={styles.inventoryStatCell}>
+                <Text style={styles.inventoryStatValue}>
+                  {inventory.recipesInStock}
+                </Text>
+                <Text style={styles.inventoryStatLabel}>recipes</Text>
+              </View>
+              <View style={styles.inventoryStatCell}>
+                <Text style={[styles.inventoryStatValue, { color: Colors.sageDeep }]}>
+                  {inventory.totalPortions}
+                </Text>
+                <Text style={styles.inventoryStatLabel}>portions</Text>
+              </View>
+            </View>
+            {inventory.items.slice(0, 4).map((item) => (
+              <View key={item.recipe_id} style={styles.inventoryItemRow}>
+                <Text style={styles.inventoryItemTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Pill label={`${item.portionsAvailable}p`} accent="sage" />
+              </View>
+            ))}
+            {inventory.items.length > 4 && (
+              <Text style={styles.inventoryMoreLabel}>
+                +{inventory.items.length - 4} more
+              </Text>
+            )}
+          </>
+        )}
+      </Card>
+    </>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AnalyticsDashboardScreen() {
@@ -524,6 +838,28 @@ export default function AnalyticsDashboardScreen() {
   const [weightDelta, setWeightDelta] = useState<number | null>(null);
   const [workoutCount30, setWorkoutCount30] = useState(0);
   const [fastingStreak, setFastingStreak] = useState(0);
+
+  // ── Nutrition analytics state ────────────────────────────────────────────────
+  const [consumedMacros, setConsumedMacros] = useState<DailyMacroTotals[]>([]);
+  const [mealAdherence, setMealAdherence] = useState<MealAdherenceSummary>({
+    planned: 0,
+    consumed: 0,
+    adherenceRatio: 0,
+  });
+  const [mostEatenRecipes, setMostEatenRecipes] = useState<EatenRecipeRow[]>([]);
+  const [avgMacros, setAvgMacros] = useState<AverageConsumedMacros>({
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    sampleSize: 0,
+  });
+  const [mostCookedRecipes, setMostCookedRecipes] = useState<CookedRecipeRow[]>([]);
+  const [inventorySnapshot, setInventorySnapshot] = useState<InventorySnapshot>({
+    recipesInStock: 0,
+    totalPortions: 0,
+    items: [],
+  });
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -623,6 +959,24 @@ export default function AnalyticsDashboardScreen() {
         }
       }
       setConsistencyDots(dots);
+
+      // ── Nutrition analytics (#267) ──────────────────────────────────────────
+      const [macrosByDay, adherence, topEaten, avgM, topCooked, invSnapshot] =
+        await Promise.all([
+          getConsumedMacrosByDay(30),
+          getMealAdherence(30),
+          getMostEatenRecipes(5),
+          getAverageConsumedMacros(),
+          getMostCookedRecipes(5),
+          getInventorySnapshot(),
+        ]);
+
+      setConsumedMacros(macrosByDay);
+      setMealAdherence(adherence);
+      setMostEatenRecipes(topEaten);
+      setAvgMacros(avgM);
+      setMostCookedRecipes(topCooked);
+      setInventorySnapshot(invSnapshot);
     } catch (err) {
       console.error('Failed to load analytics', err);
     } finally {
@@ -700,6 +1054,16 @@ export default function AnalyticsDashboardScreen() {
         {/* Rolling stats */}
         <RollingStatsCard title="7-Day Rolling Stats" stats={stats7Day} />
         <RollingStatsCard title="30-Day Rolling Stats" stats={stats30Day} />
+
+        {/* Nutrition adherence + meal & recipe insights */}
+        <NutritionSectionCard
+          macros={consumedMacros}
+          adherence={mealAdherence}
+          mostEaten={mostEatenRecipes}
+          avgMacros={avgMacros}
+          mostCooked={mostCookedRecipes}
+          inventory={inventorySnapshot}
+        />
 
         <View style={{ height: Spacing.xl }} />
       </ScrollView>
@@ -982,5 +1346,253 @@ const styles = StyleSheet.create({
   },
   statBarSpacer: {
     flex: 1,
+  },
+
+  // ── Nutrition section divider ──────────────────────────────────────────────
+  sectionDivider: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+  },
+  sectionDividerText: {
+    fontFamily: Typography.label,
+    fontSize: 10,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    color: Colors.textMuted,
+  },
+
+  // ── Macro trend chart ──────────────────────────────────────────────────────
+  macroChartBlock: {
+    marginBottom: Spacing.md,
+  },
+  macroChartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  macroChartLabel: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.textSecondary,
+  },
+  macroChartValue: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.bold,
+    color: Colors.textMuted,
+  },
+  macroChartContainer: {
+    height: 56,
+    position: 'relative',
+    marginBottom: Spacing.xs,
+  },
+  macroChartBg: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: Radius.sm,
+  },
+  /** Hairline reference at the top of the chart = 100% of goal */
+  macroGoalLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: Colors.line2,
+  },
+  macroBarsLayer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    top: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  macroBarCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: '100%',
+    marginHorizontal: 1,
+  },
+  macroBar: {
+    width: '75%',
+    maxWidth: 10,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  macroBarDateLabel: {
+    position: 'absolute',
+    bottom: -14,
+    fontFamily: Typography.body,
+    fontSize: 8,
+    color: Colors.textMuted,
+  },
+  macroGoalAnnotation: {
+    fontFamily: Typography.body,
+    fontSize: 9,
+    color: Colors.textMuted,
+    textAlign: 'right',
+    marginTop: Spacing.lg,
+  },
+
+  // ── Plan adherence row ─────────────────────────────────────────────────────
+  adherenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  adherenceLabel: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+    width: 90,
+  },
+  adherenceBar: {
+    flex: 1,
+  },
+
+  // ── Insight subheading ─────────────────────────────────────────────────────
+  insightSubheading: {
+    fontFamily: Typography.label,
+    fontSize: 9,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: Colors.textMuted,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+
+  // ── Recipe rank list ───────────────────────────────────────────────────────
+  recipeRankList: {
+    gap: Spacing.xs,
+  },
+  recipeRankRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  recipeRankBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.clayTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  recipeRankBadgeSage: {
+    backgroundColor: Colors.sageTint,
+  },
+  recipeRankNum: {
+    fontFamily: Typography.label,
+    fontSize: 9,
+    fontWeight: Typography.weights.bold,
+    color: Colors.clayDeep,
+  },
+  recipeRankNumSage: {
+    color: Colors.sageDeep,
+  },
+  recipeRankTitle: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+
+  // ── Average macros stat row ────────────────────────────────────────────────
+  avgMacrosRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  avgMacroCell: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: Colors.canvasSunken,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+  },
+  avgMacroValue: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.clay,
+    lineHeight: 18,
+  },
+  avgMacroUnit: {
+    fontFamily: Typography.label,
+    fontSize: 8,
+    fontWeight: Typography.weights.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  avgMacroSample: {
+    fontFamily: Typography.body,
+    fontSize: 9,
+    color: Colors.textMuted,
+    marginTop: Spacing.xs,
+    textAlign: 'right',
+  },
+
+  // ── Inventory snapshot ─────────────────────────────────────────────────────
+  inventorySummaryRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  inventoryStatCell: {
+    flex: 1,
+    backgroundColor: Colors.sageTint,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    alignItems: 'center',
+  },
+  inventoryStatValue: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.sageDeep,
+    lineHeight: 20,
+  },
+  inventoryStatLabel: {
+    fontFamily: Typography.label,
+    fontSize: 8,
+    fontWeight: Typography.weights.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  inventoryItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+    gap: Spacing.sm,
+  },
+  inventoryItemTitle: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  inventoryMoreLabel: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+    marginTop: Spacing.xs,
   },
 });

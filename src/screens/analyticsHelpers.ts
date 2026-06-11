@@ -5,6 +5,7 @@
  * All functions are side-effect free and fully unit-testable.
  *
  * Issue #265 — Analytics · strength progression + longer trends & streaks
+ * Issue #267 — Analytics · nutrition adherence + meal & recipe insights
  */
 
 // ─────────────────────────────────────────────
@@ -243,4 +244,77 @@ function offsetDate(isoDate: string, days: number): string {
   const d = parseISO(isoDate);
   d.setDate(d.getDate() + days);
   return formatISO(d);
+}
+
+// ─────────────────────────────────────────────
+// Nutrition adherence helpers (#267)
+// ─────────────────────────────────────────────
+
+export interface DailyMacroPoint {
+  date: string;
+  calories: number;
+  protein: number;
+}
+
+/**
+ * Given a list of per-day macro totals from `getConsumedMacrosByDay()`,
+ * compute how many days are at or above the given calorie goal and protein goal.
+ *
+ * Returns a 0–1 fraction for each goal (0 when input is empty).
+ */
+export function computeGoalAdherenceDays(
+  days: DailyMacroPoint[],
+  calorieGoal: number,
+  proteinGoal: number
+): { calorieAdherence: number; proteinAdherence: number } {
+  if (days.length === 0) return { calorieAdherence: 0, proteinAdherence: 0 };
+  const calDays = days.filter((d) => d.calories >= calorieGoal).length;
+  const protDays = days.filter((d) => d.protein >= proteinGoal).length;
+  return {
+    calorieAdherence: calDays / days.length,
+    proteinAdherence: protDays / days.length,
+  };
+}
+
+/**
+ * Normalise a series of daily macro totals to a 0–1 range relative to `goalValue`
+ * for use in a View-based chart (bar heights). A day at or above the goal is 1.0.
+ * Days exceeding the goal are capped at 1.0.
+ *
+ * Returns the same array with each point replaced by its clamped ratio.
+ * Handles goalValue = 0 gracefully (returns all zeros).
+ */
+export function normaliseMacroSeries(
+  days: DailyMacroPoint[],
+  key: 'calories' | 'protein',
+  goalValue: number
+): number[] {
+  if (goalValue <= 0) return days.map(() => 0);
+  return days.map((d) => Math.min(1, d[key] / goalValue));
+}
+
+/**
+ * Build a compact display label for a per-day macro chart.
+ * Returns "dd/MM" for the first and last item; empty string for all others.
+ * Used by the View-based chart to avoid label clutter.
+ */
+export function macroChartDateLabel(index: number, total: number, date: string): string {
+  if (total <= 1) return date.substring(8, 10) + '/' + date.substring(5, 7);
+  if (index === 0 || index === total - 1) {
+    return date.substring(8, 10) + '/' + date.substring(5, 7);
+  }
+  return '';
+}
+
+/**
+ * Compute the 7-day rolling average of a macro series. Returns an array of
+ * the same length; the first min(6, length-1) entries use a shorter window.
+ * Useful for smoothing noisy daily data.
+ */
+export function rollingAverage(values: number[], window: number = 7): number[] {
+  return values.map((_, i) => {
+    const start = Math.max(0, i - window + 1);
+    const slice = values.slice(start, i + 1);
+    return slice.reduce((s, v) => s + v, 0) / slice.length;
+  });
 }
