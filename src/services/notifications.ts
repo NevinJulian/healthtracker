@@ -11,7 +11,12 @@
  *   - cancelWorkoutReminder()
  *   - reconcileScheduledNotifications()
  *
- * Unit 3b can add cooking-reminder equivalents here.
+ * Unit 3b additions:
+ *   - scheduleWeeklyCookDay(day, time)
+ *   - cancelWeeklyCookDay()
+ *   - checkAndNotifyEmptyInventory()
+ *   - mapWeekdayToExpo(day) — maps 0–6 (JS, Sun=0) to 1–7 (expo, Sun=1)
+ *   - reconcileScheduledNotifications() extended to sync weekly cook-day
  */
 
 import * as Notifications from 'expo-notifications';
@@ -21,12 +26,19 @@ import {
   setSetting,
   getWorkoutReminderEnabled,
   getWorkoutReminderTime,
+  getWeeklyCookDayEnabled,
+  getWeeklyCookDay,
+  getWeeklyCookDayTime,
+  getMealInventory,
+  getCookEmptyNotified,
+  setCookEmptyNotified,
 } from '../db/database';
 
 // ─── Internal constants ────────────────────────────────────────────────────
 
 const ANDROID_CHANNEL_ID = 'reminders';
 const WORKOUT_REMINDER_ID_KEY = 'workoutReminderNotificationId';
+const WEEKLY_COOK_DAY_ID_KEY = 'weeklyCookDayNotificationId';
 
 // ─── Foreground display handler ────────────────────────────────────────────
 
@@ -164,6 +176,124 @@ export async function cancelWorkoutReminder(): Promise<void> {
   }
 }
 
+// ─── Weekly cook-day reminder ────────────────────────────────────────────────
+
+/**
+ * Map a JS weekday (0–6, 0 = Sunday) to expo-notifications weekday (1–7, 1 = Sunday).
+ * Exported so it can be unit-tested without any native dependencies.
+ */
+export function mapWeekdayToExpo(day: number): number {
+  // JS: 0=Sun,1=Mon,...,6=Sat → expo: 1=Sun,2=Mon,...,7=Sat
+  return day + 1;
+}
+
+/**
+ * Schedule a weekly repeating cook-day reminder on the given weekday + time.
+ * Cancels any previously scheduled cook-day notification first.
+ *
+ * @param day  0–6 (0 = Sunday)
+ * @param time "HH:MM"
+ */
+export async function scheduleWeeklyCookDay(day: number, time: string): Promise<void> {
+  try {
+    await cancelWeeklyCookDay();
+
+    const { hour, minute } = parseTimeString(time);
+    const weekday = mapWeekdayToExpo(day);
+
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Cook day',
+        body: 'Time to restock your meals for the week.',
+        sound: false,
+        ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday,
+        hour,
+        minute,
+      } as any,
+    });
+
+    await setSetting(WEEKLY_COOK_DAY_ID_KEY, id);
+    console.log(`[Notifications] Weekly cook-day scheduled (weekday ${weekday}, ${time}, id: ${id})`);
+  } catch (err) {
+    console.warn('[Notifications] scheduleWeeklyCookDay failed:', err);
+  }
+}
+
+/**
+ * Cancel the previously scheduled weekly cook-day reminder (if any).
+ */
+export async function cancelWeeklyCookDay(): Promise<void> {
+  try {
+    const id = await getSetting(WEEKLY_COOK_DAY_ID_KEY);
+    if (id) {
+      await Notifications.cancelScheduledNotificationAsync(id);
+      await setSetting(WEEKLY_COOK_DAY_ID_KEY, '');
+      console.log(`[Notifications] Weekly cook-day reminder cancelled (id: ${id})`);
+    }
+  } catch (err) {
+    console.warn('[Notifications] cancelWeeklyCookDay failed:', err);
+  }
+}
+
+// ─── Cook-when-empty nudge ───────────────────────────────────────────────────
+
+/**
+ * Determine whether an immediate "inventory empty" notification should fire.
+ *
+ * Exported as a pure decision helper so it can be unit-tested without
+ * any DB or native calls.
+ *
+ * @param totalPortions   Sum of portions_available across all inventory rows.
+ * @param alreadyNotified Whether the debounce flag is already set.
+ * @returns true when the notification should be presented.
+ */
+export function shouldNotifyEmpty(totalPortions: number, alreadyNotified: boolean): boolean {
+  return totalPortions === 0 && !alreadyNotified;
+}
+
+/**
+ * Check inventory and, when empty and not yet notified in this episode,
+ * present an immediate local notification and set the debounce flag.
+ *
+ * This is an in-app triggered check — there is no background OS scheduling
+ * for this notification type. The caller is responsible for invoking this
+ * at appropriate moments (after consuming a meal, on relevant screen focus).
+ *
+ * The debounce flag (cookEmptyNotified in app_state) is cleared by
+ * resetCookEmptyNotified() when cooking finishes and inventory is replenished,
+ * so each new empty episode produces exactly one notification.
+ */
+export async function checkAndNotifyEmptyInventory(): Promise<void> {
+  try {
+    const enabled = await (await import('../db/database')).getCookWhenEmptyEnabled();
+    if (!enabled) return;
+
+    const inventory = await getMealInventory();
+    const totalPortions = inventory.reduce((sum, item) => sum + item.portions_available, 0);
+    const alreadyNotified = await getCookEmptyNotified();
+
+    if (!shouldNotifyEmpty(totalPortions, alreadyNotified)) return;
+
+    await Notifications.presentNotificationAsync({
+      title: 'Meal stock empty',
+      body: "You're out of prepped meals — time to cook a batch.",
+      sound: false,
+      ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
+    } as any);
+
+    await setCookEmptyNotified(true);
+    console.log('[Notifications] Cook-when-empty notification presented.');
+  } catch (err) {
+    console.warn('[Notifications] checkAndNotifyEmptyInventory failed:', err);
+  }
+}
+
+// ─── Reconcile ───────────────────────────────────────────────────────────────
+
 /**
  * Read persisted settings and bring the OS scheduled notifications into sync.
  *
@@ -175,13 +305,25 @@ export async function cancelWorkoutReminder(): Promise<void> {
  */
 export async function reconcileScheduledNotifications(): Promise<void> {
   try {
-    const enabled = await getWorkoutReminderEnabled();
-    const time = await getWorkoutReminderTime();
+    // Workout reminder
+    const workoutEnabled = await getWorkoutReminderEnabled();
+    const workoutTime = await getWorkoutReminderTime();
 
-    if (enabled) {
-      await scheduleWorkoutReminder(time);
+    if (workoutEnabled) {
+      await scheduleWorkoutReminder(workoutTime);
     } else {
       await cancelWorkoutReminder();
+    }
+
+    // Weekly cook-day reminder
+    const cookDayEnabled = await getWeeklyCookDayEnabled();
+    const cookDay = await getWeeklyCookDay();
+    const cookDayTime = await getWeeklyCookDayTime();
+
+    if (cookDayEnabled) {
+      await scheduleWeeklyCookDay(cookDay, cookDayTime);
+    } else {
+      await cancelWeeklyCookDay();
     }
   } catch (err) {
     console.warn('[Notifications] reconcileScheduledNotifications failed:', err);
