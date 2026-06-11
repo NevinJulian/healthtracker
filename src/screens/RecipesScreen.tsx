@@ -138,11 +138,22 @@ export default function RecipesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Screen header — Fraunces display title */}
+      {/* Screen header — Fraunces display title + New Recipe action */}
       <ScreenHeader
         title="Recipe Library"
         subtitle={`${filteredRecipes.length} recipe${filteredRecipes.length === 1 ? '' : 's'}`}
         style={styles.screenHeader}
+        trailing={
+          <TouchableOpacity
+            style={styles.newRecipeBtn}
+            onPress={() => navigation.navigate('RecipeEditor')}
+            activeOpacity={0.75}
+            accessibilityLabel="Create new recipe"
+            accessibilityRole="button"
+          >
+            <Ionicons name="add-outline" size={20} color={Colors.surface} />
+          </TouchableOpacity>
+        }
       />
 
       {/* Search bar */}
@@ -217,6 +228,14 @@ const styles = StyleSheet.create({
   screenHeader: {
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.sm,
+  },
+  newRecipeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.sage,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // ── Search bar ────────────────────────────────────────────────────────────

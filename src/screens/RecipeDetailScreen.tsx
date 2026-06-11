@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
-import { getRecipeById, Recipe, addShoppingListItem, insertCookingTask } from '../db/database';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import {
+  getRecipeById,
+  Recipe,
+  addShoppingListItem,
+  insertCookingTask,
+  deleteRecipe,
+  isSeededRecipe,
+} from '../db/database';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Card, Row, IconChip, Button } from '../components';
 import { iconChipIconColor } from '../components/IconChip';
 
@@ -39,11 +46,14 @@ export default function RecipeDetailScreen() {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [servings, setServings] = useState<number>(1);
 
-  useEffect(() => {
-    if (recipeId) {
-      loadRecipe(recipeId);
-    }
-  }, [recipeId]);
+  // Reload recipe when the screen regains focus (e.g. returning from editor)
+  useFocusEffect(
+    useCallback(() => {
+      if (recipeId) {
+        loadRecipe(recipeId);
+      }
+    }, [recipeId]),
+  );
 
   const loadRecipe = async (id: string) => {
     const data = await getRecipeById(id);
@@ -51,6 +61,33 @@ export default function RecipeDetailScreen() {
       setRecipe(data);
       setServings(data.defaultServings);
     }
+  };
+
+  const handleEdit = () => {
+    navigation.navigate('RecipeEditor', { recipeId });
+  };
+
+  const handleDelete = () => {
+    if (!recipe) return;
+    Alert.alert(
+      'Delete Recipe',
+      `Are you sure you want to delete "${recipe.title}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRecipe(recipe.id);
+              navigation.navigate('RecipesMain');
+            } catch {
+              Alert.alert('Error', 'Failed to delete recipe.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const getCalculatedQuantity = (baseQuantity: number) => {
@@ -238,6 +275,29 @@ export default function RecipeDetailScreen() {
             variant="ghost"
             onPress={() => navigation.navigate('Cooking Tasks')}
           />
+
+          {/* Edit/Delete row — always show Edit; Delete only for non-seeded recipes */}
+          <View style={styles.editDeleteRow}>
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={handleEdit}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="create-outline" size={16} color={Colors.sageDeep} />
+              <Text style={styles.editBtnText}>Edit Recipe</Text>
+            </TouchableOpacity>
+
+            {!isSeededRecipe(recipe.id) && (
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={handleDelete}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+                <Text style={styles.deleteBtnText}>Delete</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         <View style={{ height: Spacing.xxl }} />
@@ -464,5 +524,45 @@ const styles = StyleSheet.create({
   // ── Action buttons ────────────────────────────────────────────────────────
   actionsSection: {
     gap: Spacing.md,
+  },
+
+  // ── Edit / Delete row ─────────────────────────────────────────────────────
+  editDeleteRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    justifyContent: 'center',
+    paddingTop: Spacing.xs,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.surface,
+  },
+  editBtnText: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.sageDeep,
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.surface,
+  },
+  deleteBtnText: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.danger,
   },
 });
