@@ -1596,6 +1596,108 @@ export async function resetCookEmptyNotified(): Promise<void> {
   await setCookEmptyNotified(false);
 }
 
+// ─────────────────────────────────────────────
+// Backup & restore helpers (#277)
+// ─────────────────────────────────────────────
+
+/**
+ * Return the highest version number recorded in schema_version.
+ * Used by the backup service to tag the payload and by the restore
+ * path to enforce the compatibility gate.
+ */
+export async function getCurrentSchemaVersion(): Promise<number> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ max_version: number | null }>(
+    'SELECT MAX(version) AS max_version FROM schema_version'
+  );
+  return row?.max_version ?? 0;
+}
+
+/**
+ * Return all user-owned table names from sqlite_master, excluding any
+ * internal SQLite tables (sqlite_*) and the schema_version table (never
+ * backed up or overwritten during restore).
+ */
+export async function listUserTables(): Promise<string[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{ name: string }>(
+    `SELECT name FROM sqlite_master
+     WHERE type = 'table'
+       AND name NOT LIKE 'sqlite_%'
+       AND name != 'schema_version'
+     ORDER BY name ASC`
+  );
+  return rows.map((r) => r.name);
+}
+
+/**
+ * Return all rows from the named table as plain objects.
+ * Called once per table during backup export.
+ */
+export async function dumpTable(
+  tableName: string
+): Promise<Record<string, unknown>[]> {
+  const db = getDatabase();
+  // Table name is from sqlite_master — safe to interpolate.
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `SELECT * FROM ${tableName}`
+  );
+  return rows;
+}
+
+/**
+ * Restore all tables from the backup payload inside a single transaction.
+ * Rules:
+ *   - schema_version and sqlite_* tables are never touched.
+ *   - Only tables that exist in the current DB are restored (unknown tables
+ *     in older/newer backups are silently skipped).
+ *   - Per-row INSERT uses that row's own column list so new columns added by
+ *     later migrations default-fill rather than error.
+ *
+ * @param payloadTables  The `tables` object from the BackupPayload.
+ * @returns A summary of what was restored.
+ */
+export async function restoreFromPayload(
+  payloadTables: Record<string, Record<string, unknown>[]>
+): Promise<{ tablesRestored: number; rowsRestored: number }> {
+  const db = getDatabase();
+  const liveTableNames = await listUserTables();
+  const liveTableSet = new Set(liveTableNames);
+
+  let tablesRestored = 0;
+  let rowsRestored = 0;
+
+  await db.withTransactionAsync(async () => {
+    for (const [tableName, rows] of Object.entries(payloadTables)) {
+      // Skip tables that don't exist in the current schema
+      if (!liveTableSet.has(tableName)) continue;
+
+      // Wipe existing rows
+      await db.runAsync(`DELETE FROM ${tableName}`);
+
+      // Re-insert each row using that row's own column list
+      for (const row of rows) {
+        const keys = Object.keys(row);
+        if (keys.length === 0) continue;
+
+        const columns = keys.join(', ');
+        const placeholders = keys.map(() => '?').join(', ');
+        const values = keys.map((k) => row[k]);
+
+        await db.runAsync(
+          `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders})`,
+          values as (string | number | null)[]
+        );
+        rowsRestored += 1;
+      }
+
+      tablesRestored += 1;
+    }
+  });
+
+  return { tablesRestored, rowsRestored };
+}
+
 // ── Nutrition goal settings (#274) ────────────────────────────────────────────
 
 const SETTING_NUTRITION_GOAL_CALORIES = 'nutritionGoalCalories';
