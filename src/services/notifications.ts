@@ -17,6 +17,11 @@
  *   - checkAndNotifyEmptyInventory()
  *   - mapWeekdayToExpo(day) — maps 0–6 (JS, Sun=0) to 1–7 (expo, Sun=1)
  *   - reconcileScheduledNotifications() extended to sync weekly cook-day
+ *
+ * #287 additions:
+ *   - scheduleMealReminder(meal, hour, minute)
+ *   - cancelMealReminder(meal)
+ *   - reconcileScheduledNotifications() extended to sync meal reminders
  */
 
 import * as Notifications from 'expo-notifications';
@@ -32,6 +37,9 @@ import {
   getMealInventory,
   getCookEmptyNotified,
   setCookEmptyNotified,
+  getMealReminderEnabled,
+  getMealReminderTime,
+  type MealType,
 } from '../db/database';
 
 // ─── Internal constants ────────────────────────────────────────────────────
@@ -239,6 +247,85 @@ export async function cancelWeeklyCookDay(): Promise<void> {
   }
 }
 
+// ─── Meal-time reminders (#287) ─────────────────────────────────────────────
+
+/** Stable identifier for each meal's daily notification. */
+const MEAL_REMINDER_IDS: Record<MealType, string> = {
+  breakfast: 'meal-reminder-breakfast',
+  lunch:     'meal-reminder-lunch',
+  dinner:    'meal-reminder-dinner',
+};
+
+/** Key under which we persist the scheduled notification ID for each meal. */
+const MEAL_REMINDER_ID_KEYS: Record<MealType, string> = {
+  breakfast: 'mealReminderBreakfastNotificationId',
+  lunch:     'mealReminderLunchNotificationId',
+  dinner:    'mealReminderDinnerNotificationId',
+};
+
+const MEAL_REMINDER_CONTENT: Record<MealType, { title: string; body: string }> = {
+  breakfast: { title: 'Breakfast time',  body: 'Time to log your breakfast.' },
+  lunch:     { title: 'Lunch time',      body: 'Time to log your lunch.' },
+  dinner:    { title: 'Dinner time',     body: 'Time to log your dinner.' },
+};
+
+/**
+ * Schedule a daily repeating meal reminder at the given hour and minute.
+ * Uses the same DAILY trigger pattern as the workout reminder.
+ * The stable identifier is `meal-reminder-<meal>`.
+ */
+export async function scheduleMealReminder(meal: MealType, hour: number, minute: number): Promise<void> {
+  try {
+    await cancelMealReminder(meal);
+
+    const { title, body } = MEAL_REMINDER_CONTENT[meal];
+
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: false,
+        ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour,
+        minute,
+      } as any,
+    });
+
+    await setSetting(MEAL_REMINDER_ID_KEYS[meal], id);
+    console.log(`[Notifications] Meal reminder (${meal}) scheduled at ${formatTimeString(hour, minute)} (id: ${id})`);
+  } catch (err) {
+    console.warn(`[Notifications] scheduleMealReminder(${meal}) failed:`, err);
+  }
+}
+
+/**
+ * Cancel the previously scheduled daily reminder for the given meal (if any).
+ * Silently succeeds when no reminder was previously scheduled.
+ */
+export async function cancelMealReminder(meal: MealType): Promise<void> {
+  try {
+    const id = await getSetting(MEAL_REMINDER_ID_KEYS[meal]);
+    if (id) {
+      await Notifications.cancelScheduledNotificationAsync(id);
+      await setSetting(MEAL_REMINDER_ID_KEYS[meal], '');
+      console.log(`[Notifications] Meal reminder (${meal}) cancelled (id: ${id})`);
+    }
+  } catch (err) {
+    console.warn(`[Notifications] cancelMealReminder(${meal}) failed:`, err);
+  }
+}
+
+/**
+ * Returns the stable notification identifier string for a given meal.
+ * Exported for use in tests.
+ */
+export function getMealReminderIdentifier(meal: MealType): string {
+  return MEAL_REMINDER_IDS[meal];
+}
+
 // ─── Cook-when-empty nudge ───────────────────────────────────────────────────
 
 /**
@@ -335,6 +422,19 @@ export async function reconcileScheduledNotifications(): Promise<void> {
       await scheduleWeeklyCookDay(cookDay, cookDayTime);
     } else {
       await cancelWeeklyCookDay();
+    }
+
+    // Meal-time reminders (#287)
+    const meals: MealType[] = ['breakfast', 'lunch', 'dinner'];
+    for (const meal of meals) {
+      const enabled = await getMealReminderEnabled(meal);
+      const time = await getMealReminderTime(meal);
+      const { hour, minute } = parseTimeString(time);
+      if (enabled) {
+        await scheduleMealReminder(meal, hour, minute);
+      } else {
+        await cancelMealReminder(meal);
+      }
     }
   } catch (err) {
     console.warn('[Notifications] reconcileScheduledNotifications failed:', err);
