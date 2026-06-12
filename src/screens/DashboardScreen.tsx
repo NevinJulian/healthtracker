@@ -28,6 +28,12 @@ import {
   getTodaysMealsWithRecipe,
   MealPlanWithRecipe,
   toggleMealConsumed,
+  getWaterForDay,
+  addWater,
+  getHydrationGoal,
+  logBodyMeasurement,
+  getLatestMeasurements,
+  type BodyMeasurement,
 } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
@@ -211,17 +217,33 @@ export default function DashboardScreen() {
   const [weightInput, setWeightInput] = useState('');
   const [isExtraModalVisible, setExtraModalVisible] = useState(false);
 
+  // Hydration state
+  const [waterMl, setWaterMl] = useState(0);
+  const [hydrationGoal, setHydrationGoal] = useState(2000);
+
+  // Measurements state
+  const [measurementsModalVisible, setMeasurementsModalVisible] = useState(false);
+  const [latestMeasurements, setLatestMeasurements] = useState<BodyMeasurement | null>(null);
+
   const today = toISODate();
 
   const loadToday = useCallback(async () => {
     setLoading(true);
     try {
       await syncRollingSchedule();
-      const data = await getLogByDate(today);
-      const meals = await getTodaysMealsWithRecipe(today);
+      const [data, meals, water, goal, measurements] = await Promise.all([
+        getLogByDate(today),
+        getTodaysMealsWithRecipe(today),
+        getWaterForDay(today),
+        getHydrationGoal(),
+        getLatestMeasurements(),
+      ]);
 
       setEntry(data);
       setTodaysMeals(meals);
+      setWaterMl(water);
+      setHydrationGoal(goal);
+      setLatestMeasurements(measurements);
       if (data?.body_weight) {
         setWeightInput(data.body_weight.toString());
       }
@@ -323,6 +345,35 @@ export default function DashboardScreen() {
       loadToday();
     } catch (err) {
       console.error('toggleMeal error', err);
+    }
+  };
+
+  // ── Hydration handlers ────────────────────────────────────────────────────────
+
+  const handleAddWater = async (ml: number) => {
+    try {
+      await addWater(today, ml);
+      setWaterMl((prev) => Math.max(0, prev + ml));
+    } catch (err) {
+      console.error('addWater error', err);
+    }
+  };
+
+  // ── Measurement handlers ──────────────────────────────────────────────────────
+
+  const handleSaveMeasurements = async (fields: {
+    waist_cm?: number | null;
+    chest_cm?: number | null;
+    hips_cm?: number | null;
+    thigh_cm?: number | null;
+    arm_cm?: number | null;
+  }) => {
+    try {
+      await logBodyMeasurement(today, fields);
+      const updated = await getLatestMeasurements();
+      setLatestMeasurements(updated);
+    } catch (err) {
+      console.error('logBodyMeasurement error', err);
     }
   };
 
@@ -539,6 +590,129 @@ export default function DashboardScreen() {
           </Card>
         </View>
 
+        {/* ── Hydration ────────────────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Card style={styles.sectionHeaderCard}>
+            <View style={styles.sectionHeaderRow}>
+              <IconChip
+                icon={<Ionicons name="water-outline" size={20} color={iconChipIconColor('sky')} />}
+                accent="sky"
+              />
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionLabel}>HYDRATION</Text>
+                <Text style={styles.sectionSub}>
+                  {waterMl} / {hydrationGoal} ml today
+                </Text>
+              </View>
+              <Pill
+                label={waterMl >= hydrationGoal ? 'Goal met' : `${Math.round((waterMl / hydrationGoal) * 100)}%`}
+                accent={waterMl >= hydrationGoal ? 'sage' : 'sky'}
+              />
+            </View>
+            <ProgressBar
+              progress={Math.min(1, waterMl / Math.max(1, hydrationGoal))}
+              height={6}
+              style={styles.hydrationBar}
+            />
+            <View style={styles.hydrationButtons}>
+              <TouchableOpacity
+                style={styles.hydrationBtn}
+                onPress={() => handleAddWater(250)}
+                activeOpacity={0.75}
+                accessibilityLabel="Add 250 ml"
+                accessibilityRole="button"
+              >
+                <Ionicons name="add-outline" size={14} color={Colors.skyDeep} />
+                <Text style={styles.hydrationBtnLabel}>+250 ml</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.hydrationBtn}
+                onPress={() => handleAddWater(500)}
+                activeOpacity={0.75}
+                accessibilityLabel="Add 500 ml"
+                accessibilityRole="button"
+              >
+                <Ionicons name="add-outline" size={14} color={Colors.skyDeep} />
+                <Text style={styles.hydrationBtnLabel}>+500 ml</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.hydrationBtn, styles.hydrationBtnUndo]}
+                onPress={() => handleAddWater(-250)}
+                activeOpacity={0.75}
+                accessibilityLabel="Remove 250 ml"
+                accessibilityRole="button"
+              >
+                <Ionicons name="remove-outline" size={14} color={Colors.textMuted} />
+                <Text style={[styles.hydrationBtnLabel, styles.hydrationBtnUndoLabel]}>-250 ml</Text>
+              </TouchableOpacity>
+            </View>
+          </Card>
+        </View>
+
+        {/* ── Body Measurements ────────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Card style={styles.sectionHeaderCard}>
+            <View style={styles.sectionHeaderRow}>
+              <IconChip
+                icon={<Ionicons name="body-outline" size={20} color={iconChipIconColor('clay')} />}
+                accent="clay"
+              />
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionLabel}>MEASUREMENTS</Text>
+                <Text style={styles.sectionSub}>
+                  {latestMeasurements
+                    ? `Last: ${latestMeasurements.date}`
+                    : 'No measurements logged yet'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.measureLogBtn}
+                onPress={() => setMeasurementsModalVisible(true)}
+                activeOpacity={0.75}
+                accessibilityLabel="Log measurements"
+                accessibilityRole="button"
+              >
+                <Ionicons name="add-outline" size={16} color={Colors.clayDeep} />
+                <Text style={styles.measureLogBtnLabel}>Log</Text>
+              </TouchableOpacity>
+            </View>
+            {latestMeasurements && (
+              <View style={styles.measurementPills}>
+                {latestMeasurements.waist_cm != null && (
+                  <View style={styles.measurePill}>
+                    <Text style={styles.measurePillLabel}>Waist</Text>
+                    <Text style={styles.measurePillValue}>{latestMeasurements.waist_cm} cm</Text>
+                  </View>
+                )}
+                {latestMeasurements.chest_cm != null && (
+                  <View style={styles.measurePill}>
+                    <Text style={styles.measurePillLabel}>Chest</Text>
+                    <Text style={styles.measurePillValue}>{latestMeasurements.chest_cm} cm</Text>
+                  </View>
+                )}
+                {latestMeasurements.hips_cm != null && (
+                  <View style={styles.measurePill}>
+                    <Text style={styles.measurePillLabel}>Hips</Text>
+                    <Text style={styles.measurePillValue}>{latestMeasurements.hips_cm} cm</Text>
+                  </View>
+                )}
+                {latestMeasurements.thigh_cm != null && (
+                  <View style={styles.measurePill}>
+                    <Text style={styles.measurePillLabel}>Thigh</Text>
+                    <Text style={styles.measurePillValue}>{latestMeasurements.thigh_cm} cm</Text>
+                  </View>
+                )}
+                {latestMeasurements.arm_cm != null && (
+                  <View style={styles.measurePill}>
+                    <Text style={styles.measurePillLabel}>Arm</Text>
+                    <Text style={styles.measurePillValue}>{latestMeasurements.arm_cm} cm</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </Card>
+        </View>
+
         {/* ── Extra Workouts ───────────────────────────────────────────────── */}
         <View style={styles.section}>
           <Text style={styles.extraWorkoutsTitle}>Bonuses / Ad-hoc</Text>
@@ -578,7 +752,111 @@ export default function DashboardScreen() {
         onClose={() => setExtraModalVisible(false)}
         onAddWorkout={handleAddExtraWorkout}
       />
+
+      {/* ── Body Measurements Modal ──────────────────────────────────────── */}
+      <MeasurementsModal
+        visible={measurementsModalVisible}
+        onClose={() => setMeasurementsModalVisible(false)}
+        onSave={handleSaveMeasurements}
+        latest={latestMeasurements}
+      />
     </View>
+  );
+}
+
+// ─── Body Measurements Modal ──────────────────────────────────────────────────
+
+function MeasurementsModal({
+  visible,
+  onClose,
+  onSave,
+  latest,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSave: (fields: {
+    waist_cm?: number | null;
+    chest_cm?: number | null;
+    hips_cm?: number | null;
+    thigh_cm?: number | null;
+    arm_cm?: number | null;
+  }) => Promise<void>;
+  latest: BodyMeasurement | null;
+}) {
+  const [waist, setWaist] = useState('');
+  const [chest, setChest] = useState('');
+  const [hips, setHips]   = useState('');
+  const [thigh, setThigh] = useState('');
+  const [arm, setArm]     = useState('');
+
+  // Pre-fill from latest measurements when the modal opens
+  useEffect(() => {
+    if (visible) {
+      setWaist(latest?.waist_cm != null ? String(latest.waist_cm) : '');
+      setChest(latest?.chest_cm != null ? String(latest.chest_cm) : '');
+      setHips(latest?.hips_cm != null  ? String(latest.hips_cm)  : '');
+      setThigh(latest?.thigh_cm != null ? String(latest.thigh_cm) : '');
+      setArm(latest?.arm_cm != null    ? String(latest.arm_cm)   : '');
+    }
+  }, [visible, latest]);
+
+  const parseField = (s: string): number | null => {
+    const v = parseFloat(s);
+    return isNaN(v) || v <= 0 ? null : v;
+  };
+
+  const handleSave = async () => {
+    await onSave({
+      waist_cm: parseField(waist),
+      chest_cm: parseField(chest),
+      hips_cm:  parseField(hips),
+      thigh_cm: parseField(thigh),
+      arm_cm:   parseField(arm),
+    });
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Body Measurements</Text>
+          <Text style={styles.modalSubtitle}>Enter values in cm — leave blank to skip</Text>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+            {(
+              [
+                { label: 'Waist', value: waist, onChange: setWaist },
+                { label: 'Chest', value: chest, onChange: setChest },
+                { label: 'Hips',  value: hips,  onChange: setHips  },
+                { label: 'Thigh', value: thigh, onChange: setThigh },
+                { label: 'Arm',   value: arm,   onChange: setArm   },
+              ] as const
+            ).map((field) => (
+              <View key={field.label} style={styles.measureField}>
+                <Text style={styles.measureFieldLabel}>{field.label} (cm)</Text>
+                <TextInput
+                  style={styles.measureFieldInput}
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  keyboardType="decimal-pad"
+                  placeholder="—"
+                  placeholderTextColor={Colors.textMuted}
+                  returnKeyType="next"
+                />
+              </View>
+            ))}
+          </ScrollView>
+          <View style={styles.modalFooter}>
+            <Button title="Cancel" variant="ghost" onPress={onClose} />
+            <Button title="Save" variant="primary" onPress={handleSave} />
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -869,5 +1147,154 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     paddingHorizontal: Spacing.xs,
     paddingBottom: Spacing.xs,
+  },
+
+  // ── Hydration ─────────────────────────────────────────────────────────────
+  hydrationBar: {
+    marginTop: Spacing.md,
+  },
+  hydrationButtons: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  hydrationBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.skyTint,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.sky,
+  },
+  hydrationBtnLabel: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.xs,
+    color: Colors.skyDeep,
+  },
+  hydrationBtnUndo: {
+    backgroundColor: Colors.canvasSunken,
+    borderColor: Colors.line2,
+  },
+  hydrationBtnUndoLabel: {
+    color: Colors.textMuted,
+  },
+
+  // ── Measurements ──────────────────────────────────────────────────────────
+  measureLogBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.clayTint,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.clay,
+    alignSelf: 'center',
+  },
+  measureLogBtnLabel: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.xs,
+    color: Colors.clayDeep,
+  },
+  measurementPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  measurePill: {
+    backgroundColor: Colors.clayTint,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    minWidth: 64,
+  },
+  measurePillLabel: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs - 1,
+    color: Colors.clayDeep,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  measurePillValue: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textPrimary,
+    marginTop: 2,
+  },
+
+  // ── Measurements modal ────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(44,53,46,0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xl,
+    maxHeight: '75%',
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: Colors.line2,
+    borderRadius: Radius.full,
+    alignSelf: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xl,
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
+    marginBottom: Spacing.xs,
+  },
+  modalSubtitle: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    marginBottom: Spacing.md,
+  },
+  modalScroll: {
+    paddingBottom: Spacing.md,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.line,
+  },
+  measureField: {
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  measureFieldLabel: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  measureFieldInput: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.line2,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.md,
+    color: Colors.textPrimary,
   },
 });
