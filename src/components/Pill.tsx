@@ -9,6 +9,12 @@ export interface PillProps {
   /** Accent colour family for tint bg + deep-shade text */
   accent?: AccentFamily;
   style?: StyleProp<ViewStyle>;
+  /**
+   * Override the accessibility label when the raw text needs richer context,
+   * e.g. "3 of 5 exercises complete" instead of just "3/5".
+   * When omitted the pill's text label is used by the accessibility tree.
+   */
+  accessibilityLabel?: string;
 }
 
 const PILL_BG: Record<AccentFamily, string> = {
@@ -29,9 +35,14 @@ const PILL_TEXT: Record<AccentFamily, string> = {
  * Verdure Pill — 999-radius small label or count badge.
  * Tint background + deep-shade text per accent family (DESIGN.md §2).
  */
-export default function Pill({ label, accent = 'sage', style }: PillProps) {
+export default function Pill({ label, accent = 'sage', style, accessibilityLabel }: PillProps) {
   return (
-    <View style={[styles.pill, { backgroundColor: PILL_BG[accent] }, style]}>
+    <View
+      style={[styles.pill, { backgroundColor: PILL_BG[accent] }, style]}
+      accessible={accessibilityLabel !== undefined}
+      accessibilityLabel={accessibilityLabel}
+      importantForAccessibility={accessibilityLabel !== undefined ? 'yes' : 'no-hide-descendants'}
+    >
       <Text style={[styles.text, { color: PILL_TEXT[accent] }]}>
         {String(label)}
       </Text>
