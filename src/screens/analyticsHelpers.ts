@@ -6,7 +6,15 @@
  *
  * Issue #265 — Analytics · strength progression + longer trends & streaks
  * Issue #267 — Analytics · nutrition adherence + meal & recipe insights
+ * Issue #279 — timezone / local-date hardening (date utils delegated to src/utils/dates.ts)
  */
+
+import {
+  dateKeyToLocalDate,
+  localDateKey,
+  addDays as _addDays,
+  daysBetween as _daysBetween,
+} from '../utils/dates';
 
 // ─────────────────────────────────────────────
 // Types
@@ -168,23 +176,18 @@ export function computeStrengthProgression(
   endDateISO: string,
   baselineKg: number = 0
 ): StrengthPoint[] {
-  const start = parseISO(startDateISO);
-  const end = parseISO(endDateISO);
-
-  if (start > end) return [];
+  if (startDateISO > endDateISO) return [];
 
   const result: StrengthPoint[] = [];
-  let cursor = new Date(start);
+  let cursorISO = startDateISO;
 
-  while (cursor <= end) {
-    const iso = formatISO(cursor);
-    const daysDiff = Math.round(
-      (cursor.getTime() - start.getTime()) / 86_400_000
-    );
+  while (cursorISO <= endDateISO) {
+    // DST-safe calendar-day difference via the centralised helper
+    const daysDiff = dateDiffDays(startDateISO, cursorISO);
     const cycle = Math.floor(daysDiff / CYCLE_DAYS);
     const weightKg = baselineKg + cycle * KG_PER_CYCLE;
-    result.push({ date: iso, weightKg, cycle });
-    cursor.setDate(cursor.getDate() + 1);
+    result.push({ date: cursorISO, weightKg, cycle });
+    cursorISO = offsetDate(cursorISO, 1);
   }
 
   return result;
@@ -213,38 +216,20 @@ export function progressionSteps(points: StrengthPoint[]): StrengthPoint[] {
 }
 
 // ─────────────────────────────────────────────
-// Date utilities (no external dep)
+// Date utilities — delegated to src/utils/dates (issue #279)
 // ─────────────────────────────────────────────
 
-/** Parse an ISO date string (YYYY-MM-DD) as midnight UTC-independent Date. */
-function parseISO(iso: string): Date {
-  const [y, m, d] = iso.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
+/** Parse an ISO date string (YYYY-MM-DD) as local midnight. */
+const parseISO = dateKeyToLocalDate;
 
-/** Format a Date as YYYY-MM-DD. */
-function formatISO(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
+/** Format a Date as YYYY-MM-DD using local calendar getters. */
+const formatISO = localDateKey;
 
 /** Return how many calendar days b is after a (negative if before). */
-function dateDiffDays(a: string, b: string): number {
-  const da = parseISO(a);
-  const db = parseISO(b);
-  return Math.round((db.getTime() - da.getTime()) / 86_400_000);
-}
+const dateDiffDays = _daysBetween;
 
 /** Return an ISO date string offset by `days` from `isoDate`. */
-function offsetDate(isoDate: string, days: number): string {
-  const d = parseISO(isoDate);
-  d.setDate(d.getDate() + days);
-  return formatISO(d);
-}
+const offsetDate = _addDays;
 
 // ─────────────────────────────────────────────
 // Nutrition adherence helpers (#267)
