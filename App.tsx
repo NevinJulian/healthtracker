@@ -18,8 +18,9 @@ import {
   PlusJakartaSans_600SemiBold,
   PlusJakartaSans_700Bold,
 } from '@expo-google-fonts/plus-jakarta-sans';
-import { initDatabase } from './src/db/database';
+import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from './src/db/database';
 import AppNavigator from './src/navigation/AppNavigator';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 import { Colors, Typography } from './src/theme/tokens';
 import {
   configureNotificationHandler,
@@ -30,6 +31,9 @@ import {
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // null = unknown (still loading), false = show onboarding, true = show navigator
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [latestWeight, setLatestWeight] = useState<number | null>(null);
 
   const [fontsLoaded, fontError] = useFonts({
     Fraunces_600SemiBold,
@@ -50,6 +54,13 @@ export default function App() {
         // fire-and-forget: failures are logged but must not block startup.
         await ensureAndroidChannel();
         await reconcileScheduledNotifications();
+        // Read onboarding state and latest weight after DB is ready.
+        const [onboardingComplete, weight] = await Promise.all([
+          getOnboardingComplete(),
+          getLatestBodyWeight(),
+        ]);
+        setLatestWeight(weight);
+        setOnboardingDone(onboardingComplete);
         setDbReady(true);
       } catch (err: any) {
         console.error('[App] DB init failed:', err);
@@ -80,6 +91,20 @@ export default function App() {
         <ActivityIndicator size="large" color={Colors.accent} />
         <Text style={styles.splashText}>Loading your tracker…</Text>
       </View>
+    );
+  }
+
+  // If onboarding has not been completed (first launch), render the onboarding
+  // screen outside the navigator so it owns the full screen including safe-area.
+  if (onboardingDone === false) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+        <OnboardingScreen
+          onComplete={() => setOnboardingDone(true)}
+          latestWeight={latestWeight}
+        />
+      </SafeAreaProvider>
     );
   }
 

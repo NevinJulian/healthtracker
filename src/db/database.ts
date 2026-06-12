@@ -22,6 +22,7 @@ import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
 import { recipes } from '../data/recipes';
 import { NUTRITION_GOALS, NutritionGoals } from '../nutrition/goals';
+import type { Sex, ActivityLevel, GoalType } from '../nutrition/tdee';
 import {
   localDateKey,
   addDays as _addDaysKey,
@@ -31,6 +32,9 @@ import {
 
 // Re-export NutritionGoals so screens only need to import from database.ts
 export type { NutritionGoals };
+
+// Re-export profile types from tdee.ts so callers only ever import from database.ts
+export type { Sex, ActivityLevel, GoalType };
 
 export interface RecipeIngredient {
   name: string;
@@ -1730,4 +1734,112 @@ export async function setNutritionGoalCalories(kcal: number): Promise<void> {
 /** Persist the user's daily protein goal (grams). */
 export async function setNutritionGoalProtein(g: number): Promise<void> {
   await setSetting(SETTING_NUTRITION_GOAL_PROTEIN, String(g));
+}
+
+// ── User profile settings (#281) ─────────────────────────────────────────────
+//
+// Profile fields are stored as simple string KV pairs in app_state.
+// No schema migration is needed — the existing KV mechanism is reused.
+
+const SETTING_PROFILE_HEIGHT_CM       = 'profileHeightCm';
+const SETTING_PROFILE_AGE             = 'profileAge';
+const SETTING_PROFILE_SEX             = 'profileSex';
+const SETTING_PROFILE_ACTIVITY_LEVEL  = 'profileActivityLevel';
+const SETTING_PROFILE_GOAL_TYPE       = 'profileGoalType';
+const SETTING_ONBOARDING_COMPLETE     = 'onboardingComplete';
+
+/**
+ * Structured user profile object returned by getUserProfile().
+ * All fields are optional — null means the user has not yet entered that value.
+ */
+export interface UserProfileData {
+  heightCm:      number | null;
+  age:           number | null;
+  sex:           Sex | null;
+  activityLevel: ActivityLevel | null;
+  goalType:      GoalType | null;
+}
+
+/** Read all profile fields at once. Returns null for any unset field. */
+export async function getUserProfile(): Promise<UserProfileData> {
+  const [hRaw, aRaw, sRaw, alRaw, gtRaw] = await Promise.all([
+    getSetting(SETTING_PROFILE_HEIGHT_CM),
+    getSetting(SETTING_PROFILE_AGE),
+    getSetting(SETTING_PROFILE_SEX),
+    getSetting(SETTING_PROFILE_ACTIVITY_LEVEL),
+    getSetting(SETTING_PROFILE_GOAL_TYPE),
+  ]);
+
+  const heightCm = hRaw !== null && !isNaN(Number(hRaw)) ? Number(hRaw) : null;
+  const age      = aRaw !== null && !isNaN(Number(aRaw)) ? Number(aRaw) : null;
+
+  const VALID_SEX: Sex[] = ['male', 'female'];
+  const sex = sRaw !== null && (VALID_SEX as string[]).includes(sRaw) ? (sRaw as Sex) : null;
+
+  const VALID_ACTIVITY: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'active', 'very_active'];
+  const activityLevel =
+    alRaw !== null && (VALID_ACTIVITY as string[]).includes(alRaw)
+      ? (alRaw as ActivityLevel)
+      : null;
+
+  const VALID_GOAL: GoalType[] = ['cut', 'maintain', 'gain'];
+  const goalType =
+    gtRaw !== null && (VALID_GOAL as string[]).includes(gtRaw)
+      ? (gtRaw as GoalType)
+      : null;
+
+  return { heightCm, age, sex, activityLevel, goalType };
+}
+
+/** Persist the user's height in centimetres. */
+export async function setProfileHeightCm(cm: number): Promise<void> {
+  await setSetting(SETTING_PROFILE_HEIGHT_CM, String(cm));
+}
+
+/** Persist the user's age in years. */
+export async function setProfileAge(years: number): Promise<void> {
+  await setSetting(SETTING_PROFILE_AGE, String(years));
+}
+
+/** Persist the user's biological sex. */
+export async function setProfileSex(sex: Sex): Promise<void> {
+  await setSetting(SETTING_PROFILE_SEX, sex);
+}
+
+/** Persist the user's activity level. */
+export async function setProfileActivityLevel(level: ActivityLevel): Promise<void> {
+  await setSetting(SETTING_PROFILE_ACTIVITY_LEVEL, level);
+}
+
+/** Persist the user's goal type. */
+export async function setProfileGoalType(goal: GoalType): Promise<void> {
+  await setSetting(SETTING_PROFILE_GOAL_TYPE, goal);
+}
+
+/**
+ * Returns true once the user has completed (or explicitly skipped) the
+ * onboarding flow. App.tsx uses this to decide whether to show
+ * OnboardingScreen or jump straight to the navigator.
+ */
+export async function getOnboardingComplete(): Promise<boolean> {
+  const raw = await getSetting(SETTING_ONBOARDING_COMPLETE);
+  return raw === 'true';
+}
+
+/** Mark onboarding as complete so the gate in App.tsx never shows it again. */
+export async function setOnboardingComplete(complete: boolean): Promise<void> {
+  await setSetting(SETTING_ONBOARDING_COMPLETE, complete ? 'true' : 'false');
+}
+
+/**
+ * Return the most recent non-null body_weight from daily_log, or null when
+ * no weight has ever been logged. Used by OnboardingScreen to prefill the
+ * weight field.
+ */
+export async function getLatestBodyWeight(): Promise<number | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ body_weight: number }>(
+    'SELECT body_weight FROM daily_log WHERE body_weight IS NOT NULL ORDER BY date DESC LIMIT 1'
+  );
+  return row?.body_weight ?? null;
 }
