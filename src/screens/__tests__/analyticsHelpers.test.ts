@@ -14,6 +14,10 @@ import {
   normaliseMacroSeries,
   macroChartDateLabel,
   rollingAverage,
+  hydrationAverage,
+  hydrationGoalAdherence,
+  measurementDelta,
+  latestMeasurementValue,
 } from '../analyticsHelpers';
 
 // ─── computeStreaks ───────────────────────────────────────────────────────────
@@ -350,6 +354,159 @@ describe('rollingAverage', () => {
     expect(result[6]).toBeCloseTo(4);
     // Index 7: average of values[1..7] = (2+3+4+5+6+7+8)/7 ≈ 5
     expect(result[7]).toBeCloseTo(5);
+  });
+});
+
+// ─── hydrationAverage ────────────────────────────────────────────────────────
+
+describe('hydrationAverage', () => {
+  it('returns 0 for empty input', () => {
+    expect(hydrationAverage([])).toBe(0);
+  });
+
+  it('returns the single value for a one-day series', () => {
+    expect(hydrationAverage([{ date: '2024-01-01', water_ml: 1800 }])).toBe(1800);
+  });
+
+  it('correctly averages multiple days', () => {
+    const days = [
+      { date: '2024-01-01', water_ml: 1000 },
+      { date: '2024-01-02', water_ml: 2000 },
+      { date: '2024-01-03', water_ml: 3000 },
+    ];
+    expect(hydrationAverage(days)).toBe(2000);
+  });
+
+  it('rounds the result to the nearest integer', () => {
+    const days = [
+      { date: '2024-01-01', water_ml: 1000 },
+      { date: '2024-01-02', water_ml: 1001 },
+    ];
+    // Average = 1000.5, rounds to 1001
+    expect(hydrationAverage(days)).toBe(1001);
+  });
+});
+
+// ─── hydrationGoalAdherence ───────────────────────────────────────────────────
+
+describe('hydrationGoalAdherence', () => {
+  it('returns 0 for empty input', () => {
+    expect(hydrationGoalAdherence([], 2000)).toBe(0);
+  });
+
+  it('returns 0 when goalMl is 0', () => {
+    const days = [{ date: '2024-01-01', water_ml: 1500 }];
+    expect(hydrationGoalAdherence(days, 0)).toBe(0);
+  });
+
+  it('returns 1 when all days meet the goal', () => {
+    const days = [
+      { date: '2024-01-01', water_ml: 2000 },
+      { date: '2024-01-02', water_ml: 2500 },
+    ];
+    expect(hydrationGoalAdherence(days, 2000)).toBe(1);
+  });
+
+  it('treats exact goal value as meeting the goal', () => {
+    const days = [{ date: '2024-01-01', water_ml: 2000 }];
+    expect(hydrationGoalAdherence(days, 2000)).toBe(1);
+  });
+
+  it('returns 0 when no days meet the goal', () => {
+    const days = [
+      { date: '2024-01-01', water_ml: 500 },
+      { date: '2024-01-02', water_ml: 750 },
+    ];
+    expect(hydrationGoalAdherence(days, 2000)).toBe(0);
+  });
+
+  it('returns 0.5 when half the days meet the goal', () => {
+    const days = [
+      { date: '2024-01-01', water_ml: 2500 }, // meets
+      { date: '2024-01-02', water_ml: 1000 }, // misses
+    ];
+    expect(hydrationGoalAdherence(days, 2000)).toBeCloseTo(0.5);
+  });
+});
+
+// ─── measurementDelta ────────────────────────────────────────────────────────
+
+describe('measurementDelta', () => {
+  it('returns null for empty input', () => {
+    expect(measurementDelta([], 'waist_cm')).toBeNull();
+  });
+
+  it('returns null when only one non-null value exists', () => {
+    const records = [
+      { waist_cm: 80, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+    ];
+    expect(measurementDelta(records, 'waist_cm')).toBeNull();
+  });
+
+  it('returns null when all values for the field are null', () => {
+    const records = [
+      { waist_cm: null, chest_cm: 90, hips_cm: null, thigh_cm: null, arm_cm: null },
+      { waist_cm: null, chest_cm: 88, hips_cm: null, thigh_cm: null, arm_cm: null },
+    ];
+    expect(measurementDelta(records, 'waist_cm')).toBeNull();
+  });
+
+  it('computes a negative delta (measurement decreased)', () => {
+    const records = [
+      { waist_cm: 90, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+      { waist_cm: 85, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+    ];
+    expect(measurementDelta(records, 'waist_cm')).toBeCloseTo(-5);
+  });
+
+  it('computes a positive delta (measurement increased)', () => {
+    const records = [
+      { waist_cm: null, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: 32 },
+      { waist_cm: null, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: 34 },
+    ];
+    expect(measurementDelta(records, 'arm_cm')).toBeCloseTo(2);
+  });
+
+  it('skips null values when computing first and last', () => {
+    // First non-null is 80, last non-null is 75 (the null in the middle is ignored)
+    const records = [
+      { waist_cm: 80, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+      { waist_cm: null, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+      { waist_cm: 75, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+    ];
+    expect(measurementDelta(records, 'waist_cm')).toBeCloseTo(-5);
+  });
+});
+
+// ─── latestMeasurementValue ───────────────────────────────────────────────────
+
+describe('latestMeasurementValue', () => {
+  it('returns null for empty input', () => {
+    expect(latestMeasurementValue([], 'waist_cm')).toBeNull();
+  });
+
+  it('returns null when all values for the field are null', () => {
+    const records = [
+      { waist_cm: null, chest_cm: 90, hips_cm: null, thigh_cm: null, arm_cm: null },
+    ];
+    expect(latestMeasurementValue(records, 'waist_cm')).toBeNull();
+  });
+
+  it('returns the latest non-null value', () => {
+    const records = [
+      { waist_cm: 85, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+      { waist_cm: null, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+      { waist_cm: 82, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+    ];
+    expect(latestMeasurementValue(records, 'waist_cm')).toBe(82);
+  });
+
+  it('skips trailing nulls and returns the last non-null value', () => {
+    const records = [
+      { waist_cm: 88, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+      { waist_cm: null, chest_cm: null, hips_cm: null, thigh_cm: null, arm_cm: null },
+    ];
+    expect(latestMeasurementValue(records, 'waist_cm')).toBe(88);
   });
 });
 
