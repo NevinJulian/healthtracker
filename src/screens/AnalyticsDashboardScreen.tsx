@@ -51,6 +51,8 @@ import {
   getWaterHistory,
   getBodyMeasurements,
   getHydrationGoal,
+  getLoggedExercises,
+  getWorkoutHistory,
   type NutritionGoals,
   type DailyMacroTotals,
   type MealAdherenceSummary,
@@ -59,6 +61,7 @@ import {
   type CookedRecipeRow,
   type InventorySnapshot,
   type BodyMeasurement,
+  type WorkoutSet,
 } from '../db/database';
 import { addDays as addDaysKey } from '../utils/dates';
 import { Card, ProgressBar, ScreenHeader, Pill } from '../components';
@@ -74,7 +77,10 @@ import {
   hydrationGoalAdherence,
   measurementDelta,
   latestMeasurementValue,
+  computePRs,
+  bestSetPerDay,
   type HydrationDay,
+  type WorkoutSetSlice,
 } from './analyticsHelpers';
 import { NUTRITION_GOALS } from '../nutrition/goals';
 
@@ -780,6 +786,218 @@ function MeasurementsTrendCard({
   );
 }
 
+// ─── Strength / Lifts section (#285) ─────────────────────────────────────────
+
+/**
+ * PRSummaryCard — per-exercise personal records (best weight, best estimated
+ * 1RM, best single-set volume) with the date each was achieved.
+ */
+function PRSummaryCard({
+  exercise,
+  history,
+}: {
+  exercise: string;
+  history: WorkoutSetSlice[];
+}) {
+  const prs = computePRs(history);
+  const hasData = history.length > 0;
+
+  return (
+    <View style={styles.prExerciseBlock}>
+      <Text style={styles.prExerciseName}>{exercise}</Text>
+      {!hasData ? (
+        <Text style={styles.emptyText}>No sets logged yet.</Text>
+      ) : (
+        <View style={styles.prStatsRow}>
+          {prs.bestWeight && (
+            <View style={styles.prStatCell}>
+              <Text style={styles.prStatValue}>{prs.bestWeight.value} kg</Text>
+              <Text style={styles.prStatLabel}>Best weight</Text>
+              <Text style={styles.prStatDate}>{prs.bestWeight.date}</Text>
+            </View>
+          )}
+          {prs.best1RM && (
+            <View style={styles.prStatCell}>
+              <Text style={[styles.prStatValue, { color: Colors.sageDeep }]}>
+                {Math.round(prs.best1RM.value)} kg
+              </Text>
+              <Text style={styles.prStatLabel}>Est. 1RM</Text>
+              <Text style={styles.prStatDate}>{prs.best1RM.date}</Text>
+            </View>
+          )}
+          {prs.bestVolume && (
+            <View style={styles.prStatCell}>
+              <Text style={[styles.prStatValue, { color: Colors.goldDeep }]}>
+                {Math.round(prs.bestVolume.value)}
+              </Text>
+              <Text style={styles.prStatLabel}>Best vol (kg)</Text>
+              <Text style={styles.prStatDate}>{prs.bestVolume.date}</Text>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * LiftingProgressChart — View-based bar chart of best set per day for one exercise.
+ * Shows weight_kg on the y-axis; each bar = one logged day's best set.
+ */
+function LiftingProgressChart({
+  points,
+}: {
+  points: ReturnType<typeof bestSetPerDay>;
+}) {
+  if (points.length === 0) return null;
+
+  const weights = points.map((p) => p.weight_kg);
+  const minW = Math.min(...weights);
+  const maxW = Math.max(...weights);
+  const range = maxW - minW || 1;
+
+  return (
+    <View style={styles.liftChartContainer}>
+      <View style={styles.areaBackground} />
+      <View style={styles.lineLayer}>
+        {points.map((pt, i) => {
+          const heightPct = Math.max(6, ((pt.weight_kg - minW) / range) * 100);
+          const isLast = i === points.length - 1;
+          return (
+            <View key={`lbar-${i}`} style={styles.barColumn}>
+              {isLast ? (
+                <View style={styles.lastDot} />
+              ) : (
+                <View
+                  style={[
+                    styles.bar,
+                    { height: `${heightPct}%`, backgroundColor: Colors.sage },
+                  ]}
+                />
+              )}
+              {(i === 0 || isLast) && (
+                <Text style={styles.barDateLabel}>
+                  {pt.date.substring(8, 10)}/{pt.date.substring(5, 7)}
+                </Text>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * LiftingSectionCard — the top-level "Strength / Lifts" card shown in Analytics.
+ *
+ * - Shows PRs per logged exercise (best weight + estimated 1RM)
+ * - Shows a progression chart for the currently selected exercise
+ */
+function LiftingSectionCard({
+  loggedExercises,
+  historyByExercise,
+}: {
+  loggedExercises: string[];
+  historyByExercise: Record<string, WorkoutSetSlice[]>;
+}) {
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(
+    loggedExercises.length > 0 ? loggedExercises[0] : null
+  );
+
+  const selectedHistory = selectedExercise
+    ? (historyByExercise[selectedExercise] ?? [])
+    : [];
+  const chartPoints = bestSetPerDay(selectedHistory);
+
+  return (
+    <>
+      <View style={styles.sectionDivider}>
+        <Text style={styles.sectionDividerText}>Strength / Lifts</Text>
+      </View>
+
+      <Card style={styles.sectionCard}>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardSectionTitle}>Personal records</Text>
+          <Text style={styles.cardSectionTrailing}>
+            {loggedExercises.length} exercise{loggedExercises.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
+
+        {loggedExercises.length === 0 ? (
+          <Text style={styles.emptyText}>
+            Log sets on the Today screen to see your personal records here.
+          </Text>
+        ) : (
+          <>
+            {loggedExercises.map((ex) => (
+              <PRSummaryCard
+                key={ex}
+                exercise={ex}
+                history={historyByExercise[ex] ?? []}
+              />
+            ))}
+          </>
+        )}
+      </Card>
+
+      {loggedExercises.length > 0 && (
+        <Card style={styles.sectionCard}>
+          <View style={styles.cardTitleRow}>
+            <Text style={styles.cardSectionTitle}>Progression</Text>
+            <Text style={styles.cardSectionTrailing}>Best set per day</Text>
+          </View>
+
+          {/* Exercise picker pills */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.exercisePickerRow}
+            contentContainerStyle={styles.exercisePickerContent}
+          >
+            {loggedExercises.map((ex) => (
+              <TouchableOpacity
+                key={ex}
+                style={[
+                  styles.exercisePickerPill,
+                  selectedExercise === ex && styles.exercisePickerPillActive,
+                ]}
+                onPress={() => setSelectedExercise(ex)}
+                activeOpacity={0.75}
+              >
+                <Text
+                  style={[
+                    styles.exercisePickerPillText,
+                    selectedExercise === ex && styles.exercisePickerPillTextActive,
+                  ]}
+                >
+                  {ex}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {chartPoints.length === 0 ? (
+            <Text style={styles.emptyText}>No data for this exercise yet.</Text>
+          ) : (
+            <>
+              <LiftingProgressChart points={chartPoints} />
+              <View style={styles.chartMeta}>
+                <Text style={styles.chartMetaText}>
+                  Min {Math.min(...chartPoints.map((p) => p.weight_kg)).toFixed(1)} kg
+                </Text>
+                <Text style={styles.chartMetaText}>
+                  Max {Math.max(...chartPoints.map((p) => p.weight_kg)).toFixed(1)} kg
+                </Text>
+              </View>
+            </>
+          )}
+        </Card>
+      )}
+    </>
+  );
+}
+
 // ─── Nutrition: Section card ──────────────────────────────────────────────────
 
 function NutritionSectionCard({
@@ -1031,6 +1249,12 @@ export default function AnalyticsDashboardScreen() {
   // ── Body measurements state (#283) ────────────────────────────────────────
   const [bodyMeasurements, setBodyMeasurements] = useState<BodyMeasurement[]>([]);
 
+  // ── Lifting / workout-set-log state (#285) ─────────────────────────────────
+  const [loggedExercises, setLoggedExercises] = useState<string[]>([]);
+  const [liftHistoryByExercise, setLiftHistoryByExercise] = useState<
+    Record<string, WorkoutSetSlice[]>
+  >({});
+
   // ── Nutrition analytics state ────────────────────────────────────────────────
   const [nutritionGoals, setNutritionGoals] = useState<NutritionGoals>(NUTRITION_GOALS);
   const [consumedMacros, setConsumedMacros] = useState<DailyMacroTotals[]>([]);
@@ -1160,6 +1384,7 @@ export default function AnalyticsDashboardScreen() {
         waterRows,
         measurementRows,
         hydGoal,
+        liftExercises,
       ] = await Promise.all([
         getConsumedMacrosByDay(30),
         getMealAdherence(30),
@@ -1171,6 +1396,7 @@ export default function AnalyticsDashboardScreen() {
         getWaterHistory(since7Days),
         getBodyMeasurements(),
         getHydrationGoal(),
+        getLoggedExercises(),
       ]);
 
       setConsumedMacros(macrosByDay);
@@ -1183,6 +1409,27 @@ export default function AnalyticsDashboardScreen() {
       setHydrationDays(waterRows);
       setBodyMeasurements(measurementRows);
       setHydrationGoalMl(hydGoal);
+
+      // ── Lifting history (#285) ──────────────────────────────────────────────
+      setLoggedExercises(liftExercises);
+      if (liftExercises.length > 0) {
+        const historyArrays = await Promise.all(
+          liftExercises.map((ex) => getWorkoutHistory(ex))
+        );
+        const byEx: Record<string, WorkoutSetSlice[]> = {};
+        liftExercises.forEach((ex, i) => {
+          byEx[ex] = historyArrays[i].map((s: WorkoutSet) => ({
+            id: s.id,
+            date: s.date,
+            exercise: s.exercise,
+            reps: s.reps,
+            weight_kg: s.weight_kg,
+          }));
+        });
+        setLiftHistoryByExercise(byEx);
+      } else {
+        setLiftHistoryByExercise({});
+      }
     } catch (err) {
       console.error('Failed to load analytics', err);
     } finally {
@@ -1260,6 +1507,12 @@ export default function AnalyticsDashboardScreen() {
         {/* Rolling stats */}
         <RollingStatsCard title="7-Day Rolling Stats" stats={stats7Day} />
         <RollingStatsCard title="30-Day Rolling Stats" stats={stats30Day} />
+
+        {/* Strength / Lifts — logged actuals PRs + progression (#285) */}
+        <LiftingSectionCard
+          loggedExercises={loggedExercises}
+          historyByExercise={liftHistoryByExercise}
+        />
 
         {/* Nutrition adherence + meal & recipe insights */}
         <NutritionSectionCard
@@ -1940,5 +2193,89 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: 'right',
     marginTop: Spacing.xs,
+  },
+
+  // ── Lifting / PRs section (#285) ──────────────────────────────────────────
+  prExerciseBlock: {
+    marginBottom: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.line,
+  },
+  prExerciseName: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+  },
+  prStatsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  prStatCell: {
+    flex: 1,
+    backgroundColor: Colors.sageTint,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    alignItems: 'center',
+  },
+  prStatValue: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.textPrimary,
+    lineHeight: 18,
+  },
+  prStatLabel: {
+    fontFamily: Typography.label,
+    fontSize: 8,
+    fontWeight: Typography.weights.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    color: Colors.textMuted,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  prStatDate: {
+    fontFamily: Typography.body,
+    fontSize: 8,
+    color: Colors.textMuted,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  liftChartContainer: {
+    height: 72,
+    marginBottom: Spacing.lg,
+  },
+  exercisePickerRow: {
+    marginBottom: Spacing.md,
+  },
+  exercisePickerContent: {
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  exercisePickerPill: {
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    backgroundColor: Colors.canvasSunken,
+    borderWidth: 1,
+    borderColor: Colors.line2,
+  },
+  exercisePickerPillActive: {
+    backgroundColor: Colors.sage,
+    borderColor: Colors.sage,
+  },
+  exercisePickerPillText: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.bold,
+    color: Colors.textMuted,
+    letterSpacing: 0.3,
+  },
+  exercisePickerPillTextActive: {
+    color: Colors.textOnAccent,
   },
 });
