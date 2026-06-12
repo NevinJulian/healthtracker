@@ -1843,3 +1843,194 @@ export async function getLatestBodyWeight(): Promise<number | null> {
   );
   return row?.body_weight ?? null;
 }
+
+// ── Hydration settings (v31) ──────────────────────────────────────────────────
+
+const SETTING_HYDRATION_GOAL_ML = 'hydrationGoalMl';
+const DEFAULT_HYDRATION_GOAL_ML = 2000;
+
+/**
+ * Read the user's daily hydration goal in ml from app_state.
+ * Defaults to 2000 ml when not yet set.
+ */
+export async function getHydrationGoal(): Promise<number> {
+  const raw = await getSetting(SETTING_HYDRATION_GOAL_ML);
+  if (raw !== null && !isNaN(Number(raw))) return Number(raw);
+  return DEFAULT_HYDRATION_GOAL_ML;
+}
+
+/** Persist the user's daily hydration goal in ml. */
+export async function setHydrationGoal(ml: number): Promise<void> {
+  await setSetting(SETTING_HYDRATION_GOAL_ML, String(ml));
+}
+
+// ── Hydration CRUD (water_ml column on daily_log, migration v31) ──────────────
+
+/**
+ * Return today's logged water total for the given date key (YYYY-MM-DD).
+ * Returns 0 when the row doesn't exist or water_ml has not been set.
+ */
+export async function getWaterForDay(dateKey: string): Promise<number> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ water_ml: number }>(
+    'SELECT water_ml FROM daily_log WHERE date = ?',
+    [dateKey]
+  );
+  return row?.water_ml ?? 0;
+}
+
+/**
+ * Increment (or decrement) the water total for `dateKey` by `ml`.
+ * The result is clamped to a minimum of 0 — it never goes negative.
+ *
+ * Upsert-safe: if no row exists for the date (e.g. outside the rolling
+ * window) it inserts one with water_ml = max(0, ml).
+ */
+export async function addWater(dateKey: string, ml: number): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    `UPDATE daily_log SET water_ml = MAX(0, water_ml + ?) WHERE date = ?`,
+    [ml, dateKey]
+  );
+}
+
+/**
+ * Overwrite the water total for `dateKey` to exactly `ml` (clamped ≥ 0).
+ */
+export async function setWaterForDay(dateKey: string, ml: number): Promise<void> {
+  const db = getDatabase();
+  const clamped = Math.max(0, ml);
+  await db.runAsync(
+    `UPDATE daily_log SET water_ml = ? WHERE date = ?`,
+    [clamped, dateKey]
+  );
+}
+
+/**
+ * Return water_ml for each day in the given date range, ordered ascending.
+ * Days with no row (outside the rolling window) are omitted.
+ *
+ * @param sinceDateKey - Earliest date to include (YYYY-MM-DD).
+ */
+export async function getWaterHistory(
+  sinceDateKey: string
+): Promise<{ date: string; water_ml: number }[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{ date: string; water_ml: number }>(
+    'SELECT date, water_ml FROM daily_log WHERE date >= ? ORDER BY date ASC',
+    [sinceDateKey]
+  );
+  return rows;
+}
+
+// ── Body measurements CRUD (body_measurements table, migration v32) ───────────
+
+/** A single body-measurement record (one row per date). */
+export interface BodyMeasurement {
+  id: number;
+  date: string;
+  waist_cm: number | null;
+  chest_cm: number | null;
+  hips_cm: number | null;
+  thigh_cm: number | null;
+  arm_cm: number | null;
+}
+
+type MeasurementInput = {
+  waist_cm?: number | null;
+  chest_cm?: number | null;
+  hips_cm?: number | null;
+  thigh_cm?: number | null;
+  arm_cm?: number | null;
+};
+
+/**
+ * Upsert a body-measurement entry for `date`.
+ *
+ * If no row exists for that date, inserts a new one with only the provided
+ * fields set (others stay NULL).  If a row already exists, updates only the
+ * non-undefined fields so previous measurements are preserved.
+ *
+ * @param date   - YYYY-MM-DD date key.
+ * @param fields - Partial measurement object; undefined fields are ignored.
+ */
+export async function logBodyMeasurement(
+  date: string,
+  fields: MeasurementInput
+): Promise<void> {
+  const db = getDatabase();
+  const existing = await db.getFirstAsync<{ id: number }>(
+    'SELECT id FROM body_measurements WHERE date = ?',
+    [date]
+  );
+
+  if (!existing) {
+    // Insert — only supply provided fields; missing ones default to NULL
+    await db.runAsync(
+      `INSERT INTO body_measurements (date, waist_cm, chest_cm, hips_cm, thigh_cm, arm_cm)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        date,
+        fields.waist_cm ?? null,
+        fields.chest_cm ?? null,
+        fields.hips_cm ?? null,
+        fields.thigh_cm ?? null,
+        fields.arm_cm ?? null,
+      ]
+    );
+    return;
+  }
+
+  // Update — only the explicitly provided (non-undefined) fields
+  const setClauses: string[] = [];
+  const values: (number | null)[] = [];
+
+  if (fields.waist_cm !== undefined) { setClauses.push('waist_cm = ?'); values.push(fields.waist_cm ?? null); }
+  if (fields.chest_cm !== undefined) { setClauses.push('chest_cm = ?'); values.push(fields.chest_cm ?? null); }
+  if (fields.hips_cm  !== undefined) { setClauses.push('hips_cm = ?');  values.push(fields.hips_cm  ?? null); }
+  if (fields.thigh_cm !== undefined) { setClauses.push('thigh_cm = ?'); values.push(fields.thigh_cm ?? null); }
+  if (fields.arm_cm   !== undefined) { setClauses.push('arm_cm = ?');   values.push(fields.arm_cm   ?? null); }
+
+  if (setClauses.length === 0) return; // Nothing to update
+
+  await db.runAsync(
+    `UPDATE body_measurements SET ${setClauses.join(', ')} WHERE id = ?`,
+    [...values, existing.id]
+  );
+}
+
+/**
+ * Return all body-measurement rows since `sinceDateKey` (inclusive), ordered
+ * ascending by date.  Returns all rows when `sinceDateKey` is omitted.
+ *
+ * @param sinceDateKey - Optional earliest date (YYYY-MM-DD) to include.
+ */
+export async function getBodyMeasurements(
+  sinceDateKey?: string
+): Promise<BodyMeasurement[]> {
+  const db = getDatabase();
+  let rows: BodyMeasurement[];
+  if (sinceDateKey) {
+    rows = await db.getAllAsync<BodyMeasurement>(
+      'SELECT * FROM body_measurements WHERE date >= ? ORDER BY date ASC',
+      [sinceDateKey]
+    );
+  } else {
+    rows = await db.getAllAsync<BodyMeasurement>(
+      'SELECT * FROM body_measurements ORDER BY date ASC'
+    );
+  }
+  return rows;
+}
+
+/**
+ * Return the single most-recent body-measurement row, or null when no
+ * measurements have been logged yet.
+ */
+export async function getLatestMeasurements(): Promise<BodyMeasurement | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<BodyMeasurement>(
+    'SELECT * FROM body_measurements ORDER BY date DESC LIMIT 1'
+  );
+  return row ?? null;
+}

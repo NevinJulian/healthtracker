@@ -48,6 +48,9 @@ import {
   getMostCookedRecipes,
   getInventorySnapshot,
   getNutritionGoals,
+  getWaterHistory,
+  getBodyMeasurements,
+  getHydrationGoal,
   type NutritionGoals,
   type DailyMacroTotals,
   type MealAdherenceSummary,
@@ -55,6 +58,7 @@ import {
   type AverageConsumedMacros,
   type CookedRecipeRow,
   type InventorySnapshot,
+  type BodyMeasurement,
 } from '../db/database';
 import { addDays as addDaysKey } from '../utils/dates';
 import { Card, ProgressBar, ScreenHeader, Pill } from '../components';
@@ -66,6 +70,11 @@ import {
   KG_PER_CYCLE,
   normaliseMacroSeries,
   macroChartDateLabel,
+  hydrationAverage,
+  hydrationGoalAdherence,
+  measurementDelta,
+  latestMeasurementValue,
+  type HydrationDay,
 } from './analyticsHelpers';
 import { NUTRITION_GOALS } from '../nutrition/goals';
 
@@ -598,6 +607,179 @@ function MacroTrendChart({
   );
 }
 
+// ─── Hydration summary card (#283) ───────────────────────────────────────────
+
+function HydrationSummaryCard({
+  days,
+  goalMl,
+}: {
+  days: HydrationDay[];
+  goalMl: number;
+}) {
+  const avg = hydrationAverage(days);
+  const adherence = hydrationGoalAdherence(days, goalMl);
+  const adherencePct = Math.round(adherence * 100);
+
+  return (
+    <>
+      <View style={styles.sectionDivider}>
+        <Text style={styles.sectionDividerText}>Hydration</Text>
+      </View>
+
+      <Card style={styles.sectionCard}>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardSectionTitle}>7-day hydration</Text>
+          <Text style={styles.cardSectionTrailing}>Last 7 days</Text>
+        </View>
+
+        {days.length === 0 ? (
+          <Text style={styles.emptyText}>No hydration data logged yet.</Text>
+        ) : (
+          <>
+            {/* Metric row */}
+            <View style={styles.hydAvgRow}>
+              <View style={styles.hydAvgCell}>
+                <Text style={styles.hydAvgValue}>{avg}</Text>
+                <Text style={styles.hydAvgUnit}>ml avg / day</Text>
+              </View>
+              <View style={styles.hydAvgCell}>
+                <Text style={[styles.hydAvgValue, { color: adherence >= 1 ? Colors.sageDeep : Colors.skyDeep }]}>
+                  {adherencePct}%
+                </Text>
+                <Text style={styles.hydAvgUnit}>days met goal</Text>
+              </View>
+              <View style={styles.hydAvgCell}>
+                <Text style={styles.hydAvgValue}>{goalMl}</Text>
+                <Text style={styles.hydAvgUnit}>ml goal</Text>
+              </View>
+            </View>
+
+            {/* Goal progress bar */}
+            <View style={styles.hydAdherenceRow}>
+              <Text style={styles.hydAdherenceLabel}>Goal adherence</Text>
+              <ProgressBar
+                progress={adherence}
+                height={7}
+                style={styles.hydAdherenceBar}
+              />
+              <Pill
+                label={`${adherencePct}%`}
+                accent={adherence >= 0.8 ? 'sage' : adherence >= 0.5 ? 'gold' : 'sky'}
+              />
+            </View>
+
+            {/* Per-day bar chart */}
+            <View style={styles.hydChartContainer}>
+              {days.map((d, i) => {
+                const ratio = goalMl > 0 ? Math.min(1, d.water_ml / goalMl) : 0;
+                const heightPct = Math.max(4, ratio * 100);
+                const isLast = i === days.length - 1;
+                return (
+                  <View key={d.date} style={styles.hydBarCol}>
+                    <View
+                      style={[
+                        styles.hydBar,
+                        {
+                          height: `${heightPct}%`,
+                          backgroundColor: isLast ? Colors.sky : Colors.sky + 'AA',
+                        },
+                      ]}
+                    />
+                    {(i === 0 || isLast) && (
+                      <Text style={styles.hydBarLabel}>
+                        {d.date.substring(8, 10)}/{d.date.substring(5, 7)}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
+      </Card>
+    </>
+  );
+}
+
+// ─── Body measurements trend card (#283) ──────────────────────────────────────
+
+function MeasurementsTrendCard({
+  measurements,
+}: {
+  measurements: BodyMeasurement[];
+}) {
+  const FIELDS: Array<{ key: keyof Omit<BodyMeasurement, 'id' | 'date'>; label: string }> = [
+    { key: 'waist_cm',  label: 'Waist'  },
+    { key: 'chest_cm',  label: 'Chest'  },
+    { key: 'hips_cm',   label: 'Hips'   },
+    { key: 'thigh_cm',  label: 'Thigh'  },
+    { key: 'arm_cm',    label: 'Arm'    },
+  ];
+
+  const hasData = measurements.length > 0;
+
+  return (
+    <>
+      <View style={styles.sectionDivider}>
+        <Text style={styles.sectionDividerText}>Body Measurements</Text>
+      </View>
+
+      <Card style={styles.sectionCard}>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardSectionTitle}>Measurement trends</Text>
+          {hasData && (
+            <Text style={styles.cardSectionTrailing}>
+              {measurements.length} {measurements.length === 1 ? 'entry' : 'entries'}
+            </Text>
+          )}
+        </View>
+
+        {!hasData ? (
+          <Text style={styles.emptyText}>
+            Log body measurements on the Today screen to track trends here.
+          </Text>
+        ) : (
+          <View style={styles.measureTrendGrid}>
+            {FIELDS.map(({ key, label }) => {
+              const latest = latestMeasurementValue(measurements, key);
+              const delta = measurementDelta(measurements, key);
+              if (latest === null) return null;
+              const deltaStr =
+                delta === null
+                  ? null
+                  : delta > 0
+                  ? `+${delta.toFixed(1)} cm`
+                  : `${delta.toFixed(1)} cm`;
+              const deltaAccent =
+                delta === null ? Colors.textMuted :
+                delta < 0 ? Colors.sageDeep : Colors.clayDeep;
+
+              return (
+                <View key={key} style={styles.measureTrendCell}>
+                  <Text style={styles.measureTrendLabel}>{label}</Text>
+                  <Text style={styles.measureTrendValue}>{latest.toFixed(1)}</Text>
+                  <Text style={styles.measureTrendUnit}>cm</Text>
+                  {deltaStr != null && (
+                    <Text style={[styles.measureTrendDelta, { color: deltaAccent }]}>
+                      {deltaStr}
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {hasData && measurements.length > 0 && (
+          <Text style={styles.measureLastDate}>
+            Latest: {measurements[measurements.length - 1].date}
+          </Text>
+        )}
+      </Card>
+    </>
+  );
+}
+
 // ─── Nutrition: Section card ──────────────────────────────────────────────────
 
 function NutritionSectionCard({
@@ -842,6 +1024,13 @@ export default function AnalyticsDashboardScreen() {
   const [workoutCount30, setWorkoutCount30] = useState(0);
   const [fastingStreak, setFastingStreak] = useState(0);
 
+  // ── Hydration analytics state (#283) ────────────────────────────────────────
+  const [hydrationDays, setHydrationDays] = useState<HydrationDay[]>([]);
+  const [hydrationGoalMl, setHydrationGoalMl] = useState(2000);
+
+  // ── Body measurements state (#283) ────────────────────────────────────────
+  const [bodyMeasurements, setBodyMeasurements] = useState<BodyMeasurement[]>([]);
+
   // ── Nutrition analytics state ────────────────────────────────────────────────
   const [nutritionGoals, setNutritionGoals] = useState<NutritionGoals>(NUTRITION_GOALS);
   const [consumedMacros, setConsumedMacros] = useState<DailyMacroTotals[]>([]);
@@ -959,16 +1148,30 @@ export default function AnalyticsDashboardScreen() {
       setConsistencyDots(dots);
 
       // ── Nutrition analytics (#267) ──────────────────────────────────────────
-      const [macrosByDay, adherence, topEaten, avgM, topCooked, invSnapshot, storedGoals] =
-        await Promise.all([
-          getConsumedMacrosByDay(30),
-          getMealAdherence(30),
-          getMostEatenRecipes(5),
-          getAverageConsumedMacros(),
-          getMostCookedRecipes(5),
-          getInventorySnapshot(),
-          getNutritionGoals(),
-        ]);
+      const since7Days = addDaysKey(todayStr, -6); // last 7 days inclusive
+      const [
+        macrosByDay,
+        adherence,
+        topEaten,
+        avgM,
+        topCooked,
+        invSnapshot,
+        storedGoals,
+        waterRows,
+        measurementRows,
+        hydGoal,
+      ] = await Promise.all([
+        getConsumedMacrosByDay(30),
+        getMealAdherence(30),
+        getMostEatenRecipes(5),
+        getAverageConsumedMacros(),
+        getMostCookedRecipes(5),
+        getInventorySnapshot(),
+        getNutritionGoals(),
+        getWaterHistory(since7Days),
+        getBodyMeasurements(),
+        getHydrationGoal(),
+      ]);
 
       setConsumedMacros(macrosByDay);
       setMealAdherence(adherence);
@@ -977,6 +1180,9 @@ export default function AnalyticsDashboardScreen() {
       setMostCookedRecipes(topCooked);
       setInventorySnapshot(invSnapshot);
       setNutritionGoals(storedGoals);
+      setHydrationDays(waterRows);
+      setBodyMeasurements(measurementRows);
+      setHydrationGoalMl(hydGoal);
     } catch (err) {
       console.error('Failed to load analytics', err);
     } finally {
@@ -1065,6 +1271,15 @@ export default function AnalyticsDashboardScreen() {
           inventory={inventorySnapshot}
           nutritionGoals={nutritionGoals}
         />
+
+        {/* Hydration summary (#283) */}
+        <HydrationSummaryCard
+          days={hydrationDays}
+          goalMl={hydrationGoalMl}
+        />
+
+        {/* Body measurements trend (#283) */}
+        <MeasurementsTrendCard measurements={bodyMeasurements} />
 
         <View style={{ height: Spacing.xl }} />
       </ScrollView>
@@ -1594,6 +1809,136 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     color: Colors.textMuted,
     fontStyle: 'italic',
+    marginTop: Spacing.xs,
+  },
+
+  // ── Hydration summary card (#283) ──────────────────────────────────────────
+  hydAvgRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  hydAvgCell: {
+    flex: 1,
+    backgroundColor: Colors.skyTint,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    alignItems: 'center',
+  },
+  hydAvgValue: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.skyDeep,
+    lineHeight: 18,
+  },
+  hydAvgUnit: {
+    fontFamily: Typography.label,
+    fontSize: 8,
+    fontWeight: Typography.weights.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  hydAdherenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  hydAdherenceLabel: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+    width: 90,
+  },
+  hydAdherenceBar: {
+    flex: 1,
+  },
+  hydChartContainer: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.skyTint,
+    borderRadius: Radius.sm,
+    padding: Spacing.xs,
+    overflow: 'hidden',
+  },
+  hydBarCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: '100%',
+    marginHorizontal: 1,
+  },
+  hydBar: {
+    width: '80%',
+    maxWidth: 10,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  hydBarLabel: {
+    position: 'absolute',
+    bottom: -14,
+    fontFamily: Typography.body,
+    fontSize: 8,
+    color: Colors.textMuted,
+  },
+
+  // ── Body measurements trend card (#283) ───────────────────────────────────
+  measureTrendGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  measureTrendCell: {
+    flex: 1,
+    minWidth: 56,
+    backgroundColor: Colors.clayTint,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    alignItems: 'center',
+  },
+  measureTrendLabel: {
+    fontFamily: Typography.label,
+    fontSize: 8,
+    fontWeight: Typography.weights.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    color: Colors.clayDeep,
+    marginBottom: 2,
+  },
+  measureTrendValue: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.textPrimary,
+    lineHeight: 18,
+  },
+  measureTrendUnit: {
+    fontFamily: Typography.label,
+    fontSize: 8,
+    fontWeight: Typography.weights.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
+  measureTrendDelta: {
+    fontFamily: Typography.title,
+    fontSize: 9,
+    marginTop: 2,
+  },
+  measureLastDate: {
+    fontFamily: Typography.body,
+    fontSize: 9,
+    color: Colors.textMuted,
+    textAlign: 'right',
     marginTop: Spacing.xs,
   },
 });

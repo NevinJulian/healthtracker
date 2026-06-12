@@ -46,6 +46,8 @@ import {
   setProfileActivityLevel,
   setProfileGoalType,
   getLatestBodyWeight,
+  getHydrationGoal,
+  setHydrationGoal,
   type Sex,
   type ActivityLevel,
   type GoalType,
@@ -86,6 +88,11 @@ const CALORIES_STEP = 50;
 const PROTEIN_MIN = 10;
 const PROTEIN_MAX = 500;
 const PROTEIN_STEP = 5;
+
+// Clamp bounds for hydration goal stepper
+const HYDRATION_MIN = 250;
+const HYDRATION_MAX = 6000;
+const HYDRATION_STEP = 250;
 
 // Day labels for the weekday chip selector (index = JS weekday 0–6)
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -202,6 +209,9 @@ export default function SettingsScreen() {
   const [goalCalories, setGoalCalories] = useState(1800);
   const [goalProtein, setGoalProtein] = useState(150);
 
+  // Hydration goal (#283)
+  const [hydrationGoalMl, setHydrationGoalMl] = useState(2000);
+
   // User profile state (#281)
   const [profile, setProfile] = useState<UserProfileData>({
     heightCm: null,
@@ -231,6 +241,7 @@ export default function SettingsScreen() {
           nutritionGoals,
           userProfile,
           weight,
+          hydrationGoal,
         ] = await Promise.all([
           getWorkoutReminderEnabled(),
           getWorkoutReminderTime(),
@@ -241,6 +252,7 @@ export default function SettingsScreen() {
           getNutritionGoals(),
           getUserProfile(),
           getLatestBodyWeight(),
+          getHydrationGoal(),
         ]);
         if (active) {
           setReminder((prev) => ({ ...prev, enabled: workoutEnabled, time: workoutTime, permissionDenied: false }));
@@ -254,6 +266,7 @@ export default function SettingsScreen() {
           }));
           setGoalCalories(nutritionGoals.calories);
           setGoalProtein(nutritionGoals.protein);
+          setHydrationGoalMl(hydrationGoal);
           setProfile(userProfile);
           setProfileHeightStr(userProfile.heightCm != null ? String(userProfile.heightCm) : '');
           setProfileAgeStr(userProfile.age != null ? String(userProfile.age) : '');
@@ -358,6 +371,14 @@ export default function SettingsScreen() {
     const newVal = Math.min(PROTEIN_MAX, Math.max(PROTEIN_MIN, goalProtein + delta));
     await setNutritionGoalProtein(newVal);
     setGoalProtein(newVal);
+  }
+
+  // ── Hydration goal: step handler (#283) ───────────────────────────────
+
+  async function adjustHydrationGoal(delta: number) {
+    const newVal = Math.min(HYDRATION_MAX, Math.max(HYDRATION_MIN, hydrationGoalMl + delta));
+    await setHydrationGoal(newVal);
+    setHydrationGoalMl(newVal);
   }
 
   // ── Profile: field save helpers (#281) ────────────────────────────────
@@ -790,6 +811,46 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </Card>
 
+      {/* ── Hydration goal section (#283) ────────────────────────────── */}
+      <Card style={styles.card}>
+        <View style={styles.sectionLabelRow}>
+          <Ionicons name="water-outline" size={16} color={Colors.skyDeep} />
+          <Text style={[styles.sectionLabel, styles.sectionLabelHydration]}>Hydration goal</Text>
+        </View>
+
+        <Text style={styles.nutritionSubtitle}>
+          Daily water intake target shown in the Today card
+        </Text>
+
+        <View style={styles.goalStepperRow}>
+          <View style={styles.goalStepperLabelBlock}>
+            <Text style={styles.goalStepperTitle}>Daily water goal</Text>
+            <Text style={styles.goalStepperUnit}>ml / day</Text>
+          </View>
+          <View style={styles.goalStepperControls}>
+            <TouchableOpacity
+              style={[styles.goalStepperBtn, styles.goalStepperBtnHydration]}
+              onPress={() => adjustHydrationGoal(-HYDRATION_STEP)}
+              accessibilityLabel="Decrease hydration goal"
+              accessibilityRole="button"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="remove-outline" size={18} color={Colors.skyDeep} />
+            </TouchableOpacity>
+            <Text style={styles.goalStepperValue}>{hydrationGoalMl}</Text>
+            <TouchableOpacity
+              style={[styles.goalStepperBtn, styles.goalStepperBtnHydration]}
+              onPress={() => adjustHydrationGoal(HYDRATION_STEP)}
+              accessibilityLabel="Increase hydration goal"
+              accessibilityRole="button"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add-outline" size={18} color={Colors.skyDeep} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Card>
+
       {/* ── Nutrition goals section (#274) ──────────────────────────── */}
       <Card style={styles.card}>
         <View style={styles.sectionLabelRow}>
@@ -1035,6 +1096,14 @@ const styles = StyleSheet.create({
   // Cooking section overrides
   sectionLabelCooking: {
     color: Colors.clayDeep,
+  },
+
+  // Hydration section overrides (#283)
+  sectionLabelHydration: {
+    color: Colors.skyDeep,
+  },
+  goalStepperBtnHydration: {
+    backgroundColor: Colors.skyTint,
   },
   sectionDivider: {
     height: 1,

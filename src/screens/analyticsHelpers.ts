@@ -303,3 +303,88 @@ export function rollingAverage(values: number[], window: number = 7): number[] {
     return slice.reduce((s, v) => s + v, 0) / slice.length;
   });
 }
+
+// ─────────────────────────────────────────────
+// Hydration helpers (#283)
+// ─────────────────────────────────────────────
+
+export interface HydrationDay {
+  date: string;
+  water_ml: number;
+}
+
+/**
+ * Compute the average daily water intake over the given array of daily rows.
+ * Returns 0 when the array is empty.
+ *
+ * @param days - Array of {date, water_ml} entries (any date range, any order).
+ */
+export function hydrationAverage(days: HydrationDay[]): number {
+  if (days.length === 0) return 0;
+  const total = days.reduce((sum, d) => sum + d.water_ml, 0);
+  return Math.round(total / days.length);
+}
+
+/**
+ * Compute how many days in the array reached or exceeded `goalMl`.
+ * Returns a 0–1 fraction (0 when the array is empty).
+ *
+ * @param days   - Array of {date, water_ml} entries.
+ * @param goalMl - Daily hydration goal in ml.
+ */
+export function hydrationGoalAdherence(days: HydrationDay[], goalMl: number): number {
+  if (days.length === 0 || goalMl <= 0) return 0;
+  const met = days.filter((d) => d.water_ml >= goalMl).length;
+  return met / days.length;
+}
+
+// ─────────────────────────────────────────────
+// Body-measurement helpers (#283)
+// ─────────────────────────────────────────────
+
+export interface MeasurementPoint {
+  waist_cm: number | null;
+  chest_cm: number | null;
+  hips_cm: number | null;
+  thigh_cm: number | null;
+  arm_cm: number | null;
+}
+
+export type MeasurementField = keyof MeasurementPoint;
+
+/**
+ * Given an ordered array of measurement records (oldest → newest), compute
+ * the change in a specific field from the first non-null value to the last
+ * non-null value.
+ *
+ * Returns null when fewer than two non-null values exist for that field.
+ *
+ * @param records - Array of MeasurementPoint objects, oldest first.
+ * @param field   - Which measurement to compute the delta for.
+ */
+export function measurementDelta(
+  records: MeasurementPoint[],
+  field: MeasurementField
+): number | null {
+  const values = records.map((r) => r[field]).filter((v): v is number => v !== null);
+  if (values.length < 2) return null;
+  return values[values.length - 1] - values[0];
+}
+
+/**
+ * Return the latest non-null value for `field` across the records array,
+ * or null when no records contain a value for that field.
+ *
+ * @param records - Array of MeasurementPoint objects, oldest first.
+ * @param field   - Which field to extract.
+ */
+export function latestMeasurementValue(
+  records: MeasurementPoint[],
+  field: MeasurementField
+): number | null {
+  for (let i = records.length - 1; i >= 0; i--) {
+    const v = records[i][field];
+    if (v !== null) return v;
+  }
+  return null;
+}
