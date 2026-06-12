@@ -388,3 +388,130 @@ export function latestMeasurementValue(
   }
   return null;
 }
+
+// ─────────────────────────────────────────────
+// Workout set / PR helpers (#285)
+// ─────────────────────────────────────────────
+
+export interface WorkoutSetSlice {
+  id: number;
+  date: string;
+  exercise: string;
+  reps: number;
+  weight_kg: number;
+}
+
+export interface PRRecord {
+  /** Best (heaviest) single weight logged, with the date it was achieved. */
+  bestWeight: { value: number; date: string } | null;
+  /** Best estimated 1-rep max (Epley), with the date it was achieved. */
+  best1RM: { value: number; date: string } | null;
+  /** Best single-set volume (weight × reps), with the date it was achieved. */
+  bestVolume: { value: number; date: string } | null;
+}
+
+/**
+ * Epley estimated 1-rep max.
+ *
+ * Formula: weight * (1 + reps / 30)
+ * For reps === 1 the formula reduces to `weight * (1 + 1/30)` which is slightly
+ * above the actual weight — we special-case it to return `weight` exactly so
+ * that a single-rep max is always equal to the actual load lifted.
+ *
+ * @param weightKg - Weight used for the set in kg.
+ * @param reps     - Repetitions performed (must be >= 1).
+ */
+export function estimated1RM(weightKg: number, reps: number): number {
+  if (reps <= 1) return weightKg;
+  return weightKg * (1 + reps / 30);
+}
+
+/**
+ * Compute personal records from a chronological history of logged sets for a
+ * single exercise.
+ *
+ * Returns null for each PR category when the history is empty.
+ * When multiple sets tie for the best value, the earliest occurrence is used
+ * (first-achieved wins).
+ *
+ * @param history - Array of WorkoutSetSlice objects, ordered chronologically
+ *                  (oldest first — as returned by getWorkoutHistory()).
+ */
+export function computePRs(history: WorkoutSetSlice[]): PRRecord {
+  if (history.length === 0) {
+    return { bestWeight: null, best1RM: null, bestVolume: null };
+  }
+
+  let bestWeight: { value: number; date: string } | null = null;
+  let best1RM: { value: number; date: string } | null = null;
+  let bestVolume: { value: number; date: string } | null = null;
+
+  for (const set of history) {
+    const orm = estimated1RM(set.weight_kg, set.reps);
+    const volume = set.weight_kg * set.reps;
+
+    // Best weight — strictly greater (first-achieved wins on tie)
+    if (bestWeight === null || set.weight_kg > bestWeight.value) {
+      bestWeight = { value: set.weight_kg, date: set.date };
+    }
+
+    // Best 1RM — strictly greater (first-achieved wins on tie)
+    if (best1RM === null || orm > best1RM.value) {
+      best1RM = { value: orm, date: set.date };
+    }
+
+    // Best volume — strictly greater (first-achieved wins on tie)
+    if (bestVolume === null || volume > bestVolume.value) {
+      bestVolume = { value: volume, date: set.date };
+    }
+  }
+
+  return { bestWeight, best1RM, bestVolume };
+}
+
+/**
+ * Collapse a set history into one "best set per calendar day" for charting.
+ *
+ * "Best" = highest weight_kg on that day; on ties, highest reps breaks the tie;
+ * if still tied, the first occurrence is returned (stable order).
+ *
+ * @param history - Array of WorkoutSetSlice objects for a single exercise,
+ *                  ordered chronologically (as from getWorkoutHistory()).
+ * @returns One entry per distinct date, sorted ascending by date.
+ */
+export function bestSetPerDay(
+  history: WorkoutSetSlice[]
+): { date: string; weight_kg: number; reps: number; estimated1RM: number }[] {
+  const byDate = new Map<
+    string,
+    { date: string; weight_kg: number; reps: number; estimated1RM: number }
+  >();
+
+  for (const set of history) {
+    const existing = byDate.get(set.date);
+    const orm = estimated1RM(set.weight_kg, set.reps);
+
+    if (!existing) {
+      byDate.set(set.date, {
+        date: set.date,
+        weight_kg: set.weight_kg,
+        reps: set.reps,
+        estimated1RM: orm,
+      });
+    } else if (
+      set.weight_kg > existing.weight_kg ||
+      (set.weight_kg === existing.weight_kg && set.reps > existing.reps)
+    ) {
+      byDate.set(set.date, {
+        date: set.date,
+        weight_kg: set.weight_kg,
+        reps: set.reps,
+        estimated1RM: orm,
+      });
+    }
+  }
+
+  return Array.from(byDate.values()).sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : 0
+  );
+}
