@@ -4,7 +4,7 @@ This folder manages static objects, arrays, and seed data logic intended to popu
 
 ## Contents
 
-- `recipes.ts` - Master lists of all base macro-friendly recipes. This static structure is consumed heavily during database seeding (creating initial state in `expo-sqlite`).
+- `recipes.ts` - Master list of all base macro-friendly recipes. This static structure is consumed by `seedRecipeLibrary()` in `database.ts` during database initialisation, which inserts records into the `recipe_library` SQLite table.
 
 ## Rules
 - Avoid importing database mutations directly here.
