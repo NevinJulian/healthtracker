@@ -36,6 +36,10 @@ import {
   setWeeklyCookDay,
   getWeeklyCookDayTime,
   setWeeklyCookDayTime,
+  getMealReminderEnabled,
+  getMealReminderTime,
+  setMealReminderEnabled,
+  setMealReminderTime,
   getNutritionGoals,
   setNutritionGoalCalories,
   setNutritionGoalProtein,
@@ -48,6 +52,7 @@ import {
   getLatestBodyWeight,
   getHydrationGoal,
   setHydrationGoal,
+  type MealType,
   type Sex,
   type ActivityLevel,
   type GoalType,
@@ -57,6 +62,8 @@ import { suggestGoals } from '../nutrition/tdee';
 import {
   ensurePermissions,
   reconcileScheduledNotifications,
+  scheduleMealReminder,
+  cancelMealReminder,
   formatTimeString,
   parseTimeString,
 } from '../services/notifications';
@@ -80,6 +87,39 @@ interface CookingReminderState {
   weeklyCookDayTime: string;   // "HH:MM"
   permissionDenied: boolean;
 }
+
+interface MealReminderRow {
+  enabled: boolean;
+  time: string;
+}
+
+interface MealReminderState {
+  breakfast: MealReminderRow;
+  lunch: MealReminderRow;
+  dinner: MealReminderRow;
+  permissionDenied: boolean;
+}
+
+const DEFAULT_MEAL_REMINDER_STATE: MealReminderState = {
+  breakfast: { enabled: false, time: '08:00' },
+  lunch:     { enabled: false, time: '12:30' },
+  dinner:    { enabled: false, time: '18:30' },
+  permissionDenied: false,
+};
+
+// ─── Meal reminder config ─────────────────────────────────────────────────────
+
+interface MealConfig {
+  meal: MealType;
+  label: string;
+  icon: 'cafe-outline' | 'restaurant-outline' | 'moon-outline';
+}
+
+const MEAL_CONFIGS: MealConfig[] = [
+  { meal: 'breakfast', label: 'Breakfast', icon: 'cafe-outline' },
+  { meal: 'lunch',     label: 'Lunch',     icon: 'restaurant-outline' },
+  { meal: 'dinner',    label: 'Dinner',    icon: 'moon-outline' },
+];
 
 // Clamp bounds for nutrition goal steppers
 const CALORIES_MIN = 500;
@@ -202,6 +242,9 @@ export default function SettingsScreen() {
     permissionDenied: false,
   });
 
+  // Meal-time reminders (#287)
+  const [mealReminders, setMealReminders] = useState<MealReminderState>(DEFAULT_MEAL_REMINDER_STATE);
+
   // Backup state
   const [backupBusy, setBackupBusy] = useState(false);
 
@@ -242,6 +285,12 @@ export default function SettingsScreen() {
           userProfile,
           weight,
           hydrationGoal,
+          breakfastEnabled,
+          breakfastTime,
+          lunchEnabled,
+          lunchTime,
+          dinnerEnabled,
+          dinnerTime,
         ] = await Promise.all([
           getWorkoutReminderEnabled(),
           getWorkoutReminderTime(),
@@ -253,6 +302,12 @@ export default function SettingsScreen() {
           getUserProfile(),
           getLatestBodyWeight(),
           getHydrationGoal(),
+          getMealReminderEnabled('breakfast'),
+          getMealReminderTime('breakfast'),
+          getMealReminderEnabled('lunch'),
+          getMealReminderTime('lunch'),
+          getMealReminderEnabled('dinner'),
+          getMealReminderTime('dinner'),
         ]);
         if (active) {
           setReminder((prev) => ({ ...prev, enabled: workoutEnabled, time: workoutTime, permissionDenied: false }));
@@ -262,6 +317,13 @@ export default function SettingsScreen() {
             weeklyCookDayEnabled,
             weeklyCookDay,
             weeklyCookDayTime,
+            permissionDenied: false,
+          }));
+          setMealReminders((prev) => ({
+            ...prev,
+            breakfast: { enabled: breakfastEnabled, time: breakfastTime },
+            lunch:     { enabled: lunchEnabled,     time: lunchTime },
+            dinner:    { enabled: dinnerEnabled,     time: dinnerTime },
             permissionDenied: false,
           }));
           setGoalCalories(nutritionGoals.calories);
@@ -356,6 +418,48 @@ export default function SettingsScreen() {
     setCooking((prev) => ({ ...prev, weeklyCookDayTime: newTime }));
     if (cooking.weeklyCookDayEnabled) {
       await reconcileScheduledNotifications();
+    }
+  }
+
+  // ── Meal reminders: toggle (#287) ─────────────────────────────────────
+
+  async function handleMealReminderToggle(meal: MealType, value: boolean) {
+    if (value) {
+      const granted = await ensurePermissions();
+      if (!granted) {
+        setMealReminders((prev) => ({ ...prev, permissionDenied: true }));
+        return;
+      }
+    }
+    await setMealReminderEnabled(meal, value);
+    setMealReminders((prev) => ({
+      ...prev,
+      [meal]: { ...prev[meal], enabled: value },
+      permissionDenied: false,
+    }));
+    const time = mealReminders[meal].time;
+    const { hour, minute } = parseTimeString(time);
+    if (value) {
+      await scheduleMealReminder(meal, hour, minute);
+    } else {
+      await cancelMealReminder(meal);
+    }
+  }
+
+  // ── Meal reminders: time adjustments (#287) ────────────────────────────
+
+  async function adjustMealTime(meal: MealType, hourDelta: number, minuteDelta: number) {
+    const { hour, minute } = parseTimeString(mealReminders[meal].time);
+    const newHour = stepHour(hour, hourDelta);
+    const newMinute = stepMinute(minute, minuteDelta);
+    const newTime = formatTimeString(newHour, newMinute);
+    await setMealReminderTime(meal, newTime);
+    setMealReminders((prev) => ({
+      ...prev,
+      [meal]: { ...prev[meal], time: newTime },
+    }));
+    if (mealReminders[meal].enabled) {
+      await scheduleMealReminder(meal, newHour, newMinute);
     }
   }
 
@@ -679,6 +783,79 @@ export default function SettingsScreen() {
             </Text>
           </View>
         )}
+      </Card>
+
+      {/* ── Meal reminders section (#287) ───────────────────────────── */}
+      <Card style={styles.card}>
+        <View style={styles.sectionLabelRow}>
+          <Ionicons name="nutrition-outline" size={16} color={Colors.clayDeep} />
+          <Text style={[styles.sectionLabel, styles.sectionLabelCooking]}>Meal reminders</Text>
+        </View>
+
+        {/* Permission denied notice */}
+        {mealReminders.permissionDenied && (
+          <View style={styles.noticeRow}>
+            <Ionicons name="information-circle-outline" size={16} color={Colors.clayDeep} />
+            <Text style={styles.noticeText}>
+              Enable notifications in your device settings to receive reminders.
+            </Text>
+          </View>
+        )}
+
+        {MEAL_CONFIGS.map((cfg, idx) => {
+          const row = mealReminders[cfg.meal];
+          const { hour: mealHour, minute: mealMinute } = parseTimeString(row.time);
+          return (
+            <View key={cfg.meal}>
+              {idx > 0 && <View style={styles.sectionDivider} />}
+
+              {/* Toggle row */}
+              <View style={styles.toggleRow}>
+                <Ionicons name={cfg.icon} size={18} color={Colors.clayDeep} style={styles.mealIcon} />
+                <View style={styles.toggleTextBlock}>
+                  <Text style={styles.toggleTitle}>{cfg.label}</Text>
+                  <Text style={styles.toggleSubtitle}>
+                    Daily reminder at {formatTimeString(mealHour, mealMinute)}
+                  </Text>
+                </View>
+                <Switch
+                  value={row.enabled}
+                  onValueChange={(v) => handleMealReminderToggle(cfg.meal, v)}
+                  trackColor={{ false: Colors.canvasSunken, true: Colors.clay }}
+                  thumbColor={row.enabled ? Colors.surface : Colors.textMuted}
+                  ios_backgroundColor={Colors.canvasSunken}
+                  accessibilityLabel={`Enable ${cfg.label} reminder`}
+                />
+              </View>
+
+              {/* Time chooser (visible only when enabled) */}
+              {row.enabled && (
+                <View style={styles.timePicker}>
+                  <View style={styles.timePickerDivider} />
+                  <Text style={styles.timePickerHeading}>{cfg.label} time</Text>
+                  <View style={styles.timeStepperRow}>
+                    <TimeStepper
+                      label="Hour"
+                      value={String(mealHour).padStart(2, '0')}
+                      onDecrement={() => adjustMealTime(cfg.meal, -1, 0)}
+                      onIncrement={() => adjustMealTime(cfg.meal, 1, 0)}
+                    />
+                    <Text style={styles.timeSeparator}>:</Text>
+                    <TimeStepper
+                      label="Minute"
+                      value={String(mealMinute).padStart(2, '0')}
+                      onDecrement={() => adjustMealTime(cfg.meal, 0, -1)}
+                      onIncrement={() => adjustMealTime(cfg.meal, 0, 1)}
+                    />
+                  </View>
+                  <Text style={styles.timePreview}>
+                    Reminder set for {formatTimeString(mealHour, mealMinute)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          );
+        })}
       </Card>
 
       {/* ── Your profile section (#281) ─────────────────────────────── */}
@@ -1013,6 +1190,11 @@ const styles = StyleSheet.create({
     color: Colors.sageDeep,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
+  },
+
+  // Meal reminder icon (sits left of the toggle text block)
+  mealIcon: {
+    marginRight: Spacing.xs,
   },
 
   // Toggle row
