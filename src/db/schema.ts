@@ -596,4 +596,19 @@ export const MIGRATIONS: Migration[] = [
     arm_cm    REAL
   );
 ` },
+  // v33: Workout set log — records actual sets performed for each exercise.
+  // Additive "actuals" layer alongside the plan; does not touch exercises JSON,
+  // rolling schedule, or the 21-day auto-progression engine. One row per logged set.
+  // date is YYYY-MM-DD (local calendar via src/utils/dates.ts helpers).
+  { version: 33, sql: `
+  CREATE TABLE IF NOT EXISTS workout_set_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    date       TEXT    NOT NULL,
+    exercise   TEXT    NOT NULL,
+    set_index  INTEGER NOT NULL,
+    reps       INTEGER NOT NULL,
+    weight_kg  REAL    NOT NULL,
+    created_at TEXT    NOT NULL
+  );
+` },
 ];
