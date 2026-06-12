@@ -21,6 +21,10 @@ import * as SQLite from 'expo-sqlite';
 import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
 import { recipes } from '../data/recipes';
+import { NUTRITION_GOALS, NutritionGoals } from '../nutrition/goals';
+
+// Re-export NutritionGoals so screens only need to import from database.ts
+export type { NutritionGoals };
 
 export interface RecipeIngredient {
   name: string;
@@ -1590,4 +1594,45 @@ export async function setCookEmptyNotified(notified: boolean): Promise<void> {
  */
 export async function resetCookEmptyNotified(): Promise<void> {
   await setCookEmptyNotified(false);
+}
+
+// ── Nutrition goal settings (#274) ────────────────────────────────────────────
+
+const SETTING_NUTRITION_GOAL_CALORIES = 'nutritionGoalCalories';
+const SETTING_NUTRITION_GOAL_PROTEIN = 'nutritionGoalProtein';
+
+/**
+ * Read the user's stored nutrition goals from app_state, falling back to
+ * NUTRITION_GOALS defaults for any value that has not been persisted yet.
+ *
+ * Callers (AnalyticsDashboardScreen, SettingsScreen) should call this in
+ * their useFocusEffect / loadData to pick up changes made in Settings.
+ */
+export async function getNutritionGoals(): Promise<NutritionGoals> {
+  const [calRaw, protRaw] = await Promise.all([
+    getSetting(SETTING_NUTRITION_GOAL_CALORIES),
+    getSetting(SETTING_NUTRITION_GOAL_PROTEIN),
+  ]);
+
+  const calories =
+    calRaw !== null && !isNaN(Number(calRaw))
+      ? Number(calRaw)
+      : NUTRITION_GOALS.calories;
+
+  const protein =
+    protRaw !== null && !isNaN(Number(protRaw))
+      ? Number(protRaw)
+      : NUTRITION_GOALS.protein;
+
+  return { calories, protein };
+}
+
+/** Persist the user's daily calorie goal (kcal). */
+export async function setNutritionGoalCalories(kcal: number): Promise<void> {
+  await setSetting(SETTING_NUTRITION_GOAL_CALORIES, String(kcal));
+}
+
+/** Persist the user's daily protein goal (grams). */
+export async function setNutritionGoalProtein(g: number): Promise<void> {
+  await setSetting(SETTING_NUTRITION_GOAL_PROTEIN, String(g));
 }
