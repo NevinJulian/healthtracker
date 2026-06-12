@@ -56,6 +56,7 @@ import {
   type CookedRecipeRow,
   type InventorySnapshot,
 } from '../db/database';
+import { addDays as addDaysKey } from '../utils/dates';
 import { Card, ProgressBar, ScreenHeader, Pill } from '../components';
 import {
   computeStreaks,
@@ -244,9 +245,7 @@ function StrengthProgressionCard({
 }: StrengthProgressionCardProps) {
   // Compute the 90-day window (or since start, whichever is shorter)
   const windowStart = (() => {
-    const d = new Date(todayISO);
-    d.setDate(d.getDate() - 89);
-    const cutoff = toISODate(d);
+    const cutoff = addDaysKey(todayISO, -89);
     return cutoff > startDateISO ? cutoff : startDateISO;
   })();
 
@@ -874,17 +873,13 @@ export default function AnalyticsDashboardScreen() {
       const weightData90 = await getWeightHistory(90);
       const startDate = await getStartDate();
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStr = toISODate(today);
+      const todayStr = toISODate();
 
       setStartDateISO(startDate);
       setTodayISO(todayStr);
 
       const computeStats = (days: number): RollingStats => {
-        const cutoff = new Date(today);
-        cutoff.setDate(cutoff.getDate() - days);
-        const cutoffIso = toISODate(cutoff);
+        const cutoffIso = addDaysKey(todayStr, -days);
 
         const relevant = logs.filter(
           (l) => l.date >= cutoffIso && l.date <= todayStr
@@ -949,9 +944,7 @@ export default function AnalyticsDashboardScreen() {
       // ── Consistency dots (last 30 days) ────────────────────────────────────
       const dots: DotState[] = [];
       for (let i = 29; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const iso = toISODate(d);
+        const iso = addDaysKey(todayStr, -i);
         const log = logs.find((l) => l.date === iso);
         if (!log) {
           dots.push('missed');

@@ -26,6 +26,7 @@ import {
   resetCookEmptyNotified,
 } from '../db/database';
 import { checkAndNotifyEmptyInventory } from '../services/notifications';
+import { addDays as addDaysKey } from '../utils/dates';
 import {
   Card,
   Row,
@@ -39,12 +40,6 @@ import { iconChipIconColor } from '../components/IconChip';
 // ─── Helpers ──────────────────────────────────────────────────
 
 const logDbError = (err: any) => console.error('[MealPrepScreen] DB Error:', err);
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
 
 // ─── Verdure circle checkbox (24px, sage when done) ───────────
 
@@ -231,9 +226,8 @@ export default function MealPrepScreen() {
   // ─── Weekly Tab ───────────────────────────────────────────────
 
   const renderWeeklyTab = () => {
-    const today = new Date();
-    const todayStr = toISODate(today);
-    const days = Array.from({ length: 7 }).map((_, i) => addDays(today, i));
+    const todayStr = toISODate();
+    const dateKeys = Array.from({ length: 7 }).map((_, i) => addDaysKey(todayStr, i));
 
     return (
       <ScrollView
@@ -241,9 +235,12 @@ export default function MealPrepScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {days.map((dateObj) => {
-          const dateStr = toISODate(dateObj);
+        {dateKeys.map((dateStr) => {
           const isToday = dateStr === todayStr;
+          // Derive a Date object for display-only formatting (weekday/day number)
+          // Using Date(y,m,d) constructor ensures local midnight interpretation
+          const [y, mo, dy] = dateStr.split('-').map(Number);
+          const dateObj = new Date(y, mo - 1, dy);
 
           const lunchPlan = weeklyPlan.find(p => p.date === dateStr && p.meal_type === 'Lunch');
           const dinnerPlan = weeklyPlan.find(p => p.date === dateStr && p.meal_type === 'Dinner');

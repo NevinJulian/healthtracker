@@ -30,6 +30,7 @@ import {
   dumpTable,
   restoreFromPayload,
 } from '../db/database';
+import { localDateKey } from '../utils/dates';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -126,13 +127,8 @@ function getAppVersion(): string {
 }
 
 // ─── ISO date helper ─────────────────────────────────────────────────────────
-
-function isoDateString(date: Date = new Date()): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
+// Delegated to the canonical utility (issue #279).
+const isoDateString = localDateKey;
 
 // ─── Export (backup) ─────────────────────────────────────────────────────────
 

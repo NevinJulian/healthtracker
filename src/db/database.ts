@@ -22,6 +22,12 @@ import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
 import { recipes } from '../data/recipes';
 import { NUTRITION_GOALS, NutritionGoals } from '../nutrition/goals';
+import {
+  localDateKey,
+  addDays as _addDaysKey,
+  daysBetween as _daysBetweenKey,
+  localMidnightToday,
+} from '../utils/dates';
 
 // Re-export NutritionGoals so screens only need to import from database.ts
 export type { NutritionGoals };
@@ -145,25 +151,17 @@ export interface DailyLogEntry {
 // Helpers
 // ─────────────────────────────────────────────
 
+/**
+ * Return a YYYY-MM-DD string for `date` using LOCAL calendar getters.
+ * Re-exported from src/utils/dates so that screens importing toISODate from
+ * database.ts continue to work without changes.
+ *
+ * Issue #279: previously this was defined inline here using local getters,
+ * which was already correct.  Now delegated to the canonical utility so there
+ * is exactly one implementation.
+ */
 export function toISODate(date: Date = new Date()): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-function daysBetween(isoA: string, isoB: string): number {
-  const a = new Date(isoA);
-  const b = new Date(isoB);
-  a.setHours(0, 0, 0, 0);
-  b.setHours(0, 0, 0, 0);
-  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+  return localDateKey(date);
 }
 
 function buildHammerTask(base: string, isRestDay: boolean, daysDiff: number): string {
@@ -338,10 +336,8 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
     templateMap.set(row.day_of_week, row);
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const cutoffDate = addDays(today, -DAYS_HISTORY);
-  const cutoffISO = toISODate(cutoffDate);
+  const todayISO = toISODate();
+  const cutoffISO = _addDaysKey(todayISO, -DAYS_HISTORY);
 
   // Pre-fetch existing rows with their exercises OUTSIDE the transaction (#37)
   const existingRows = await db.getAllAsync<{ date: string; exercises: string }>(
@@ -358,8 +354,10 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   const backfills: BackfillParams[] = [];
 
   for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
-    const targetDate = addDays(today, offset);
-    const targetISO = toISODate(targetDate);
+    const targetISO = _addDaysKey(todayISO, offset);
+    // Derive day-of-week from the local-midnight Date for this key
+    const targetDate = localMidnightToday();
+    targetDate.setDate(targetDate.getDate() + offset);
     const dow = targetDate.getDay();
     const template = templateMap.get(dow);
     if (!template) continue;
@@ -379,7 +377,7 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
       continue;
     }
 
-    const daysDiff = daysBetween(startDateISO, targetISO);
+    const daysDiff = _daysBetweenKey(startDateISO, targetISO);
     const hammerWithWeight = buildHammerTask(
       template.hammer_task,
       template.is_rest_day === 1,
@@ -565,12 +563,11 @@ export async function upsertAdditionalWorkouts(
 
 export async function getWeightHistory(days: number): Promise<{ date: string; weight: number }[]> {
   const db = getDatabase();
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - days);
+  const cutoffISO = _addDaysKey(toISODate(), -days);
 
   const rows = await db.getAllAsync<{ date: string; body_weight: number }>(
     'SELECT date, body_weight FROM daily_log WHERE date >= ? AND body_weight IS NOT NULL ORDER BY date ASC',
-    [toISODate(cutoffDate)]
+    [cutoffISO]
   );
 
   return rows.map((r) => ({ date: r.date, weight: r.body_weight }));
@@ -654,7 +651,7 @@ export async function getStartDate(): Promise<string> {
 
 export async function getCycleForDate(dateISO: string): Promise<number> {
   const startISO = await getStartDate();
-  const diff = daysBetween(startISO, dateISO);
+  const diff = _daysBetweenKey(startISO, dateISO);
   return Math.max(0, Math.floor(diff / CYCLE_DAYS));
 }
 
@@ -1231,9 +1228,7 @@ export interface DailyMacroTotals {
  */
 export async function getConsumedMacrosByDay(days: number = 30): Promise<DailyMacroTotals[]> {
   const db = getDatabase();
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const cutoffISO = toISODate(cutoff);
+  const cutoffISO = _addDaysKey(toISODate(), -days);
 
   const rows = await db.getAllAsync<{
     date: string;
@@ -1286,9 +1281,7 @@ export interface MealAdherenceSummary {
  */
 export async function getMealAdherence(days: number = 30): Promise<MealAdherenceSummary> {
   const db = getDatabase();
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const cutoffISO = toISODate(cutoff);
+  const cutoffISO = _addDaysKey(toISODate(), -days);
 
   const row = await db.getFirstAsync<{ planned: number; consumed: number }>(
     `SELECT
