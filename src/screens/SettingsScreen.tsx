@@ -9,7 +9,7 @@
  * Screen adds no top padding — the nav header owns it.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,7 +39,19 @@ import {
   getNutritionGoals,
   setNutritionGoalCalories,
   setNutritionGoalProtein,
+  getUserProfile,
+  setProfileHeightCm,
+  setProfileAge,
+  setProfileSex,
+  setProfileActivityLevel,
+  setProfileGoalType,
+  getLatestBodyWeight,
+  type Sex,
+  type ActivityLevel,
+  type GoalType,
+  type UserProfileData,
 } from '../db/database';
+import { suggestGoals } from '../nutrition/tdee';
 import {
   ensurePermissions,
   reconcileScheduledNotifications,
@@ -188,6 +202,20 @@ export default function SettingsScreen() {
   const [goalCalories, setGoalCalories] = useState(1800);
   const [goalProtein, setGoalProtein] = useState(150);
 
+  // User profile state (#281)
+  const [profile, setProfile] = useState<UserProfileData>({
+    heightCm: null,
+    age: null,
+    sex: null,
+    activityLevel: null,
+    goalType: null,
+  });
+  // Editable text fields for the profile (strings so TextInput is controlled)
+  const [profileHeightStr, setProfileHeightStr] = useState('');
+  const [profileAgeStr, setProfileAgeStr] = useState('');
+  const [latestWeight, setLatestWeight] = useState<number | null>(null);
+  const [recalcBusy, setRecalcBusy] = useState(false);
+
   // Load persisted settings on focus (same pattern as other screens using useFocusEffect)
   useFocusEffect(
     useCallback(() => {
@@ -201,6 +229,8 @@ export default function SettingsScreen() {
           weeklyCookDay,
           weeklyCookDayTime,
           nutritionGoals,
+          userProfile,
+          weight,
         ] = await Promise.all([
           getWorkoutReminderEnabled(),
           getWorkoutReminderTime(),
@@ -209,6 +239,8 @@ export default function SettingsScreen() {
           getWeeklyCookDay(),
           getWeeklyCookDayTime(),
           getNutritionGoals(),
+          getUserProfile(),
+          getLatestBodyWeight(),
         ]);
         if (active) {
           setReminder((prev) => ({ ...prev, enabled: workoutEnabled, time: workoutTime, permissionDenied: false }));
@@ -222,6 +254,10 @@ export default function SettingsScreen() {
           }));
           setGoalCalories(nutritionGoals.calories);
           setGoalProtein(nutritionGoals.protein);
+          setProfile(userProfile);
+          setProfileHeightStr(userProfile.heightCm != null ? String(userProfile.heightCm) : '');
+          setProfileAgeStr(userProfile.age != null ? String(userProfile.age) : '');
+          setLatestWeight(weight);
         }
       })();
       return () => { active = false; };
@@ -322,6 +358,70 @@ export default function SettingsScreen() {
     const newVal = Math.min(PROTEIN_MAX, Math.max(PROTEIN_MIN, goalProtein + delta));
     await setNutritionGoalProtein(newVal);
     setGoalProtein(newVal);
+  }
+
+  // ── Profile: field save helpers (#281) ────────────────────────────────
+
+  async function handleProfileHeightBlur() {
+    const val = parseFloat(profileHeightStr);
+    if (Number.isFinite(val) && val > 0) {
+      await setProfileHeightCm(val);
+      setProfile((prev) => ({ ...prev, heightCm: val }));
+    }
+  }
+
+  async function handleProfileAgeBlur() {
+    const val = parseFloat(profileAgeStr);
+    if (Number.isFinite(val) && val > 0) {
+      await setProfileAge(val);
+      setProfile((prev) => ({ ...prev, age: val }));
+    }
+  }
+
+  async function handleProfileSex(sex: Sex) {
+    await setProfileSex(sex);
+    setProfile((prev) => ({ ...prev, sex }));
+  }
+
+  async function handleProfileActivity(level: ActivityLevel) {
+    await setProfileActivityLevel(level);
+    setProfile((prev) => ({ ...prev, activityLevel: level }));
+  }
+
+  async function handleProfileGoal(goal: GoalType) {
+    await setProfileGoalType(goal);
+    setProfile((prev) => ({ ...prev, goalType: goal }));
+  }
+
+  // ── Profile: recalculate goals ────────────────────────────────────────
+
+  async function handleRecalcGoals() {
+    const { heightCm, age, sex, activityLevel, goalType } = profile;
+    if (
+      heightCm == null || age == null || sex == null ||
+      activityLevel == null || goalType == null
+    ) {
+      Alert.alert(
+        'Profile incomplete',
+        'Please fill in all profile fields (sex, height, age, activity level and goal) before recalculating.'
+      );
+      return;
+    }
+    const weightKg = latestWeight ?? 80; // fallback if no weight logged
+    const goals = suggestGoals({ sex, age, heightCm, activityLevel, goalType }, weightKg);
+    setRecalcBusy(true);
+    try {
+      await setNutritionGoalCalories(goals.calories);
+      await setNutritionGoalProtein(goals.protein);
+      setGoalCalories(goals.calories);
+      setGoalProtein(goals.protein);
+      Alert.alert(
+        'Goals updated',
+        `Daily goals set to ${goals.calories} kcal and ${goals.protein} g protein.`
+      );
+    } finally {
+      setRecalcBusy(false);
+    }
   }
 
   // ── Backup: export ──────────────────────────────────────────────────────
@@ -558,6 +658,136 @@ export default function SettingsScreen() {
             </Text>
           </View>
         )}
+      </Card>
+
+      {/* ── Your profile section (#281) ─────────────────────────────── */}
+      <Card style={styles.card}>
+        <View style={styles.sectionLabelRow}>
+          <Ionicons name="person-outline" size={16} color={Colors.sageDeep} />
+          <Text style={styles.sectionLabel}>Your profile</Text>
+        </View>
+
+        <Text style={styles.nutritionSubtitle}>
+          Used to compute personalized calorie and protein goals.
+        </Text>
+
+        {/* Sex chips */}
+        <Text style={styles.profileFieldLabel}>Biological sex</Text>
+        <View style={styles.profileChipRow}>
+          {(['male', 'female'] as Sex[]).map((s) => (
+            <TouchableOpacity
+              key={s}
+              style={[styles.profileChip, profile.sex === s && styles.profileChipSelected]}
+              onPress={() => handleProfileSex(s)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={s === 'male' ? 'Male' : 'Female'}
+            >
+              <Text style={[styles.profileChipLabel, profile.sex === s && styles.profileChipLabelSelected]}>
+                {s === 'male' ? 'Male' : 'Female'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Height */}
+        <Text style={styles.profileFieldLabel}>Height (cm)</Text>
+        <TextInput
+          style={styles.profileInput}
+          value={profileHeightStr}
+          onChangeText={setProfileHeightStr}
+          onBlur={handleProfileHeightBlur}
+          keyboardType="decimal-pad"
+          placeholder="e.g. 178"
+          placeholderTextColor={Colors.textMuted}
+          accessibilityLabel="Height in centimetres"
+          returnKeyType="done"
+        />
+
+        {/* Age */}
+        <Text style={styles.profileFieldLabel}>Age (years)</Text>
+        <TextInput
+          style={styles.profileInput}
+          value={profileAgeStr}
+          onChangeText={setProfileAgeStr}
+          onBlur={handleProfileAgeBlur}
+          keyboardType="number-pad"
+          placeholder="e.g. 30"
+          placeholderTextColor={Colors.textMuted}
+          accessibilityLabel="Age in years"
+          returnKeyType="done"
+        />
+
+        {/* Activity level chips */}
+        <Text style={styles.profileFieldLabel}>Activity level</Text>
+        <View style={styles.profileActivityGrid}>
+          {(
+            [
+              { value: 'sedentary',   label: 'Sedentary' },
+              { value: 'light',       label: 'Light' },
+              { value: 'moderate',    label: 'Moderate' },
+              { value: 'active',      label: 'Active' },
+              { value: 'very_active', label: 'Very active' },
+            ] as Array<{ value: ActivityLevel; label: string }>
+          ).map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.profileActivityChip, profile.activityLevel === opt.value && styles.profileChipSelected]}
+              onPress={() => handleProfileActivity(opt.value)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={opt.label}
+            >
+              <Text style={[styles.profileChipLabel, profile.activityLevel === opt.value && styles.profileChipLabelSelected]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Goal type chips */}
+        <Text style={styles.profileFieldLabel}>Goal</Text>
+        <View style={styles.profileChipRow}>
+          {(
+            [
+              { value: 'cut',      label: 'Lose weight' },
+              { value: 'maintain', label: 'Maintain' },
+              { value: 'gain',     label: 'Build muscle' },
+            ] as Array<{ value: GoalType; label: string }>
+          ).map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.profileChip, profile.goalType === opt.value && styles.profileChipSelected]}
+              onPress={() => handleProfileGoal(opt.value)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={opt.label}
+            >
+              <Text style={[styles.profileChipLabel, profile.goalType === opt.value && styles.profileChipLabelSelected]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.sectionDivider} />
+
+        {/* Recalculate button */}
+        <TouchableOpacity
+          style={[styles.recalcBtn, recalcBusy && styles.backupRowDisabled]}
+          onPress={handleRecalcGoals}
+          disabled={recalcBusy}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Recalculate nutrition goals from profile"
+        >
+          {recalcBusy ? (
+            <ActivityIndicator size="small" color={Colors.sageDeep} />
+          ) : (
+            <Ionicons name="calculator-outline" size={16} color={Colors.sageDeep} />
+          )}
+          <Text style={styles.recalcBtnLabel}>Recalculate goals from profile</Text>
+        </TouchableOpacity>
       </Card>
 
       {/* ── Nutrition goals section (#274) ──────────────────────────── */}
@@ -938,5 +1168,85 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
+  },
+
+  // ── Profile section (#281) ──────────────────────────────────────────────
+  profileFieldLabel: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  profileChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  profileChip: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.canvasSunken,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    minWidth: 80,
+  },
+  profileChipSelected: {
+    backgroundColor: Colors.sageTint,
+    borderColor: Colors.sage,
+  },
+  profileChipLabel: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+  },
+  profileChipLabelSelected: {
+    color: Colors.sageDeep,
+    fontFamily: Typography.title,
+  },
+  profileActivityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  profileActivityChip: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.canvasSunken,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  profileInput: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.line2,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.md,
+    color: Colors.textPrimary,
+  },
+  recalcBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.sageTint,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    justifyContent: 'center',
+  },
+  recalcBtnLabel: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.sageDeep,
   },
 });
