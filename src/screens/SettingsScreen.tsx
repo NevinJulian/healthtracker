@@ -33,6 +33,9 @@ import {
   setWeeklyCookDay,
   getWeeklyCookDayTime,
   setWeeklyCookDayTime,
+  getNutritionGoals,
+  setNutritionGoalCalories,
+  setNutritionGoalProtein,
 } from '../db/database';
 import {
   ensurePermissions,
@@ -59,6 +62,14 @@ interface CookingReminderState {
   weeklyCookDayTime: string;   // "HH:MM"
   permissionDenied: boolean;
 }
+
+// Clamp bounds for nutrition goal steppers
+const CALORIES_MIN = 500;
+const CALORIES_MAX = 5000;
+const CALORIES_STEP = 50;
+const PROTEIN_MIN = 10;
+const PROTEIN_MAX = 500;
+const PROTEIN_STEP = 5;
 
 // Day labels for the weekday chip selector (index = JS weekday 0–6)
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -168,6 +179,10 @@ export default function SettingsScreen() {
     permissionDenied: false,
   });
 
+  // Nutrition goals — seeded from NUTRITION_GOALS defaults until DB is loaded
+  const [goalCalories, setGoalCalories] = useState(1800);
+  const [goalProtein, setGoalProtein] = useState(150);
+
   // Load persisted settings on focus (same pattern as other screens using useFocusEffect)
   useFocusEffect(
     useCallback(() => {
@@ -180,6 +195,7 @@ export default function SettingsScreen() {
           weeklyCookDayEnabled,
           weeklyCookDay,
           weeklyCookDayTime,
+          nutritionGoals,
         ] = await Promise.all([
           getWorkoutReminderEnabled(),
           getWorkoutReminderTime(),
@@ -187,6 +203,7 @@ export default function SettingsScreen() {
           getWeeklyCookDayEnabled(),
           getWeeklyCookDay(),
           getWeeklyCookDayTime(),
+          getNutritionGoals(),
         ]);
         if (active) {
           setReminder((prev) => ({ ...prev, enabled: workoutEnabled, time: workoutTime, permissionDenied: false }));
@@ -198,6 +215,8 @@ export default function SettingsScreen() {
             weeklyCookDayTime,
             permissionDenied: false,
           }));
+          setGoalCalories(nutritionGoals.calories);
+          setGoalProtein(nutritionGoals.protein);
         }
       })();
       return () => { active = false; };
@@ -284,6 +303,20 @@ export default function SettingsScreen() {
     if (cooking.weeklyCookDayEnabled) {
       await reconcileScheduledNotifications();
     }
+  }
+
+  // ── Nutrition goals: step handlers ────────────────────────────────────
+
+  async function adjustCalories(delta: number) {
+    const newVal = Math.min(CALORIES_MAX, Math.max(CALORIES_MIN, goalCalories + delta));
+    await setNutritionGoalCalories(newVal);
+    setGoalCalories(newVal);
+  }
+
+  async function adjustProtein(delta: number) {
+    const newVal = Math.min(PROTEIN_MAX, Math.max(PROTEIN_MIN, goalProtein + delta));
+    await setNutritionGoalProtein(newVal);
+    setGoalProtein(newVal);
   }
 
   const { hour: workoutHour, minute: workoutMinute } = parseTimeString(reminder.time);
@@ -468,6 +501,78 @@ export default function SettingsScreen() {
           </View>
         )}
       </Card>
+
+      {/* ── Nutrition goals section (#274) ──────────────────────────── */}
+      <Card style={styles.card}>
+        <View style={styles.sectionLabelRow}>
+          <Ionicons name="nutrition-outline" size={16} color={Colors.clayDeep} />
+          <Text style={[styles.sectionLabel, styles.sectionLabelNutrition]}>Nutrition goals</Text>
+        </View>
+
+        <Text style={styles.nutritionSubtitle}>
+          Daily targets used in the Analytics screen
+        </Text>
+
+        {/* Calories stepper */}
+        <View style={styles.goalStepperRow}>
+          <View style={styles.goalStepperLabelBlock}>
+            <Text style={styles.goalStepperTitle}>Daily calories</Text>
+            <Text style={styles.goalStepperUnit}>kcal / day</Text>
+          </View>
+          <View style={styles.goalStepperControls}>
+            <TouchableOpacity
+              style={styles.goalStepperBtn}
+              onPress={() => adjustCalories(-CALORIES_STEP)}
+              accessibilityLabel="Decrease calorie goal"
+              accessibilityRole="button"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="remove-outline" size={18} color={Colors.clayDeep} />
+            </TouchableOpacity>
+            <Text style={styles.goalStepperValue}>{goalCalories}</Text>
+            <TouchableOpacity
+              style={styles.goalStepperBtn}
+              onPress={() => adjustCalories(CALORIES_STEP)}
+              accessibilityLabel="Increase calorie goal"
+              accessibilityRole="button"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add-outline" size={18} color={Colors.clayDeep} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.sectionDivider} />
+
+        {/* Protein stepper */}
+        <View style={styles.goalStepperRow}>
+          <View style={styles.goalStepperLabelBlock}>
+            <Text style={styles.goalStepperTitle}>Daily protein</Text>
+            <Text style={styles.goalStepperUnit}>g / day</Text>
+          </View>
+          <View style={styles.goalStepperControls}>
+            <TouchableOpacity
+              style={styles.goalStepperBtn}
+              onPress={() => adjustProtein(-PROTEIN_STEP)}
+              accessibilityLabel="Decrease protein goal"
+              accessibilityRole="button"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="remove-outline" size={18} color={Colors.clayDeep} />
+            </TouchableOpacity>
+            <Text style={styles.goalStepperValue}>{goalProtein}</Text>
+            <TouchableOpacity
+              style={styles.goalStepperBtn}
+              onPress={() => adjustProtein(PROTEIN_STEP)}
+              accessibilityLabel="Increase protein goal"
+              accessibilityRole="button"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add-outline" size={18} color={Colors.clayDeep} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Card>
     </ScrollView>
   );
 }
@@ -622,5 +727,57 @@ const styles = StyleSheet.create({
   },
   timePickerHeadingSpaced: {
     marginTop: Spacing.md,
+  },
+
+  // Nutrition goals section
+  sectionLabelNutrition: {
+    color: Colors.clayDeep,
+  },
+  nutritionSubtitle: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
+    lineHeight: Typography.sizes.xs * 1.5,
+  },
+  goalStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  goalStepperLabelBlock: {
+    flex: 1,
+  },
+  goalStepperTitle: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textPrimary,
+  },
+  goalStepperUnit: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+  },
+  goalStepperControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  goalStepperBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.clayTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalStepperValue: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xl,
+    color: Colors.textPrimary,
+    minWidth: 52,
+    textAlign: 'center',
   },
 });

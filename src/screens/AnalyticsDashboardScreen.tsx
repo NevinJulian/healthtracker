@@ -47,6 +47,8 @@ import {
   getAverageConsumedMacros,
   getMostCookedRecipes,
   getInventorySnapshot,
+  getNutritionGoals,
+  type NutritionGoals,
   type DailyMacroTotals,
   type MealAdherenceSummary,
   type EatenRecipeRow,
@@ -606,6 +608,7 @@ function NutritionSectionCard({
   avgMacros,
   mostCooked,
   inventory,
+  nutritionGoals,
 }: {
   macros: DailyMacroTotals[];
   adherence: MealAdherenceSummary;
@@ -613,6 +616,7 @@ function NutritionSectionCard({
   avgMacros: AverageConsumedMacros;
   mostCooked: CookedRecipeRow[];
   inventory: InventorySnapshot;
+  nutritionGoals: NutritionGoals;
 }) {
   const hasConsumedHistory = macros.length > 0;
   const hasMostEaten = mostEaten.length > 0;
@@ -642,7 +646,7 @@ function NutritionSectionCard({
             <MacroTrendChart
               macros={macros}
               macroKey="calories"
-              goal={NUTRITION_GOALS.calories}
+              goal={nutritionGoals.calories}
               label="Calories"
               accentColor={Colors.clay}
             />
@@ -651,7 +655,7 @@ function NutritionSectionCard({
             <MacroTrendChart
               macros={macros}
               macroKey="protein"
-              goal={NUTRITION_GOALS.protein}
+              goal={nutritionGoals.protein}
               label="Protein"
               accentColor={Colors.sage}
             />
@@ -840,6 +844,7 @@ export default function AnalyticsDashboardScreen() {
   const [fastingStreak, setFastingStreak] = useState(0);
 
   // ── Nutrition analytics state ────────────────────────────────────────────────
+  const [nutritionGoals, setNutritionGoals] = useState<NutritionGoals>(NUTRITION_GOALS);
   const [consumedMacros, setConsumedMacros] = useState<DailyMacroTotals[]>([]);
   const [mealAdherence, setMealAdherence] = useState<MealAdherenceSummary>({
     planned: 0,
@@ -961,7 +966,7 @@ export default function AnalyticsDashboardScreen() {
       setConsistencyDots(dots);
 
       // ── Nutrition analytics (#267) ──────────────────────────────────────────
-      const [macrosByDay, adherence, topEaten, avgM, topCooked, invSnapshot] =
+      const [macrosByDay, adherence, topEaten, avgM, topCooked, invSnapshot, storedGoals] =
         await Promise.all([
           getConsumedMacrosByDay(30),
           getMealAdherence(30),
@@ -969,6 +974,7 @@ export default function AnalyticsDashboardScreen() {
           getAverageConsumedMacros(),
           getMostCookedRecipes(5),
           getInventorySnapshot(),
+          getNutritionGoals(),
         ]);
 
       setConsumedMacros(macrosByDay);
@@ -977,6 +983,7 @@ export default function AnalyticsDashboardScreen() {
       setAvgMacros(avgM);
       setMostCookedRecipes(topCooked);
       setInventorySnapshot(invSnapshot);
+      setNutritionGoals(storedGoals);
     } catch (err) {
       console.error('Failed to load analytics', err);
     } finally {
@@ -1063,6 +1070,7 @@ export default function AnalyticsDashboardScreen() {
           avgMacros={avgMacros}
           mostCooked={mostCookedRecipes}
           inventory={inventorySnapshot}
+          nutritionGoals={nutritionGoals}
         />
 
         <View style={{ height: Spacing.xl }} />

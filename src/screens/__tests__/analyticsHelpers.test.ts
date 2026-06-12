@@ -245,6 +245,30 @@ describe('computeGoalAdherenceDays', () => {
     expect(result.calorieAdherence).toBe(1);
     expect(result.proteinAdherence).toBe(1);
   });
+
+  it('respects custom goal values (user-configured goals, #274)', () => {
+    const days = [
+      { date: '2024-01-01', calories: 2200, protein: 180 }, // meets custom 2000/160
+      { date: '2024-01-02', calories: 1900, protein: 155 }, // fails calories (< 2000), meets protein
+      { date: '2024-01-03', calories: 2100, protein: 140 }, // meets calories, fails protein (< 160)
+    ];
+    const result = computeGoalAdherenceDays(days, 2000, 160);
+    // Days meeting calorie goal 2000: day1 (2200) + day3 (2100) = 2/3
+    expect(result.calorieAdherence).toBeCloseTo(2 / 3);
+    // Days meeting protein goal 160: day1 (180) + day2 (155 fails, wait: 155 < 160 so fails)
+    // day1 (180 >= 160) + day3 (140 < 160) = 1/3
+    expect(result.proteinAdherence).toBeCloseTo(1 / 3);
+  });
+
+  it('returns 0 adherence when goal is very high and nothing meets it', () => {
+    const days = [
+      { date: '2024-01-01', calories: 1500, protein: 100 },
+      { date: '2024-01-02', calories: 1600, protein: 110 },
+    ];
+    const result = computeGoalAdherenceDays(days, 5000, 500);
+    expect(result.calorieAdherence).toBe(0);
+    expect(result.proteinAdherence).toBe(0);
+  });
 });
 
 // ─── normaliseMacroSeries ─────────────────────────────────────────────────────
