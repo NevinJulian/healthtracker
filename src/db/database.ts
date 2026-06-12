@@ -2034,3 +2034,103 @@ export async function getLatestMeasurements(): Promise<BodyMeasurement | null> {
   );
   return row ?? null;
 }
+
+// ── Workout set log CRUD (workout_set_log table, migration v33) ───────────────
+
+/** A single logged workout set. */
+export interface WorkoutSet {
+  id: number;
+  date: string;
+  exercise: string;
+  set_index: number;
+  reps: number;
+  weight_kg: number;
+  created_at: string;
+}
+
+/**
+ * Insert one logged set for an exercise on `date`.
+ *
+ * @param date      - YYYY-MM-DD date key (use toISODate() / localDateKey()).
+ * @param exercise  - Exercise name (matches Exercise.name from daily_log.exercises).
+ * @param set       - Set details: index within the session, reps performed, weight in kg.
+ */
+export async function logWorkoutSet(
+  date: string,
+  exercise: string,
+  set: { setIndex: number; reps: number; weightKg: number }
+): Promise<void> {
+  const db = getDatabase();
+  const createdAt = new Date().toISOString();
+  await db.runAsync(
+    `INSERT INTO workout_set_log (date, exercise, set_index, reps, weight_kg, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [date, exercise, set.setIndex, set.reps, set.weightKg, createdAt]
+  );
+}
+
+/**
+ * Return all sets logged for `date`, ordered by exercise name then set_index.
+ * Used on the Dashboard to display already-logged sets for today's session.
+ *
+ * @param date - YYYY-MM-DD date key.
+ */
+export async function getWorkoutSetsForDay(date: string): Promise<WorkoutSet[]> {
+  const db = getDatabase();
+  return db.getAllAsync<WorkoutSet>(
+    `SELECT * FROM workout_set_log WHERE date = ?
+     ORDER BY exercise ASC, set_index ASC`,
+    [date]
+  );
+}
+
+/**
+ * Return all sets logged for `exercise` since `sinceDateKey` (inclusive),
+ * ordered chronologically (date ASC, set_index ASC). Used to build progression
+ * charts and compute PRs.
+ *
+ * @param exercise      - Exercise name.
+ * @param sinceDateKey  - Optional earliest date (YYYY-MM-DD). Defaults to all history.
+ */
+export async function getWorkoutHistory(
+  exercise: string,
+  sinceDateKey?: string
+): Promise<WorkoutSet[]> {
+  const db = getDatabase();
+  if (sinceDateKey) {
+    return db.getAllAsync<WorkoutSet>(
+      `SELECT * FROM workout_set_log WHERE exercise = ? AND date >= ?
+       ORDER BY date ASC, set_index ASC`,
+      [exercise, sinceDateKey]
+    );
+  }
+  return db.getAllAsync<WorkoutSet>(
+    `SELECT * FROM workout_set_log WHERE exercise = ?
+     ORDER BY date ASC, set_index ASC`,
+    [exercise]
+  );
+}
+
+/**
+ * Return the distinct exercise names that have at least one logged set,
+ * sorted alphabetically. Used by the Analytics screen to populate the
+ * exercise picker.
+ */
+export async function getLoggedExercises(): Promise<string[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{ exercise: string }>(
+    `SELECT DISTINCT exercise FROM workout_set_log ORDER BY exercise ASC`
+  );
+  return rows.map((r) => r.exercise);
+}
+
+/**
+ * Delete a single logged set by its primary key id.
+ * Used when the user removes a mis-entered set from the Dashboard.
+ *
+ * @param id - Primary key of the workout_set_log row.
+ */
+export async function deleteWorkoutSet(id: number): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('DELETE FROM workout_set_log WHERE id = ?', [id]);
+}

@@ -34,6 +34,10 @@ import {
   logBodyMeasurement,
   getLatestMeasurements,
   type BodyMeasurement,
+  logWorkoutSet,
+  getWorkoutSetsForDay,
+  deleteWorkoutSet,
+  type WorkoutSet,
 } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
@@ -97,10 +101,14 @@ function CircleCheck({
 
 function ExerciseRow({
   exercise,
+  loggedSets,
   onToggle,
+  onOpenLogger,
 }: {
   exercise: Exercise;
+  loggedSets: WorkoutSet[];
   onToggle: () => void;
+  onOpenLogger: () => void;
 }) {
   const handleWatch = async () => {
     if (!exercise.videoUrl) return;
@@ -112,15 +120,37 @@ function ExerciseRow({
     }
   };
 
-  const watchTrailing = exercise.videoUrl ? (
-    <TouchableOpacity
-      style={styles.watchBtn}
-      onPress={handleWatch}
-      activeOpacity={0.75}
-    >
-      <Text style={styles.watchBtnLabel}>Watch</Text>
-    </TouchableOpacity>
-  ) : null;
+  const logCount = loggedSets.length;
+
+  const trailing = (
+    <View style={styles.exerciseTrailing}>
+      {exercise.videoUrl ? (
+        <TouchableOpacity
+          style={styles.watchBtn}
+          onPress={handleWatch}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.watchBtnLabel}>Watch</Text>
+        </TouchableOpacity>
+      ) : null}
+      <TouchableOpacity
+        style={[styles.logSetsBtn, logCount > 0 && styles.logSetsBtnActive]}
+        onPress={onOpenLogger}
+        activeOpacity={0.75}
+        accessibilityLabel={`Log sets for ${exercise.name}`}
+        accessibilityRole="button"
+      >
+        <Ionicons
+          name="barbell-outline"
+          size={13}
+          color={logCount > 0 ? Colors.sageDeep : Colors.textMuted}
+        />
+        <Text style={[styles.logSetsBtnLabel, logCount > 0 && styles.logSetsBtnLabelActive]}>
+          {logCount > 0 ? `${logCount} set${logCount > 1 ? 's' : ''}` : 'Log sets'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <Row
@@ -129,7 +159,7 @@ function ExerciseRow({
       }
       title={exercise.name}
       subtitle={`${exercise.sets} sets × ${exercise.reps} reps`}
-      trailing={watchTrailing}
+      trailing={trailing}
       style={[
         styles.exerciseRowInCard,
         exercise.completed && styles.exerciseRowDone,
@@ -142,16 +172,21 @@ function ExerciseRow({
 
 function HammerSection({
   entry,
+  workoutSets,
   onExerciseToggle,
   onSessionToggle,
+  onOpenLogger,
 }: {
   entry: DailyLogEntry;
+  workoutSets: Record<string, WorkoutSet[]>;
   onExerciseToggle: (id: string, value: boolean) => void;
   onSessionToggle: () => void;
+  onOpenLogger: (exerciseName: string) => void;
 }) {
   const doneCount = entry.exercises.filter((e) => e.completed).length;
   const total = entry.exercises.length;
   const allDone = total > 0 && doneCount === total;
+  const totalSetsLogged = Object.values(workoutSets).reduce((s, arr) => s + arr.length, 0);
 
   return (
     <View style={styles.section}>
@@ -166,12 +201,20 @@ function HammerSection({
             <Text style={styles.sectionLabel}>HAMMER MULTI-GYM</Text>
             <Text style={styles.sectionSub}>{entry.hammer_task}</Text>
           </View>
-          {total > 0 && (
-            <Pill
-              label={`${doneCount}/${total}`}
-              accent={allDone ? 'sage' : 'gold'}
-            />
-          )}
+          <View style={styles.hammerPillGroup}>
+            {total > 0 && (
+              <Pill
+                label={`${doneCount}/${total}`}
+                accent={allDone ? 'sage' : 'gold'}
+              />
+            )}
+            {totalSetsLogged > 0 && (
+              <Pill
+                label={`${totalSetsLogged} logged`}
+                accent="sage"
+              />
+            )}
+          </View>
         </View>
       </Card>
 
@@ -182,7 +225,9 @@ function HammerSection({
             <React.Fragment key={ex.id}>
               <ExerciseRow
                 exercise={ex}
+                loggedSets={workoutSets[ex.name] ?? []}
                 onToggle={() => onExerciseToggle(ex.id, !ex.completed)}
+                onOpenLogger={() => onOpenLogger(ex.name)}
               />
               {idx < entry.exercises.length - 1 && (
                 <View style={styles.exerciseDivider} />
@@ -225,18 +270,25 @@ export default function DashboardScreen() {
   const [measurementsModalVisible, setMeasurementsModalVisible] = useState(false);
   const [latestMeasurements, setLatestMeasurements] = useState<BodyMeasurement | null>(null);
 
+  // Workout set logging state (#285)
+  // workoutSets maps exercise name -> sets logged today
+  const [workoutSets, setWorkoutSets] = useState<Record<string, WorkoutSet[]>>({});
+  // activeSetLogger holds the exercise name currently open in the logger modal, or null
+  const [activeSetLogger, setActiveSetLogger] = useState<string | null>(null);
+
   const today = toISODate();
 
   const loadToday = useCallback(async () => {
     setLoading(true);
     try {
       await syncRollingSchedule();
-      const [data, meals, water, goal, measurements] = await Promise.all([
+      const [data, meals, water, goal, measurements, setsToday] = await Promise.all([
         getLogByDate(today),
         getTodaysMealsWithRecipe(today),
         getWaterForDay(today),
         getHydrationGoal(),
         getLatestMeasurements(),
+        getWorkoutSetsForDay(today),
       ]);
 
       setEntry(data);
@@ -247,6 +299,14 @@ export default function DashboardScreen() {
       if (data?.body_weight) {
         setWeightInput(data.body_weight.toString());
       }
+
+      // Group sets by exercise name for easy lookup in ExerciseRow
+      const grouped: Record<string, WorkoutSet[]> = {};
+      for (const s of setsToday) {
+        if (!grouped[s.exercise]) grouped[s.exercise] = [];
+        grouped[s.exercise].push(s);
+      }
+      setWorkoutSets(grouped);
     } catch (err) {
       console.error('DashboardScreen: loadToday error', err);
     } finally {
@@ -377,6 +437,45 @@ export default function DashboardScreen() {
     }
   };
 
+  // ── Workout set logging handlers (#285) ──────────────────────────────────────
+
+  const handleLogSet = async (
+    exerciseName: string,
+    reps: number,
+    weightKg: number
+  ) => {
+    const existingSets = workoutSets[exerciseName] ?? [];
+    const setIndex = existingSets.length;
+    try {
+      await logWorkoutSet(today, exerciseName, { setIndex, reps, weightKg });
+      // Optimistically refresh from DB so IDs are correct
+      const updated = await getWorkoutSetsForDay(today);
+      const grouped: Record<string, WorkoutSet[]> = {};
+      for (const s of updated) {
+        if (!grouped[s.exercise]) grouped[s.exercise] = [];
+        grouped[s.exercise].push(s);
+      }
+      setWorkoutSets(grouped);
+    } catch (err) {
+      console.error('logWorkoutSet error', err);
+    }
+  };
+
+  const handleDeleteSet = async (setId: number) => {
+    try {
+      await deleteWorkoutSet(setId);
+      const updated = await getWorkoutSetsForDay(today);
+      const grouped: Record<string, WorkoutSet[]> = {};
+      for (const s of updated) {
+        if (!grouped[s.exercise]) grouped[s.exercise] = [];
+        grouped[s.exercise].push(s);
+      }
+      setWorkoutSets(grouped);
+    } catch (err) {
+      console.error('deleteWorkoutSet error', err);
+    }
+  };
+
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   const formatDate = () =>
@@ -489,8 +588,10 @@ export default function DashboardScreen() {
         {/* ── Hammer / Gym task ────────────────────────────────────────────── */}
         <HammerSection
           entry={entry}
+          workoutSets={workoutSets}
           onExerciseToggle={handleExerciseToggle}
           onSessionToggle={() => handleToggle('hammer_completed')}
+          onOpenLogger={(name) => setActiveSetLogger(name)}
         />
 
         {/* ── Intermittent fasting ─────────────────────────────────────────── */}
@@ -760,6 +861,17 @@ export default function DashboardScreen() {
         onSave={handleSaveMeasurements}
         latest={latestMeasurements}
       />
+
+      {/* ── Set Logger Modal (#285) ──────────────────────────────────────── */}
+      {activeSetLogger !== null && (
+        <SetLoggerModal
+          exerciseName={activeSetLogger}
+          sets={workoutSets[activeSetLogger] ?? []}
+          onClose={() => setActiveSetLogger(null)}
+          onAddSet={(reps, weightKg) => handleLogSet(activeSetLogger, reps, weightKg)}
+          onDeleteSet={handleDeleteSet}
+        />
+      )}
     </View>
   );
 }
@@ -853,6 +965,154 @@ function MeasurementsModal({
           <View style={styles.modalFooter}>
             <Button title="Cancel" variant="ghost" onPress={onClose} />
             <Button title="Save" variant="primary" onPress={handleSave} />
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ─── Set Logger Modal (#285) ──────────────────────────────────────────────────
+
+/**
+ * SetLoggerModal — bottom-sheet modal for logging actual sets for one exercise.
+ *
+ * Shows today's already-logged sets with a delete affordance, and a simple
+ * form to add a new set (reps + weight in kg).  Weight is pre-filled from the
+ * last logged set for this exercise (or 0 if none).  Uses Verdure tokens
+ * throughout; no emoji, outline Ionicons only.
+ */
+function SetLoggerModal({
+  exerciseName,
+  sets,
+  onClose,
+  onAddSet,
+  onDeleteSet,
+}: {
+  exerciseName: string;
+  sets: WorkoutSet[];
+  onClose: () => void;
+  onAddSet: (reps: number, weightKg: number) => Promise<void>;
+  onDeleteSet: (id: number) => Promise<void>;
+}) {
+  const lastSet = sets.length > 0 ? sets[sets.length - 1] : null;
+  const [repsInput, setRepsInput] = useState('');
+  const [weightInput, setWeightInput] = useState(
+    lastSet ? String(lastSet.weight_kg) : ''
+  );
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    const reps = parseInt(repsInput, 10);
+    const weight = parseFloat(weightInput);
+    if (isNaN(reps) || reps < 1) {
+      Alert.alert('Invalid reps', 'Enter a whole number of reps (minimum 1).');
+      return;
+    }
+    if (isNaN(weight) || weight <= 0) {
+      Alert.alert('Invalid weight', 'Enter a weight in kg (must be > 0).');
+      return;
+    }
+    setSaving(true);
+    try {
+      await onAddSet(reps, weight);
+      setRepsInput('');
+      // Keep weight for the next set (common UX pattern)
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+
+          {/* Header */}
+          <View style={styles.setLoggerHeader}>
+            <Ionicons name="barbell-outline" size={18} color={Colors.sageDeep} />
+            <Text style={styles.setLoggerTitle}>{exerciseName}</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-outline" size={22} color={Colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.setLoggerSubtitle}>Log actual sets — plan stays unchanged</Text>
+
+          {/* Logged sets list */}
+          {sets.length > 0 && (
+            <View style={styles.setList}>
+              <Text style={styles.setListHeading}>Today</Text>
+              {sets.map((s, i) => (
+                <View key={s.id} style={styles.setRow}>
+                  <View style={styles.setIndexBadge}>
+                    <Text style={styles.setIndexText}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.setDetail}>
+                    {s.reps} reps @ {s.weight_kg} kg
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => onDeleteSet(s.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel={`Remove set ${i + 1}`}
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="trash-outline" size={16} color={Colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Add a new set */}
+          <View style={styles.setInputArea}>
+            <Text style={styles.setInputHeading}>Add set</Text>
+            <View style={styles.setInputRow}>
+              <View style={styles.setInputField}>
+                <Text style={styles.setInputLabel}>Reps</Text>
+                <TextInput
+                  style={styles.setInput}
+                  value={repsInput}
+                  onChangeText={setRepsInput}
+                  keyboardType="number-pad"
+                  placeholder="—"
+                  placeholderTextColor={Colors.textMuted}
+                  returnKeyType="next"
+                  selectTextOnFocus
+                />
+              </View>
+              <View style={styles.setInputField}>
+                <Text style={styles.setInputLabel}>Weight (kg)</Text>
+                <TextInput
+                  style={styles.setInput}
+                  value={weightInput}
+                  onChangeText={setWeightInput}
+                  keyboardType="decimal-pad"
+                  placeholder="—"
+                  placeholderTextColor={Colors.textMuted}
+                  returnKeyType="done"
+                  selectTextOnFocus
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.setAddBtn, saving && styles.setAddBtnDisabled]}
+                onPress={handleAdd}
+                disabled={saving}
+                activeOpacity={0.75}
+                accessibilityLabel="Add set"
+                accessibilityRole="button"
+              >
+                <Ionicons name="add-outline" size={20} color={Colors.textOnAccent} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.setLoggerFooter}>
+            <Button title="Done" variant="primary" onPress={onClose} />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -1296,5 +1556,167 @@ const styles = StyleSheet.create({
     fontFamily: Typography.body,
     fontSize: Typography.sizes.md,
     color: Colors.textPrimary,
+  },
+
+  // ── Exercise row trailing area ─────────────────────────────────────────────
+  exerciseTrailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    flexShrink: 0,
+  },
+  logSetsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.canvasSunken,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderWidth: 1,
+    borderColor: Colors.line2,
+  },
+  logSetsBtnActive: {
+    backgroundColor: Colors.sageTint,
+    borderColor: Colors.sage,
+  },
+  logSetsBtnLabel: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.xs - 1,
+    color: Colors.textMuted,
+  },
+  logSetsBtnLabelActive: {
+    color: Colors.sageDeep,
+  },
+
+  // ── Hammer section pill group ──────────────────────────────────────────────
+  hammerPillGroup: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: Spacing.xs,
+    flexShrink: 0,
+  },
+
+  // ── Set Logger Modal ───────────────────────────────────────────────────────
+  setLoggerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  setLoggerTitle: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xl,
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
+    flex: 1,
+  },
+  setLoggerSubtitle: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    marginBottom: Spacing.md,
+  },
+  setList: {
+    marginBottom: Spacing.md,
+  },
+  setListHeading: {
+    fontFamily: Typography.label,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: Colors.textMuted,
+    marginBottom: Spacing.xs,
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.line,
+  },
+  setIndexBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.sageTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  setIndexText: {
+    fontFamily: Typography.label,
+    fontSize: 9,
+    fontWeight: '700',
+    color: Colors.sageDeep,
+  },
+  setDetail: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  setInputArea: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  setInputHeading: {
+    fontFamily: Typography.label,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: Colors.textMuted,
+    marginBottom: Spacing.sm,
+  },
+  setInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Spacing.sm,
+  },
+  setInputField: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
+  setInputLabel: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs - 1,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  setInput: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.line2,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.lg,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  setAddBtn: {
+    backgroundColor: Colors.sage,
+    borderRadius: Radius.sm,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    alignSelf: 'flex-end',
+  },
+  setAddBtnDisabled: {
+    opacity: 0.5,
+  },
+  setLoggerFooter: {
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.line,
   },
 });

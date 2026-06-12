@@ -510,6 +510,194 @@ describe('latestMeasurementValue', () => {
   });
 });
 
+// ─── estimated1RM ─────────────────────────────────────────────────────────────
+
+import { estimated1RM, computePRs, bestSetPerDay } from '../analyticsHelpers';
+
+describe('estimated1RM', () => {
+  it('returns weight unchanged for reps === 1', () => {
+    expect(estimated1RM(100, 1)).toBe(100);
+  });
+
+  it('returns weight unchanged for reps <= 0 (treated as 1)', () => {
+    expect(estimated1RM(80, 0)).toBe(80);
+  });
+
+  it('applies Epley formula for reps > 1', () => {
+    // weight * (1 + reps / 30) = 100 * (1 + 10/30) = 133.333...
+    expect(estimated1RM(100, 10)).toBeCloseTo(133.333);
+  });
+
+  it('computes correctly for common rep ranges', () => {
+    // 60kg × 5 reps: 60 * (1 + 5/30) = 60 * 1.1667 = 70
+    expect(estimated1RM(60, 5)).toBeCloseTo(70);
+    // 80kg × 8 reps: 80 * (1 + 8/30) = 80 * 1.2667 ≈ 101.33
+    expect(estimated1RM(80, 8)).toBeCloseTo(101.333);
+  });
+
+  it('scales linearly with weight', () => {
+    const r1 = estimated1RM(50, 6);
+    const r2 = estimated1RM(100, 6);
+    expect(r2).toBeCloseTo(r1 * 2);
+  });
+
+  it('handles fractional weights', () => {
+    expect(estimated1RM(67.5, 3)).toBeCloseTo(67.5 * (1 + 3 / 30));
+  });
+});
+
+// ─── computePRs ──────────────────────────────────────────────────────────────
+
+describe('computePRs', () => {
+  it('returns nulls for empty history', () => {
+    const result = computePRs([]);
+    expect(result.bestWeight).toBeNull();
+    expect(result.best1RM).toBeNull();
+    expect(result.bestVolume).toBeNull();
+  });
+
+  it('returns correct PRs for a single set', () => {
+    const history = [
+      { id: 1, date: '2024-01-10', exercise: 'Squat', reps: 5, weight_kg: 80 },
+    ];
+    const result = computePRs(history);
+    expect(result.bestWeight).toEqual({ value: 80, date: '2024-01-10' });
+    expect(result.best1RM?.value).toBeCloseTo(estimated1RM(80, 5));
+    expect(result.best1RM?.date).toBe('2024-01-10');
+    expect(result.bestVolume).toEqual({ value: 80 * 5, date: '2024-01-10' });
+  });
+
+  it('reps === 1: best1RM equals weight (Epley identity)', () => {
+    const history = [
+      { id: 1, date: '2024-02-01', exercise: 'Deadlift', reps: 1, weight_kg: 120 },
+    ];
+    const result = computePRs(history);
+    expect(result.best1RM?.value).toBe(120);
+  });
+
+  it('identifies best weight from multiple sets', () => {
+    const history = [
+      { id: 1, date: '2024-01-01', exercise: 'Bench', reps: 8, weight_kg: 60 },
+      { id: 2, date: '2024-01-08', exercise: 'Bench', reps: 8, weight_kg: 65 },
+      { id: 3, date: '2024-01-15', exercise: 'Bench', reps: 5, weight_kg: 70 },
+    ];
+    const result = computePRs(history);
+    expect(result.bestWeight?.value).toBe(70);
+    expect(result.bestWeight?.date).toBe('2024-01-15');
+  });
+
+  it('identifies best 1RM which may differ from best weight set', () => {
+    // High reps at lower weight can yield higher 1RM than heavier weight at low reps
+    const history = [
+      { id: 1, date: '2024-01-01', exercise: 'Curl', reps: 1, weight_kg: 40 }, // 1RM = 40
+      { id: 2, date: '2024-01-02', exercise: 'Curl', reps: 15, weight_kg: 30 }, // 1RM = 30*(1+15/30) = 45
+    ];
+    const result = computePRs(history);
+    // Best weight set = 40kg (set 1)
+    expect(result.bestWeight?.value).toBe(40);
+    // Best 1RM = 45 (set 2 with 15 reps at 30kg)
+    expect(result.best1RM?.value).toBeCloseTo(45);
+    expect(result.best1RM?.date).toBe('2024-01-02');
+  });
+
+  it('identifies best volume (weight * reps)', () => {
+    const history = [
+      { id: 1, date: '2024-01-01', exercise: 'Row', reps: 5, weight_kg: 100 }, // vol = 500
+      { id: 2, date: '2024-01-02', exercise: 'Row', reps: 10, weight_kg: 60 }, // vol = 600
+      { id: 3, date: '2024-01-03', exercise: 'Row', reps: 3, weight_kg: 110 }, // vol = 330
+    ];
+    const result = computePRs(history);
+    expect(result.bestVolume?.value).toBe(600);
+    expect(result.bestVolume?.date).toBe('2024-01-02');
+  });
+
+  it('first-achieved wins on weight tie', () => {
+    const history = [
+      { id: 1, date: '2024-01-01', exercise: 'Press', reps: 5, weight_kg: 80 },
+      { id: 2, date: '2024-01-08', exercise: 'Press', reps: 5, weight_kg: 80 }, // same weight
+    ];
+    const result = computePRs(history);
+    expect(result.bestWeight?.date).toBe('2024-01-01');
+  });
+
+  it('first-achieved wins on 1RM tie', () => {
+    // Two sets with identical 1RM
+    const history = [
+      { id: 1, date: '2024-01-01', exercise: 'Lunge', reps: 10, weight_kg: 30 }, // 1RM = 40
+      { id: 2, date: '2024-01-02', exercise: 'Lunge', reps: 10, weight_kg: 30 }, // 1RM = 40
+    ];
+    const result = computePRs(history);
+    expect(result.best1RM?.date).toBe('2024-01-01');
+  });
+});
+
+// ─── bestSetPerDay ────────────────────────────────────────────────────────────
+
+describe('bestSetPerDay', () => {
+  it('returns empty array for empty input', () => {
+    expect(bestSetPerDay([])).toEqual([]);
+  });
+
+  it('returns one entry per day', () => {
+    const history = [
+      { id: 1, date: '2024-01-01', exercise: 'Squat', reps: 5, weight_kg: 80 },
+      { id: 2, date: '2024-01-01', exercise: 'Squat', reps: 3, weight_kg: 90 },
+      { id: 3, date: '2024-01-02', exercise: 'Squat', reps: 5, weight_kg: 85 },
+    ];
+    const result = bestSetPerDay(history);
+    expect(result).toHaveLength(2);
+  });
+
+  it('selects the heaviest set on a given day', () => {
+    const history = [
+      { id: 1, date: '2024-01-01', exercise: 'Squat', reps: 10, weight_kg: 60 },
+      { id: 2, date: '2024-01-01', exercise: 'Squat', reps: 3,  weight_kg: 90 },
+      { id: 3, date: '2024-01-01', exercise: 'Squat', reps: 8,  weight_kg: 70 },
+    ];
+    const result = bestSetPerDay(history);
+    expect(result[0].weight_kg).toBe(90);
+    expect(result[0].reps).toBe(3);
+  });
+
+  it('breaks weight ties by most reps', () => {
+    const history = [
+      { id: 1, date: '2024-01-01', exercise: 'Deadlift', reps: 3, weight_kg: 100 },
+      { id: 2, date: '2024-01-01', exercise: 'Deadlift', reps: 5, weight_kg: 100 },
+    ];
+    const result = bestSetPerDay(history);
+    expect(result[0].reps).toBe(5);
+  });
+
+  it('attaches correct estimated1RM to each best set', () => {
+    const history = [
+      { id: 1, date: '2024-01-05', exercise: 'Press', reps: 8, weight_kg: 50 },
+    ];
+    const result = bestSetPerDay(history);
+    expect(result[0].estimated1RM).toBeCloseTo(estimated1RM(50, 8));
+  });
+
+  it('returns results sorted ascending by date', () => {
+    const history = [
+      { id: 3, date: '2024-01-15', exercise: 'Curl', reps: 10, weight_kg: 20 },
+      { id: 1, date: '2024-01-05', exercise: 'Curl', reps: 10, weight_kg: 18 },
+      { id: 2, date: '2024-01-10', exercise: 'Curl', reps: 10, weight_kg: 19 },
+    ];
+    const result = bestSetPerDay(history);
+    expect(result.map((r) => r.date)).toEqual([
+      '2024-01-05', '2024-01-10', '2024-01-15',
+    ]);
+  });
+
+  it('single entry returns exactly one row', () => {
+    const history = [
+      { id: 1, date: '2024-03-01', exercise: 'RDL', reps: 12, weight_kg: 40 },
+    ];
+    const result = bestSetPerDay(history);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ date: '2024-03-01', weight_kg: 40, reps: 12 });
+  });
+});
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function formatDate(d: Date): string {
