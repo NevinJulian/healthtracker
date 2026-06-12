@@ -39,7 +39,13 @@ function ErrorView({ onRetry }: { onRetry: () => void }) {
       <Ionicons name="cloud-offline-outline" size={40} color={Colors.textMuted} />
       <Text style={styles.errorTitle}>Couldn&rsquo;t load this recipe</Text>
       <Text style={styles.errorSubtitle}>Check your connection and try again</Text>
-      <TouchableOpacity style={styles.retryBtn} onPress={onRetry} activeOpacity={0.78}>
+      <TouchableOpacity
+        style={styles.retryBtn}
+        onPress={onRetry}
+        activeOpacity={0.78}
+        accessibilityRole="button"
+        accessibilityLabel="Retry loading recipe"
+      >
         <Text style={styles.retryBtnText}>Retry</Text>
       </TouchableOpacity>
     </View>

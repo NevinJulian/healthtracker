@@ -63,21 +63,33 @@ function CircleCheck({
   checked,
   label,
   onToggle,
+  accessibilityLabel: a11yLabel,
 }: {
   checked: boolean;
   label?: string;
   onToggle: () => void;
+  /** Accessibility label for bare (icon-only) usage. Falls back to label when provided. */
+  accessibilityLabel?: string;
 }) {
   const circle = (
-    <View style={[styles.circleCheck, checked && styles.circleCheckDone]}>
+    <View
+      style={[styles.circleCheck, checked && styles.circleCheckDone]}
+      importantForAccessibility="no-hide-descendants"
+    >
       {checked && <Text style={styles.circleCheckMark}>✓</Text>}
     </View>
   );
 
   if (!label) {
     return (
-      <TouchableOpacity onPress={onToggle} activeOpacity={0.7}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity
+        onPress={onToggle}
+        activeOpacity={0.7}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityRole="checkbox"
+        accessibilityLabel={a11yLabel ?? 'Toggle'}
+        accessibilityState={{ checked }}
+      >
         {circle}
       </TouchableOpacity>
     );
@@ -88,6 +100,9 @@ function CircleCheck({
       style={styles.checkboxRow}
       onPress={onToggle}
       activeOpacity={0.7}
+      accessibilityRole="checkbox"
+      accessibilityLabel={a11yLabel ?? label}
+      accessibilityState={{ checked }}
     >
       {circle}
       <Text style={[styles.checkboxLabel, checked && styles.checkboxLabelChecked]}>
@@ -129,6 +144,8 @@ function ExerciseRow({
           style={styles.watchBtn}
           onPress={handleWatch}
           activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel={`Watch tutorial for ${exercise.name}`}
         >
           <Text style={styles.watchBtnLabel}>Watch</Text>
         </TouchableOpacity>
@@ -155,7 +172,11 @@ function ExerciseRow({
   return (
     <Row
       leading={
-        <CircleCheck checked={exercise.completed} onToggle={onToggle} />
+        <CircleCheck
+          checked={exercise.completed}
+          onToggle={onToggle}
+          accessibilityLabel={`Mark ${exercise.name} ${exercise.completed ? 'incomplete' : 'complete'}`}
+        />
       }
       title={exercise.name}
       subtitle={`${exercise.sets} sets × ${exercise.reps} reps`}
@@ -544,7 +565,11 @@ export default function DashboardScreen() {
 
       {/* ── Progress bar ─────────────────────────────────────────────────── */}
       <View style={styles.progressContainer}>
-        <ProgressBar progress={progress} height={8} />
+        <ProgressBar
+          progress={progress}
+          height={8}
+          accessibilityLabel={`Daily progress: ${count} of 3 tasks complete`}
+        />
         <Text style={styles.progressLabel}>
           {count} / 3 tasks complete
         </Text>
@@ -639,6 +664,7 @@ export default function DashboardScreen() {
                   <CircleCheck
                     checked={meal.is_consumed}
                     onToggle={() => handleToggleMeal(meal.id, meal.is_consumed)}
+                    accessibilityLabel={`Mark ${meal.recipe?.title ?? meal.meal_type} ${meal.is_consumed ? 'not consumed' : 'consumed'}`}
                   />
                 }
                 title={
@@ -684,6 +710,8 @@ export default function DashboardScreen() {
                 style={styles.weightLogBtn}
                 onPress={handleSaveWeight}
                 activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Log body weight"
               >
                 <Text style={styles.weightLogBtnText}>Log</Text>
               </TouchableOpacity>
@@ -714,6 +742,7 @@ export default function DashboardScreen() {
               progress={Math.min(1, waterMl / Math.max(1, hydrationGoal))}
               height={6}
               style={styles.hydrationBar}
+              accessibilityLabel={`Hydration: ${waterMl} of ${hydrationGoal} ml`}
             />
             <View style={styles.hydrationButtons}>
               <TouchableOpacity
@@ -825,6 +854,7 @@ export default function DashboardScreen() {
                 <CircleCheck
                   checked={aw.completed}
                   onToggle={() => handleToggleExtraWorkout(aw.id)}
+                  accessibilityLabel={`Mark ${aw.name} ${aw.completed ? 'incomplete' : 'complete'}`}
                 />
               }
               title={aw.name}
@@ -1034,10 +1064,15 @@ function SetLoggerModal({
 
           {/* Header */}
           <View style={styles.setLoggerHeader}>
-            <Ionicons name="barbell-outline" size={18} color={Colors.sageDeep} />
+            <Ionicons name="barbell-outline" size={18} color={Colors.sageDeep} importantForAccessibility="no-hide-descendants" />
             <Text style={styles.setLoggerTitle}>{exerciseName}</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-outline" size={22} color={Colors.textMuted} />
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Close set logger"
+            >
+              <Ionicons name="close-outline" size={22} color={Colors.textMuted} importantForAccessibility="no-hide-descendants" />
             </TouchableOpacity>
           </View>
           <Text style={styles.setLoggerSubtitle}>Log actual sets — plan stays unchanged</Text>

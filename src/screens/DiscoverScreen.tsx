@@ -18,11 +18,14 @@ import { Card, Pill, ScreenHeader } from '../components';
 // ─── Meal result card ─────────────────────────────────────────────────────────
 
 function MealCard({ item, onPress }: { item: MealSummary; onPress: () => void }) {
+  const a11yLabel = [item.name, item.category, item.area].filter(Boolean).join(', ');
   return (
     <TouchableOpacity
       style={styles.cardWrapper}
       onPress={onPress}
       activeOpacity={0.78}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
     >
       <Card style={styles.mealCard}>
         {/* Thumbnail */}
@@ -91,7 +94,13 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
       <Ionicons name="cloud-offline-outline" size={40} color={Colors.textMuted} />
       <Text style={styles.emptyTitle}>Couldn&rsquo;t reach the recipe service</Text>
       <Text style={styles.emptySubtitle}>Check your connection and try again</Text>
-      <TouchableOpacity style={styles.retryBtn} onPress={onRetry} activeOpacity={0.78}>
+      <TouchableOpacity
+        style={styles.retryBtn}
+        onPress={onRetry}
+        activeOpacity={0.78}
+        accessibilityRole="button"
+        accessibilityLabel="Retry search"
+      >
         <Text style={styles.retryBtnText}>Retry</Text>
       </TouchableOpacity>
     </View>

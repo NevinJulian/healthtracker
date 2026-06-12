@@ -414,6 +414,8 @@ export default function RecipeEditorScreen() {
               style={styles.pickerRow}
               onPress={() => setShowCategoryPicker((v) => !v)}
               activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel={`Category: ${showCustomCategory ? (customCategory.trim() || 'Custom category') : category}. Tap to change`}
             >
               <Text style={styles.pickerValue}>
                 {showCustomCategory
@@ -546,8 +548,10 @@ export default function RecipeEditorScreen() {
               style={styles.addIngredientBtn}
               onPress={addIngredient}
               activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Add ingredient"
             >
-              <Ionicons name="add-circle-outline" size={18} color={Colors.sage} />
+              <Ionicons name="add-circle-outline" size={18} color={Colors.sage} importantForAccessibility="no-hide-descendants" />
               <Text style={styles.addIngredientText}>Add ingredient</Text>
             </TouchableOpacity>
           </Card>
@@ -590,8 +594,10 @@ export default function RecipeEditorScreen() {
               style={styles.recomputeBtn}
               onPress={recomputeMacros}
               activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Recompute macros"
             >
-              <Ionicons name="refresh-outline" size={14} color={Colors.sageDeep} />
+              <Ionicons name="refresh-outline" size={14} color={Colors.sageDeep} importantForAccessibility="no-hide-descendants" />
               <Text style={styles.recomputeText}>Recompute</Text>
             </TouchableOpacity>
           </Card>
@@ -699,6 +705,8 @@ function IngredientEditorRow({
         onPress={onCycleUnit}
         activeOpacity={0.75}
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        accessibilityRole="button"
+        accessibilityLabel={`Change unit, currently ${row.unit}`}
       >
         <Text style={styles.unitChipText}>{row.unit}</Text>
       </TouchableOpacity>
@@ -708,8 +716,10 @@ function IngredientEditorRow({
           onPress={onRemove}
           activeOpacity={0.75}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Remove ingredient ${row.name || ''}`}
         >
-          <Ionicons name="close-circle-outline" size={20} color={Colors.textMuted} />
+          <Ionicons name="close-circle-outline" size={20} color={Colors.textMuted} importantForAccessibility="no-hide-descendants" />
         </TouchableOpacity>
       )}
     </View>
