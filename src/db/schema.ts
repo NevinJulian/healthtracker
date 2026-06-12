@@ -577,4 +577,23 @@ export const MIGRATIONS: Migration[] = [
     date TEXT NOT NULL
   );
 ` },
+  // v31: Daily hydration tracking — water_ml stored as running daily total on daily_log.
+  // Date-keyed (one row per YYYY-MM-DD calendar day, same as all other daily_log fields).
+  // DEFAULT 0 so existing rows and new rows created by syncRollingSchedule have a baseline.
+  { version: 31, sql: `ALTER TABLE daily_log ADD COLUMN water_ml INTEGER NOT NULL DEFAULT 0;` },
+  // v32: Body measurements table — one logical entry per date (UNIQUE constraint on date)
+  // so the upsert accessor (logBodyMeasurement) can update only provided fields.
+  // All measurement columns are nullable so the user can log only the measurements they
+  // took on a given day without leaving dummy zeros on the others.
+  { version: 32, sql: `
+  CREATE TABLE IF NOT EXISTS body_measurements (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    date      TEXT    NOT NULL UNIQUE,
+    waist_cm  REAL,
+    chest_cm  REAL,
+    hips_cm   REAL,
+    thigh_cm  REAL,
+    arm_cm    REAL
+  );
+` },
 ];
