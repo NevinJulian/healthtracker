@@ -16,6 +16,7 @@ import {
   syncRollingSchedule,
   toISODate,
 } from '../db/database';
+import { dateKeyToLocalDate } from '../utils/dates';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
   Card,
@@ -72,7 +73,8 @@ const BADGE_ICON: Record<BadgeStatus, IoniconsName> = {
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function formatShortDate(iso: string): { day: string; date: string } {
-  const d = new Date(iso);
+  // Use dateKeyToLocalDate so the date is local midnight, not UTC midnight
+  const d = dateKeyToLocalDate(iso);
   return {
     day: d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase(),
     date: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
