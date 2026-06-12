@@ -1593,6 +1593,51 @@ export async function resetCookEmptyNotified(): Promise<void> {
   await setCookEmptyNotified(false);
 }
 
+// ── Meal-time reminder settings (#287) ──────────
+
+/**
+ * The three meal slots that can each carry a daily reminder.
+ */
+export type MealType = 'breakfast' | 'lunch' | 'dinner';
+
+const MEAL_REMINDER_ENABLED_KEYS: Record<MealType, string> = {
+  breakfast: 'mealReminderBreakfastEnabled',
+  lunch:     'mealReminderLunchEnabled',
+  dinner:    'mealReminderDinnerEnabled',
+};
+
+const MEAL_REMINDER_TIME_KEYS: Record<MealType, string> = {
+  breakfast: 'mealReminderBreakfastTime',
+  lunch:     'mealReminderLunchTime',
+  dinner:    'mealReminderDinnerTime',
+};
+
+/** Sensible defaults — disabled until the user opts in. */
+const MEAL_REMINDER_DEFAULT_TIMES: Record<MealType, string> = {
+  breakfast: '08:00',
+  lunch:     '12:30',
+  dinner:    '18:30',
+};
+
+export async function getMealReminderEnabled(meal: MealType): Promise<boolean> {
+  const raw = await getSetting(MEAL_REMINDER_ENABLED_KEYS[meal]);
+  return raw === 'true';
+}
+
+export async function setMealReminderEnabled(meal: MealType, enabled: boolean): Promise<void> {
+  await setSetting(MEAL_REMINDER_ENABLED_KEYS[meal], enabled ? 'true' : 'false');
+}
+
+/** Returns the saved reminder time for the meal, or the default if not yet persisted. */
+export async function getMealReminderTime(meal: MealType): Promise<string> {
+  const raw = await getSetting(MEAL_REMINDER_TIME_KEYS[meal]);
+  return raw ?? MEAL_REMINDER_DEFAULT_TIMES[meal];
+}
+
+export async function setMealReminderTime(meal: MealType, time: string): Promise<void> {
+  await setSetting(MEAL_REMINDER_TIME_KEYS[meal], time);
+}
+
 // ─────────────────────────────────────────────
 // Backup & restore helpers (#277)
 // ─────────────────────────────────────────────
