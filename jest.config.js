@@ -14,5 +14,11 @@ module.exports = {
     // expo-notifications pulls in native channel/permission modules unavailable
     // in Jest's node testEnvironment. Stub the whole package.
     '^expo-notifications$': '<rootDir>/__mocks__/expo-notifications.js',
+    // expo-sharing, expo-document-picker, and expo-file-system use native
+    // modules unavailable in Jest's node testEnvironment.
+    '^expo-sharing$': '<rootDir>/__mocks__/expo-sharing.js',
+    '^expo-document-picker$': '<rootDir>/__mocks__/expo-document-picker.js',
+    '^expo-file-system/legacy$': '<rootDir>/__mocks__/expo-file-system/legacy.js',
+    '^expo-file-system$': '<rootDir>/__mocks__/expo-file-system.js',
   },
 };
