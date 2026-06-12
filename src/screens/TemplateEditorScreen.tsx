@@ -181,13 +181,17 @@ function ExerciseItem({
             style={styles.exEditBtn}
             onPress={onEdit}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Edit ${exercise.name}`}
           >
-            <Ionicons name="create-outline" size={16} color={Colors.sageDeep} />
+            <Ionicons name="create-outline" size={16} color={Colors.sageDeep} importantForAccessibility="no-hide-descendants" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.exDeleteBtn}
             onPress={onDelete}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${exercise.name}`}
           >
             <Text style={styles.exDeleteBtnText}>✕</Text>
           </TouchableOpacity>
