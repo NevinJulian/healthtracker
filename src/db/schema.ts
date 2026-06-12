@@ -1,21 +1,26 @@
-/**
+﻿/**
  * SQLite schema for the 7-Day Rolling Window architecture.
  *
- * Three domain tables:
- *   1. app_state       — key-value store (e.g., app_start_date)
- *   2. weekly_template — 7 base rows, one per weekday (seeded below)
- *   3. daily_log       — rolling tracker, date-keyed, pruned to ±7 days
+ * Core tables:
+ *   - schema_version   — applied migration versions (never use user_version PRAGMA)
+ *   - app_state        — key-value store (e.g., app_start_date)
+ *   - weekly_template  — 7 base rows, one per weekday (seeded in v4-v10)
+ *   - daily_log        — rolling tracker, date-keyed, pruned to +/-7 days
+ *                        body_weight column (v20) stores weight — there is no weight_log table
  *
- * Migration tracking:
- *   schema_version — records every applied migration version so that each
- *   statement runs exactly once, even across app updates.
- *
- * v11: ADD COLUMN exercises TEXT to weekly_template
- * v12: ADD COLUMN exercises TEXT to daily_log
- * v24: CREATE TABLE recipe_library, recipe_ingredients, shopping_list
- * v25: CREATE TABLE meal_inventory
- * v26: ADD COLUMN freezerTips TEXT to recipe_library
- * v27: CREATE TABLE cooking_tasks (bridge between shopping list and inventory)
+ * Selected migration notes:
+ *   v11-v12: ADD COLUMN exercises TEXT to weekly_template / daily_log
+ *   v20:     ADD COLUMN body_weight REAL to daily_log
+ *   v21:     ADD COLUMN additional_workouts TEXT to daily_log
+ *   v22:     CREATE TABLE bio_force_library
+ *   v23:     CREATE TABLE recipe_library
+ *   v24:     CREATE TABLE shopping_list
+ *   v25:     CREATE TABLE meal_inventory
+ *   v26:     CREATE TABLE weekly_meal_plan
+ *   v27:     CREATE TABLE cooking_tasks
+ *   v28:     UPDATE recipe_library — correct macro values to engine-computed data
+ *   v29:     CREATE TABLE off_cache (Open Food Facts ingredient cache)
+ *   v30:     CREATE TABLE cook_log (persistent cook-event history)
  */
 
 // ─── Exercise type (shared between DB layer and UI) ───────────────────────────
