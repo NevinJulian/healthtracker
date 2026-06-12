@@ -17,6 +17,7 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,6 +44,7 @@ import {
   formatTimeString,
   parseTimeString,
 } from '../services/notifications';
+import { exportBackup, importBackup } from '../services/backup';
 import Card from '../components/Card';
 import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
@@ -178,6 +180,9 @@ export default function SettingsScreen() {
     weeklyCookDayTime: '10:00',
     permissionDenied: false,
   });
+
+  // Backup state
+  const [backupBusy, setBackupBusy] = useState(false);
 
   // Nutrition goals — seeded from NUTRITION_GOALS defaults until DB is loaded
   const [goalCalories, setGoalCalories] = useState(1800);
@@ -317,6 +322,59 @@ export default function SettingsScreen() {
     const newVal = Math.min(PROTEIN_MAX, Math.max(PROTEIN_MIN, goalProtein + delta));
     await setNutritionGoalProtein(newVal);
     setGoalProtein(newVal);
+  }
+
+  // ── Backup: export ──────────────────────────────────────────────────────
+
+  async function handleBackupExport() {
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      await exportBackup();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Something went wrong.';
+      Alert.alert('Backup failed', message);
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  // ── Backup: restore ─────────────────────────────────────────────────────
+
+  function handleBackupRestore() {
+    if (backupBusy) return;
+    Alert.alert(
+      'Restore from backup',
+      'This will replace ALL current data with the contents of the backup file. This cannot be undone. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restore',
+          style: 'destructive',
+          onPress: async () => {
+            setBackupBusy(true);
+            try {
+              const result = await importBackup();
+              if (result === null) {
+                // User cancelled the picker — no action needed
+                return;
+              }
+              Alert.alert(
+                'Restore complete',
+                `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows. Revisit each screen to see the updated data.`
+              );
+            } catch (err) {
+              const message =
+                err instanceof Error ? err.message : 'Something went wrong.';
+              Alert.alert('Restore failed', message);
+            } finally {
+              setBackupBusy(false);
+            }
+          },
+        },
+      ]
+    );
   }
 
   const { hour: workoutHour, minute: workoutMinute } = parseTimeString(reminder.time);
@@ -573,6 +631,62 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Card>
+
+      {/* ── Data & backup section (#277) ──────────────────────────────── */}
+      <Card style={styles.card}>
+        <View style={styles.sectionLabelRow}>
+          <Ionicons name="save-outline" size={16} color={Colors.skyDeep} />
+          <Text style={[styles.sectionLabel, styles.sectionLabelBackup]}>Data &amp; backup</Text>
+        </View>
+
+        <Text style={styles.backupSubtitle}>
+          Save a copy of all your data to Files, iCloud, or Drive.
+        </Text>
+
+        {/* Back up data */}
+        <TouchableOpacity
+          style={[styles.backupRow, backupBusy && styles.backupRowDisabled]}
+          onPress={handleBackupExport}
+          disabled={backupBusy}
+          accessibilityLabel="Back up data"
+          accessibilityRole="button"
+          activeOpacity={0.7}
+        >
+          <View style={styles.backupIconChip}>
+            <Ionicons name="cloud-upload-outline" size={18} color={Colors.skyDeep} />
+          </View>
+          <View style={styles.backupTextBlock}>
+            <Text style={styles.backupRowTitle}>Back up data</Text>
+            <Text style={styles.backupRowSubtitle}>
+              Export all your data to a JSON file
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward-outline" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        <View style={styles.sectionDivider} />
+
+        {/* Restore from backup */}
+        <TouchableOpacity
+          style={[styles.backupRow, backupBusy && styles.backupRowDisabled]}
+          onPress={handleBackupRestore}
+          disabled={backupBusy}
+          accessibilityLabel="Restore from backup"
+          accessibilityRole="button"
+          activeOpacity={0.7}
+        >
+          <View style={[styles.backupIconChip, styles.backupIconChipRestore]}>
+            <Ionicons name="cloud-download-outline" size={18} color={Colors.clayDeep} />
+          </View>
+          <View style={styles.backupTextBlock}>
+            <Text style={styles.backupRowTitle}>Restore from backup</Text>
+            <Text style={styles.backupRowSubtitle}>
+              Replace all data from a backup file
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward-outline" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+      </Card>
     </ScrollView>
   );
 }
@@ -779,5 +893,50 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     minWidth: 52,
     textAlign: 'center',
+  },
+
+  // Data & backup section
+  sectionLabelBackup: {
+    color: Colors.skyDeep,
+  },
+  backupSubtitle: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
+    lineHeight: Typography.sizes.xs * 1.5,
+  },
+  backupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  backupRowDisabled: {
+    opacity: 0.5,
+  },
+  backupIconChip: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.skyTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backupIconChipRestore: {
+    backgroundColor: Colors.clayTint,
+  },
+  backupTextBlock: {
+    flex: 1,
+  },
+  backupRowTitle: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textPrimary,
+  },
+  backupRowSubtitle: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
   },
 });
