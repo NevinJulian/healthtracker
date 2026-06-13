@@ -130,7 +130,12 @@ function DayRow({
   const subtitle = subtitleParts.join(' · ');
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`${day} ${date}${isToday ? ', today' : ''}, ${entry.hammer_task}, status: ${future ? 'upcoming' : BADGE_LABEL[status]}`}
+    >
       <Row
         leading={dateColumn}
         title={entry.hammer_task}

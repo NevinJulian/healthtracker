@@ -163,6 +163,9 @@ function WeightTrendCard({
             styles.togglePill,
             window === 30 && styles.togglePillActive,
           ]}
+          accessibilityRole="button"
+          accessibilityLabel="Show 30 day history"
+          accessibilityState={{ selected: window === 30 }}
         >
           <Text
             style={[
@@ -179,6 +182,9 @@ function WeightTrendCard({
             styles.togglePill,
             window === 90 && styles.togglePillActive,
           ]}
+          accessibilityRole="button"
+          accessibilityLabel="Show 90 day history"
+          accessibilityState={{ selected: window === 90 }}
         >
           <Text
             style={[
@@ -964,6 +970,9 @@ function LiftingSectionCard({
                 ]}
                 onPress={() => setSelectedExercise(ex)}
                 activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`View progression for ${ex}`}
+                accessibilityState={{ selected: selectedExercise === ex }}
               >
                 <Text
                   style={[

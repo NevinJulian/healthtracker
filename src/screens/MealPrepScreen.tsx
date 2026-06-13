@@ -46,17 +46,25 @@ const logDbError = (err: any) => console.error('[MealPrepScreen] DB Error:', err
 function CircleCheck({
   checked,
   onToggle,
+  accessibilityLabel,
 }: {
   checked: boolean;
   onToggle: () => void;
+  accessibilityLabel?: string;
 }) {
   return (
     <TouchableOpacity
       onPress={onToggle}
       activeOpacity={0.7}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="checkbox"
+      accessibilityLabel={accessibilityLabel ?? 'Toggle'}
+      accessibilityState={{ checked }}
     >
-      <View style={[styles.circle, checked && styles.circleDone]}>
+      <View
+        style={[styles.circle, checked && styles.circleDone]}
+        importantForAccessibility="no-hide-descendants"
+      >
         {checked && <Text style={styles.circleMark}>✓</Text>}
       </View>
     </TouchableOpacity>
@@ -158,6 +166,9 @@ export default function MealPrepScreen() {
             style={[styles.tabPill, active && styles.tabPillActive]}
             onPress={() => setActiveTab(tab)}
             activeOpacity={0.75}
+            accessibilityRole="tab"
+            accessibilityLabel={label}
+            accessibilityState={{ selected: active }}
           >
             <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>
               {label}
@@ -417,6 +428,7 @@ function MealSlot({
           <CircleCheck
             checked={plan.is_consumed}
             onToggle={() => onToggleConsumed(plan.id, plan.is_consumed)}
+            accessibilityLabel={`Mark ${recipe?.title ?? label} ${plan.is_consumed ? 'not consumed' : 'consumed'}`}
           />
         </View>
       ) : (
@@ -425,6 +437,8 @@ function MealSlot({
             style={styles.assignBtn}
             onPress={onAssign}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`Assign recipe to ${label}`}
           >
             <Text style={styles.assignBtnText}>Assign</Text>
           </TouchableOpacity>

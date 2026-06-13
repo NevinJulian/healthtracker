@@ -76,6 +76,8 @@ function RecipeCard({
       style={styles.cardWrapper}
       onPress={onPress}
       activeOpacity={0.78}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}, ${item.category}, ${item.calories} kcal, ${item.prepTimeMinutes} minutes`}
     >
       <Card style={styles.recipeCard}>
         {/* Tinted icon band */}
@@ -187,6 +189,9 @@ export default function RecipesScreen() {
                 style={[styles.chip, isActive && styles.chipActive]}
                 onPress={() => setActiveCategory(cat)}
                 activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter by ${cat}`}
+                accessibilityState={{ selected: isActive }}
               >
                 <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
                   {cat}

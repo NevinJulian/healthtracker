@@ -99,6 +99,7 @@ function OptionChip({ label, selected, onPress, accessibilityLabel }: OptionChip
       activeOpacity={0.7}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
+      accessibilityState={{ selected }}
     >
       <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>{label}</Text>
     </TouchableOpacity>
@@ -119,7 +120,8 @@ function OptionRow({ label, description, selected, onPress }: OptionRowProps) {
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={`${label}: ${description}`}
+      accessibilityState={{ selected }}
     >
       <View style={styles.optionRowText}>
         <Text style={[styles.optionRowLabel, selected && styles.optionRowLabelSelected]}>

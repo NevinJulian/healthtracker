@@ -12,6 +12,14 @@ export interface RowProps {
   /** Optional trailing element (e.g. Pill, chevron, checkbox) */
   trailing?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  /**
+   * When true, the row is exposed as a single accessible element.
+   * Combine with `accessibilityLabel` to provide a richer announcement than
+   * reading title + subtitle individually.
+   */
+  accessible?: boolean;
+  /** Custom accessibility label used when `accessible={true}`. */
+  accessibilityLabel?: string;
 }
 
 /**
@@ -19,9 +27,13 @@ export interface RowProps {
  * Optional leading slot | title + subtitle | optional trailing slot.
  * Used across Today, Cooking, Plan and any list surface.
  */
-export default function Row({ leading, title, subtitle, trailing, style }: RowProps) {
+export default function Row({ leading, title, subtitle, trailing, style, accessible, accessibilityLabel }: RowProps) {
   return (
-    <View style={[styles.row, style]}>
+    <View
+      style={[styles.row, style]}
+      accessible={accessible}
+      accessibilityLabel={accessibilityLabel}
+    >
       {leading != null && <View style={styles.leadingSlot}>{leading}</View>}
       <View style={styles.textBlock}>
         <Text style={styles.title} numberOfLines={1}>

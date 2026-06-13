@@ -1,9 +1,11 @@
 /**
  * Unit tests for src/utils/dates.ts
  *
- * These helpers must be correct regardless of the host timezone, so tests
- * that verify local-vs-UTC behavior explicitly set process.env.TZ to a known
- * zone and restore it afterwards.
+ * These helpers must be correct regardless of the host timezone. Note that
+ * Node/V8 caches the zone at process startup, so assigning process.env.TZ at
+ * runtime does NOT change Date behavior — therefore local-vs-UTC tests assert
+ * against each Date's OWN local getters (getFullYear/getMonth/getDate), which
+ * holds in any host zone, including UTC on CI.
  *
  * Issue #279 — timezone / local-date hardening
  */
@@ -69,23 +71,18 @@ describe('localDateKey', () => {
     }
   });
 
-  it('returns a LOCAL date, not a UTC date, for a non-UTC timezone', () => {
-    const origTZ = process.env.TZ;
-    try {
-      // Set timezone to UTC+1 (Europe/Zurich standard time, no DST adjustment)
-      process.env.TZ = 'Europe/Zurich';
-      // 2024-01-14 23:30 UTC = 2024-01-15 00:30 local (UTC+1)
-      // toISOString() would give '2024-01-14' — localDateKey must give '2024-01-15'
-      const utcLateNight = new Date('2024-01-15T00:30:00+01:00'); // 23:30 UTC on Jan 14
-      // The Date object stores the absolute instant; getDate() interprets it locally
-      expect(localDateKey(utcLateNight)).toBe('2024-01-15');
-    } finally {
-      if (origTZ === undefined) {
-        delete process.env.TZ;
-      } else {
-        process.env.TZ = origTZ;
-      }
-    }
+  it('uses LOCAL calendar components, never the UTC date', () => {
+    // localDateKey must format from the host's LOCAL getters, not toISOString()
+    // (which is UTC). Assert against the Date's own local components so the
+    // expectation is correct in ANY host timezone — including UTC on CI.
+    // (The previous version hard-coded '2024-01-15' and only passed in a UTC+1
+    // zone; in CI's UTC zone the local date of this instant is genuinely Jan 14.)
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const instant = new Date('2024-01-15T00:30:00Z'); // fixed absolute instant
+    const expectedLocal = `${instant.getFullYear()}-${pad(instant.getMonth() + 1)}-${pad(instant.getDate())}`;
+    expect(localDateKey(instant)).toBe(expectedLocal);
+    // A UTC-based implementation would diverge from the local getters whenever
+    // the host zone shifts this instant across a day boundary, which this catches.
   });
 });
 

@@ -185,15 +185,25 @@ export default function RecipeDetailScreen() {
                 onPress={() => setServings(Math.max(1, servings - 1))}
                 activeOpacity={0.75}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Decrease servings"
               >
                 <Text style={styles.stepperBtnText}>−</Text>
               </TouchableOpacity>
-              <Text style={styles.stepperValue}>{servings}</Text>
+              <Text
+                style={styles.stepperValue}
+                accessible={true}
+                accessibilityLabel={`${servings} serving${servings !== 1 ? 's' : ''}`}
+              >
+                {servings}
+              </Text>
               <TouchableOpacity
                 style={styles.stepperBtn}
                 onPress={() => setServings(servings + 1)}
                 activeOpacity={0.75}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Increase servings"
               >
                 <Text style={styles.stepperBtnText}>+</Text>
               </TouchableOpacity>
@@ -282,8 +292,10 @@ export default function RecipeDetailScreen() {
               style={styles.editBtn}
               onPress={handleEdit}
               activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Edit recipe"
             >
-              <Ionicons name="create-outline" size={16} color={Colors.sageDeep} />
+              <Ionicons name="create-outline" size={16} color={Colors.sageDeep} importantForAccessibility="no-hide-descendants" />
               <Text style={styles.editBtnText}>Edit Recipe</Text>
             </TouchableOpacity>
 
@@ -292,8 +304,10 @@ export default function RecipeDetailScreen() {
                 style={styles.deleteBtn}
                 onPress={handleDelete}
                 activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Delete recipe"
               >
-                <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+                <Ionicons name="trash-outline" size={16} color={Colors.danger} importantForAccessibility="no-hide-descendants" />
                 <Text style={styles.deleteBtnText}>Delete</Text>
               </TouchableOpacity>
             )}

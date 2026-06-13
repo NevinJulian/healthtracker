@@ -17,6 +17,8 @@ export interface ButtonProps {
   variant?: ButtonVariant;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Override the accessibility label. Defaults to the button title. */
+  accessibilityLabel?: string;
 }
 
 /**
@@ -31,6 +33,7 @@ export default function Button({
   variant = 'primary',
   disabled = false,
   style,
+  accessibilityLabel,
 }: ButtonProps) {
   const containerStyle: StyleProp<ViewStyle> = [
     styles.base,
@@ -51,8 +54,11 @@ export default function Button({
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityState={{ disabled }}
     >
-      <Text style={textStyle}>{title}</Text>
+      <Text style={textStyle} importantForAccessibility="no-hide-descendants">{title}</Text>
     </TouchableOpacity>
   );
 }
