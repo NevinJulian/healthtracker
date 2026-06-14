@@ -8,11 +8,20 @@
  * Coverage:
  *   - buildInsertColumns: pure column/placeholder/values builder
  *   - validatePayload: format check, schema version compatibility gate
- *   - exportBackup / importBackup smoke: confirm the service exports the
- *     expected functions (consistent with the repo's existing test style)
+ *   - exportBackup / importBackup / buildBackupPayload / writeSafetySnapshot
+ *     smoke: confirm the service exports the expected functions (consistent
+ *     with the repo's existing test style)
  */
 
-import { buildInsertColumns, validatePayload, exportBackup, importBackup } from '../backup';
+import {
+  buildInsertColumns,
+  validatePayload,
+  exportBackup,
+  importBackup,
+  buildBackupPayload,
+  writeSafetySnapshot,
+  shareFile,
+} from '../backup';
 
 // ─── buildInsertColumns ───────────────────────────────────────────────────────
 
@@ -140,5 +149,17 @@ describe('backup service', () => {
 
   it('exports importBackup as a function', () => {
     expect(typeof importBackup).toBe('function');
+  });
+
+  it('exports buildBackupPayload as a function (#293)', () => {
+    expect(typeof buildBackupPayload).toBe('function');
+  });
+
+  it('exports writeSafetySnapshot as a function (#293)', () => {
+    expect(typeof writeSafetySnapshot).toBe('function');
+  });
+
+  it('exports shareFile as a function (#293)', () => {
+    expect(typeof shareFile).toBe('function');
   });
 });
