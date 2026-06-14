@@ -27,7 +27,7 @@ export const Colors = {
   // Text
   textPrimary: '#2C352E',     // deep pine
   textSecondary: '#5E665E',
-  textMuted: '#98A096',
+  textMuted: '#696E67',       // darkened from #98A096 for WCAG AA: ≥4.5:1 on surface & canvas (#294)
 
   // Completion badges
   badgeComplete: '#7C9A85',
@@ -40,7 +40,7 @@ export const Colors = {
   sageDeep: '#4E6B58',
   sageTint: '#E6ECE2',
   clay: '#C98A6B',
-  clayDeep: '#9A5E42',
+  clayDeep: '#945A3F',        // darkened from #9A5E42 for WCAG AA: ≥4.5:1 on clayTint (#294)
   clayTint: '#F3E6DB',
   sky: '#8FAABF',
   skyDeep: '#516675',
