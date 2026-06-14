@@ -15,6 +15,8 @@
  *   - schema_version is NEVER included in the backup tables or overwritten
  *     on restore — that table is managed exclusively by runMigrations().
  *   - Restore is all-or-nothing via db.withTransactionAsync().
+ *   - Before any restore, a safety snapshot of the current data is written
+ *     to cacheDirectory so an accidental restore is always recoverable (#293).
  */
 
 import * as DocumentPicker from 'expo-document-picker';
@@ -46,6 +48,8 @@ export interface BackupPayload {
 export interface RestoreResult {
   tablesRestored: number;
   rowsRestored: number;
+  /** URI of the pre-restore safety snapshot written to cache. */
+  safetySnapshotUri: string;
 }
 
 // ─── Pure helpers (exported for unit tests) ──────────────────────────────────
@@ -130,6 +134,36 @@ function getAppVersion(): string {
 // Delegated to the canonical utility (issue #279).
 const isoDateString = localDateKey;
 
+// ─── Shared payload builder (exported for unit tests) ────────────────────────
+
+/**
+ * Dump all user tables from the database and assemble a BackupPayload object.
+ *
+ * This is the single source-of-truth for the serialization format — both
+ * exportBackup (user-initiated) and the pre-restore safety snapshot (#293)
+ * call this to avoid duplicating the dump/serialize logic.
+ *
+ * @returns A fully-populated BackupPayload ready for JSON serialization.
+ */
+export async function buildBackupPayload(): Promise<BackupPayload> {
+  const schemaVersion = await getCurrentSchemaVersion();
+  const tableNames = await listUserTables();
+  const tables: Record<string, Record<string, unknown>[]> = {};
+
+  for (const name of tableNames) {
+    tables[name] = await dumpTable(name);
+  }
+
+  return {
+    format: 'healthtracker-backup',
+    version: 1,
+    appVersion: getAppVersion(),
+    schemaVersion,
+    createdAt: new Date().toISOString(),
+    tables,
+  };
+}
+
 // ─── Export (backup) ─────────────────────────────────────────────────────────
 
 /**
@@ -147,23 +181,7 @@ export async function exportBackup(): Promise<string> {
     );
   }
 
-  // Dump all user tables
-  const schemaVersion = await getCurrentSchemaVersion();
-  const tableNames = await listUserTables();
-  const tables: Record<string, Record<string, unknown>[]> = {};
-
-  for (const name of tableNames) {
-    tables[name] = await dumpTable(name);
-  }
-
-  const payload: BackupPayload = {
-    format: 'healthtracker-backup',
-    version: 1,
-    appVersion: getAppVersion(),
-    schemaVersion,
-    createdAt: new Date().toISOString(),
-    tables,
-  };
+  const payload = await buildBackupPayload();
 
   const json = JSON.stringify(payload, null, 2);
   const fileName = `healthtracker-backup-${isoDateString()}.json`;
@@ -180,17 +198,68 @@ export async function exportBackup(): Promise<string> {
   return fileUri;
 }
 
+// ─── Safety snapshot (pre-restore) ───────────────────────────────────────────
+
+/**
+ * Produce a filename-safe ISO-ish timestamp for use in filenames.
+ * Replaces ':' with '-' and strips milliseconds so the name is readable on
+ * all platforms.
+ *
+ * Example: "2026-06-14T18-05-30"
+ */
+function safeTimestamp(): string {
+  return new Date().toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, '');
+}
+
+/**
+ * Write a safety snapshot of the current DB state to cacheDirectory and
+ * return its URI.
+ *
+ * Called automatically by importBackup() before wiping any data so that a
+ * mistaken restore is always recoverable. The snapshot uses the same payload
+ * format as a regular export — it can be shared or imported as a normal
+ * backup file.
+ *
+ * @throws When the file write fails (caller decides whether to abort restore).
+ */
+export async function writeSafetySnapshot(): Promise<string> {
+  const payload = await buildBackupPayload();
+  const json = JSON.stringify(payload, null, 2);
+  const fileName = `healthtracker-pre-restore-${safeTimestamp()}.json`;
+  const fileUri = `${cacheDirectory ?? ''}${fileName}`;
+  await writeAsStringAsync(fileUri, json);
+  return fileUri;
+}
+
 // ─── Import (restore) ────────────────────────────────────────────────────────
 
 /**
  * Open the document picker, validate the chosen file as a HealthTracker
- * backup, then restore all tables transactionally.
+ * backup, write a safety snapshot of the current data, then restore all
+ * tables transactionally.
  *
- * @returns A RestoreResult summary, or null when the user cancelled.
+ * Safety snapshot behaviour (#293):
+ *   - Written to cacheDirectory before any data is modified.
+ *   - If the write fails the user is asked whether to continue; the restore
+ *     is aborted when they say no.
+ *   - The returned RestoreResult includes the snapshot URI so the caller can
+ *     offer to share it.
+ *
+ * @returns A RestoreResult summary (including safetySnapshotUri), or null
+ *          when the user cancelled.
  * @throws  When the file is invalid, the schema is incompatible, or the
  *          DB restore transaction fails.
  */
-export async function importBackup(): Promise<RestoreResult | null> {
+export async function importBackup(
+  options: {
+    /**
+     * Called when the safety-snapshot write fails. Receives the error message.
+     * Should return true to proceed with the restore anyway, false to abort.
+     * Defaults to always aborting (returns false) when omitted.
+     */
+    onSnapshotFailed?: (errorMessage: string) => Promise<boolean>;
+  } = {}
+): Promise<RestoreResult | null> {
   const result = await DocumentPicker.getDocumentAsync({
     type: 'application/json',
     copyToCacheDirectory: true,
@@ -214,5 +283,47 @@ export async function importBackup(): Promise<RestoreResult | null> {
   const currentSchemaVersion = await getCurrentSchemaVersion();
   const payload = validatePayload(parsed, currentSchemaVersion);
 
-  return restoreFromPayload(payload.tables);
+  // ── Safety snapshot (written BEFORE any data is wiped) ──────────────────
+  let safetySnapshotUri = '';
+  try {
+    safetySnapshotUri = await writeSafetySnapshot();
+    console.log(`[Backup] Safety snapshot written to: ${safetySnapshotUri}`);
+  } catch (snapshotErr) {
+    const msg =
+      snapshotErr instanceof Error
+        ? snapshotErr.message
+        : 'Unknown error writing safety snapshot.';
+
+    const proceed = options.onSnapshotFailed
+      ? await options.onSnapshotFailed(msg)
+      : false;
+
+    if (!proceed) {
+      throw new Error(
+        `Could not save a safety copy before restoring (${msg}). Restore aborted.`
+      );
+    }
+    // Caller chose to proceed despite failed snapshot — continue without URI.
+  }
+
+  const { tablesRestored, rowsRestored } = await restoreFromPayload(payload.tables);
+  return { tablesRestored, rowsRestored, safetySnapshotUri };
+}
+
+/**
+ * Share an existing file URI via the OS share sheet.
+ * Used to let the user save the safety snapshot after a restore completes.
+ *
+ * @param uri - A file:// URI returned by writeSafetySnapshot or exportBackup.
+ * @returns true when the share sheet was presented, false when sharing is unavailable.
+ */
+export async function shareFile(uri: string): Promise<boolean> {
+  const sharingAvailable = await Sharing.isAvailableAsync();
+  if (!sharingAvailable) return false;
+  await Sharing.shareAsync(uri, {
+    mimeType: 'application/json',
+    dialogTitle: 'Save your safety backup',
+    UTI: 'public.json',
+  });
+  return true;
 }
