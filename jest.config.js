@@ -2,6 +2,10 @@ module.exports = {
   preset: 'jest-expo',
   // Override testEnvironment to node to avoid jest-expo's custom env adding
   // more winter-runtime surface area.
+  // Ignore agent worktrees under .claude/ so leftover repo copies are never
+  // discovered or collide with the live test suite.
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/.claude/'],
+  modulePathIgnorePatterns: ['<rootDir>/.claude/'],
   testEnvironment: 'node',
   moduleNameMapper: {
     // expo/src/winter installs __ExpoImportMetaRegistry via a getter that

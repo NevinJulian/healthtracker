@@ -10,7 +10,7 @@
     "build:apk": "eas build -p android --profile preview",
     "build:android-bundle": "eas build -p android --profile production",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "cross-env TZ=UTC jest"
   },
   "dependencies": {
     "@expo-google-fonts/fraunces": "^0.4.1",
@@ -42,9 +42,12 @@
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
+    "@types/sql.js": "^1.4.9",
+    "cross-env": "^10.1.0",
     "jest": "^30.3.0",
     "jest-expo": "^55.0.16",
     "react-test-renderer": "^19.2.5",
+    "sql.js": "^1.14.1",
     "typescript": "~5.9.2"
   },
   "private": true
