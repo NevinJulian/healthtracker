@@ -2179,3 +2179,53 @@ export async function deleteWorkoutSet(id: number): Promise<void> {
   const db = getDatabase();
   await db.runAsync('DELETE FROM workout_set_log WHERE id = ?', [id]);
 }
+
+// ── Backup reminder settings (#293) ──────────────────────────────────────────
+//
+// Stored as KV pairs in app_state — no schema migration required.
+// Disabled by default; the user opts in from the "Data & backup" section of
+// SettingsScreen.
+
+const SETTING_BACKUP_REMINDER_ENABLED = 'backupReminderEnabled';
+const SETTING_BACKUP_REMINDER_DAY     = 'backupReminderDay';
+const SETTING_BACKUP_REMINDER_TIME    = 'backupReminderTime';
+
+const DEFAULT_BACKUP_REMINDER_DAY  = 0;       // Sunday
+const DEFAULT_BACKUP_REMINDER_TIME = '18:00'; // 6 pm
+
+/** Returns true when the periodic backup reminder is enabled. Default: false. */
+export async function getBackupReminderEnabled(): Promise<boolean> {
+  const raw = await getSetting(SETTING_BACKUP_REMINDER_ENABLED);
+  return raw === 'true';
+}
+
+/** Persist whether the periodic backup reminder is enabled. */
+export async function setBackupReminderEnabled(enabled: boolean): Promise<void> {
+  await setSetting(SETTING_BACKUP_REMINDER_ENABLED, enabled ? 'true' : 'false');
+}
+
+/** Returns the saved weekday (0–6, 0 = Sunday) for the backup reminder. */
+export async function getBackupReminderDay(): Promise<number> {
+  const raw = await getSetting(SETTING_BACKUP_REMINDER_DAY);
+  if (raw === null) return DEFAULT_BACKUP_REMINDER_DAY;
+  const parsed = parseInt(raw, 10);
+  return isNaN(parsed) || parsed < 0 || parsed > 6
+    ? DEFAULT_BACKUP_REMINDER_DAY
+    : parsed;
+}
+
+/** Persist the weekday (0–6) for the backup reminder. */
+export async function setBackupReminderDay(day: number): Promise<void> {
+  await setSetting(SETTING_BACKUP_REMINDER_DAY, String(day));
+}
+
+/** Returns the saved time ("HH:MM") for the backup reminder. Default: "18:00". */
+export async function getBackupReminderTime(): Promise<string> {
+  const raw = await getSetting(SETTING_BACKUP_REMINDER_TIME);
+  return raw ?? DEFAULT_BACKUP_REMINDER_TIME;
+}
+
+/** Persist the time ("HH:MM") for the backup reminder. */
+export async function setBackupReminderTime(time: string): Promise<void> {
+  await setSetting(SETTING_BACKUP_REMINDER_TIME, time);
+}

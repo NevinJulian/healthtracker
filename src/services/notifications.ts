@@ -22,6 +22,12 @@
  *   - scheduleMealReminder(meal, hour, minute)
  *   - cancelMealReminder(meal)
  *   - reconcileScheduledNotifications() extended to sync meal reminders
+ *
+ * #293 additions:
+ *   - scheduleBackupReminder(day, time)
+ *   - cancelBackupReminder()
+ *   - getBackupReminderIdentifier()
+ *   - reconcileScheduledNotifications() extended to sync backup reminder
  */
 
 import * as Notifications from 'expo-notifications';
@@ -39,6 +45,9 @@ import {
   setCookEmptyNotified,
   getMealReminderEnabled,
   getMealReminderTime,
+  getBackupReminderEnabled,
+  getBackupReminderDay,
+  getBackupReminderTime,
   type MealType,
 } from '../db/database';
 
@@ -47,6 +56,11 @@ import {
 const ANDROID_CHANNEL_ID = 'reminders';
 const WORKOUT_REMINDER_ID_KEY = 'workoutReminderNotificationId';
 const WEEKLY_COOK_DAY_ID_KEY = 'weeklyCookDayNotificationId';
+
+/** Stable notification identifier for the backup reminder. */
+const BACKUP_REMINDER_IDENTIFIER = 'backup-reminder';
+/** app_state key for the OS-scheduled notification id. */
+const BACKUP_REMINDER_ID_KEY = 'backupReminderNotificationId';
 
 // ─── Foreground display handler ────────────────────────────────────────────
 
@@ -390,6 +404,71 @@ export async function checkAndNotifyEmptyInventory(): Promise<void> {
   }
 }
 
+// ─── Backup reminder (#293) ──────────────────────────────────────────────────
+
+/**
+ * Returns the stable notification identifier string for the backup reminder.
+ * Exported for use in tests.
+ */
+export function getBackupReminderIdentifier(): string {
+  return BACKUP_REMINDER_IDENTIFIER;
+}
+
+/**
+ * Schedule a weekly repeating backup reminder on the given weekday + time.
+ * Cancels any previously scheduled backup reminder first.
+ *
+ * Uses the same WEEKLY trigger pattern as scheduleWeeklyCookDay.
+ *
+ * @param day  0–6 (0 = Sunday)
+ * @param time "HH:MM"
+ */
+export async function scheduleBackupReminder(day: number, time: string): Promise<void> {
+  try {
+    await cancelBackupReminder();
+
+    const { hour, minute } = parseTimeString(time);
+    const weekday = mapWeekdayToExpo(day);
+
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Back up your data',
+        body: "It's been a while — save a backup so you don't lose your history.",
+        sound: false,
+        ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday,
+        hour,
+        minute,
+      } as any,
+    });
+
+    await setSetting(BACKUP_REMINDER_ID_KEY, id);
+    console.log(`[Notifications] Backup reminder scheduled (weekday ${weekday}, ${time}, id: ${id})`);
+  } catch (err) {
+    console.warn('[Notifications] scheduleBackupReminder failed:', err);
+  }
+}
+
+/**
+ * Cancel the previously scheduled backup reminder (if any).
+ * Silently succeeds when no reminder was previously scheduled.
+ */
+export async function cancelBackupReminder(): Promise<void> {
+  try {
+    const id = await getSetting(BACKUP_REMINDER_ID_KEY);
+    if (id) {
+      await Notifications.cancelScheduledNotificationAsync(id);
+      await setSetting(BACKUP_REMINDER_ID_KEY, '');
+      console.log(`[Notifications] Backup reminder cancelled (id: ${id})`);
+    }
+  } catch (err) {
+    console.warn('[Notifications] cancelBackupReminder failed:', err);
+  }
+}
+
 // ─── Reconcile ───────────────────────────────────────────────────────────────
 
 /**
@@ -435,6 +514,17 @@ export async function reconcileScheduledNotifications(): Promise<void> {
       } else {
         await cancelMealReminder(meal);
       }
+    }
+
+    // Backup reminder (#293)
+    const backupEnabled = await getBackupReminderEnabled();
+    const backupDay = await getBackupReminderDay();
+    const backupTime = await getBackupReminderTime();
+
+    if (backupEnabled) {
+      await scheduleBackupReminder(backupDay, backupTime);
+    } else {
+      await cancelBackupReminder();
     }
   } catch (err) {
     console.warn('[Notifications] reconcileScheduledNotifications failed:', err);

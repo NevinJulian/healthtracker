@@ -1,12 +1,22 @@
 /**
  * Unit tests for pure helper functions in the notification service.
  *
- * parseTimeString, formatTimeString, mapWeekdayToExpo, shouldNotifyEmpty, and
- * getMealReminderIdentifier are all stateless and have no native dependencies,
- * so they can be tested directly in Jest's node environment.
+ * parseTimeString, formatTimeString, mapWeekdayToExpo, shouldNotifyEmpty,
+ * getMealReminderIdentifier, and getBackupReminderIdentifier are all stateless
+ * and have no native dependencies, so they can be tested directly in Jest's
+ * node environment.
  */
 
-import { parseTimeString, formatTimeString, mapWeekdayToExpo, shouldNotifyEmpty, getMealReminderIdentifier } from '../notifications';
+import {
+  parseTimeString,
+  formatTimeString,
+  mapWeekdayToExpo,
+  shouldNotifyEmpty,
+  getMealReminderIdentifier,
+  getBackupReminderIdentifier,
+  scheduleBackupReminder,
+  cancelBackupReminder,
+} from '../notifications';
 import type { MealType } from '../../db/database';
 
 describe('parseTimeString', () => {
@@ -134,5 +144,45 @@ describe('meal reminder default times (via parseTimeString)', () => {
 
   it('dinner default 18:30 parses to hour 18, minute 30', () => {
     expect(parseTimeString('18:30')).toEqual({ hour: 18, minute: 30 });
+  });
+});
+
+describe('getBackupReminderIdentifier', () => {
+  it('returns a non-empty string', () => {
+    const id = getBackupReminderIdentifier();
+    expect(typeof id).toBe('string');
+    expect(id.length).toBeGreaterThan(0);
+  });
+
+  it('contains "backup" in the identifier', () => {
+    expect(getBackupReminderIdentifier()).toContain('backup');
+  });
+
+  it('is stable across calls (same value each time)', () => {
+    expect(getBackupReminderIdentifier()).toBe(getBackupReminderIdentifier());
+  });
+
+  it('is distinct from all meal reminder identifiers', () => {
+    const meals: MealType[] = ['breakfast', 'lunch', 'dinner'];
+    const mealIds = meals.map(getMealReminderIdentifier);
+    const backupId = getBackupReminderIdentifier();
+    for (const mealId of mealIds) {
+      expect(backupId).not.toBe(mealId);
+    }
+  });
+
+  it('default backup reminder time parses correctly', () => {
+    // Default is 18:00 (Sunday evening)
+    expect(parseTimeString('18:00')).toEqual({ hour: 18, minute: 0 });
+  });
+});
+
+describe('backup reminder service (smoke)', () => {
+  it('exports scheduleBackupReminder as a function', () => {
+    expect(typeof scheduleBackupReminder).toBe('function');
+  });
+
+  it('exports cancelBackupReminder as a function', () => {
+    expect(typeof cancelBackupReminder).toBe('function');
   });
 });

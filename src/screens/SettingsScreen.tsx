@@ -40,6 +40,12 @@ import {
   getMealReminderTime,
   setMealReminderEnabled,
   setMealReminderTime,
+  getBackupReminderEnabled,
+  setBackupReminderEnabled,
+  getBackupReminderDay,
+  setBackupReminderDay,
+  getBackupReminderTime,
+  setBackupReminderTime,
   getNutritionGoals,
   setNutritionGoalCalories,
   setNutritionGoalProtein,
@@ -64,10 +70,12 @@ import {
   reconcileScheduledNotifications,
   scheduleMealReminder,
   cancelMealReminder,
+  scheduleBackupReminder,
+  cancelBackupReminder,
   formatTimeString,
   parseTimeString,
 } from '../services/notifications';
-import { exportBackup, importBackup } from '../services/backup';
+import { exportBackup, importBackup, shareFile } from '../services/backup';
 import Card from '../components/Card';
 import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
@@ -104,6 +112,22 @@ const DEFAULT_MEAL_REMINDER_STATE: MealReminderState = {
   breakfast: { enabled: false, time: '08:00' },
   lunch:     { enabled: false, time: '12:30' },
   dinner:    { enabled: false, time: '18:30' },
+  permissionDenied: false,
+};
+
+// ─── Backup reminder state (#293) ─────────────────────────────────────────────
+
+interface BackupReminderState {
+  enabled: boolean;
+  day: number;    // 0–6 (0 = Sunday)
+  time: string;   // "HH:MM"
+  permissionDenied: boolean;
+}
+
+const DEFAULT_BACKUP_REMINDER_STATE: BackupReminderState = {
+  enabled: false,
+  day: 0,
+  time: '18:00',
   permissionDenied: false,
 };
 
@@ -245,6 +269,9 @@ export default function SettingsScreen() {
   // Meal-time reminders (#287)
   const [mealReminders, setMealReminders] = useState<MealReminderState>(DEFAULT_MEAL_REMINDER_STATE);
 
+  // Backup reminder (#293)
+  const [backupReminder, setBackupReminder] = useState<BackupReminderState>(DEFAULT_BACKUP_REMINDER_STATE);
+
   // Backup state
   const [backupBusy, setBackupBusy] = useState(false);
 
@@ -291,6 +318,9 @@ export default function SettingsScreen() {
           lunchTime,
           dinnerEnabled,
           dinnerTime,
+          backupEnabled,
+          backupDay,
+          backupTime,
         ] = await Promise.all([
           getWorkoutReminderEnabled(),
           getWorkoutReminderTime(),
@@ -308,6 +338,9 @@ export default function SettingsScreen() {
           getMealReminderTime('lunch'),
           getMealReminderEnabled('dinner'),
           getMealReminderTime('dinner'),
+          getBackupReminderEnabled(),
+          getBackupReminderDay(),
+          getBackupReminderTime(),
         ]);
         if (active) {
           setReminder((prev) => ({ ...prev, enabled: workoutEnabled, time: workoutTime, permissionDenied: false }));
@@ -324,6 +357,13 @@ export default function SettingsScreen() {
             breakfast: { enabled: breakfastEnabled, time: breakfastTime },
             lunch:     { enabled: lunchEnabled,     time: lunchTime },
             dinner:    { enabled: dinnerEnabled,     time: dinnerTime },
+            permissionDenied: false,
+          }));
+          setBackupReminder((prev) => ({
+            ...prev,
+            enabled: backupEnabled,
+            day: backupDay,
+            time: backupTime,
             permissionDenied: false,
           }));
           setGoalCalories(nutritionGoals.calories);
@@ -571,7 +611,7 @@ export default function SettingsScreen() {
     if (backupBusy) return;
     Alert.alert(
       'Restore from backup',
-      'This will replace ALL current data with the contents of the backup file. This cannot be undone. Continue?',
+      'This will replace ALL current data with the contents of the backup file. A safety copy of your current data will be saved first. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -580,15 +620,43 @@ export default function SettingsScreen() {
           onPress: async () => {
             setBackupBusy(true);
             try {
-              const result = await importBackup();
+              const result = await importBackup({
+                onSnapshotFailed: async (errorMessage) => {
+                  return new Promise<boolean>((resolve) => {
+                    Alert.alert(
+                      'Safety copy failed',
+                      `Could not save a safety copy of your current data (${errorMessage}). Proceeding may make the restore unrecoverable. Continue anyway?`,
+                      [
+                        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                        { text: 'Continue anyway', style: 'destructive', onPress: () => resolve(true) },
+                      ]
+                    );
+                  });
+                },
+              });
               if (result === null) {
                 // User cancelled the picker — no action needed
                 return;
               }
-              Alert.alert(
-                'Restore complete',
-                `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows. Revisit each screen to see the updated data.`
-              );
+              // Offer to share the safety snapshot if one was written
+              if (result.safetySnapshotUri) {
+                Alert.alert(
+                  'Restore complete',
+                  `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows.\n\nA safety copy of your previous data was saved. Would you like to share it?`,
+                  [
+                    { text: 'Dismiss', style: 'cancel' },
+                    {
+                      text: 'Share safety copy',
+                      onPress: () => shareFile(result.safetySnapshotUri),
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert(
+                  'Restore complete',
+                  `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows. Revisit each screen to see the updated data.`
+                );
+              }
             } catch (err) {
               const message =
                 err instanceof Error ? err.message : 'Something went wrong.';
@@ -602,8 +670,48 @@ export default function SettingsScreen() {
     );
   }
 
+  // ── Backup reminder: toggle (#293) ───────────────────────────────────────
+
+  async function handleBackupReminderToggle(value: boolean) {
+    if (value) {
+      const granted = await ensurePermissions();
+      if (!granted) {
+        setBackupReminder((prev) => ({ ...prev, permissionDenied: true }));
+        return;
+      }
+    }
+    await setBackupReminderEnabled(value);
+    setBackupReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
+    await reconcileScheduledNotifications();
+  }
+
+  // ── Backup reminder: weekday chip ─────────────────────────────────────────
+
+  async function handleBackupReminderDaySelect(day: number) {
+    await setBackupReminderDay(day);
+    setBackupReminder((prev) => ({ ...prev, day }));
+    if (backupReminder.enabled) {
+      await reconcileScheduledNotifications();
+    }
+  }
+
+  // ── Backup reminder: time adjustments ─────────────────────────────────────
+
+  async function adjustBackupReminderTime(hourDelta: number, minuteDelta: number) {
+    const { hour, minute } = parseTimeString(backupReminder.time);
+    const newHour = stepHour(hour, hourDelta);
+    const newMinute = stepMinute(minute, minuteDelta);
+    const newTime = formatTimeString(newHour, newMinute);
+    await setBackupReminderTime(newTime);
+    setBackupReminder((prev) => ({ ...prev, time: newTime }));
+    if (backupReminder.enabled) {
+      await scheduleBackupReminder(backupReminder.day, newTime);
+    }
+  }
+
   const { hour: workoutHour, minute: workoutMinute } = parseTimeString(reminder.time);
   const { hour: cookHour, minute: cookMinute } = parseTimeString(cooking.weeklyCookDayTime);
+  const { hour: backupHour, minute: backupMinute } = parseTimeString(backupReminder.time);
 
   return (
     <ScrollView
@@ -1154,6 +1262,92 @@ export default function SettingsScreen() {
           </View>
           <Ionicons name="chevron-forward-outline" size={16} color={Colors.textMuted} />
         </TouchableOpacity>
+
+        <View style={styles.sectionDivider} />
+
+        {/* ── Backup reminder (#293) ──────────────────────────── */}
+        <View style={styles.sectionLabelRow}>
+          <Ionicons name="shield-checkmark-outline" size={16} color={Colors.skyDeep} />
+          <Text style={[styles.sectionLabel, styles.sectionLabelBackup]}>Backup reminder</Text>
+        </View>
+
+        {/* Permission denied notice */}
+        {backupReminder.permissionDenied && (
+          <View style={styles.noticeRow}>
+            <Ionicons name="information-circle-outline" size={16} color={Colors.clayDeep} />
+            <Text style={styles.noticeText}>
+              Enable notifications in your device settings to receive reminders.
+            </Text>
+          </View>
+        )}
+
+        {/* Toggle row */}
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleTextBlock}>
+            <Text style={styles.toggleTitle}>Weekly backup reminder</Text>
+            <Text style={styles.toggleSubtitle}>
+              A nudge to save a backup on your chosen day
+            </Text>
+          </View>
+          <Switch
+            value={backupReminder.enabled}
+            onValueChange={handleBackupReminderToggle}
+            trackColor={{ false: Colors.canvasSunken, true: Colors.sky }}
+            thumbColor={backupReminder.enabled ? Colors.surface : Colors.textMuted}
+            ios_backgroundColor={Colors.canvasSunken}
+            accessibilityLabel="Enable weekly backup reminder"
+          />
+        </View>
+
+        {/* Weekday + time chooser (visible only when enabled) */}
+        {backupReminder.enabled && (
+          <View style={styles.timePicker}>
+            <View style={styles.timePickerDivider} />
+
+            {/* Weekday chip selector */}
+            <Text style={styles.timePickerHeading}>Reminder day</Text>
+            <View style={styles.weekdayRow}>
+              {DAY_LABELS.map((label, idx) => {
+                const selected = backupReminder.day === idx;
+                return (
+                  <TouchableOpacity
+                    key={label}
+                    style={[styles.weekdayChip, selected && styles.weekdayChipBackupSelected]}
+                    onPress={() => handleBackupReminderDaySelect(idx)}
+                    accessibilityLabel={`Select ${label}`}
+                    accessibilityRole="button"
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.weekdayChipLabel, selected && styles.weekdayChipLabelBackupSelected]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Time stepper */}
+            <Text style={[styles.timePickerHeading, styles.timePickerHeadingSpaced]}>Reminder time</Text>
+            <View style={styles.timeStepperRow}>
+              <TimeStepper
+                label="Hour"
+                value={String(backupHour).padStart(2, '0')}
+                onDecrement={() => adjustBackupReminderTime(-1, 0)}
+                onIncrement={() => adjustBackupReminderTime(1, 0)}
+              />
+              <Text style={styles.timeSeparator}>:</Text>
+              <TimeStepper
+                label="Minute"
+                value={String(backupMinute).padStart(2, '0')}
+                onDecrement={() => adjustBackupReminderTime(0, -1)}
+                onIncrement={() => adjustBackupReminderTime(0, 1)}
+              />
+            </View>
+            <Text style={styles.timePreview}>
+              Reminder every {DAY_LABELS[backupReminder.day]} at {formatTimeString(backupHour, backupMinute)}
+            </Text>
+          </View>
+        )}
       </Card>
     </ScrollView>
   );
@@ -1310,6 +1504,9 @@ const styles = StyleSheet.create({
   weekdayChipSelected: {
     backgroundColor: Colors.clayTint,
   },
+  weekdayChipBackupSelected: {
+    backgroundColor: Colors.skyTint,
+  },
   weekdayChipLabel: {
     fontFamily: Typography.label,
     fontSize: Typography.sizes.xs,
@@ -1319,6 +1516,9 @@ const styles = StyleSheet.create({
   },
   weekdayChipLabelSelected: {
     color: Colors.clayDeep,
+  },
+  weekdayChipLabelBackupSelected: {
+    color: Colors.skyDeep,
   },
   timePickerHeadingSpaced: {
     marginTop: Spacing.md,
