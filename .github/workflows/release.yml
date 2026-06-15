@@ -5,6 +5,12 @@ on:
     branches:
       - main
 
+# Never run two release builds at once. Queue them (don't cancel an in-flight
+# build) so every push to main still gets its own Release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
@@ -24,7 +30,7 @@ jobs:
           cache: 'npm'
 
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -48,20 +54,27 @@ jobs:
       - name: Generate Release Notes
         id: notes
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          # Only consider version tags, and list commits SINCE the last release
+          # (two-dot range) so the changelog is "what's new", not the full history.
+          PREV_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+          echo "## Changes" > release-notes.md
           if [ -z "$PREV_TAG" ]; then
-            git log --oneline > release-notes.md
+            git log --oneline >> release-notes.md
           else
-            git log ${PREV_TAG}...HEAD --oneline > release-notes.md
+            git log "${PREV_TAG}..HEAD" --oneline >> release-notes.md
           fi
-          
+
           DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${{ github.run_number }}/app-release.apk"
           QR_CODE_URL="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${DOWNLOAD_URL}"
-          
-          echo "## Download APK" >> release-notes.md
-          echo "[Direct Download Link](${DOWNLOAD_URL})" >> release-notes.md
-          echo "### Scan to Install:" >> release-notes.md
-          echo "![QR Code](${QR_CODE_URL})" >> release-notes.md
+
+          {
+            echo ""
+            echo "## Download APK"
+            echo "[Direct Download Link](${DOWNLOAD_URL})"
+            echo ""
+            echo "### Scan to Install:"
+            echo "![QR Code](${QR_CODE_URL})"
+          } >> release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -70,5 +83,6 @@ jobs:
           name: Release v${{ github.run_number }}
           body_path: release-notes.md
           files: app-release.apk
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
