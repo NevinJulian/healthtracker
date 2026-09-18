@@ -20,6 +20,7 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -207,8 +208,20 @@ function useDebouncedCommit<T>(
   commitRef.current = commit;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Flush a still-pending write immediately (used on unmount/blur, and
-  // callable manually). Idempotent — safe to call more than once.
+  // Runs the commit and catches a rejected write so it never becomes an
+  // unhandled promise rejection — it's fired from a timer/AppState callback,
+  // not from an event handler React can attach its own error boundary to.
+  // `Promise.resolve(...)` also normalizes the `void | Promise<void>` return
+  // type of `commit` into something `.catch` can always be called on.
+  const runCommit = useCallback((committedValue: T) => {
+    Promise.resolve(commitRef.current(committedValue)).catch((err: unknown) => {
+      console.error('[SettingsScreen] debounced stepper write failed:', err);
+    });
+  }, []);
+
+  // Flush a still-pending write immediately (used on unmount/blur/
+  // backgrounding, and callable manually). Idempotent — safe to call more
+  // than once.
   const flush = useCallback(() => {
     if (timerRef.current != null) {
       clearTimeout(timerRef.current);
@@ -216,9 +229,9 @@ function useDebouncedCommit<T>(
     }
     if (dirtyRef.current) {
       dirtyRef.current = false;
-      commitRef.current(valueRef.current);
+      runCommit(valueRef.current);
     }
-  }, [dirtyRef]);
+  }, [dirtyRef, runCommit]);
 
   useEffect(() => {
     if (!dirtyRef.current) return undefined;
@@ -226,7 +239,7 @@ function useDebouncedCommit<T>(
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
       dirtyRef.current = false;
-      commitRef.current(valueRef.current);
+      runCommit(valueRef.current);
     }, STEPPER_DEBOUNCE_MS);
     return () => {
       if (timerRef.current != null) {
@@ -234,7 +247,7 @@ function useDebouncedCommit<T>(
         timerRef.current = null;
       }
     };
-  }, [value, dirtyRef]);
+  }, [value, dirtyRef, runCommit]);
 
   // Flush on unmount so a pending change is never silently dropped. Correct
   // regardless of cleanup ordering relative to the effect above: that effect
@@ -445,6 +458,41 @@ export default function SettingsScreen() {
       await scheduleBackupReminder(backupReminder.day, time);
     }
   });
+
+  // ── Stepper debounce: flush on backgrounding (#313) ────────────────────
+  // Android can tear down the RN instance as soon as the app is backgrounded
+  // — a pending setTimeout never gets to fire. Flush every debounced write
+  // as soon as the app stops being active, not just on blur/unmount. Each
+  // flush is dirty-ref gated (see useDebouncedCommit), so this can never
+  // double-write alongside the useFocusEffect blur/unmount flushes below.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        flushWorkoutTime();
+        flushCookDayTime();
+        flushBreakfastTime();
+        flushLunchTime();
+        flushDinnerTime();
+        flushCalories();
+        flushProtein();
+        flushHydration();
+        flushBackupTime();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [
+    flushWorkoutTime,
+    flushCookDayTime,
+    flushBreakfastTime,
+    flushLunchTime,
+    flushDinnerTime,
+    flushCalories,
+    flushProtein,
+    flushHydration,
+    flushBackupTime,
+  ]);
 
   // Load persisted settings on focus (same pattern as other screens using useFocusEffect)
   useFocusEffect(
