@@ -9,7 +9,7 @@
  * Screen adds no top padding — the nav header owns it.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -176,6 +176,79 @@ function stepMinute(minute: number, delta: number): number {
   return newStep * MINUTE_STEP;
 }
 
+// ─── Debounced stepper writes ────────────────────────────────────────────────
+//
+// Steppers apply changes to local state immediately via a functional setState
+// updater (so N rapid taps always compound on the true previous value, never
+// a stale render-closure value). The DB write — and any notification
+// reconcile/schedule call that depends on it — is debounced here so N rapid
+// taps produce exactly one write, keyed on the piece of state that changed.
+//
+// `dirtyRef` is the thing that distinguishes a user edit from hydration:
+// hydrating state from the DB (on mount/focus) changes the same state, but
+// only a stepper's onPress handler ever sets `dirtyRef.current = true`, so
+// hydration never schedules a write.
+//
+// `commit` is passed fresh (not memoized) on every render by callers, so by
+// the time it actually runs it always reflects the latest values of any
+// other state it closes over (e.g. whether the reminder is enabled) — never
+// a stale outer closure.
+
+const STEPPER_DEBOUNCE_MS = 400;
+
+function useDebouncedCommit<T>(
+  value: T,
+  dirtyRef: React.MutableRefObject<boolean>,
+  commit: (value: T) => void | Promise<void>
+): () => void {
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Flush a still-pending write immediately (used on unmount/blur, and
+  // callable manually). Idempotent — safe to call more than once.
+  const flush = useCallback(() => {
+    if (timerRef.current != null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (dirtyRef.current) {
+      dirtyRef.current = false;
+      commitRef.current(valueRef.current);
+    }
+  }, [dirtyRef]);
+
+  useEffect(() => {
+    if (!dirtyRef.current) return undefined;
+    if (timerRef.current != null) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      dirtyRef.current = false;
+      commitRef.current(valueRef.current);
+    }, STEPPER_DEBOUNCE_MS);
+    return () => {
+      if (timerRef.current != null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [value, dirtyRef]);
+
+  // Flush on unmount so a pending change is never silently dropped. Correct
+  // regardless of cleanup ordering relative to the effect above: that effect
+  // only ever clears the timer, never `dirtyRef`, so whichever cleanup runs
+  // first, `flush` still sees a dirty value to commit exactly once.
+  useEffect(() => {
+    return () => {
+      flush();
+    };
+  }, [flush]);
+
+  return flush;
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 interface StepperProps {
@@ -296,6 +369,83 @@ export default function SettingsScreen() {
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [recalcBusy, setRecalcBusy] = useState(false);
 
+  // ── Stepper debounce: dirty refs (#313) ────────────────────────────────
+  // Flipped to true only by a stepper's onPress handler — never by
+  // hydration — so a DB write is only ever scheduled for a real user edit.
+  const workoutTimeDirtyRef = useRef(false);
+  const cookDayTimeDirtyRef = useRef(false);
+  const breakfastTimeDirtyRef = useRef(false);
+  const lunchTimeDirtyRef = useRef(false);
+  const dinnerTimeDirtyRef = useRef(false);
+  const caloriesDirtyRef = useRef(false);
+  const proteinDirtyRef = useRef(false);
+  const hydrationDirtyRef = useRef(false);
+  const backupTimeDirtyRef = useRef(false);
+
+  const mealTimeDirtyRefs: Record<MealType, React.MutableRefObject<boolean>> = {
+    breakfast: breakfastTimeDirtyRef,
+    lunch: lunchTimeDirtyRef,
+    dinner: dinnerTimeDirtyRef,
+  };
+
+  // ── Stepper debounce: debounced commits (#313) ─────────────────────────
+  const flushWorkoutTime = useDebouncedCommit(reminder.time, workoutTimeDirtyRef, async (time) => {
+    await setWorkoutReminderTime(time);
+    if (reminder.enabled) {
+      await reconcileScheduledNotifications();
+    }
+  });
+
+  const flushCookDayTime = useDebouncedCommit(cooking.weeklyCookDayTime, cookDayTimeDirtyRef, async (time) => {
+    await setWeeklyCookDayTime(time);
+    if (cooking.weeklyCookDayEnabled) {
+      await reconcileScheduledNotifications();
+    }
+  });
+
+  const flushBreakfastTime = useDebouncedCommit(mealReminders.breakfast.time, breakfastTimeDirtyRef, async (time) => {
+    await setMealReminderTime('breakfast', time);
+    if (mealReminders.breakfast.enabled) {
+      const { hour, minute } = parseTimeString(time);
+      await scheduleMealReminder('breakfast', hour, minute);
+    }
+  });
+
+  const flushLunchTime = useDebouncedCommit(mealReminders.lunch.time, lunchTimeDirtyRef, async (time) => {
+    await setMealReminderTime('lunch', time);
+    if (mealReminders.lunch.enabled) {
+      const { hour, minute } = parseTimeString(time);
+      await scheduleMealReminder('lunch', hour, minute);
+    }
+  });
+
+  const flushDinnerTime = useDebouncedCommit(mealReminders.dinner.time, dinnerTimeDirtyRef, async (time) => {
+    await setMealReminderTime('dinner', time);
+    if (mealReminders.dinner.enabled) {
+      const { hour, minute } = parseTimeString(time);
+      await scheduleMealReminder('dinner', hour, minute);
+    }
+  });
+
+  const flushCalories = useDebouncedCommit(goalCalories, caloriesDirtyRef, async (value) => {
+    await setNutritionGoalCalories(value);
+  });
+
+  const flushProtein = useDebouncedCommit(goalProtein, proteinDirtyRef, async (value) => {
+    await setNutritionGoalProtein(value);
+  });
+
+  const flushHydration = useDebouncedCommit(hydrationGoalMl, hydrationDirtyRef, async (value) => {
+    await setHydrationGoal(value);
+  });
+
+  const flushBackupTime = useDebouncedCommit(backupReminder.time, backupTimeDirtyRef, async (time) => {
+    await setBackupReminderTime(time);
+    if (backupReminder.enabled) {
+      await scheduleBackupReminder(backupReminder.day, time);
+    }
+  });
+
   // Load persisted settings on focus (same pattern as other screens using useFocusEffect)
   useFocusEffect(
     useCallback(() => {
@@ -375,7 +525,23 @@ export default function SettingsScreen() {
           setLatestWeight(weight);
         }
       })();
-      return () => { active = false; };
+      return () => {
+        active = false;
+        // Flush any pending debounced stepper write immediately when the
+        // screen loses focus, so a rapid final tap is never silently
+        // dropped (#313). Each flush is idempotent (a no-op unless a write
+        // is actually pending), and these callbacks are stable across
+        // renders, so capturing them in this empty-deps useCallback is safe.
+        flushWorkoutTime();
+        flushCookDayTime();
+        flushBreakfastTime();
+        flushLunchTime();
+        flushDinnerTime();
+        flushCalories();
+        flushProtein();
+        flushHydration();
+        flushBackupTime();
+      };
     }, [])
   );
 
@@ -396,16 +562,14 @@ export default function SettingsScreen() {
 
   // ── Workout: Time adjustments ───────────────────────────────────────────
 
-  async function adjustWorkoutTime(hourDelta: number, minuteDelta: number) {
-    const { hour, minute } = parseTimeString(reminder.time);
-    const newHour = stepHour(hour, hourDelta);
-    const newMinute = stepMinute(minute, minuteDelta);
-    const newTime = formatTimeString(newHour, newMinute);
-    await setWorkoutReminderTime(newTime);
-    setReminder((prev) => ({ ...prev, time: newTime }));
-    if (reminder.enabled) {
-      await reconcileScheduledNotifications();
-    }
+  function adjustWorkoutTime(hourDelta: number, minuteDelta: number) {
+    workoutTimeDirtyRef.current = true;
+    setReminder((prev) => {
+      const { hour, minute } = parseTimeString(prev.time);
+      const newHour = stepHour(hour, hourDelta);
+      const newMinute = stepMinute(minute, minuteDelta);
+      return { ...prev, time: formatTimeString(newHour, newMinute) };
+    });
   }
 
   // ── Cooking: Cook-when-empty toggle ────────────────────────────────────
@@ -449,16 +613,14 @@ export default function SettingsScreen() {
 
   // ── Cooking: Cook-day time adjustments ─────────────────────────────────
 
-  async function adjustCookDayTime(hourDelta: number, minuteDelta: number) {
-    const { hour, minute } = parseTimeString(cooking.weeklyCookDayTime);
-    const newHour = stepHour(hour, hourDelta);
-    const newMinute = stepMinute(minute, minuteDelta);
-    const newTime = formatTimeString(newHour, newMinute);
-    await setWeeklyCookDayTime(newTime);
-    setCooking((prev) => ({ ...prev, weeklyCookDayTime: newTime }));
-    if (cooking.weeklyCookDayEnabled) {
-      await reconcileScheduledNotifications();
-    }
+  function adjustCookDayTime(hourDelta: number, minuteDelta: number) {
+    cookDayTimeDirtyRef.current = true;
+    setCooking((prev) => {
+      const { hour, minute } = parseTimeString(prev.weeklyCookDayTime);
+      const newHour = stepHour(hour, hourDelta);
+      const newMinute = stepMinute(minute, minuteDelta);
+      return { ...prev, weeklyCookDayTime: formatTimeString(newHour, newMinute) };
+    });
   }
 
   // ── Meal reminders: toggle (#287) ─────────────────────────────────────
@@ -488,41 +650,33 @@ export default function SettingsScreen() {
 
   // ── Meal reminders: time adjustments (#287) ────────────────────────────
 
-  async function adjustMealTime(meal: MealType, hourDelta: number, minuteDelta: number) {
-    const { hour, minute } = parseTimeString(mealReminders[meal].time);
-    const newHour = stepHour(hour, hourDelta);
-    const newMinute = stepMinute(minute, minuteDelta);
-    const newTime = formatTimeString(newHour, newMinute);
-    await setMealReminderTime(meal, newTime);
-    setMealReminders((prev) => ({
-      ...prev,
-      [meal]: { ...prev[meal], time: newTime },
-    }));
-    if (mealReminders[meal].enabled) {
-      await scheduleMealReminder(meal, newHour, newMinute);
-    }
+  function adjustMealTime(meal: MealType, hourDelta: number, minuteDelta: number) {
+    mealTimeDirtyRefs[meal].current = true;
+    setMealReminders((prev) => {
+      const { hour, minute } = parseTimeString(prev[meal].time);
+      const newHour = stepHour(hour, hourDelta);
+      const newMinute = stepMinute(minute, minuteDelta);
+      return { ...prev, [meal]: { ...prev[meal], time: formatTimeString(newHour, newMinute) } };
+    });
   }
 
   // ── Nutrition goals: step handlers ────────────────────────────────────
 
-  async function adjustCalories(delta: number) {
-    const newVal = Math.min(CALORIES_MAX, Math.max(CALORIES_MIN, goalCalories + delta));
-    await setNutritionGoalCalories(newVal);
-    setGoalCalories(newVal);
+  function adjustCalories(delta: number) {
+    caloriesDirtyRef.current = true;
+    setGoalCalories((prev) => Math.min(CALORIES_MAX, Math.max(CALORIES_MIN, prev + delta)));
   }
 
-  async function adjustProtein(delta: number) {
-    const newVal = Math.min(PROTEIN_MAX, Math.max(PROTEIN_MIN, goalProtein + delta));
-    await setNutritionGoalProtein(newVal);
-    setGoalProtein(newVal);
+  function adjustProtein(delta: number) {
+    proteinDirtyRef.current = true;
+    setGoalProtein((prev) => Math.min(PROTEIN_MAX, Math.max(PROTEIN_MIN, prev + delta)));
   }
 
   // ── Hydration goal: step handler (#283) ───────────────────────────────
 
-  async function adjustHydrationGoal(delta: number) {
-    const newVal = Math.min(HYDRATION_MAX, Math.max(HYDRATION_MIN, hydrationGoalMl + delta));
-    await setHydrationGoal(newVal);
-    setHydrationGoalMl(newVal);
+  function adjustHydrationGoal(delta: number) {
+    hydrationDirtyRef.current = true;
+    setHydrationGoalMl((prev) => Math.min(HYDRATION_MAX, Math.max(HYDRATION_MIN, prev + delta)));
   }
 
   // ── Profile: field save helpers (#281) ────────────────────────────────
@@ -697,16 +851,14 @@ export default function SettingsScreen() {
 
   // ── Backup reminder: time adjustments ─────────────────────────────────────
 
-  async function adjustBackupReminderTime(hourDelta: number, minuteDelta: number) {
-    const { hour, minute } = parseTimeString(backupReminder.time);
-    const newHour = stepHour(hour, hourDelta);
-    const newMinute = stepMinute(minute, minuteDelta);
-    const newTime = formatTimeString(newHour, newMinute);
-    await setBackupReminderTime(newTime);
-    setBackupReminder((prev) => ({ ...prev, time: newTime }));
-    if (backupReminder.enabled) {
-      await scheduleBackupReminder(backupReminder.day, newTime);
-    }
+  function adjustBackupReminderTime(hourDelta: number, minuteDelta: number) {
+    backupTimeDirtyRef.current = true;
+    setBackupReminder((prev) => {
+      const { hour, minute } = parseTimeString(prev.time);
+      const newHour = stepHour(hour, hourDelta);
+      const newMinute = stepMinute(minute, minuteDelta);
+      return { ...prev, time: formatTimeString(newHour, newMinute) };
+    });
   }
 
   const { hour: workoutHour, minute: workoutMinute } = parseTimeString(reminder.time);
