@@ -1,0 +1,35 @@
+{
+  "startedAt": "2026-09-18T22:39:45Z",
+  "integrationBranch": "sprint/auto-fixes",
+  "baseSha": "198a5f2",
+  "baseline": { "typecheck": "pass", "testSuites": 17, "tests": 331 },
+  "frozenScope": [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 335, 336],
+  "excluded": { "334": "SPRINT.md §3 — .gitattributes renormalisation lands alone, by hand" },
+  "budget": { "maxRoundTripsPerIssue": 3, "maxParkedBeforeAbort": 8 },
+  "worktreeRoot": "C:/git/ht-lanes",
+  "orchestratorDecisions": [
+    "Each lane runs in its own git worktree outside the repo (C:/git/ht-lanes/lane-<x>) so parallel lanes never switch branches under each other and jest in the main tree never scans lane copies.",
+    "Lane D starts in parallel with its independent issues; only #317 and #304 wait for lane A to merge (SPRINT.md §3 'Lane D waits for lane A to merge into sprint/auto-fixes before starting #304 and #317'). #304 runs last per 'Lane D: #304 last'.",
+    "Test-file ownership: lane G owns jest.config.js and #336, but every developer must write a regression test, so each lane owns the tests for its own modules: A=src/db/__tests__/**, B=src/services/__tests__/**, C=src/screens/__tests__/analyticsHelpers.test.ts + src/screens/__tests__/AnalyticsDashboardScreen*.test.tsx, D=src/screens/__tests__/{Settings,MealPrep,Dashboard}Screen*.test.tsx, E=src/api/__tests__/**. Lane G runs last so there is no concurrent editor.",
+    "#315 (lane A) spans database.ts and backup.ts validatePayload. Lane A is granted validatePayload in src/services/backup.ts + its tests in src/services/__tests__/backup.test.ts ONLY after lane B has merged into integration and integration has been merged into lane A. If lane B has not merged when lane A reaches #315, lane A defers #315 and continues.",
+    "#317 (lane D) is a database.ts/schema.ts fix. It runs after lane A merges, on a lane D branch refreshed from integration, and is granted the workout_set_log functions in src/db/database.ts, an appended migration in src/db/schema.ts, and src/db/__tests__/** for its test. No concurrent lane-A editor exists by then, so migration numbering cannot collide.",
+    "#335 (lane F) edits src/db/README.md and the schema.ts header. It runs after lane A merges, on a lane F branch refreshed from integration, so the docs describe the post-sprint db layer. Granted: src/**/README.md, the header comment of src/db/schema.ts only, CLAUDE.md.",
+    "#310 (lane B): the SettingsScreen success-alert wording is lane D territory; lane B stays in backup.ts/notifications.ts and reports any criterion it cannot meet in-lane."
+  ],
+  "lanes": {
+    "A": { "branch": "sprint/lane-a-db", "worktree": "C:/git/ht-lanes/lane-a", "status": "pending", "order": [300, 301, 305, 302, 303, 319, 320, 321, 314, 315, 316, 306, 307, 331], "current": null, "done": [], "parked": [] },
+    "B": { "branch": "sprint/lane-b-notify", "worktree": "C:/git/ht-lanes/lane-b", "status": "pending", "order": [309, 310, 311], "current": null, "done": [], "parked": [] },
+    "C": { "branch": "sprint/lane-c-analytics", "worktree": "C:/git/ht-lanes/lane-c", "status": "pending", "order": [308, 312, 327, 328], "current": null, "done": [], "parked": [] },
+    "D": { "branch": "sprint/lane-d-screens", "worktree": "C:/git/ht-lanes/lane-d", "status": "pending", "order": [313, 322, 323, 324, 325, 326, 329, 330, 317, 304], "waitsForLaneA": [317, 304], "current": null, "done": [], "parked": [] },
+    "E": { "branch": "sprint/lane-e-api", "worktree": "C:/git/ht-lanes/lane-e", "status": "pending", "order": [318], "current": null, "done": [], "parked": [] },
+    "F": { "branch": "sprint/lane-f-repo", "worktree": "C:/git/ht-lanes/lane-f", "status": "pending", "order": [332, 333, 335], "waitsForLaneA": [335], "current": null, "done": [], "parked": [] },
+    "G": { "branch": "sprint/lane-g-tests", "worktree": "C:/git/ht-lanes/lane-g", "status": "pending", "order": [336], "waitsFor": "all other lanes merged", "current": null, "done": [], "parked": [] }
+  },
+  "issues": {},
+  "foundDuringSprint": [],
+  "log": [
+    { "at": "2026-09-18T22:39:45Z", "event": "preflight green on main: typecheck pass, 331 tests / 17 suites" },
+    { "at": "2026-09-18T22:39:45Z", "event": "created and pushed sprint/auto-fixes from main", "sha": "198a5f2" },
+    { "at": "2026-09-18T22:39:45Z", "event": "scope frozen: 36 open issues in #300-#336, #334 excluded" }
+  ]
+}
