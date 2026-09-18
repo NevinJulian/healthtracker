@@ -416,3 +416,191 @@ describe('reconcileScheduledNotifications — post-upgrade sweep (#309)', () => 
     );
   });
 });
+
+// ─── #311: coalescing in-flight guard + per-reminder isolation ─────────────
+//
+// #309 gave every recurring reminder a stable OS identifier, so overlapping
+// reconcile passes no longer create duplicate entries — but they still
+// interleave at `await` points, and whichever pass *writes* last wins, not
+// whichever *read* the freshest settings. These helpers give the guard
+// tests a controllable app_state store (so a later pass's cancel/schedule
+// calls see whatever an earlier pass in the same test actually persisted)
+// and a Map-simulated OS schedule (upsert-by-identifier, delete-on-cancel)
+// so the tests can assert on the OS's *final* state rather than on call
+// counts alone.
+
+/** In-memory stand-in for every app_state key reconcile touches. */
+function mockAppStateStore() {
+  const store = new Map<string, string>();
+  jest.mocked(db.getSetting).mockImplementation(async (key: string) =>
+    store.has(key) ? store.get(key)! : null
+  );
+  jest.mocked(db.setSetting).mockImplementation(async (key: string, value: string) => {
+    store.set(key, value);
+  });
+  // Pre-seed the #309 sweep flag as already-done: these tests are about the
+  // #311 guard/isolation behaviour, not the sweep, so keep it out of the way.
+  store.set('notificationIdSweepV1Done', 'true');
+  return store;
+}
+
+/**
+ * In-memory stand-in for the OS's scheduled-notification table, keyed by
+ * identifier the way expo-notifications' real upsert-by-identifier
+ * semantics work (see the #309 "scheduling the same reminder twice" test
+ * above) — extended here to also delete on cancel, so a full
+ * schedule-then-cancel round trip is observable.
+ */
+function mockOsSchedule() {
+  const entries = new Map<string, unknown>();
+  let counter = 0;
+  jest.mocked(Notifications.scheduleNotificationAsync).mockImplementation(async (request: any) => {
+    const id = request.identifier ?? `random-${counter++}`;
+    entries.set(id, request);
+    return id;
+  });
+  jest.mocked(Notifications.cancelScheduledNotificationAsync).mockImplementation(async (id: string) => {
+    entries.delete(id);
+  });
+  return entries;
+}
+
+/** A promise plus its resolve function, for controlling exactly when a mocked read settles. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+/**
+ * Drains the entire microtask queue (via a macrotask boundary), so that
+ * every promise chain which can make progress without external input has
+ * done so before we continue. Needed because resolving a deferred promise
+ * synchronously, right after kicking off two calls, resolves it *before*
+ * either call has actually reached the `await` that consumes it — which
+ * would make both calls observe it as already-settled instead of pending,
+ * defeating the "A is still in flight / A's read resolves last" ordering
+ * these tests depend on.
+ */
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
+describe('reconcileScheduledNotifications — coalescing in-flight guard (#311)', () => {
+  it('a call made while a pass is in flight does not start overlapping work: the OS ends up reflecting the settings the trailing pass read, not the in-flight one', async () => {
+    // Reconcile A reads enabled=true (deferred); reconcile B is called while
+    // A is still in flight and reads enabled=false; A's read resolves last.
+    // The final OS state must reflect B's settings (disabled ⇒ not
+    // scheduled) — not A's, and not some interleaved mix of both.
+    mockAppStateStore();
+    const entries = mockOsSchedule();
+    jest.mocked(db.getWorkoutReminderTime).mockResolvedValue('07:00');
+
+    let calls = 0;
+    const firstRead = deferred<boolean>();
+    jest.mocked(db.getWorkoutReminderEnabled).mockImplementation(() => {
+      calls++;
+      return calls === 1 ? firstRead.promise : Promise.resolve(false);
+    });
+
+    const passA = reconcileScheduledNotifications();
+    const passB = reconcileScheduledNotifications(); // called while A is in flight
+
+    // Let B's read (and everything it can do without A) run to completion
+    // before A's read resolves, so A really does resolve last.
+    await flushMicrotasks();
+    firstRead.resolve(true);
+
+    await passA;
+    await passB;
+
+    expect(entries.has('workout-reminder')).toBe(false);
+  });
+
+  it('N calls that arrive while a pass is in flight collapse into at most 2 _reconcile passes total', async () => {
+    mockAppStateStore();
+    mockOsSchedule();
+
+    let passStarts = 0;
+    const firstRead = deferred<boolean>();
+    jest.mocked(db.getWorkoutReminderEnabled).mockImplementation(() => {
+      passStarts++;
+      return passStarts === 1 ? firstRead.promise : Promise.resolve(false);
+    });
+
+    const calls = [
+      reconcileScheduledNotifications(),
+      reconcileScheduledNotifications(),
+      reconcileScheduledNotifications(),
+      reconcileScheduledNotifications(),
+      reconcileScheduledNotifications(),
+    ];
+
+    firstRead.resolve(false);
+    await Promise.all(calls);
+
+    expect(passStarts).toBeLessThanOrEqual(2);
+  });
+
+  it("a caller's returned promise resolves only once a pass that STARTED AFTER its own call has finished — it must not resolve as soon as the already-running pass finishes", async () => {
+    // This is the shape importBackup() (#310) depends on: write settings,
+    // then await reconcile — the promise must reflect a pass that actually
+    // read the just-written value, not a pass that started earlier and
+    // happened to still be in flight.
+    mockAppStateStore();
+    const entries = mockOsSchedule();
+    jest.mocked(db.getWorkoutReminderTime).mockResolvedValue('07:00');
+
+    let calls = 0;
+    const firstRead = deferred<boolean>();
+    jest.mocked(db.getWorkoutReminderEnabled).mockImplementation(() => {
+      calls++;
+      // Pass A (already running when the caller below calls in) eventually
+      // reads disabled; every pass after it reads enabled.
+      return calls === 1 ? firstRead.promise : Promise.resolve(true);
+    });
+
+    const passA = reconcileScheduledNotifications();
+    const callerPromise = reconcileScheduledNotifications(); // called while A is in flight
+
+    await flushMicrotasks();
+    firstRead.resolve(false);
+    await passA;
+    await callerPromise;
+
+    // The caller's own promise only resolved once a second pass — started
+    // after its call, per the contract — had itself read and applied the
+    // live (enabled=true) settings.
+    expect(calls).toBe(2);
+    expect(entries.has('workout-reminder')).toBe(true);
+  });
+
+  it('a pass that throws does not wedge the guard — the next call still runs a full pass', async () => {
+    // #309/#310 section isolation (below) means a single getter rejecting
+    // is normally contained inside its own try/catch and never escapes
+    // _reconcile(). To prove the guard itself is resilient even if
+    // something does slip past that isolation, force the escape
+    // synthetically: the getter rejects AND the warn-logging call the
+    // catch block makes also throws (once), so the error propagates out of
+    // that whole pass. The guard must still let the next call run.
+    mockAppStateStore();
+    const entries = mockOsSchedule();
+
+    jest.mocked(db.getWorkoutReminderEnabled).mockRejectedValueOnce(new Error('boom'));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementationOnce(() => {
+      throw new Error('logging exploded');
+    });
+
+    await reconcileScheduledNotifications(); // must not hang or wedge the guard
+    warnSpy.mockRestore();
+
+    jest.mocked(db.getWorkoutReminderEnabled).mockResolvedValue(true);
+    jest.mocked(db.getWorkoutReminderTime).mockResolvedValue('07:00');
+
+    await reconcileScheduledNotifications();
+
+    expect(entries.has('workout-reminder')).toBe(true);
+  });
+});
