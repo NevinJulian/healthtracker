@@ -17,10 +17,22 @@
  *   - Restore is all-or-nothing via db.withTransactionAsync().
  *   - Before any restore, a safety snapshot of the current data is written
  *     to cacheDirectory so an accidental restore is always recoverable (#293).
+ *   - After a successful restore, scheduled OS notifications are resynced to
+ *     the restored settings (#310): cancelAllScheduledNotificationsAsync()
+ *     runs first, then reconcileScheduledNotifications(). cancelAll (rather
+ *     than reconcile alone) is required because a restored reminder that is
+ *     disabled can carry an empty/stale *_ID_KEY in app_state — the cancel*
+ *     helpers in notifications.ts still cancel by that stored id, not by the
+ *     #309 stable identifier, so reconcile alone could leave a
+ *     currently-scheduled-but-now-disabled reminder firing forever. This
+ *     resync is best-effort: it only runs once restoreFromPayload has
+ *     resolved successfully, and a failure in it is logged, never thrown —
+ *     the data restore itself already succeeded by that point.
  */
 
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
+import * as Notifications from 'expo-notifications';
 import {
   cacheDirectory,
   writeAsStringAsync,
@@ -32,6 +44,7 @@ import {
   dumpTable,
   restoreFromPayload,
 } from '../db/database';
+import { reconcileScheduledNotifications } from './notifications';
 import { localDateKey } from '../utils/dates';
 
 // ─── Public types ────────────────────────────────────────────────────────────
@@ -307,6 +320,19 @@ export async function importBackup(
   }
 
   const { tablesRestored, rowsRestored } = await restoreFromPayload(payload.tables);
+
+  // ── Resync scheduled notifications to the restored settings (#310) ──────
+  // Runs only after a successful restore; nothing above this point touches
+  // notifications, so a restore that throws leaves existing reminders
+  // untouched. Best-effort: a failure here must not turn a successful data
+  // restore into a reported failure.
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    await reconcileScheduledNotifications();
+  } catch (err) {
+    console.warn('[Backup] Failed to resync notifications after restore:', err);
+  }
+
   return { tablesRestored, rowsRestored, safetySnapshotUri };
 }
 
