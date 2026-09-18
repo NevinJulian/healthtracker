@@ -25,7 +25,7 @@
  *       · Average macros stat card
  *       · Most-cooked recipes (cook_log, builds over time) + inventory snapshot
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -79,6 +79,8 @@ import {
   latestMeasurementValue,
   computePRs,
   bestSetPerDay,
+  resolveSelectedExercise,
+  plausibleWeights,
   type HydrationDay,
   type WorkoutSetSlice,
 } from './analyticsHelpers';
@@ -119,7 +121,7 @@ function MetricCard({
 
 // ─── Weight trend (flat View-based chart with 30/90-day toggle) ───────────────
 
-function WeightTrendCard({
+export function WeightTrendCard({
   history30,
   history90,
 }: {
@@ -140,10 +142,16 @@ function WeightTrendCard({
     );
   }
 
-  const weights = history.length > 0 ? history.map((w) => w.weight) : [0];
+  // getWeightHistory() only filters IS NOT NULL, so a mis-typed entry (e.g.
+  // 9999 instead of 99.9) can still reach here. Keep the chart, the
+  // current-weight label, and the Min/Max text limited to plausible points
+  // (#322); excluded points are surfaced as a small muted note below.
+  const { valid: plausible, excludedCount } = plausibleWeights(history);
+
+  const weights = plausible.length > 0 ? plausible.map((w) => w.weight) : [0];
   const minW = Math.min(...weights) - 2;
   const maxW = Math.max(...weights) + 2;
-  const current = history.length > 0 ? weights[weights.length - 1] : null;
+  const current = plausible.length > 0 ? weights[weights.length - 1] : null;
   const range = maxW - minW || 1;
 
   return (
@@ -197,7 +205,7 @@ function WeightTrendCard({
         </TouchableOpacity>
       </View>
 
-      {history.length === 0 ? (
+      {plausible.length === 0 ? (
         <Text style={styles.emptyText}>No data for this period.</Text>
       ) : (
         <>
@@ -209,9 +217,9 @@ function WeightTrendCard({
 
             {/* Bars + last-point dot */}
             <View style={styles.lineLayer}>
-              {history.map((pt, i) => {
+              {plausible.map((pt, i) => {
                 const heightPct = Math.max(4, ((pt.weight - minW) / range) * 100);
-                const isLast = i === history.length - 1;
+                const isLast = i === plausible.length - 1;
                 return (
                   <View key={`bar-${i}`} style={styles.barColumn}>
                     {isLast ? (
@@ -249,6 +257,14 @@ function WeightTrendCard({
           </View>
         </>
       )}
+
+      {excludedCount > 0 && (
+        <Text style={[styles.chartMetaText, { color: Colors.textMuted }]}>
+          {excludedCount === 1
+            ? '1 entry hidden — out of range'
+            : `${excludedCount} entries hidden — out of range`}
+        </Text>
+      )}
     </Card>
   );
 }
@@ -260,7 +276,7 @@ interface StrengthProgressionCardProps {
   todayISO: string;
 }
 
-function StrengthProgressionCard({
+export function StrengthProgressionCard({
   startDateISO,
   todayISO,
 }: StrengthProgressionCardProps) {
@@ -270,7 +286,13 @@ function StrengthProgressionCard({
     return cutoff > startDateISO ? cutoff : startDateISO;
   })();
 
-  const fullPoints = computeStrengthProgression(windowStart, todayISO, 0);
+  // computeStrengthProgression loops over up to 90 days — memoise it so it
+  // only re-runs when the window it reads (windowStart, todayISO) actually
+  // changes, not on every render (#327).
+  const fullPoints = useMemo(
+    () => computeStrengthProgression(windowStart, todayISO, 0),
+    [windowStart, todayISO]
+  );
   const steps = progressionSteps(fullPoints);
 
   // Current weight and cycle
@@ -894,27 +916,55 @@ function LiftingProgressChart({
   );
 }
 
+// Shared stable identity for "no history" so a useMemo keyed on the
+// selected exercise's history isn't defeated by a fresh [] literal on
+// every render when there's nothing logged yet (#327).
+const EMPTY_HISTORY: WorkoutSetSlice[] = [];
+
 /**
  * LiftingSectionCard — the top-level "Strength / Lifts" card shown in Analytics.
  *
  * - Shows PRs per logged exercise (best weight + estimated 1RM)
  * - Shows a progression chart for the currently selected exercise
  */
-function LiftingSectionCard({
+export function LiftingSectionCard({
   loggedExercises,
   historyByExercise,
 }: {
   loggedExercises: string[];
   historyByExercise: Record<string, WorkoutSetSlice[]>;
 }) {
-  const [selectedExercise, setSelectedExercise] = useState<string | null>(
-    loggedExercises.length > 0 ? loggedExercises[0] : null
+  // `selectedExercise` only ever holds the user's explicit pill tap — it
+  // starts null and is never re-initialised. `loggedExercises` is `[]` on
+  // first render and populated asynchronously, so the active exercise must
+  // be derived on every render rather than trusted from the useState
+  // initializer (which only sees the first render's value).
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const activeExercise = resolveSelectedExercise(selectedExercise, loggedExercises);
+
+  const selectedHistory = activeExercise
+    ? (historyByExercise[activeExercise] ?? EMPTY_HISTORY)
+    : EMPTY_HISTORY;
+
+  // bestSetPerDay is a Map scan of the exercise history — memoise it so it
+  // only re-runs when the selected exercise's history actually changes,
+  // not on every render (#327). EMPTY_HISTORY above keeps a stable
+  // identity for the "nothing logged" case so this memo isn't silently
+  // defeated by a fresh [] literal each render.
+  const chartPoints = useMemo(
+    () => bestSetPerDay(selectedHistory),
+    [selectedHistory]
   );
 
-  const selectedHistory = selectedExercise
-    ? (historyByExercise[selectedExercise] ?? [])
-    : [];
-  const chartPoints = bestSetPerDay(selectedHistory);
+  // Math.min/max spread over chartPoints.map(...) allocates a fresh array
+  // and re-scans it every render; memoise alongside chartPoints (#327).
+  const chartWeightRange = useMemo(() => {
+    const weights = chartPoints.map((p) => p.weight_kg);
+    return {
+      min: weights.length > 0 ? Math.min(...weights) : 0,
+      max: weights.length > 0 ? Math.max(...weights) : 0,
+    };
+  }, [chartPoints]);
 
   return (
     <>
@@ -966,18 +1016,18 @@ function LiftingSectionCard({
                 key={ex}
                 style={[
                   styles.exercisePickerPill,
-                  selectedExercise === ex && styles.exercisePickerPillActive,
+                  activeExercise === ex && styles.exercisePickerPillActive,
                 ]}
                 onPress={() => setSelectedExercise(ex)}
                 activeOpacity={0.75}
                 accessibilityRole="button"
                 accessibilityLabel={`View progression for ${ex}`}
-                accessibilityState={{ selected: selectedExercise === ex }}
+                accessibilityState={{ selected: activeExercise === ex }}
               >
                 <Text
                   style={[
                     styles.exercisePickerPillText,
-                    selectedExercise === ex && styles.exercisePickerPillTextActive,
+                    activeExercise === ex && styles.exercisePickerPillTextActive,
                   ]}
                 >
                   {ex}
@@ -993,10 +1043,10 @@ function LiftingSectionCard({
               <LiftingProgressChart points={chartPoints} />
               <View style={styles.chartMeta}>
                 <Text style={styles.chartMetaText}>
-                  Min {Math.min(...chartPoints.map((p) => p.weight_kg)).toFixed(1)} kg
+                  Min {chartWeightRange.min.toFixed(1)} kg
                 </Text>
                 <Text style={styles.chartMetaText}>
-                  Max {Math.max(...chartPoints.map((p) => p.weight_kg)).toFixed(1)} kg
+                  Max {chartWeightRange.max.toFixed(1)} kg
                 </Text>
               </View>
             </>
@@ -1287,7 +1337,29 @@ export default function AnalyticsDashboardScreen() {
     items: [],
   });
 
+  // ── Cancellation guard (#312) ───────────────────────────────────────────
+  // `loadData` can be in flight more than once at a time (focus fires again
+  // before a previous load finishes, or pull-to-refresh triggers a new load
+  // while one is still pending). `runIdRef` is a monotonic run-sequence
+  // counter: each call captures its own id, and every setter batch checks
+  // it's still the current run before committing. `mountedRef` tracks real
+  // unmount only — the focus-effect cleanup below runs on blur too (not
+  // only unmount), so it must not be the thing that flips `mountedRef`, or
+  // the screen would silently stop updating after navigating away and back.
+  const runIdRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const loadData = useCallback(async () => {
+    runIdRef.current += 1;
+    const myRunId = runIdRef.current;
+    const isCurrent = () => mountedRef.current && runIdRef.current === myRunId;
+
     setLoading(true);
     try {
       const logs = await getRollingWindow();
@@ -1297,8 +1369,10 @@ export default function AnalyticsDashboardScreen() {
 
       const todayStr = toISODate();
 
-      setStartDateISO(startDate);
-      setTodayISO(todayStr);
+      if (isCurrent()) {
+        setStartDateISO(startDate);
+        setTodayISO(todayStr);
+      }
 
       const computeStats = (days: number): RollingStats => {
         const cutoffIso = addDaysKey(todayStr, -days);
@@ -1329,24 +1403,18 @@ export default function AnalyticsDashboardScreen() {
 
       const s7 = computeStats(7);
       const s30 = computeStats(30);
-      setStats7Day(s7);
-      setStats30Day(s30);
-      setWeightHistory30(weightData30);
-      setWeightHistory90(weightData90);
 
-      // ── Metric card values ──────────────────────────────────────────────────
-
-      // Weight delta (first vs last in 30-day window)
-      if (weightData30.length >= 2) {
-        const delta = weightData30[weightData30.length - 1].weight - weightData30[0].weight;
-        setWeightDelta(delta);
-      } else {
-        setWeightDelta(null);
-      }
+      // Weight delta (first vs last plausible point in the 30-day window —
+      // an implausible outlier must not dominate the metric tile, #322)
+      const { valid: plausibleWeightData30 } = plausibleWeights(weightData30);
+      const weightDelta =
+        plausibleWeightData30.length >= 2
+          ? plausibleWeightData30[plausibleWeightData30.length - 1].weight -
+            plausibleWeightData30[0].weight
+          : null;
 
       // Total workouts (gym sessions + extra) in 30 days
       const gymDays30 = s30.total > 0 ? Math.round((s30.gym / 100) * s30.total) : 0;
-      setWorkoutCount30(gymDays30 + s30.extra);
 
       // Fasting streak — consecutive days from today going back
       const sortedDesc = [...logs]
@@ -1357,11 +1425,9 @@ export default function AnalyticsDashboardScreen() {
         if (l.fasting_completed) streak++;
         else break;
       }
-      setFastingStreak(streak);
 
       // ── Streaks (gym, walk, fasting) ────────────────────────────────────────
       const computedStreaks = computeStreaks(logs, todayStr);
-      setStreaks(computedStreaks);
 
       // ── Consistency dots (last 30 days) ────────────────────────────────────
       const dots: DotState[] = [];
@@ -1378,7 +1444,18 @@ export default function AnalyticsDashboardScreen() {
           else dots.push('missed');
         }
       }
-      setConsistencyDots(dots);
+
+      if (isCurrent()) {
+        setStats7Day(s7);
+        setStats30Day(s30);
+        setWeightHistory30(weightData30);
+        setWeightHistory90(weightData90);
+        setWeightDelta(weightDelta);
+        setWorkoutCount30(gymDays30 + s30.extra);
+        setFastingStreak(streak);
+        setStreaks(computedStreaks);
+        setConsistencyDots(dots);
+      }
 
       // ── Nutrition analytics (#267) ──────────────────────────────────────────
       const since7Days = addDaysKey(todayStr, -6); // last 7 days inclusive
@@ -1408,19 +1485,21 @@ export default function AnalyticsDashboardScreen() {
         getLoggedExercises(),
       ]);
 
-      setConsumedMacros(macrosByDay);
-      setMealAdherence(adherence);
-      setMostEatenRecipes(topEaten);
-      setAvgMacros(avgM);
-      setMostCookedRecipes(topCooked);
-      setInventorySnapshot(invSnapshot);
-      setNutritionGoals(storedGoals);
-      setHydrationDays(waterRows);
-      setBodyMeasurements(measurementRows);
-      setHydrationGoalMl(hydGoal);
+      if (isCurrent()) {
+        setConsumedMacros(macrosByDay);
+        setMealAdherence(adherence);
+        setMostEatenRecipes(topEaten);
+        setAvgMacros(avgM);
+        setMostCookedRecipes(topCooked);
+        setInventorySnapshot(invSnapshot);
+        setNutritionGoals(storedGoals);
+        setHydrationDays(waterRows);
+        setBodyMeasurements(measurementRows);
+        setHydrationGoalMl(hydGoal);
+        setLoggedExercises(liftExercises);
+      }
 
       // ── Lifting history (#285) ──────────────────────────────────────────────
-      setLoggedExercises(liftExercises);
       if (liftExercises.length > 0) {
         const historyArrays = await Promise.all(
           liftExercises.map((ex) => getWorkoutHistory(ex))
@@ -1435,20 +1514,27 @@ export default function AnalyticsDashboardScreen() {
             weight_kg: s.weight_kg,
           }));
         });
-        setLiftHistoryByExercise(byEx);
+        if (isCurrent()) setLiftHistoryByExercise(byEx);
       } else {
-        setLiftHistoryByExercise({});
+        if (isCurrent()) setLiftHistoryByExercise({});
       }
     } catch (err) {
       console.error('Failed to load analytics', err);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
+      return () => {
+        // Blur (which also fires on unmount) invalidates any run still in
+        // flight so its setters become no-ops. This does NOT touch
+        // `mountedRef` — blur is not unmount, and the screen must resume
+        // applying fresh loads on re-focus (#312).
+        runIdRef.current += 1;
+      };
     }, [loadData])
   );
 
