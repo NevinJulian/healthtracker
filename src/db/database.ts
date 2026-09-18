@@ -176,6 +176,23 @@ function buildHammerTask(base: string, isRestDay: boolean, daysDiff: number): st
   return `${base} @ Baseline + ${cycle * KG_PER_CYCLE}kg`;
 }
 
+/**
+ * True when `value` is a syntactically valid YYYY-MM-DD date key that
+ * round-trips through the Date constructor to the same calendar day
+ * (rejects both the wrong shape and overflow like "2026-13-40").
+ *
+ * Guards `_syncRollingSchedule()`'s rolling-window floor against a garbled
+ * `app_start_date` — e.g. restored verbatim from a corrupted backup — which
+ * would otherwise turn `_daysBetweenKey()` into NaN arithmetic and silently
+ * generate zero rows (#301).
+ */
+function isValidDateKey(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
 /** Safely parse a JSON string as Exercise[]; returns [] on any error. */
 function parseExercises(raw: string | null | undefined): Exercise[] {
   try {
@@ -352,7 +369,17 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   // BACKFILL_CAP_DAYS in the past, but never before the app's own start date
   // — there's no schedule to backfill before the user started using the app.
   const backfillFloorISO = _addDaysKey(todayISO, -BACKFILL_CAP_DAYS);
-  const floorISO = startDateISO > backfillFloorISO ? startDateISO : backfillFloorISO;
+  // A garbled/legacy startDateISO (e.g. restored from a corrupted backup)
+  // must not poison the range with NaN arithmetic — fall back to the
+  // 90-day cap instead (#301).
+  const safeStartDateISO = isValidDateKey(startDateISO) ? startDateISO : backfillFloorISO;
+  const lowerBoundISO =
+    safeStartDateISO > backfillFloorISO ? safeStartDateISO : backfillFloorISO;
+  // A startDateISO in the future (e.g. restored from a device whose clock
+  // ran fast, or that crossed a timezone) must not push the floor past
+  // today — today..today+DAYS_AHEAD always has to generate regardless of
+  // what startDateISO claims (#301).
+  const floorISO = lowerBoundISO < todayISO ? lowerBoundISO : todayISO;
 
   // Pre-fetch existing rows with their exercises OUTSIDE the transaction (#37)
   const existingRows = await db.getAllAsync<{ date: string; exercises: string }>(
