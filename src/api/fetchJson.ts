@@ -13,7 +13,8 @@
  *   - one retry, 1s later, for transient failures only: a thrown network
  *     error, our own timeout abort, or a `status >= 500` — never a 4xx,
  *     including 429
- *   - an optional external `AbortSignal` so a caller can cancel in flight;
+ *   - an optional external `AbortSignal` so a caller can cancel in flight —
+ *     during either a fetch attempt or the retry backoff between attempts;
  *     an external abort rejects immediately and is never retried
  *   - `res.ok` checked before `.json()` is ever called, and a readable
  *     `FetchJsonError` (carrying the HTTP status when there is one) instead
@@ -62,8 +63,52 @@ class TimeoutAbortError extends Error {
   }
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Wait `ms`, unless `externalSignal` aborts first — in which case reject
+ * immediately with `ExternalAbortError` instead of waiting out the delay.
+ * Always clears its timer and listener on the way out.
+ */
+function delay(ms: number, externalSignal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (externalSignal?.aborted) {
+      reject(new ExternalAbortError());
+      return;
+    }
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      externalSignal?.removeEventListener('abort', onAbort);
+    };
+
+    const onAbort = () => {
+      cleanup();
+      reject(new ExternalAbortError());
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+
+    externalSignal?.addEventListener('abort', onAbort);
+  });
+}
+
+/**
+ * The retry backoff, but an external abort during the wait rejects
+ * immediately as the same `FetchJsonError('Request aborted')` used for
+ * every other external-abort path — never as a bare `ExternalAbortError`,
+ * and never followed by another attempt.
+ */
+async function retryDelay(externalSignal?: AbortSignal): Promise<void> {
+  try {
+    await delay(RETRY_DELAY_MS, externalSignal);
+  } catch (err) {
+    if (err instanceof ExternalAbortError) {
+      throw new FetchJsonError('Request aborted');
+    }
+    throw err;
+  }
 }
 
 /**
@@ -131,7 +176,7 @@ export async function fetchJson<T = unknown>(
       if (!res.ok) {
         if (res.status >= 500 && attempt < retries) {
           attempt++;
-          await delay(RETRY_DELAY_MS);
+          await retryDelay(signal);
           continue;
         }
         throw new FetchJsonError(`Request failed with status ${res.status}`, res.status);
@@ -156,7 +201,7 @@ export async function fetchJson<T = unknown>(
       // A thrown network error or our own timeout abort — retry once.
       if (attempt < retries) {
         attempt++;
-        await delay(RETRY_DELAY_MS);
+        await retryDelay(signal);
         continue;
       }
       throw new FetchJsonError(
