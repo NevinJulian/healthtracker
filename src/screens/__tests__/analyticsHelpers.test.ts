@@ -18,6 +18,7 @@ import {
   hydrationGoalAdherence,
   measurementDelta,
   latestMeasurementValue,
+  resolveSelectedExercise,
 } from '../analyticsHelpers';
 
 // ─── computeStreaks ───────────────────────────────────────────────────────────
@@ -695,6 +696,26 @@ describe('bestSetPerDay', () => {
     const result = bestSetPerDay(history);
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ date: '2024-03-01', weight_kg: 40, reps: 12 });
+  });
+});
+
+// ─── resolveSelectedExercise ──────────────────────────────────────────────────
+
+describe('resolveSelectedExercise', () => {
+  it('keeps the current selection when it is still a logged exercise', () => {
+    expect(resolveSelectedExercise('bench', ['squat', 'bench'])).toBe('bench');
+  });
+
+  it('falls back to the first logged exercise when selection is null', () => {
+    expect(resolveSelectedExercise(null, ['squat', 'bench'])).toBe('squat');
+  });
+
+  it('falls back to the first logged exercise when selection is stale (no longer logged)', () => {
+    expect(resolveSelectedExercise('deadlift', ['squat', 'bench'])).toBe('squat');
+  });
+
+  it('returns null when there are no logged exercises', () => {
+    expect(resolveSelectedExercise(null, [])).toBeNull();
   });
 });
 
