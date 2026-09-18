@@ -67,7 +67,7 @@ function travelTo(dateKey: string): void {
 async function insertRawLogRow(
   db: DatabaseModule,
   date: string,
-  fields: Record<string, unknown>
+  fields: Record<string, string | number>
 ): Promise<void> {
   const rawDb = db.getDatabase();
   const columns = ['date', ...Object.keys(fields)];
@@ -107,12 +107,14 @@ describe('syncRollingSchedule() backfills gaps after time away (#301)', () => {
     await db.initDatabase();
 
     const day0 = todayKey();
-    const day20 = addDays(day0, 20);
-    const fifteenDaysBeforeDay20 = addDays(day20, -15);
+    const day30 = addDays(day0, 30);
+    // day0's own initDatabase() sync already forward-fills day0..day0+7 —
+    // pick a date outside that so the manual INSERT below doesn't collide.
+    const fifteenDaysBeforeDay30 = addDays(day30, -15);
 
-    travelTo(day20);
+    travelTo(day30);
 
-    await insertRawLogRow(db, fifteenDaysBeforeDay20, {
+    await insertRawLogRow(db, fifteenDaysBeforeDay30, {
       walking_task: 'Walk 10k',
       hammer_task: 'Bench 3x8',
       walk_completed: 1,
@@ -122,7 +124,7 @@ describe('syncRollingSchedule() backfills gaps after time away (#301)', () => {
 
     await db.syncRollingSchedule();
 
-    const after = await db.getLogByDate(fifteenDaysBeforeDay20);
+    const after = await db.getLogByDate(fifteenDaysBeforeDay30);
     expect(after).not.toBeNull();
     expect(after?.walk_completed).toBe(true);
     expect(after?.hammer_completed).toBe(true);
