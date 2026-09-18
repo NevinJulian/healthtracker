@@ -25,7 +25,7 @@
  *       · Average macros stat card
  *       · Most-cooked recipes (cook_log, builds over time) + inventory snapshot
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -1292,7 +1292,29 @@ export default function AnalyticsDashboardScreen() {
     items: [],
   });
 
+  // ── Cancellation guard (#312) ───────────────────────────────────────────
+  // `loadData` can be in flight more than once at a time (focus fires again
+  // before a previous load finishes, or pull-to-refresh triggers a new load
+  // while one is still pending). `runIdRef` is a monotonic run-sequence
+  // counter: each call captures its own id, and every setter batch checks
+  // it's still the current run before committing. `mountedRef` tracks real
+  // unmount only — the focus-effect cleanup below runs on blur too (not
+  // only unmount), so it must not be the thing that flips `mountedRef`, or
+  // the screen would silently stop updating after navigating away and back.
+  const runIdRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const loadData = useCallback(async () => {
+    runIdRef.current += 1;
+    const myRunId = runIdRef.current;
+    const isCurrent = () => mountedRef.current && runIdRef.current === myRunId;
+
     setLoading(true);
     try {
       const logs = await getRollingWindow();
@@ -1302,8 +1324,10 @@ export default function AnalyticsDashboardScreen() {
 
       const todayStr = toISODate();
 
-      setStartDateISO(startDate);
-      setTodayISO(todayStr);
+      if (isCurrent()) {
+        setStartDateISO(startDate);
+        setTodayISO(todayStr);
+      }
 
       const computeStats = (days: number): RollingStats => {
         const cutoffIso = addDaysKey(todayStr, -days);
@@ -1334,24 +1358,15 @@ export default function AnalyticsDashboardScreen() {
 
       const s7 = computeStats(7);
       const s30 = computeStats(30);
-      setStats7Day(s7);
-      setStats30Day(s30);
-      setWeightHistory30(weightData30);
-      setWeightHistory90(weightData90);
-
-      // ── Metric card values ──────────────────────────────────────────────────
 
       // Weight delta (first vs last in 30-day window)
-      if (weightData30.length >= 2) {
-        const delta = weightData30[weightData30.length - 1].weight - weightData30[0].weight;
-        setWeightDelta(delta);
-      } else {
-        setWeightDelta(null);
-      }
+      const weightDelta =
+        weightData30.length >= 2
+          ? weightData30[weightData30.length - 1].weight - weightData30[0].weight
+          : null;
 
       // Total workouts (gym sessions + extra) in 30 days
       const gymDays30 = s30.total > 0 ? Math.round((s30.gym / 100) * s30.total) : 0;
-      setWorkoutCount30(gymDays30 + s30.extra);
 
       // Fasting streak — consecutive days from today going back
       const sortedDesc = [...logs]
@@ -1362,11 +1377,9 @@ export default function AnalyticsDashboardScreen() {
         if (l.fasting_completed) streak++;
         else break;
       }
-      setFastingStreak(streak);
 
       // ── Streaks (gym, walk, fasting) ────────────────────────────────────────
       const computedStreaks = computeStreaks(logs, todayStr);
-      setStreaks(computedStreaks);
 
       // ── Consistency dots (last 30 days) ────────────────────────────────────
       const dots: DotState[] = [];
@@ -1383,7 +1396,18 @@ export default function AnalyticsDashboardScreen() {
           else dots.push('missed');
         }
       }
-      setConsistencyDots(dots);
+
+      if (isCurrent()) {
+        setStats7Day(s7);
+        setStats30Day(s30);
+        setWeightHistory30(weightData30);
+        setWeightHistory90(weightData90);
+        setWeightDelta(weightDelta);
+        setWorkoutCount30(gymDays30 + s30.extra);
+        setFastingStreak(streak);
+        setStreaks(computedStreaks);
+        setConsistencyDots(dots);
+      }
 
       // ── Nutrition analytics (#267) ──────────────────────────────────────────
       const since7Days = addDaysKey(todayStr, -6); // last 7 days inclusive
@@ -1413,19 +1437,21 @@ export default function AnalyticsDashboardScreen() {
         getLoggedExercises(),
       ]);
 
-      setConsumedMacros(macrosByDay);
-      setMealAdherence(adherence);
-      setMostEatenRecipes(topEaten);
-      setAvgMacros(avgM);
-      setMostCookedRecipes(topCooked);
-      setInventorySnapshot(invSnapshot);
-      setNutritionGoals(storedGoals);
-      setHydrationDays(waterRows);
-      setBodyMeasurements(measurementRows);
-      setHydrationGoalMl(hydGoal);
+      if (isCurrent()) {
+        setConsumedMacros(macrosByDay);
+        setMealAdherence(adherence);
+        setMostEatenRecipes(topEaten);
+        setAvgMacros(avgM);
+        setMostCookedRecipes(topCooked);
+        setInventorySnapshot(invSnapshot);
+        setNutritionGoals(storedGoals);
+        setHydrationDays(waterRows);
+        setBodyMeasurements(measurementRows);
+        setHydrationGoalMl(hydGoal);
+        setLoggedExercises(liftExercises);
+      }
 
       // ── Lifting history (#285) ──────────────────────────────────────────────
-      setLoggedExercises(liftExercises);
       if (liftExercises.length > 0) {
         const historyArrays = await Promise.all(
           liftExercises.map((ex) => getWorkoutHistory(ex))
@@ -1440,20 +1466,27 @@ export default function AnalyticsDashboardScreen() {
             weight_kg: s.weight_kg,
           }));
         });
-        setLiftHistoryByExercise(byEx);
+        if (isCurrent()) setLiftHistoryByExercise(byEx);
       } else {
-        setLiftHistoryByExercise({});
+        if (isCurrent()) setLiftHistoryByExercise({});
       }
     } catch (err) {
       console.error('Failed to load analytics', err);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
+      return () => {
+        // Blur (which also fires on unmount) invalidates any run still in
+        // flight so its setters become no-ops. This does NOT touch
+        // `mountedRef` — blur is not unmount, and the screen must resume
+        // applying fresh loads on re-focus (#312).
+        runIdRef.current += 1;
+      };
     }, [loadData])
   );
 
