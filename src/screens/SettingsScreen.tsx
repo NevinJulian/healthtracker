@@ -159,6 +159,12 @@ const HYDRATION_MIN = 250;
 const HYDRATION_MAX = 6000;
 const HYDRATION_STEP = 250;
 
+// Valid ranges for the profile height/age text fields (#323)
+const PROFILE_HEIGHT_MIN = 50;
+const PROFILE_HEIGHT_MAX = 250;
+const PROFILE_AGE_MIN = 10;
+const PROFILE_AGE_MAX = 120;
+
 // Day labels for the weekday chip selector (index = JS weekday 0–6)
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
@@ -379,6 +385,17 @@ export default function SettingsScreen() {
   // Editable text fields for the profile (strings so TextInput is controlled)
   const [profileHeightStr, setProfileHeightStr] = useState('');
   const [profileAgeStr, setProfileAgeStr] = useState('');
+  // Inline validation errors for the height/age fields (#323). Separate from
+  // `profile` (the persisted values) — an invalid, unsaved edit never
+  // touches what's actually saved.
+  const [profileHeightError, setProfileHeightError] = useState<string | null>(null);
+  const [profileAgeError, setProfileAgeError] = useState<string | null>(null);
+  // Mirrors "this field currently has an unsaved invalid edit" for the
+  // hydration effect below. That effect's callback is captured once (empty
+  // deps on the useFocusEffect useCallback, same as the dirty refs further
+  // down) so it can't read fresh state directly — only a ref's `.current`.
+  const profileHeightInvalidRef = useRef(false);
+  const profileAgeInvalidRef = useRef(false);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [recalcBusy, setRecalcBusy] = useState(false);
 
@@ -568,8 +585,16 @@ export default function SettingsScreen() {
           setGoalProtein(nutritionGoals.protein);
           setHydrationGoalMl(hydrationGoal);
           setProfile(userProfile);
-          setProfileHeightStr(userProfile.heightCm != null ? String(userProfile.heightCm) : '');
-          setProfileAgeStr(userProfile.age != null ? String(userProfile.age) : '');
+          // Don't clobber text the user is actively correcting after an
+          // invalid blur (#323) — skip re-hydrating a field from storage
+          // while it has an unsaved invalid edit, so the error text and the
+          // field text never end up describing different values.
+          if (!profileHeightInvalidRef.current) {
+            setProfileHeightStr(userProfile.heightCm != null ? String(userProfile.heightCm) : '');
+          }
+          if (!profileAgeInvalidRef.current) {
+            setProfileAgeStr(userProfile.age != null ? String(userProfile.age) : '');
+          }
           setLatestWeight(weight);
         }
       })();
@@ -730,19 +755,47 @@ export default function SettingsScreen() {
   // ── Profile: field save helpers (#281) ────────────────────────────────
 
   async function handleProfileHeightBlur() {
-    const val = parseFloat(profileHeightStr);
-    if (Number.isFinite(val) && val > 0) {
-      await setProfileHeightCm(val);
-      setProfile((prev) => ({ ...prev, heightCm: val }));
+    const trimmed = profileHeightStr.trim();
+    if (trimmed === '') {
+      // Blank stays blank: nothing to validate, nothing to save, and
+      // nothing persisted gets cleared here (#323 part 1 — clearing a
+      // saved value is part 2, once a dedicated db function exists).
+      profileHeightInvalidRef.current = false;
+      setProfileHeightError(null);
+      return;
     }
+    // A comma decimal separator ("178,5") is plausible input here: the
+    // numeric/decimal-pad keyboard's separator key is locale-aware, and
+    // fr-CH / it-CH (both official Swiss locales) use a comma.
+    const val = Number(trimmed.replace(',', '.'));
+    if (!Number.isFinite(val) || val < PROFILE_HEIGHT_MIN || val > PROFILE_HEIGHT_MAX) {
+      profileHeightInvalidRef.current = true;
+      setProfileHeightError(`Enter a height between ${PROFILE_HEIGHT_MIN} and ${PROFILE_HEIGHT_MAX} cm`);
+      return;
+    }
+    profileHeightInvalidRef.current = false;
+    setProfileHeightError(null);
+    await setProfileHeightCm(val);
+    setProfile((prev) => ({ ...prev, heightCm: val }));
   }
 
   async function handleProfileAgeBlur() {
-    const val = parseFloat(profileAgeStr);
-    if (Number.isFinite(val) && val > 0) {
-      await setProfileAge(val);
-      setProfile((prev) => ({ ...prev, age: val }));
+    const trimmed = profileAgeStr.trim();
+    if (trimmed === '') {
+      profileAgeInvalidRef.current = false;
+      setProfileAgeError(null);
+      return;
     }
+    const val = Number(trimmed.replace(',', '.'));
+    if (!Number.isFinite(val) || val < PROFILE_AGE_MIN || val > PROFILE_AGE_MAX) {
+      profileAgeInvalidRef.current = true;
+      setProfileAgeError(`Enter an age between ${PROFILE_AGE_MIN} and ${PROFILE_AGE_MAX} years`);
+      return;
+    }
+    profileAgeInvalidRef.current = false;
+    setProfileAgeError(null);
+    await setProfileAge(val);
+    setProfile((prev) => ({ ...prev, age: val }));
   }
 
   async function handleProfileSex(sex: Sex) {
@@ -1209,6 +1262,9 @@ export default function SettingsScreen() {
           accessibilityLabel="Height in centimetres"
           returnKeyType="done"
         />
+        {profileHeightError != null && (
+          <Text style={styles.profileFieldError}>{profileHeightError}</Text>
+        )}
 
         {/* Age */}
         <Text style={styles.profileFieldLabel}>Age (years)</Text>
@@ -1223,6 +1279,9 @@ export default function SettingsScreen() {
           accessibilityLabel="Age in years"
           returnKeyType="done"
         />
+        {profileAgeError != null && (
+          <Text style={styles.profileFieldError}>{profileAgeError}</Text>
+        )}
 
         {/* Activity level chips */}
         <Text style={styles.profileFieldLabel}>Activity level</Text>
@@ -1884,6 +1943,12 @@ const styles = StyleSheet.create({
     fontFamily: Typography.body,
     fontSize: Typography.sizes.md,
     color: Colors.textPrimary,
+  },
+  profileFieldError: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.danger,
+    marginTop: Spacing.xs,
   },
   recalcBtn: {
     flexDirection: 'row',
