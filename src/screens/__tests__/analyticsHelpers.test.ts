@@ -2,6 +2,7 @@
  * Unit tests for analyticsHelpers.ts — pure functions, no DB required.
  * Issue #265 — Analytics · strength progression + longer trends & streaks
  * Issue #267 — Analytics · nutrition adherence + meal & recipe insights
+ * Issue #322 — Analytics · weight chart resilience to implausible outliers
  */
 
 import {
@@ -19,6 +20,9 @@ import {
   measurementDelta,
   latestMeasurementValue,
   resolveSelectedExercise,
+  plausibleWeights,
+  WEIGHT_MIN_KG,
+  WEIGHT_MAX_KG,
 } from '../analyticsHelpers';
 
 // ─── computeStreaks ───────────────────────────────────────────────────────────
@@ -716,6 +720,51 @@ describe('resolveSelectedExercise', () => {
 
   it('returns null when there are no logged exercises', () => {
     expect(resolveSelectedExercise(null, [])).toBeNull();
+  });
+});
+
+// ─── plausibleWeights ──────────────────────────────────────────────────────
+
+describe('plausibleWeights', () => {
+  it('excludes points below WEIGHT_MIN_KG and above WEIGHT_MAX_KG', () => {
+    const points = [
+      { date: '2024-01-01', weight: 70 },
+      { date: '2024-01-02', weight: 9999 },
+      { date: '2024-01-03', weight: 7 },
+      { date: '2024-01-04', weight: 75 },
+    ];
+    const { valid, excludedCount } = plausibleWeights(points);
+    expect(valid).toEqual([
+      { date: '2024-01-01', weight: 70 },
+      { date: '2024-01-04', weight: 75 },
+    ]);
+    expect(excludedCount).toBe(2);
+  });
+
+  it('keeps points exactly at the inclusive boundaries (20 and 400)', () => {
+    const points = [
+      { date: '2024-01-01', weight: WEIGHT_MIN_KG },
+      { date: '2024-01-02', weight: WEIGHT_MAX_KG },
+    ];
+    const { valid, excludedCount } = plausibleWeights(points);
+    expect(valid).toEqual(points);
+    expect(excludedCount).toBe(0);
+  });
+
+  it('preserves input order in the valid output', () => {
+    const points = [
+      { date: '2024-01-01', weight: 90 },
+      { date: '2024-01-02', weight: 9999 },
+      { date: '2024-01-03', weight: 60 },
+      { date: '2024-01-04', weight: 5 },
+      { date: '2024-01-05', weight: 80 },
+    ];
+    const { valid } = plausibleWeights(points);
+    expect(valid.map((p) => p.weight)).toEqual([90, 60, 80]);
+  });
+
+  it('returns { valid: [], excludedCount: 0 } for an empty array', () => {
+    expect(plausibleWeights([])).toEqual({ valid: [], excludedCount: 0 });
   });
 });
 
