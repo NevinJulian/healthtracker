@@ -305,6 +305,43 @@ export function rollingAverage(values: number[], window: number = 7): number[] {
 }
 
 // ─────────────────────────────────────────────
+// Body-weight plausibility helpers (#322)
+// ─────────────────────────────────────────────
+
+/**
+ * Plausible body-weight bounds in kg, inclusive.
+ * Duplicated from the input-validation bounds in DashboardScreen.tsx (lane D) —
+ * that constant lives in another lane's file, so this is a deliberate copy.
+ */
+export const WEIGHT_MIN_KG = 20;
+export const WEIGHT_MAX_KG = 400;
+
+/**
+ * Filter a series of weighted points down to those within the plausible
+ * body-weight range, preserving order. `getWeightHistory()` only filters
+ * `IS NOT NULL`, so a mis-typed entry (e.g. 9999 instead of 99.9) can still
+ * dominate a chart's min/max and skew a delta computed from first vs. last.
+ *
+ * @param points - Any array of objects carrying a `weight` field, in order.
+ * @returns The in-range points (same order, same references) plus a count
+ *          of how many points were excluded.
+ */
+export function plausibleWeights<T extends { weight: number }>(
+  points: T[]
+): { valid: T[]; excludedCount: number } {
+  const valid: T[] = [];
+  let excludedCount = 0;
+  for (const p of points) {
+    if (p.weight >= WEIGHT_MIN_KG && p.weight <= WEIGHT_MAX_KG) {
+      valid.push(p);
+    } else {
+      excludedCount++;
+    }
+  }
+  return { valid, excludedCount };
+}
+
+// ─────────────────────────────────────────────
 // Hydration helpers (#283)
 // ─────────────────────────────────────────────
 
