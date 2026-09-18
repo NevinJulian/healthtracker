@@ -25,7 +25,7 @@
  *       · Average macros stat card
  *       · Most-cooked recipes (cook_log, builds over time) + inventory snapshot
  */
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -271,7 +271,13 @@ export function StrengthProgressionCard({
     return cutoff > startDateISO ? cutoff : startDateISO;
   })();
 
-  const fullPoints = computeStrengthProgression(windowStart, todayISO, 0);
+  // computeStrengthProgression loops over up to 90 days — memoise it so it
+  // only re-runs when the window it reads (windowStart, todayISO) actually
+  // changes, not on every render (#327).
+  const fullPoints = useMemo(
+    () => computeStrengthProgression(windowStart, todayISO, 0),
+    [windowStart, todayISO]
+  );
   const steps = progressionSteps(fullPoints);
 
   // Current weight and cycle
@@ -895,6 +901,11 @@ function LiftingProgressChart({
   );
 }
 
+// Shared stable identity for "no history" so a useMemo keyed on the
+// selected exercise's history isn't defeated by a fresh [] literal on
+// every render when there's nothing logged yet (#327).
+const EMPTY_HISTORY: WorkoutSetSlice[] = [];
+
 /**
  * LiftingSectionCard — the top-level "Strength / Lifts" card shown in Analytics.
  *
@@ -917,9 +928,28 @@ export function LiftingSectionCard({
   const activeExercise = resolveSelectedExercise(selectedExercise, loggedExercises);
 
   const selectedHistory = activeExercise
-    ? (historyByExercise[activeExercise] ?? [])
-    : [];
-  const chartPoints = bestSetPerDay(selectedHistory);
+    ? (historyByExercise[activeExercise] ?? EMPTY_HISTORY)
+    : EMPTY_HISTORY;
+
+  // bestSetPerDay is a Map scan of the exercise history — memoise it so it
+  // only re-runs when the selected exercise's history actually changes,
+  // not on every render (#327). EMPTY_HISTORY above keeps a stable
+  // identity for the "nothing logged" case so this memo isn't silently
+  // defeated by a fresh [] literal each render.
+  const chartPoints = useMemo(
+    () => bestSetPerDay(selectedHistory),
+    [selectedHistory]
+  );
+
+  // Math.min/max spread over chartPoints.map(...) allocates a fresh array
+  // and re-scans it every render; memoise alongside chartPoints (#327).
+  const chartWeightRange = useMemo(() => {
+    const weights = chartPoints.map((p) => p.weight_kg);
+    return {
+      min: weights.length > 0 ? Math.min(...weights) : 0,
+      max: weights.length > 0 ? Math.max(...weights) : 0,
+    };
+  }, [chartPoints]);
 
   return (
     <>
@@ -998,10 +1028,10 @@ export function LiftingSectionCard({
               <LiftingProgressChart points={chartPoints} />
               <View style={styles.chartMeta}>
                 <Text style={styles.chartMetaText}>
-                  Min {Math.min(...chartPoints.map((p) => p.weight_kg)).toFixed(1)} kg
+                  Min {chartWeightRange.min.toFixed(1)} kg
                 </Text>
                 <Text style={styles.chartMetaText}>
-                  Max {Math.max(...chartPoints.map((p) => p.weight_kg)).toFixed(1)} kg
+                  Max {chartWeightRange.max.toFixed(1)} kg
                 </Text>
               </View>
             </>
