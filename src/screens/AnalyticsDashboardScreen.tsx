@@ -261,7 +261,7 @@ interface StrengthProgressionCardProps {
   todayISO: string;
 }
 
-function StrengthProgressionCard({
+export function StrengthProgressionCard({
   startDateISO,
   todayISO,
 }: StrengthProgressionCardProps) {
