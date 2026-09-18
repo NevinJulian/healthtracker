@@ -79,6 +79,7 @@ import {
   latestMeasurementValue,
   computePRs,
   bestSetPerDay,
+  resolveSelectedExercise,
   type HydrationDay,
   type WorkoutSetSlice,
 } from './analyticsHelpers';
@@ -900,19 +901,23 @@ function LiftingProgressChart({
  * - Shows PRs per logged exercise (best weight + estimated 1RM)
  * - Shows a progression chart for the currently selected exercise
  */
-function LiftingSectionCard({
+export function LiftingSectionCard({
   loggedExercises,
   historyByExercise,
 }: {
   loggedExercises: string[];
   historyByExercise: Record<string, WorkoutSetSlice[]>;
 }) {
-  const [selectedExercise, setSelectedExercise] = useState<string | null>(
-    loggedExercises.length > 0 ? loggedExercises[0] : null
-  );
+  // `selectedExercise` only ever holds the user's explicit pill tap — it
+  // starts null and is never re-initialised. `loggedExercises` is `[]` on
+  // first render and populated asynchronously, so the active exercise must
+  // be derived on every render rather than trusted from the useState
+  // initializer (which only sees the first render's value).
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const activeExercise = resolveSelectedExercise(selectedExercise, loggedExercises);
 
-  const selectedHistory = selectedExercise
-    ? (historyByExercise[selectedExercise] ?? [])
+  const selectedHistory = activeExercise
+    ? (historyByExercise[activeExercise] ?? [])
     : [];
   const chartPoints = bestSetPerDay(selectedHistory);
 
@@ -966,18 +971,18 @@ function LiftingSectionCard({
                 key={ex}
                 style={[
                   styles.exercisePickerPill,
-                  selectedExercise === ex && styles.exercisePickerPillActive,
+                  activeExercise === ex && styles.exercisePickerPillActive,
                 ]}
                 onPress={() => setSelectedExercise(ex)}
                 activeOpacity={0.75}
                 accessibilityRole="button"
                 accessibilityLabel={`View progression for ${ex}`}
-                accessibilityState={{ selected: selectedExercise === ex }}
+                accessibilityState={{ selected: activeExercise === ex }}
               >
                 <Text
                   style={[
                     styles.exercisePickerPillText,
-                    selectedExercise === ex && styles.exercisePickerPillTextActive,
+                    activeExercise === ex && styles.exercisePickerPillTextActive,
                   ]}
                 >
                   {ex}

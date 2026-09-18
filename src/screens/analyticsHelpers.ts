@@ -470,6 +470,31 @@ export function computePRs(history: WorkoutSetSlice[]): PRRecord {
 }
 
 /**
+ * Derive the exercise that should be active in the lifting progression picker.
+ *
+ * `selected` is the user's explicit override (from local component state,
+ * `null` until they tap a pill). It is honoured as long as it still refers to
+ * a currently-logged exercise; otherwise (including the initial `null` case,
+ * or a previously-selected exercise that has since dropped out of
+ * `loggedExercises`) the first logged exercise is used instead. This lets the
+ * selection track `loggedExercises` as it loads asynchronously, without
+ * requiring a `useState` initializer that only ever sees the first render's
+ * (often empty) value.
+ *
+ * @param selected         - The user's current pill selection, or null.
+ * @param loggedExercises  - Exercises with at least one logged set, in display order.
+ */
+export function resolveSelectedExercise(
+  selected: string | null,
+  loggedExercises: string[]
+): string | null {
+  if (selected !== null && loggedExercises.includes(selected)) {
+    return selected;
+  }
+  return loggedExercises[0] ?? null;
+}
+
+/**
  * Collapse a set history into one "best set per calendar day" for charting.
  *
  * "Best" = highest weight_kg on that day; on ties, highest reps breaks the tie;
