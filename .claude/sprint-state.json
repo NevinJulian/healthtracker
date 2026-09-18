@@ -112,7 +112,7 @@
     "C": {
       "branch": "sprint/lane-c-analytics",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "merging",
+      "status": "merged",
       "order": [
         308,
         312,
@@ -130,7 +130,8 @@
       "parked": [
         328
       ],
-      "cleanup": "no changes needed"
+      "cleanup": "no changes needed",
+      "mergeSha": "5de3b4c"
     },
     "D": {
       "branch": "sprint/lane-d-screens",
@@ -266,11 +267,12 @@
         "8efa95c"
       ],
       "lane": "C",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-c-analytics",
       "notes": "tester APPROVE round 0; 336 tests/18 suites",
       "securityReview": "skipped-pure-ui",
-      "regressionProof": "helper tests fail at 577e79b (not a function); component rerender test fails on selected=false when only behavioural fix reverted (tester reproduced); pass at 8efa95c"
+      "regressionProof": "helper tests fail at 577e79b (not a function); component rerender test fails on selected=false when only behavioural fix reverted (tester reproduced); pass at 8efa95c",
+      "mergeSha": "5de3b4c"
     },
     "309": {
       "roundTrips": 0,
@@ -325,11 +327,12 @@
         "f97b321"
       ],
       "lane": "C",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-c-analytics",
       "notes": "tester APPROVE r0. HISTORY WRINKLE: 3189d8f alone does not load (jest.mock scope error), fixed by bdbf4ea - disclosed by dev, not force-pushed over; flag in report. 339 tests/19 suites.",
       "securityReview": "skipped-client-state-only",
-      "regressionProof": "cancellationGuard test fails with bdbf4ea screen source (stale squat run wins), passes at f97b321 (tester reproduced)"
+      "regressionProof": "cancellationGuard test fails with bdbf4ea screen source (stale squat run wins), passes at f97b321 (tester reproduced)",
+      "mergeSha": "5de3b4c"
     },
     "313": {
       "roundTrips": 1,
@@ -387,7 +390,8 @@
         "a55de6b"
       ],
       "chartHalf": "ready",
-      "regressionProofChart": "card tests fail on assertions with export kept + raw history (tester trap check); full-screen delta fails at 31348f5 (-9924.0); helper tests fail at base"
+      "regressionProofChart": "card tests fail on assertions with export kept + raw history (tester trap check); full-screen delta fails at 31348f5 (-9924.0); helper tests fail at base",
+      "chartHalfMergeSha": "5de3b4c"
     },
     "323": {
       "roundTrips": 0,
@@ -421,11 +425,12 @@
         "31348f5"
       ],
       "lane": "C",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-c-analytics",
       "notes": "tester REJECT r1 (coverage), APPROVE r2. roundTrips=1. Parent passes stable state identities -> real prod improvement. DOT_COLORS/React.memo/loadData batching excluded per 'measurable parts only'.",
       "securityReview": "skipped-pure-render-perf",
-      "regressionProof": "3/5 memo tests fail at 1a874bf on call counts, pass d9f76cc; r2 coverage tests each sole failure under deps mutations (tester reproduced both)"
+      "regressionProof": "3/5 memo tests fail at 1a874bf on call counts, pass d9f76cc; r2 coverage tests each sole failure under deps mutations (tester reproduced both)",
+      "mergeSha": "5de3b4c"
     },
     "328": {
       "roundTrips": 0,
@@ -1023,6 +1028,35 @@
     {
       "at": "2026-09-18T23:55:18Z",
       "event": "lane C: status=merging cleanup=no changes needed"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "#308: status=merged mergeSha=5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "#312: status=merged mergeSha=5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "#327: status=merged mergeSha=5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "#322: chartHalfMergeSha=5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "lane C: status=merged mergeSha=5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "merged lane C into sprint/auto-fixes; integration green: typecheck pass, 394 tests / 24 suites (370 + 24 from lane C)",
+      "sha": "5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "#300 deferred-step prerequisite met: lane C merged; lane A may now merge integration and swap AnalyticsDashboardScreen's getRollingWindow() -> getDailyLogsBetween(today-90, today)"
     }
   ]
 }
