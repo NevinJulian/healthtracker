@@ -144,6 +144,44 @@ describe('fetchJson (#318)', () => {
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
   });
 
+  it('rejects promptly (no full retry) when the external signal aborts during the retry backoff', async () => {
+    const fetchMock = jest.fn(async () => {
+      throw new TypeError('Network request failed');
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    jest.useFakeTimers();
+    const controller = new AbortController();
+    const promise = fetchJson('https://example.com/unreachable', { signal: controller.signal });
+
+    let settled = false;
+    promise.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+
+    // First attempt fails immediately and enters the ~1000ms retry backoff.
+    await jest.advanceTimersByTimeAsync(10);
+    expect(settled).toBe(false);
+
+    // Abort 10ms into the backoff — well before the 1000ms delay elapses.
+    controller.abort();
+
+    // A couple more ms should be enough for the abort to be noticed; the
+    // bug lets the bare setTimeout backoff run all the way to ~1000ms
+    // regardless, so this catches it well before that.
+    await jest.advanceTimersByTimeAsync(5);
+    expect(settled).toBe(true);
+
+    await expect(promise).rejects.toBeInstanceOf(FetchJsonError);
+    // Aborted during backoff — no second attempt.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('clears its timeout timer so a completed request leaves no open handle', async () => {
     jest.useFakeTimers();
     const clearSpy = jest.spyOn(global, 'clearTimeout');
