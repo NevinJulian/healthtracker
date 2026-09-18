@@ -28,6 +28,17 @@
  *   - cancelBackupReminder()
  *   - getBackupReminderIdentifier()
  *   - reconcileScheduledNotifications() extended to sync backup reminder
+ *
+ * #309 additions:
+ *   - All 4 recurring scheduleNotificationAsync calls (workout, cook-day,
+ *     meal, backup) now pass a stable `identifier` instead of letting
+ *     expo-notifications assign a random UUID, so rescheduling the same
+ *     reminder replaces the OS entry instead of duplicating it.
+ *   - reconcileScheduledNotifications() runs a one-shot
+ *     cancelAllScheduledNotificationsAsync() sweep on the first call after
+ *     upgrade (gated by the notificationIdSweepV1Done app_state flag),
+ *     before any per-reminder rescheduling in that same pass, to clear out
+ *     notifications scheduled under the old random-UUID scheme.
  */
 
 import * as Notifications from 'expo-notifications';
@@ -57,10 +68,21 @@ const ANDROID_CHANNEL_ID = 'reminders';
 const WORKOUT_REMINDER_ID_KEY = 'workoutReminderNotificationId';
 const WEEKLY_COOK_DAY_ID_KEY = 'weeklyCookDayNotificationId';
 
+/** Stable notification identifier for the workout reminder (#309). */
+const WORKOUT_REMINDER_IDENTIFIER = 'workout-reminder';
+/** Stable notification identifier for the weekly cook-day reminder (#309). */
+const COOKDAY_REMINDER_IDENTIFIER = 'cookday-reminder';
+
 /** Stable notification identifier for the backup reminder. */
 const BACKUP_REMINDER_IDENTIFIER = 'backup-reminder';
 /** app_state key for the OS-scheduled notification id. */
 const BACKUP_REMINDER_ID_KEY = 'backupReminderNotificationId';
+
+/**
+ * app_state flag gating the one-shot post-upgrade sweep in
+ * reconcileScheduledNotifications() — see #309.
+ */
+const NOTIFICATION_ID_SWEEP_V1_KEY = 'notificationIdSweepV1Done';
 
 // ─── Foreground display handler ────────────────────────────────────────────
 
@@ -161,6 +183,7 @@ export async function scheduleWorkoutReminder(time: string): Promise<void> {
     const { hour, minute } = parseTimeString(time);
 
     const id = await Notifications.scheduleNotificationAsync({
+      identifier: WORKOUT_REMINDER_IDENTIFIER,
       content: {
         title: 'Time to train',
         body: "Your workout is waiting. Let's do this.",
@@ -224,6 +247,7 @@ export async function scheduleWeeklyCookDay(day: number, time: string): Promise<
     const weekday = mapWeekdayToExpo(day);
 
     const id = await Notifications.scheduleNotificationAsync({
+      identifier: COOKDAY_REMINDER_IDENTIFIER,
       content: {
         title: 'Cook day',
         body: 'Time to restock your meals for the week.',
@@ -295,6 +319,7 @@ export async function scheduleMealReminder(meal: MealType, hour: number, minute:
     const { title, body } = MEAL_REMINDER_CONTENT[meal];
 
     const id = await Notifications.scheduleNotificationAsync({
+      identifier: getMealReminderIdentifier(meal),
       content: {
         title,
         body,
@@ -431,6 +456,7 @@ export async function scheduleBackupReminder(day: number, time: string): Promise
     const weekday = mapWeekdayToExpo(day);
 
     const id = await Notifications.scheduleNotificationAsync({
+      identifier: getBackupReminderIdentifier(),
       content: {
         title: 'Back up your data',
         body: "It's been a while — save a backup so you don't lose your history.",
@@ -482,6 +508,18 @@ export async function cancelBackupReminder(): Promise<void> {
  */
 export async function reconcileScheduledNotifications(): Promise<void> {
   try {
+    // One-shot post-upgrade sweep (#309): notifications scheduled before
+    // stable identifiers existed carry Expo-random UUIDs, so rescheduling
+    // under the new stable ids would leave those old entries orphaned in
+    // the OS. Clear everything exactly once, gated by an app_state flag,
+    // BEFORE any of the per-reminder (re)scheduling below in this same pass.
+    const sweepDone = await getSetting(NOTIFICATION_ID_SWEEP_V1_KEY);
+    if (sweepDone !== 'true') {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      await setSetting(NOTIFICATION_ID_SWEEP_V1_KEY, 'true');
+      console.log('[Notifications] One-time notification-id sweep complete.');
+    }
+
     // Workout reminder
     const workoutEnabled = await getWorkoutReminderEnabled();
     const workoutTime = await getWorkoutReminderTime();
