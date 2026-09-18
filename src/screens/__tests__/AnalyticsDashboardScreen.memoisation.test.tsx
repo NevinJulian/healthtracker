@@ -73,6 +73,22 @@ describe('StrengthProgressionCard memoisation (#327)', () => {
     );
     expect(computeSpy).toHaveBeenCalledTimes(2);
   });
+
+  it('re-invokes computeStrengthProgression when startDateISO changes but todayISO does not', () => {
+    const { rerender } = render(
+      <StrengthProgressionCard startDateISO="2024-01-01" todayISO="2024-03-01" />
+    );
+    expect(computeSpy).toHaveBeenCalledTimes(1);
+
+    // windowStart = max(today-89, startDateISO), so it moves from
+    // 2024-01-01 to 2024-01-15 even though todayISO is unchanged. A memo
+    // dep array of just [todayISO] (dropping windowStart) would miss this
+    // and serve a stale chart.
+    rerender(
+      <StrengthProgressionCard startDateISO="2024-01-15" todayISO="2024-03-01" />
+    );
+    expect(computeSpy).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('LiftingSectionCard memoisation (#327)', () => {
@@ -123,6 +139,36 @@ describe('LiftingSectionCard memoisation (#327)', () => {
       <LiftingSectionCard
         loggedExercises={['squat']}
         historyByExercise={{ squat: updatedHistory }}
+      />
+    );
+    expect(bestSetSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-invokes bestSetPerDay when loggedExercises changes the auto-selected exercise, even with the same historyByExercise reference', () => {
+    const benchHistory: WorkoutSetSlice[] = [
+      { id: 4, date: '2024-02-01', exercise: 'bench', reps: 5, weight_kg: 60 },
+    ];
+    // Same object reference passed on both renders below — only the order
+    // of loggedExercises changes. No pill is tapped, so the active
+    // exercise is entirely auto-resolved (resolveSelectedExercise) from
+    // loggedExercises[0].
+    const sharedHistoryByExercise: Record<string, WorkoutSetSlice[]> = {
+      squat: squatHistory,
+      bench: benchHistory,
+    };
+
+    const { rerender } = render(
+      <LiftingSectionCard
+        loggedExercises={['squat', 'bench']}
+        historyByExercise={sharedHistoryByExercise}
+      />
+    );
+    expect(bestSetSpy).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <LiftingSectionCard
+        loggedExercises={['bench', 'squat']}
+        historyByExercise={sharedHistoryByExercise}
       />
     );
     expect(bestSetSpy).toHaveBeenCalledTimes(2);
