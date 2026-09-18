@@ -83,9 +83,10 @@
         307,
         331
       ],
-      "current": 301,
+      "current": 305,
       "done": [
-        300
+        300,
+        301
       ],
       "parked": []
     },
@@ -113,14 +114,18 @@
         308,
         312,
         327,
-        328
+        328,
+        "322-chart"
       ],
-      "current": 327,
+      "current": "\"322-chart\"",
       "done": [
         308,
-        312
+        312,
+        327
       ],
-      "parked": []
+      "parked": [
+        328
+      ]
     },
     "D": {
       "branch": "sprint/lane-d-screens",
@@ -136,14 +141,19 @@
         329,
         330,
         317,
+        "323-clear",
         304
       ],
       "waitsForLaneA": [
         317,
+        "323-clear",
         304
       ],
-      "current": 313,
-      "done": [],
+      "current": 323,
+      "done": [
+        313,
+        322
+      ],
       "parked": []
     },
     "E": {
@@ -215,16 +225,29 @@
       "regressionProof": "retention test fails 66d3f58/passes e46607f; bounded-window test fails 313877b/passes 91e7932; range test fails 231d644/passes 0aad077 (tester reproduced all three; also TZ=UTC+14/UTC-12)"
     },
     "301": {
-      "roundTrips": 0,
+      "roundTrips": 2,
       "commits": [
         "bfabfdb",
         "d9ff8d7",
-        "ab6ae5e"
+        "ab6ae5e",
+        "263a593",
+        "d1890de",
+        "382b62a"
       ],
       "lane": "A",
-      "status": "in_test",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "dev: floor=max(startDate,today-90), loop from floor, exercise-backfill gated by targetISO>=cutoffISO. 3/6 tests fail pre-fix. Tester asked to explain why the 'does NOT backfill exercises' test failed pre-fix + mutation-test the gate. 340 tests/21 suites."
+      "notes": "tester REJECT r1, REJECT r2, APPROVE r3; security APPROVE (probed 9999-12-31, 0000-0099 years, numeric via TEXT affinity). roundTrips=2. Security note: raw startDateISO in hammer-task daysDiff now hits up to 98 rows (#363 comment added).",
+      "securityReview": "required-src-db",
+      "regressionProof": "backfillGap fails at 0aad077 (3/6), backfillStartDateGuard fails at ab6ae5e (3/4) + calendar-overflow case sole failure w/o validator; tester generalised across 6 month/year boundaries x 3 TZs"
+    },
+    "305": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "in_dev",
+      "branch": "sprint/lane-a-db",
+      "notes": "work order ready: _ensureDailyLogRow (template-correct INSERT OR IGNORE; issue's own SQL would violate NOT NULL walking_task/hammer_task) before each of SIX writers (analyst found upsertExerciseCompleted missing from issue) + _assertWrote changes check; extract shared per-date row builder. date is PK -> no migration. Orchestrator: upsertExerciseCompleted gets ensure-row ONLY (malformed JSON/RMW is #319). Developer held until #301 security finishes (same worktree)."
     },
     "308": {
       "roundTrips": 0,
@@ -267,11 +290,17 @@
     },
     "311": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "6f0bb27",
+        "457d423",
+        "b1aeb91",
+        "081f1fa"
+      ],
       "lane": "B",
-      "status": "analysing",
+      "status": "in_test",
       "branch": "sprint/lane-b-notify",
-      "notes": "analysis pipelined with #310 security (read-only); carries #309 tester's per-reminder isolation question"
+      "notes": "dev: coalescing dispatcher (single .finally hand-off, closed a microtask race in own first design) + per-reminder isolation; 7 new tests fail on their pre-fix commits. 355 tests. Tester to check hand-off interleavings + in-flight reconcile during #310 restore. AC #4 excluded -> partial.",
+      "partial": true
     },
     "312": {
       "roundTrips": 0,
@@ -296,11 +325,11 @@
         "846aaef"
       ],
       "lane": "D",
-      "status": "in_test",
+      "status": "ready",
       "branch": "sprint/lane-d-screens",
-      "notes": "r2 dev: AppState background/inactive flush (single subscription, removed on unmount) + runCommit catch/console.error; 4 new tests fail at 490f75a. 341 tests. Back to tester, then security.",
+      "notes": "tester APPROVE r1+r2, security BLOCK r1 (no AppState flush) -> APPROVE r2. roundTrips=1. Residual (not blocking): force-stop/SIGKILL with no AppState transition; universal RN limit. 341 tests.",
       "securityReview": "required-deferred-write-path",
-      "regressionProof": "5 of 6 new tests fail with f132381 SettingsScreen.tsx, 7/7 pass at 490f75a (tester reproduced; hydration test spec-only)"
+      "regressionProof": "r1: 5/6 stepper tests fail with f132381 source, pass 490f75a; r2: 4 AppState/rejection tests fail with 490f75a source, pass 846aaef (tester reproduced both)"
     },
     "318": {
       "roundTrips": 1,
@@ -320,13 +349,56 @@
       "regressionProof": "mealdb tests fail at 1beee5e (settled=false; fetch x2) pass at def1e4f; backoff-abort test fails at def1e4f pass at 8f867a5 (tester reproduced both)",
       "mergeSha": 605533
     },
+    "322": {
+      "roundTrips": 0,
+      "commits": [
+        "ee4fbb0",
+        "389c189"
+      ],
+      "lane": "D",
+      "status": "ready_partial",
+      "branch": "sprint/lane-d-screens",
+      "notes": "lane D half ready (389c189). Chart half in dev (lane C): plausibleWeights() 20-400kg filter + 'N entries hidden' note; bars/min/max/current/delta all consume valid points.",
+      "splitAcrossLanes": true,
+      "laneDHalf": "ready",
+      "securityReview": "skipped-device-owner-input",
+      "regressionProof": "10/14 new body-weight tests fail with 846aaef DashboardScreen.tsx, 14/14 at 389c189 (tester reproduced)"
+    },
+    "323": {
+      "roundTrips": 0,
+      "commits": [
+        "b06a2d7",
+        "9b2445e"
+      ],
+      "lane": "D",
+      "status": "in_test",
+      "branch": "sprint/lane-d-screens",
+      "splitAcrossPhases": true,
+      "notes": "part 1 dev: Number()+comma, inline errors, blank unchanged; 5 tests fail pre-fix. Hydration skips fields with unsaved invalid edit via refs - UNTESTED (mock fires once); tester probing stuck-ref cases. Part 2 (persisted clear) deferred until lane A merges."
+    },
     "327": {
+      "roundTrips": 1,
+      "commits": [
+        "1a874bf",
+        "d9f76cc",
+        "31348f5"
+      ],
+      "lane": "C",
+      "status": "ready",
+      "branch": "sprint/lane-c-analytics",
+      "notes": "tester REJECT r1 (coverage), APPROVE r2. roundTrips=1. Parent passes stable state identities -> real prod improvement. DOT_COLORS/React.memo/loadData batching excluded per 'measurable parts only'.",
+      "securityReview": "skipped-pure-render-perf",
+      "regressionProof": "3/5 memo tests fail at 1a874bf on call counts, pass d9f76cc; r2 coverage tests each sole failure under deps mutations (tester reproduced both)"
+    },
+    "328": {
       "roundTrips": 0,
       "commits": [],
       "lane": "C",
-      "status": "in_dev",
+      "status": "parked",
       "branch": "sprint/lane-c-analytics",
-      "notes": "work order: useMemo on computeStrengthProgression (deps windowStart,todayISO) and bestSetPerDay+min/max, measured by spy call counts across identical-props rerender + re-invoked-on-change check. Excluded: loadData batching, React.memo, DOT_COLORS hoist (orchestrator: not measurable). Park if spy test cannot fail on current code."
+      "stalledAt": "analysis",
+      "parkReason": "Issue premise partly stale: the chart that reads getWorkoutHistory (LiftingSectionCard progression) is ALL-TIME, so bounding it silently truncates visible data (product decision). PRSummaryCard needs lifetime history for correct PRs and no aggregate PR query exists -> needs new query in database.ts (lane A). Human needs: decide all-time vs windowed chart; add getExercisePRs() aggregate. Screen-side change then mechanical.",
+      "notes": "issue comment posted"
     },
     "332": {
       "roundTrips": 0,
@@ -355,7 +427,9 @@
   "foundDuringSprint": [
     360,
     361,
-    362
+    362,
+    363,
+    364
   ],
   "log": [
     {
@@ -675,6 +749,162 @@
     {
       "at": "2026-09-18T23:17:48Z",
       "event": "filed found-during-sprint #362"
+    },
+    {
+      "at": "2026-09-18T23:20:51Z",
+      "event": "#313: status=in_security notes=…"
+    },
+    {
+      "at": "2026-09-18T23:20:51Z",
+      "event": "#322: lane=D status=analysing branch=sprint/lane-d-screens notes=…"
+    },
+    {
+      "at": "2026-09-18T23:21:44Z",
+      "event": "#311: status=in_dev partial=true notes=…"
+    },
+    {
+      "at": "2026-09-18T23:22:10Z",
+      "event": "#313: status=ready regressionProof=r1: 5/6 stepper tests fail with f132381 source, pass 490f75a; r2: 4 AppState/rejection tests fail with 490f75a source, pass 846aaef (tester reproduced both) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:22:10Z",
+      "event": "lane D: done+=313 current=322"
+    },
+    {
+      "at": "2026-09-18T23:23:06Z",
+      "event": "#301: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-18T23:23:24Z",
+      "event": "#327: status=in_test commits=[\"1a874bf\",\"d9f76cc\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:24:04Z",
+      "event": "#322: status=in_dev splitAcrossLanes=true notes=…"
+    },
+    {
+      "at": "2026-09-18T23:24:05Z",
+      "event": "lane C: order=[308,312,327,328,\"322-chart\"]"
+    },
+    {
+      "at": "2026-09-18T23:24:05Z",
+      "event": "orchestrator decision: #322 split - input half in lane D, WeightTrendCard outlier half appended to lane C after #328 (lane C owns AnalyticsDashboardScreen.tsx; no cross-lane edit)"
+    },
+    {
+      "at": "2026-09-18T23:27:55Z",
+      "event": "#327: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-18T23:27:55Z",
+      "event": "#301: status=in_test commits=[\"bfabfdb\",\"d9ff8d7\",\"ab6ae5e\",\"263a593\",\"d1890de\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:27:55Z",
+      "event": "filed found-during-sprint #363"
+    },
+    {
+      "at": "2026-09-18T23:28:43Z",
+      "event": "filed found-during-sprint #364"
+    },
+    {
+      "at": "2026-09-18T23:28:43Z",
+      "event": "#322: status=in_test commits=[\"ee4fbb0\",\"389c189\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:31:59Z",
+      "event": "#322: status=ready_partial laneDHalf=ready securityReview=skipped-device-owner-input regressionProof=10/14 new body-weight tests fail with 846aaef DashboardScreen.tsx, 14/14 at 389c189 (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:31:59Z",
+      "event": "lane D: done+=322 current=323"
+    },
+    {
+      "at": "2026-09-18T23:31:59Z",
+      "event": "#323: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-18T23:32:10Z",
+      "event": "#327: status=in_test commits=[\"1a874bf\",\"d9f76cc\",\"31348f5\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:33:40Z",
+      "event": "#301: status=in_dev roundTrips=2 notes=…"
+    },
+    {
+      "at": "2026-09-18T23:34:14Z",
+      "event": "#327: status=ready securityReview=skipped-pure-render-perf regressionProof=3/5 memo tests fail at 1a874bf on call counts, pass d9f76cc; r2 coverage tests each sole failure under deps mutations (tester reproduced both) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:34:14Z",
+      "event": "lane C: done+=327 current=328"
+    },
+    {
+      "at": "2026-09-18T23:34:14Z",
+      "event": "#328: lane=C status=analysing branch=sprint/lane-c-analytics"
+    },
+    {
+      "at": "2026-09-18T23:35:20Z",
+      "event": "#323: status=in_dev splitAcrossPhases=true notes=…"
+    },
+    {
+      "at": "2026-09-18T23:35:20Z",
+      "event": "lane D: order=[313,322,323,324,325,326,329,330,317,\"323-clear\",304] waitsForLaneA=[317,\"323-clear\",304]"
+    },
+    {
+      "at": "2026-09-18T23:35:20Z",
+      "event": "orchestrator decision: #323 split - validation now; persisted clear (needs new deleteSetting in database.ts) done by lane D after lane A merges, under the same database.ts grant as #317"
+    },
+    {
+      "at": "2026-09-18T23:35:38Z",
+      "event": "#301: status=in_test commits=[\"bfabfdb\",\"d9ff8d7\",\"ab6ae5e\",\"263a593\",\"d1890de\",\"382b62a\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:37:11Z",
+      "event": "#328: status=parked stalledAt=analysis parkReason=Issue premise partly stale: the chart that reads getWorkoutHistory (LiftingSectionCard progression) is ALL-TIME, so bounding it silently truncates visible data (product decision). PRSummaryCard needs lifetime history for correct PRs and no aggregate PR query exists -> needs new query in database.ts (lane A). Human needs: decide all-time vs windowed chart; add getExercisePRs() aggregate. Screen-side change then mechanical. notes=…"
+    },
+    {
+      "at": "2026-09-18T23:37:11Z",
+      "event": "lane C: parked+=328 current=\"322-chart\""
+    },
+    {
+      "at": "2026-09-18T23:37:11Z",
+      "event": "#322: notes=…"
+    },
+    {
+      "at": "2026-09-18T23:37:39Z",
+      "event": "#311: status=in_test commits=[\"6f0bb27\",\"457d423\",\"b1aeb91\",\"081f1fa\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:38:33Z",
+      "event": "#301: status=in_security securityReview=required-src-db regressionProof=backfillGap fails at 0aad077 (3/6), backfillStartDateGuard fails at ab6ae5e (3/4) + calendar-overflow case sole failure w/o validator; tester generalised across 6 month/year boundaries x 3 TZs notes=…"
+    },
+    {
+      "at": "2026-09-18T23:38:33Z",
+      "event": "#305: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-18T23:38:59Z",
+      "event": "#322: notes=…"
+    },
+    {
+      "at": "2026-09-18T23:40:29Z",
+      "event": "#305: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-18T23:40:52Z",
+      "event": "#323: status=in_test commits=[\"b06a2d7\",\"9b2445e\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:42:57Z",
+      "event": "#301: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-18T23:42:58Z",
+      "event": "lane A: done+=301 current=305"
+    },
+    {
+      "at": "2026-09-18T23:42:58Z",
+      "event": "#305: status=in_dev"
     }
   ]
 }
