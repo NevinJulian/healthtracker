@@ -30,6 +30,18 @@
  * happens if a malformed date key produces NaN date arithmetic and NaN
  * fails every offset<=DAYS_AHEAD loop guard).
  *
+ * Round-3 addition: `'not-a-date'` alone does NOT exercise `isValidDateKey`
+ * — as a *string*, `'not-a-date' > todayISO` (letters sort after digits),
+ * so the `MIN(lowerBoundISO, todayISO)` clamp catches it on its own; the
+ * validator is redundant for that input; deleting `isValidDateKey` entirely
+ * still leaves that case green. A shape-valid but calendar-invalid date —
+ * day 99 of the *previous* month, e.g. `"2026-08-99"` — sorts BEFORE today
+ * as a string (so the clamp does NOT catch it), but
+ * `new Date(y, m - 1, 99)` overflows forward past today (99 days into a
+ * ~30-day month lands roughly 2 months later), reproducing the original
+ * "today's row never generated" bug if `isValidDateKey` is removed. This is
+ * the case that actually proves the validator is load-bearing.
+ *
  * Issue #301
  */
 
@@ -61,6 +73,27 @@ function expectedForwardWindow(today: string): string[] {
   const expected: string[] = [];
   for (let i = 0; i <= DAYS_AHEAD; i++) expected.push(addDays(today, i));
   return expected;
+}
+
+/**
+ * Builds a shape-valid ("\d{4}-\d{2}-\d{2}") but calendar-invalid date key:
+ * day 99 of the month before today. As a STRING this sorts BEFORE today
+ * (year/month digits are <= today's), so it is not caught by clamping
+ * floorISO to todayISO. But `new Date(y, m - 1, 99)` — the calculation
+ * `isValidDateKey` round-trips through — overflows day 99 forward past the
+ * end of that month, landing on a real Date well AFTER today. That's the
+ * only input in this file that actually requires `isValidDateKey` (as
+ * opposed to the todayISO clamp) to keep today's row from disappearing.
+ */
+function previousMonthOverflowDate(today: string): string {
+  const [y, m] = today.split('-').map(Number);
+  let py = y;
+  let pm = m - 1;
+  if (pm === 0) {
+    pm = 12;
+    py -= 1;
+  }
+  return `${py}-${String(pm).padStart(2, '0')}-99`;
 }
 
 describe('syncRollingSchedule() tolerates a bad app_start_date (#301 round 2)', () => {
@@ -102,6 +135,26 @@ describe('syncRollingSchedule() tolerates a bad app_start_date (#301 round 2)', 
     await rawDb.runAsync('DELETE FROM daily_log');
 
     await db.syncRollingSchedule(); // must not throw
+
+    const rows = await db.getDailyLogsBetween(today, addDays(today, DAYS_AHEAD));
+    expect(rows.map((r) => r.date)).toEqual(expectedForwardWindow(today));
+  });
+
+  it('does not throw and still fills today..today+DAYS_AHEAD when app_start_date is a shape-valid but calendar-overflow date (e.g. day 99 of last month)', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    const today = todayKey();
+    const garbled = previousMonthOverflowDate(today);
+    await setStartDate(db, garbled);
+
+    const rawDb = db.getDatabase();
+    await rawDb.runAsync('DELETE FROM daily_log');
+
+    await db.syncRollingSchedule(); // must not throw
+
+    const todayRow = await db.getLogByDate(today);
+    expect(todayRow).not.toBeNull();
 
     const rows = await db.getDailyLogsBetween(today, addDays(today, DAYS_AHEAD));
     expect(rows.map((r) => r.date)).toEqual(expectedForwardWindow(today));
