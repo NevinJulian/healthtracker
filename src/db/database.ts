@@ -496,8 +496,22 @@ export async function getLogByDate(date: string): Promise<DailyLogEntry | null> 
   return mapLogRow(row);
 }
 
+/**
+ * Returns daily_log rows for the current 7-day rolling window only
+ * (today - DAYS_HISTORY .. today + DAYS_AHEAD, inclusive), using the same
+ * todayISO/_addDaysKey arithmetic _syncRollingSchedule() uses to generate
+ * that window — so this always matches what sync just produced.
+ *
+ * Before #300's amendment this was an unbounded `SELECT * FROM daily_log`;
+ * it only ever *looked* windowed because _syncRollingSchedule() used to
+ * delete everything outside the window on every sync. Now that history is
+ * retained, this query does the bounding itself instead.
+ */
 export async function getRollingWindow(): Promise<DailyLogEntry[]> {
   const db = getDatabase();
+  const todayISO = toISODate();
+  const fromISO = _addDaysKey(todayISO, -DAYS_HISTORY);
+  const toISO = _addDaysKey(todayISO, DAYS_AHEAD);
   const rows = await db.getAllAsync<{
     date: string;
     walking_task: string;
@@ -510,7 +524,10 @@ export async function getRollingWindow(): Promise<DailyLogEntry[]> {
     exercises: string;
     body_weight: number | null;
     additional_workouts: string;
-  }>('SELECT * FROM daily_log ORDER BY date ASC');
+  }>(
+    'SELECT * FROM daily_log WHERE date >= ? AND date <= ? ORDER BY date ASC',
+    [fromISO, toISO]
+  );
 
   return rows.map(mapLogRow);
 }
