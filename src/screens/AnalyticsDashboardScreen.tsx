@@ -1404,10 +1404,13 @@ export default function AnalyticsDashboardScreen() {
       const s7 = computeStats(7);
       const s30 = computeStats(30);
 
-      // Weight delta (first vs last in 30-day window)
+      // Weight delta (first vs last plausible point in the 30-day window —
+      // an implausible outlier must not dominate the metric tile, #322)
+      const { valid: plausibleWeightData30 } = plausibleWeights(weightData30);
       const weightDelta =
-        weightData30.length >= 2
-          ? weightData30[weightData30.length - 1].weight - weightData30[0].weight
+        plausibleWeightData30.length >= 2
+          ? plausibleWeightData30[plausibleWeightData30.length - 1].weight -
+            plausibleWeightData30[0].weight
           : null;
 
       // Total workouts (gym sessions + extra) in 30 days
