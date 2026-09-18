@@ -509,6 +509,77 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
 }
 
 // ─────────────────────────────────────────────
+// Ensure-row helper for daily_log writers (#305)
+// ─────────────────────────────────────────────
+
+/**
+ * Ensure a daily_log row exists for `date`. If missing, inserts one using
+ * exactly the column values _syncRollingSchedule() would generate for that
+ * date — same weekly_template lookup, same (raw, unsanitised) startDateISO
+ * handling, same exercises reset — via the shared _buildDailyLogRowValues()
+ * builder, so an on-demand row can never drift from what the next sync
+ * would have produced for it. `INSERT OR IGNORE` makes this safe to call
+ * unconditionally before every daily_log UPDATE: a no-op when the row is
+ * already there.
+ *
+ * Every column outside the builder's set (walk_completed, hammer_completed,
+ * fasting_completed, body_weight, water_ml, additional_workouts) takes its
+ * schema DEFAULT — identical to a row _syncRollingSchedule() itself inserts.
+ *
+ * Silently inserts nothing if weekly_template has no row for `date`'s
+ * weekday — shouldn't happen given the 7-row invariant (CLAUDE.md), but
+ * this helper must not throw over user-editable template data. The caller's
+ * own UPDATE then simply won't find the row, and _assertWrote() surfaces
+ * that loudly instead of the previous silent no-op.
+ */
+async function _ensureDailyLogRow(db: SQLite.SQLiteDatabase, date: string): Promise<void> {
+  const startRow = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM app_state WHERE key = ?',
+    [START_DATE_KEY]
+  );
+  const startDateISO = startRow?.value ?? toISODate();
+
+  const templateRows = await db.getAllAsync<WeeklyTemplateRow>('SELECT * FROM weekly_template');
+  const templateMap = new Map<number, WeeklyTemplateRow>();
+  for (const row of templateRows) {
+    templateMap.set(row.day_of_week, row);
+  }
+
+  const rowValues = _buildDailyLogRowValues(date, templateMap, startDateISO);
+  if (!rowValues) return;
+
+  await db.runAsync(
+    `INSERT OR IGNORE INTO daily_log
+       (date, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      rowValues.date,
+      rowValues.walking_task,
+      rowValues.hammer_task,
+      rowValues.is_rest_day,
+      rowValues.is_meal_prep_day,
+      rowValues.exercises,
+    ]
+  );
+}
+
+/**
+ * Throws a clear error when a daily_log writer's UPDATE didn't touch exactly
+ * one row. Called immediately after each writer's UPDATE, once
+ * _ensureDailyLogRow() has guaranteed the row exists for any date whose
+ * weekday has a weekly_template row — so `changes !== 1` here means
+ * something is actually wrong (e.g. weekly_template is missing a row for
+ * that weekday), surfaced loudly instead of the previous silent no-op (#305).
+ */
+function _assertWrote(result: SQLite.SQLiteRunResult, fnName: string, date: string): void {
+  if (result.changes !== 1) {
+    throw new Error(
+      `[DB] ${fnName}: expected to update exactly 1 daily_log row for date=${date}, but ${result.changes} row(s) changed`
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
 // Database Init
 // ─────────────────────────────────────────────
 
@@ -644,7 +715,12 @@ export async function upsertLogField(
   value: boolean
 ): Promise<void> {
   const db = getDatabase();
-  await db.runAsync(`UPDATE daily_log SET ${field} = ? WHERE date = ?`, [value ? 1 : 0, date]);
+  await _ensureDailyLogRow(db, date);
+  const result = await db.runAsync(
+    `UPDATE daily_log SET ${field} = ? WHERE date = ?`,
+    [value ? 1 : 0, date]
+  );
+  _assertWrote(result, 'upsertLogField', date);
 }
 
 /**
@@ -657,6 +733,7 @@ export async function upsertExerciseCompleted(
   value: boolean
 ): Promise<void> {
   const db = getDatabase();
+  await _ensureDailyLogRow(db, date);
   const row = await db.getFirstAsync<{ exercises: string }>(
     'SELECT exercises FROM daily_log WHERE date = ?',
     [date]
@@ -665,15 +742,21 @@ export async function upsertExerciseCompleted(
   const updated = exercises.map((ex) =>
     ex.id === exerciseId ? { ...ex, completed: value } : ex
   );
-  await db.runAsync(
+  const result = await db.runAsync(
     'UPDATE daily_log SET exercises = ? WHERE date = ?',
     [JSON.stringify(updated), date]
   );
+  _assertWrote(result, 'upsertExerciseCompleted', date);
 }
 
 export async function upsertBodyWeight(date: string, weight: number): Promise<void> {
   const db = getDatabase();
-  await db.runAsync('UPDATE daily_log SET body_weight = ? WHERE date = ?', [weight, date]);
+  await _ensureDailyLogRow(db, date);
+  const result = await db.runAsync(
+    'UPDATE daily_log SET body_weight = ? WHERE date = ?',
+    [weight, date]
+  );
+  _assertWrote(result, 'upsertBodyWeight', date);
 }
 
 export async function upsertAdditionalWorkouts(
@@ -681,10 +764,12 @@ export async function upsertAdditionalWorkouts(
   workouts: AdditionalWorkout[]
 ): Promise<void> {
   const db = getDatabase();
-  await db.runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [
+  await _ensureDailyLogRow(db, date);
+  const result = await db.runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [
     JSON.stringify(workouts),
     date,
   ]);
+  _assertWrote(result, 'upsertAdditionalWorkouts', date);
 }
 
 export async function getWeightHistory(days: number): Promise<{ date: string; weight: number }[]> {
@@ -2050,27 +2135,34 @@ export async function getWaterForDay(dateKey: string): Promise<number> {
  * Increment (or decrement) the water total for `dateKey` by `ml`.
  * The result is clamped to a minimum of 0 — it never goes negative.
  *
- * Upsert-safe: if no row exists for the date (e.g. outside the rolling
- * window) it inserts one with water_ml = max(0, ml).
+ * Ensures a daily_log row exists for `dateKey` first (#305) — e.g. when
+ * `dateKey` is outside the current rolling window — using the same
+ * template/hammer-task values syncRollingSchedule() would generate for it,
+ * then applies the increment to that row's (default 0) water_ml.
  */
 export async function addWater(dateKey: string, ml: number): Promise<void> {
   const db = getDatabase();
-  await db.runAsync(
+  await _ensureDailyLogRow(db, dateKey);
+  const result = await db.runAsync(
     `UPDATE daily_log SET water_ml = MAX(0, water_ml + ?) WHERE date = ?`,
     [ml, dateKey]
   );
+  _assertWrote(result, 'addWater', dateKey);
 }
 
 /**
  * Overwrite the water total for `dateKey` to exactly `ml` (clamped ≥ 0).
+ * Ensures a daily_log row exists for `dateKey` first (#305).
  */
 export async function setWaterForDay(dateKey: string, ml: number): Promise<void> {
   const db = getDatabase();
+  await _ensureDailyLogRow(db, dateKey);
   const clamped = Math.max(0, ml);
-  await db.runAsync(
+  const result = await db.runAsync(
     `UPDATE daily_log SET water_ml = ? WHERE date = ?`,
     [clamped, dateKey]
   );
+  _assertWrote(result, 'setWaterForDay', dateKey);
 }
 
 /**
