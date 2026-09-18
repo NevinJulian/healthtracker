@@ -508,10 +508,25 @@ export async function getLogByDate(date: string): Promise<DailyLogEntry | null> 
  * retained, this query does the bounding itself instead.
  */
 export async function getRollingWindow(): Promise<DailyLogEntry[]> {
-  const db = getDatabase();
   const todayISO = toISODate();
   const fromISO = _addDaysKey(todayISO, -DAYS_HISTORY);
   const toISO = _addDaysKey(todayISO, DAYS_AHEAD);
+  return getDailyLogsBetween(fromISO, toISO);
+}
+
+/**
+ * Returns daily_log rows with date in [fromKey, toKey], inclusive on both
+ * ends, ordered ascending by date. Row shape matches getRollingWindow().
+ *
+ * Intended for callers (e.g. analytics) that need an explicit date range
+ * rather than the current rolling window — added in #300 for later
+ * adoption; not yet wired into any screen.
+ */
+export async function getDailyLogsBetween(
+  fromKey: string,
+  toKey: string
+): Promise<DailyLogEntry[]> {
+  const db = getDatabase();
   const rows = await db.getAllAsync<{
     date: string;
     walking_task: string;
@@ -526,7 +541,7 @@ export async function getRollingWindow(): Promise<DailyLogEntry[]> {
     additional_workouts: string;
   }>(
     'SELECT * FROM daily_log WHERE date >= ? AND date <= ? ORDER BY date ASC',
-    [fromISO, toISO]
+    [fromKey, toKey]
   );
 
   return rows.map(mapLogRow);
