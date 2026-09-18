@@ -414,7 +414,6 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
         [exercisesJson, date]
       );
     }
-    await db.runAsync('DELETE FROM daily_log WHERE date < ?', [cutoffISO]);
   });
 }
 
