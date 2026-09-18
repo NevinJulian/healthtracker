@@ -373,9 +373,21 @@ export default function DashboardScreen() {
   };
 
   const handleSaveWeight = async () => {
-    const val = parseFloat(weightInput);
+    const trimmed = weightInput.trim();
+    if (trimmed === '') {
+      Alert.alert('Invalid Weight', 'Enter a weight before saving');
+      return;
+    }
+    // A comma decimal separator ("78,4") is plausible input here: the
+    // numeric/decimal-pad keyboard's separator key is locale-aware, and
+    // fr-CH / it-CH (both official Swiss locales) use a comma.
+    const val = Number(trimmed.replace(',', '.'));
     if (isNaN(val)) {
-      Alert.alert('Invalid Weight', 'Please enter a valid number.');
+      Alert.alert('Invalid Weight', 'Please enter a valid number');
+      return;
+    }
+    if (val < 20 || val > 400) {
+      Alert.alert('Invalid Weight', 'Enter a weight between 20 and 400 kg');
       return;
     }
     try {
@@ -702,7 +714,7 @@ export default function DashboardScreen() {
                   keyboardType="numeric"
                   value={weightInput}
                   onChangeText={setWeightInput}
-                  onBlur={handleSaveWeight}
+                  onSubmitEditing={handleSaveWeight}
                   returnKeyType="done"
                 />
               </View>
