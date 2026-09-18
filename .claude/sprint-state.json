@@ -2,10 +2,56 @@
   "startedAt": "2026-09-18T22:39:45Z",
   "integrationBranch": "sprint/auto-fixes",
   "baseSha": "198a5f2",
-  "baseline": { "typecheck": "pass", "testSuites": 17, "tests": 331 },
-  "frozenScope": [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 335, 336],
-  "excluded": { "334": "SPRINT.md §3 — .gitattributes renormalisation lands alone, by hand" },
-  "budget": { "maxRoundTripsPerIssue": 3, "maxParkedBeforeAbort": 8 },
+  "baseline": {
+    "typecheck": "pass",
+    "testSuites": 17,
+    "tests": 331
+  },
+  "frozenScope": [
+    300,
+    301,
+    302,
+    303,
+    304,
+    305,
+    306,
+    307,
+    308,
+    309,
+    310,
+    311,
+    312,
+    313,
+    314,
+    315,
+    316,
+    317,
+    318,
+    319,
+    320,
+    321,
+    322,
+    323,
+    324,
+    325,
+    326,
+    327,
+    328,
+    329,
+    330,
+    331,
+    332,
+    333,
+    335,
+    336
+  ],
+  "excluded": {
+    "334": "SPRINT.md §3 — .gitattributes renormalisation lands alone, by hand"
+  },
+  "budget": {
+    "maxRoundTripsPerIssue": 3,
+    "maxParkedBeforeAbort": 8
+  },
   "worktreeRoot": "C:/git/ht-lanes",
   "orchestratorDecisions": [
     "Each lane runs in its own git worktree outside the repo (C:/git/ht-lanes/lane-<x>) so parallel lanes never switch branches under each other and jest in the main tree never scans lane copies.",
@@ -17,19 +63,352 @@
     "#310 (lane B): the SettingsScreen success-alert wording is lane D territory; lane B stays in backup.ts/notifications.ts and reports any criterion it cannot meet in-lane."
   ],
   "lanes": {
-    "A": { "branch": "sprint/lane-a-db", "worktree": "C:/git/ht-lanes/lane-a", "status": "pending", "order": [300, 301, 305, 302, 303, 319, 320, 321, 314, 315, 316, 306, 307, 331], "current": null, "done": [], "parked": [] },
-    "B": { "branch": "sprint/lane-b-notify", "worktree": "C:/git/ht-lanes/lane-b", "status": "pending", "order": [309, 310, 311], "current": null, "done": [], "parked": [] },
-    "C": { "branch": "sprint/lane-c-analytics", "worktree": "C:/git/ht-lanes/lane-c", "status": "pending", "order": [308, 312, 327, 328], "current": null, "done": [], "parked": [] },
-    "D": { "branch": "sprint/lane-d-screens", "worktree": "C:/git/ht-lanes/lane-d", "status": "pending", "order": [313, 322, 323, 324, 325, 326, 329, 330, 317, 304], "waitsForLaneA": [317, 304], "current": null, "done": [], "parked": [] },
-    "E": { "branch": "sprint/lane-e-api", "worktree": "C:/git/ht-lanes/lane-e", "status": "pending", "order": [318], "current": null, "done": [], "parked": [] },
-    "F": { "branch": "sprint/lane-f-repo", "worktree": "C:/git/ht-lanes/lane-f", "status": "pending", "order": [332, 333, 335], "waitsForLaneA": [335], "current": null, "done": [], "parked": [] },
-    "G": { "branch": "sprint/lane-g-tests", "worktree": "C:/git/ht-lanes/lane-g", "status": "pending", "order": [336], "waitsFor": "all other lanes merged", "current": null, "done": [], "parked": [] }
+    "A": {
+      "branch": "sprint/lane-a-db",
+      "worktree": "C:/git/ht-lanes/lane-a",
+      "status": "in_progress",
+      "order": [
+        300,
+        301,
+        305,
+        302,
+        303,
+        319,
+        320,
+        321,
+        314,
+        315,
+        316,
+        306,
+        307,
+        331
+      ],
+      "current": 300,
+      "done": [],
+      "parked": []
+    },
+    "B": {
+      "branch": "sprint/lane-b-notify",
+      "worktree": "C:/git/ht-lanes/lane-b",
+      "status": "in_progress",
+      "order": [
+        309,
+        310,
+        311
+      ],
+      "current": 309,
+      "done": [],
+      "parked": []
+    },
+    "C": {
+      "branch": "sprint/lane-c-analytics",
+      "worktree": "C:/git/ht-lanes/lane-c",
+      "status": "in_progress",
+      "order": [
+        308,
+        312,
+        327,
+        328
+      ],
+      "current": 308,
+      "done": [],
+      "parked": []
+    },
+    "D": {
+      "branch": "sprint/lane-d-screens",
+      "worktree": "C:/git/ht-lanes/lane-d",
+      "status": "in_progress",
+      "order": [
+        313,
+        322,
+        323,
+        324,
+        325,
+        326,
+        329,
+        330,
+        317,
+        304
+      ],
+      "waitsForLaneA": [
+        317,
+        304
+      ],
+      "current": 313,
+      "done": [],
+      "parked": []
+    },
+    "E": {
+      "branch": "sprint/lane-e-api",
+      "worktree": "C:/git/ht-lanes/lane-e",
+      "status": "in_progress",
+      "order": [
+        318
+      ],
+      "current": 318,
+      "done": [],
+      "parked": []
+    },
+    "F": {
+      "branch": "sprint/lane-f-repo",
+      "worktree": "C:/git/ht-lanes/lane-f",
+      "status": "waiting_for_lane_A",
+      "order": [
+        332,
+        333,
+        335
+      ],
+      "waitsForLaneA": [
+        335
+      ],
+      "current": 335,
+      "done": [
+        332
+      ],
+      "parked": [
+        333
+      ]
+    },
+    "G": {
+      "branch": "sprint/lane-g-tests",
+      "worktree": "C:/git/ht-lanes/lane-g",
+      "status": "pending",
+      "order": [
+        336
+      ],
+      "waitsFor": "all other lanes merged",
+      "current": null,
+      "done": [],
+      "parked": []
+    }
   },
-  "issues": {},
-  "foundDuringSprint": [],
+  "issues": {
+    "300": {
+      "roundTrips": 0,
+      "commits": [
+        "266cf76",
+        "66d3f58"
+      ],
+      "lane": "A",
+      "status": "in_dev",
+      "branch": "sprint/lane-a-db",
+      "notes": "work order: remove DELETE at database.ts:417; build reusable sql.js expo-sqlite adapter in src/db/__tests__; tester must verify getRollingWindow callers filter by date"
+    },
+    "308": {
+      "roundTrips": 0,
+      "commits": [
+        "577e79b",
+        "8efa95c"
+      ],
+      "lane": "C",
+      "status": "in_test",
+      "branch": "sprint/lane-c-analytics",
+      "notes": "dev done: helper + component rerender test (proved failing on real bug, not just missing export). Uses RNTL_SKIP_DEPS_CHECK workaround (filed #360). Tester resumed after interruption."
+    },
+    "309": {
+      "roundTrips": 0,
+      "commits": [
+        "2c171a8",
+        "398f733"
+      ],
+      "lane": "B",
+      "status": "in_dev",
+      "branch": "sprint/lane-b-notify",
+      "notes": "commits pushed before interruption; developer resumed to verify and report"
+    },
+    "313": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "D",
+      "status": "in_dev",
+      "branch": "sprint/lane-d-screens",
+      "notes": "work order: functional updaters + debounced write in all 7 steppers (protein in scope per title); orchestrator added flush-on-unmount and no-write-on-hydration criteria"
+    },
+    "318": {
+      "roundTrips": 0,
+      "commits": [
+        "1beee5e",
+        "1a59e42",
+        "def1e4f"
+      ],
+      "lane": "E",
+      "status": "in_test",
+      "branch": "sprint/lane-e-api",
+      "partial": true,
+      "notes": "in-lane only: fetchJson timeout/retry/res.ok + meal cache. UNMET in-lane: abort-on-navigation and out-of-order search responses need DiscoverScreen/RecipeEditorScreen, which no lane owns. Will not close #318."
+    },
+    "332": {
+      "roundTrips": 0,
+      "commits": [
+        "19ecb0c",
+        "a6e5813"
+      ],
+      "lane": "F",
+      "status": "ready",
+      "branch": "sprint/lane-f-repo",
+      "securityReview": "skipped-no-data-flow",
+      "notes": "tester APPROVE round 0; security skipped (no data flow)",
+      "regressionProof": "mechanical: 4 git ls-files/check-ignore checks fail at f132381, pass at a6e5813 (tester re-ran)"
+    },
+    "333": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "F",
+      "status": "parked",
+      "branch": "sprint/lane-f-repo",
+      "notes": "issue comment posted with exact commands and enumeration",
+      "stalledAt": "analysis",
+      "parkReason": "All acceptance criteria are local git state or a GitHub repo setting; nothing travels through the reviewable PR; sprint does not delete branches on the user's machine unreviewed. fix-recipe-detail-safe-area is NOT merged (1 commit, 7d7ba67) despite the issue grouping it as a leftover. Human needs: run -d sweep after sprint PR resolves, enable auto-delete head branches, decide on unmerged branches."
+    }
+  },
+  "foundDuringSprint": [
+    360
+  ],
   "log": [
-    { "at": "2026-09-18T22:39:45Z", "event": "preflight green on main: typecheck pass, 331 tests / 17 suites" },
-    { "at": "2026-09-18T22:39:45Z", "event": "created and pushed sprint/auto-fixes from main", "sha": "198a5f2" },
-    { "at": "2026-09-18T22:39:45Z", "event": "scope frozen: 36 open issues in #300-#336, #334 excluded" }
+    {
+      "at": "2026-09-18T22:39:45Z",
+      "event": "preflight green on main: typecheck pass, 331 tests / 17 suites"
+    },
+    {
+      "at": "2026-09-18T22:39:45Z",
+      "event": "created and pushed sprint/auto-fixes from main",
+      "sha": "198a5f2"
+    },
+    {
+      "at": "2026-09-18T22:39:45Z",
+      "event": "scope frozen: 36 open issues in #300-#336, #334 excluded"
+    },
+    {
+      "at": "2026-09-18T22:41:44Z",
+      "event": "worktrees created at C:/git/ht-lanes/lane-{a..f}, lane branches pushed, npm ci running"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane A: status=in_progress current=300"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#300: lane=A status=analysing branch=sprint/lane-a-db"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane B: status=in_progress current=309"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#309: lane=B status=analysing branch=sprint/lane-b-notify"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane C: status=in_progress current=308"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#308: lane=C status=analysing branch=sprint/lane-c-analytics"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane D: status=in_progress current=313"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#313: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane E: status=in_progress current=318"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#318: lane=E status=analysing branch=sprint/lane-e-api"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane F: status=in_progress current=332"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#332: lane=F status=analysing branch=sprint/lane-f-repo"
+    },
+    {
+      "at": "2026-09-18T22:42:55Z",
+      "event": "npm ci done in all six worktrees; lane-b sanity run 331/17 green"
+    },
+    {
+      "at": "2026-09-18T22:42:55Z",
+      "event": "#309: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T22:42:55Z",
+      "event": "#308: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T22:44:10Z",
+      "event": "#313: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T22:44:10Z",
+      "event": "#318: status=in_dev partial=true notes=…"
+    },
+    {
+      "at": "2026-09-18T22:44:10Z",
+      "event": "#300: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T22:44:36Z",
+      "event": "#332: status=in_dev securityReview=skipped-no-data-flow notes=…"
+    },
+    {
+      "at": "2026-09-18T22:46:10Z",
+      "event": "#332: status=in_test commits=[\"19ecb0c\",\"a6e5813\"]"
+    },
+    {
+      "at": "2026-09-18T22:46:10Z",
+      "event": "#333: lane=F status=analysing branch=sprint/lane-f-repo notes=…"
+    },
+    {
+      "at": "2026-09-18T22:47:21Z",
+      "event": "#332: status=ready regressionProof=mechanical: 4 git ls-files/check-ignore checks fail at f132381, pass at a6e5813 (tester re-ran) notes=…"
+    },
+    {
+      "at": "2026-09-18T22:47:21Z",
+      "event": "lane F: done+=332 current=333"
+    },
+    {
+      "at": "2026-09-18T22:47:55Z",
+      "event": "#333: status=parked stalledAt=analysis parkReason=All acceptance criteria are local git state or a GitHub repo setting; nothing travels through the reviewable PR; sprint does not delete branches on the user's machine unreviewed. fix-recipe-detail-safe-area is NOT merged (1 commit, 7d7ba67) despite the issue grouping it as a leftover. Human needs: run -d sweep after sprint PR resolves, enable auto-delete head branches, decide on unmerged branches. notes=…"
+    },
+    {
+      "at": "2026-09-18T22:47:55Z",
+      "event": "lane F: parked+=333 current=335 status=waiting_for_lane_A"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "SESSION INTERRUPTED ~00:49 local: 4 agents stopped (dev #309/#313/#300, tester #308). refs/heads/sprint/lane-a-db was left NUL-filled; restored from branch reflog to 66d3f58 (no commits lost; fix line uncommitted in worktree). No NUL corruption in in-flight files; git fsck connectivity clean. All four agents resumed via SendMessage."
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "RULE ADDED: agents must not use git stash — stash stack is shared across all worktrees (found lane C spike stash 9982099 in the shared stack)"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "filed found-during-sprint #360"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "#308: status=in_test commits=[\"577e79b\",\"8efa95c\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "#318: status=in_test commits=[\"1beee5e\",\"1a59e42\",\"def1e4f\"]"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "#300: commits=[\"266cf76\",\"66d3f58\"]"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "#309: commits=[\"2c171a8\",\"398f733\"] notes=…"
+    }
   ]
 }
