@@ -497,6 +497,13 @@ export async function cancelBackupReminder(): Promise<void> {
 
 // ─── Reconcile ───────────────────────────────────────────────────────────────
 
+/** The `_reconcile()` pass currently in flight, if any (#311). */
+let inFlightPass: Promise<void> | null = null;
+/** A single trailing pass queued to start once `inFlightPass` finishes (#311). */
+let queuedPass: Promise<void> | null = null;
+/** Resolver for the promise handed out to every caller sharing `queuedPass`. */
+let queuedResolve: (() => void) | null = null;
+
 /**
  * Read persisted settings and bring the OS scheduled notifications into sync.
  *
@@ -505,8 +512,63 @@ export async function cancelBackupReminder(): Promise<void> {
  *   2. From SettingsScreen after any toggle or time change.
  *
  * This is intentionally defensive — any failure is logged, never thrown.
+ *
+ * Coalescing in-flight guard (#311): at most one `_reconcile()` pass runs at
+ * a time. A call made while a pass is already running does not start a
+ * second, overlapping pass — every such call joins a single trailing pass
+ * (shared by all of them), which starts only once the current pass finishes
+ * and re-reads live settings at that point.
+ *
+ * CONTRACT: the promise returned to a caller resolves only once a pass that
+ * STARTED AFTER that call has completed — never the promise of a pass that
+ * was already running when the call was made. This matters because
+ * importBackup() (#310) awaits this immediately after restoring settings and
+ * must observe a pass that actually read the restored values, not a stale
+ * one that may have already read the old ones before the restore happened.
  */
-export async function reconcileScheduledNotifications(): Promise<void> {
+export function reconcileScheduledNotifications(): Promise<void> {
+  if (!inFlightPass) {
+    inFlightPass = runPass();
+    return inFlightPass;
+  }
+  if (!queuedPass) {
+    queuedPass = new Promise<void>((resolve) => {
+      queuedResolve = resolve;
+    });
+  }
+  return queuedPass;
+}
+
+/**
+ * Runs one `_reconcile()` pass and, once it settles, atomically either
+ * clears the in-flight guard or hands off to the queued trailing pass (if
+ * any caller joined one while this pass was running). The hand-off happens
+ * synchronously inside a single `.finally()` callback so there is no window
+ * where another caller could observe an inconsistent guard state.
+ */
+function runPass(): Promise<void> {
+  return _reconcile()
+    .catch((err) => {
+      // _reconcile() isolates every reminder behind its own try/catch (see
+      // below), so this should never actually fire — but it's the backstop
+      // that guarantees the guard can't get stuck on `inFlightPass` if
+      // something unexpected still slips through (#311).
+      console.warn('[Notifications] reconcileScheduledNotifications failed:', err);
+    })
+    .finally(() => {
+      if (queuedResolve) {
+        const resolve = queuedResolve;
+        queuedPass = null;
+        queuedResolve = null;
+        inFlightPass = runPass();
+        inFlightPass.then(resolve, resolve);
+      } else {
+        inFlightPass = null;
+      }
+    });
+}
+
+async function _reconcile(): Promise<void> {
   try {
     // One-shot post-upgrade sweep (#309): notifications scheduled before
     // stable identifiers existed carry Expo-random UUIDs, so rescheduling
