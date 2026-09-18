@@ -112,7 +112,7 @@
     "C": {
       "branch": "sprint/lane-c-analytics",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "in_progress",
+      "status": "merging",
       "order": [
         308,
         312,
@@ -120,15 +120,17 @@
         328,
         "322-chart"
       ],
-      "current": "\"322-chart\"",
+      "current": null,
       "done": [
         308,
         312,
-        327
+        327,
+        "\"322-chart\""
       ],
       "parked": [
         328
-      ]
+      ],
+      "cleanup": "no changes needed"
     },
     "D": {
       "branch": "sprint/lane-d-screens",
@@ -247,11 +249,15 @@
     },
     "305": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "77fc8ae",
+        "cdc5a90",
+        "52409f4"
+      ],
       "lane": "A",
-      "status": "in_dev",
+      "status": "in_test",
       "branch": "sprint/lane-a-db",
-      "notes": "work order ready: _ensureDailyLogRow (template-correct INSERT OR IGNORE; issue's own SQL would violate NOT NULL walking_task/hammer_task) before each of SIX writers (analyst found upsertExerciseCompleted missing from issue) + _assertWrote changes check; extract shared per-date row builder. date is PK -> no migration. Orchestrator: upsertExerciseCompleted gets ensure-row ONLY (malformed JSON/RMW is #319). Developer held until #301 security finishes (same worktree)."
+      "notes": "dev: pure-refactor shared row builder (all #300/#301 tests green at cdc5a90), _ensureDailyLogRow + _assertWrote on 6 writers; upsertExerciseCompleted ensure+assert only (no early return exists). 9/10 new tests fail pre-fix. 355 tests/23 suites."
     },
     "308": {
       "roundTrips": 0,
@@ -365,25 +371,36 @@
         "389c189"
       ],
       "lane": "D",
-      "status": "ready_partial",
+      "status": "ready",
       "branch": "sprint/lane-d-screens",
-      "notes": "lane D half ready (389c189). Chart half in dev (lane C): plausibleWeights() 20-400kg filter + 'N entries hidden' note; bars/min/max/current/delta all consume valid points.",
+      "notes": "BOTH HALVES READY. Lane D half on sprint/lane-d-screens (389c189), chart half on sprint/lane-c-analytics (a55de6b). Closes only when both lanes merged. Chart half tester APPROVE r0; security skipped (pure render).",
       "splitAcrossLanes": true,
       "laneDHalf": "ready",
       "securityReview": "skipped-device-owner-input",
-      "regressionProof": "10/14 new body-weight tests fail with 846aaef DashboardScreen.tsx, 14/14 at 389c189 (tester reproduced)"
+      "regressionProof": "10/14 new body-weight tests fail with 846aaef DashboardScreen.tsx, 14/14 at 389c189 (tester reproduced)",
+      "chartHalfCommits": [
+        "733de02",
+        "4b74b42",
+        "c7c8292",
+        "1481f7b",
+        "4fde986",
+        "a55de6b"
+      ],
+      "chartHalf": "ready",
+      "regressionProofChart": "card tests fail on assertions with export kept + raw history (tester trap check); full-screen delta fails at 31348f5 (-9924.0); helper tests fail at base"
     },
     "323": {
       "roundTrips": 0,
       "commits": [
         "b06a2d7",
-        "9b2445e"
+        "9b2445e",
+        "5cb4219"
       ],
       "lane": "D",
       "status": "ready_partial",
       "branch": "sprint/lane-d-screens",
       "splitAcrossPhases": true,
-      "notes": "part 1 tester APPROVE r0; probed 5 focus-cycle scenarios incl stuck-ref - all correct. Follow-up test-only commit requested (separate file, focus-capable mock). Part 2 (persisted clear via deleteSetting) after lane A merges.",
+      "notes": "part 1 ready: tester APPROVE r0 + follow-up test-only commit 5cb4219 (separate file, focus-capable mock; mutation proof: removing ref reset -> field stuck blank; source byte-identical) accepted by orchestrator without re-test. Part 2 (persisted clear) after lane A merges.",
       "part1": "ready",
       "securityReview": "skipped-device-owner-input",
       "regressionProof": "5 new tests fail with 389c189 SettingsScreen.tsx, pass at 9b2445e (tester reproduced)"
@@ -392,8 +409,9 @@
       "roundTrips": 0,
       "commits": [],
       "lane": "D",
-      "status": "analysing",
-      "branch": "sprint/lane-d-screens"
+      "status": "in_dev",
+      "branch": "sprint/lane-d-screens",
+      "notes": "work order: Number()+comma, integer 1-50, Save disabled when invalid/empty, inline 'Enter 1-50 portions' for non-empty invalid, modal mounted only while visible (fresh state per open). Save path = logCookedMeal (additive; not lane A's #302/#303 writers). MeasurementsModal same pattern = #325 (lane D next), not new. Developer held: #323 follow-up test committing in same worktree."
     },
     "327": {
       "roundTrips": 1,
@@ -973,6 +991,38 @@
     {
       "at": "2026-09-18T23:47:22Z",
       "event": "#315 prerequisite met: lane B merged into integration; lane A must merge integration before starting #315 (backup.ts validatePayload grant)"
+    },
+    {
+      "at": "2026-09-18T23:48:29Z",
+      "event": "#322: chartHalfCommits=[\"733de02\",\"4b74b42\",\"c7c8292\",\"1481f7b\",\"4fde986\",\"a55de6b\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:49:30Z",
+      "event": "#324: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-18T23:51:53Z",
+      "event": "#305: status=in_test commits=[\"77fc8ae\",\"cdc5a90\",\"52409f4\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:52:16Z",
+      "event": "#323: commits=[\"b06a2d7\",\"9b2445e\",\"5cb4219\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:52:16Z",
+      "event": "#324: status=in_dev"
+    },
+    {
+      "at": "2026-09-18T23:52:34Z",
+      "event": "#322: status=ready chartHalf=ready regressionProofChart=card tests fail on assertions with export kept + raw history (tester trap check); full-screen delta fails at 31348f5 (-9924.0); helper tests fail at base notes=…"
+    },
+    {
+      "at": "2026-09-18T23:52:34Z",
+      "event": "lane C: done+=\"322-chart\" status=cleanup current=null"
+    },
+    {
+      "at": "2026-09-18T23:55:18Z",
+      "event": "lane C: status=merging cleanup=no changes needed"
     }
   ]
 }
