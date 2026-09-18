@@ -112,6 +112,7 @@ const KG_PER_CYCLE = 5;
 const CYCLE_DAYS = 21;
 const DAYS_AHEAD = 7;
 const DAYS_HISTORY = 7;
+const BACKFILL_CAP_DAYS = 90;
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -341,12 +342,22 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   }
 
   const todayISO = toISODate();
+  // cutoffISO gates the *existing-row* exercises backfill further below —
+  // kept at its pre-#301 range (today - DAYS_HISTORY) on purpose. Widening
+  // the INSERT range (below) must not also widen this: retroactively handing
+  // an old row today's template exercises would invent history the user
+  // never had (#301, orchestrator amendment).
   const cutoffISO = _addDaysKey(todayISO, -DAYS_HISTORY);
+  // floorISO gates how far back MISSING rows get inserted: up to
+  // BACKFILL_CAP_DAYS in the past, but never before the app's own start date
+  // — there's no schedule to backfill before the user started using the app.
+  const backfillFloorISO = _addDaysKey(todayISO, -BACKFILL_CAP_DAYS);
+  const floorISO = startDateISO > backfillFloorISO ? startDateISO : backfillFloorISO;
 
   // Pre-fetch existing rows with their exercises OUTSIDE the transaction (#37)
   const existingRows = await db.getAllAsync<{ date: string; exercises: string }>(
     'SELECT date, exercises FROM daily_log WHERE date >= ?',
-    [cutoffISO]
+    [floorISO]
   );
   const existingDates = new Set(existingRows.map((r) => r.date));
 
@@ -357,7 +368,8 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   type BackfillParams = [string, string]; // [exercisesJson, date]
   const backfills: BackfillParams[] = [];
 
-  for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
+  const startOffset = _daysBetweenKey(todayISO, floorISO);
+  for (let offset = startOffset; offset <= DAYS_AHEAD; offset++) {
     const targetISO = _addDaysKey(todayISO, offset);
     // Derive day-of-week from the local-midnight Date for this key
     const targetDate = localMidnightToday();
@@ -372,11 +384,16 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
     const baseExercisesJson = JSON.stringify(baseExercises);
 
     if (existingDates.has(targetISO)) {
-      // Row exists — check if exercises need to be backfilled
-      const existing = existingRows.find((r) => r.date === targetISO);
-      const currentExercises = parseExercises(existing?.exercises);
-      if (currentExercises.length === 0 && templateExercises.length > 0) {
-        backfills.push([baseExercisesJson, targetISO]);
+      // Row exists — check if exercises need to be backfilled. Restricted to
+      // the pre-#301 range (cutoffISO..today+DAYS_AHEAD): dates further back
+      // than that were never visited by this pass before #301 widened the
+      // insert range below, and must stay untouched (see cutoffISO comment).
+      if (targetISO >= cutoffISO) {
+        const existing = existingRows.find((r) => r.date === targetISO);
+        const currentExercises = parseExercises(existing?.exercises);
+        if (currentExercises.length === 0 && templateExercises.length > 0) {
+          backfills.push([baseExercisesJson, targetISO]);
+        }
       }
       continue;
     }
