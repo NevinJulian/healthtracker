@@ -93,7 +93,7 @@
     "B": {
       "branch": "sprint/lane-b-notify",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "merging",
+      "status": "merged",
       "order": [
         309,
         310,
@@ -106,7 +106,8 @@
         311
       ],
       "parked": [],
-      "cleanup": "59ba330 comment-only (2 docblocks)"
+      "cleanup": "59ba330 comment-only (2 docblocks)",
+      "mergeSha": "c424709"
     },
     "C": {
       "branch": "sprint/lane-c-analytics",
@@ -272,11 +273,12 @@
         "398f733"
       ],
       "lane": "B",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-b-notify",
       "notes": "tester APPROVE round 0; 343 tests. Needs device verification: expo-notifications upsert-by-identifier on Android; scheduleNotificationAsync resolving with the given identifier. Tester note: reconcile's single shared try/catch means a throwing getter skips later reminders (pre-existing; first post-upgrade pass now also has the sweep behind it; self-heals on next reconcile) - handed to #311 analyst to decide coverage before filing.",
       "securityReview": "skipped-notifications-only",
-      "regressionProof": "12 of 40 notification tests fail at 2c171a8, 40/40 at 398f733 (tester reproduced); test file diff is additions only"
+      "regressionProof": "12 of 40 notification tests fail at 2c171a8, 40/40 at 398f733 (tester reproduced); test file diff is additions only",
+      "mergeSha": "c424709"
     },
     "310": {
       "roundTrips": 0,
@@ -285,11 +287,12 @@
         "186cabf"
       ],
       "lane": "B",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-b-notify",
       "notes": "tester APPROVE + security APPROVE r0. Security: diff changes timing not reachability (App.tsx reconciles restored settings at startup anyway); if cancelAll rejects, old schedule remains (not zero reminders). Pre-existing getWeeklyCookDay range gap filed. Honest-alert criterion judged moot by orchestrator (flag for human).",
       "securityReview": "required-backup-ts",
-      "regressionProof": "4 of 5 new backup tests fail with 398f733 backup.ts, 23/23 pass at 186cabf (tester reproduced); spy interception proven by error reference identity"
+      "regressionProof": "4 of 5 new backup tests fail with 398f733 backup.ts, 23/23 pass at 186cabf (tester reproduced); spy interception proven by error reference identity",
+      "mergeSha": "c424709"
     },
     "311": {
       "roundTrips": 0,
@@ -300,12 +303,13 @@
         "081f1fa"
       ],
       "lane": "B",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-b-notify",
       "notes": "tester APPROVE r0. Adversarial: third-pass contract holds; #310x#311 restore race ends in restored-settings state (stable ids make each pass self-consistent). PARTIAL: AC #4 excluded -> Refs #311.",
       "partial": true,
       "securityReview": "skipped-notifications-only",
-      "regressionProof": "4 guard tests fail at 186cabf, 3 isolation tests fail at 457d423, all pass at 081f1fa (tester reproduced)"
+      "regressionProof": "4 guard tests fail at 186cabf, 3 isolation tests fail at 457d423, all pass at 081f1fa (tester reproduced)",
+      "mergeSha": "c424709"
     },
     "312": {
       "roundTrips": 0,
@@ -944,6 +948,31 @@
     {
       "at": "2026-09-18T23:47:02Z",
       "event": "lane B: status=merging cleanup=59ba330 comment-only (2 docblocks)"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "#309: status=merged mergeSha=c424709"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "#310: status=merged mergeSha=c424709"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "#311: status=merged mergeSha=c424709"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "lane B: status=merged mergeSha=c424709"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "merged lane B into sprint/auto-fixes; integration gates green: typecheck pass, 370 tests / 20 suites (346 + 24 from lane B)",
+      "sha": "c424709"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "#315 prerequisite met: lane B merged into integration; lane A must merge integration before starting #315 (backup.ts validatePayload grant)"
     }
   ]
 }
