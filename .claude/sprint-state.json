@@ -83,8 +83,10 @@
         307,
         331
       ],
-      "current": 300,
-      "done": [],
+      "current": 301,
+      "done": [
+        300
+      ],
       "parked": []
     },
     "B": {
@@ -98,7 +100,8 @@
       ],
       "current": 310,
       "done": [
-        309
+        309,
+        310
       ],
       "parked": []
     },
@@ -112,9 +115,10 @@
         327,
         328
       ],
-      "current": 312,
+      "current": 327,
       "done": [
-        308
+        308,
+        312
       ],
       "parked": []
     },
@@ -203,20 +207,24 @@
         "0aad077"
       ],
       "lane": "A",
-      "status": "in_security",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "tester APPROVE (amended scope). Adapter audited: all 7 db.*Async methods covered; ROLLBACK/null/binding probed. AC #3/#4 deferred (analytics switch after lane C merges).",
+      "notes": "tester APPROVE + security APPROVE. Security notes: getDailyLogsBetween has no shape check on keys (no live external caller - add when analytics wires it); schema.ts header still says 'pruned to +/-7 days' -> lane A cleanup / #335. AC #3/#4 DEFERRED: analytics switch to getDailyLogsBetween after lane C merges.",
       "deferredStep": "after lane C merges: merge integration into lane A, switch AnalyticsDashboardScreen loadData getRollingWindow() -> getDailyLogsBetween(today-90, today) (covers AC #3/#4)",
       "securityReview": "required-src-db",
       "regressionProof": "retention test fails 66d3f58/passes e46607f; bounded-window test fails 313877b/passes 91e7932; range test fails 231d644/passes 0aad077 (tester reproduced all three; also TZ=UTC+14/UTC-12)"
     },
     "301": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "bfabfdb",
+        "d9ff8d7",
+        "ab6ae5e"
+      ],
       "lane": "A",
-      "status": "analysing",
+      "status": "in_test",
       "branch": "sprint/lane-a-db",
-      "notes": "analysis pipelined with #300 security review (read-only); developer held until #300 clears"
+      "notes": "dev: floor=max(startDate,today-90), loop from floor, exercise-backfill gated by targetISO>=cutoffISO. 3/6 tests fail pre-fix. Tester asked to explain why the 'does NOT backfill exercises' test failed pre-fix + mutation-test the gate. 340 tests/21 suites."
     },
     "308": {
       "roundTrips": 0,
@@ -246,30 +254,53 @@
     },
     "310": {
       "roundTrips": 0,
+      "commits": [
+        "1edd492",
+        "186cabf"
+      ],
+      "lane": "B",
+      "status": "ready",
+      "branch": "sprint/lane-b-notify",
+      "notes": "tester APPROVE + security APPROVE r0. Security: diff changes timing not reachability (App.tsx reconciles restored settings at startup anyway); if cancelAll rejects, old schedule remains (not zero reminders). Pre-existing getWeeklyCookDay range gap filed. Honest-alert criterion judged moot by orchestrator (flag for human).",
+      "securityReview": "required-backup-ts",
+      "regressionProof": "4 of 5 new backup tests fail with 398f733 backup.ts, 23/23 pass at 186cabf (tester reproduced); spy interception proven by error reference identity"
+    },
+    "311": {
+      "roundTrips": 0,
       "commits": [],
       "lane": "B",
-      "status": "in_dev",
+      "status": "analysing",
       "branch": "sprint/lane-b-notify",
-      "notes": "work order amended: after SUCCESSFUL restore -> cancelAll then reconcile (covers disabled-in-backup edge case where stale ID key would leave reminder firing). Honest-alert criterion judged moot by orchestrator (flag for human). Analyst's also-found filed as #361."
+      "notes": "analysis pipelined with #310 security (read-only); carries #309 tester's per-reminder isolation question"
     },
     "312": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "3189d8f",
+        "bdbf4ea",
+        "f97b321"
+      ],
       "lane": "C",
-      "status": "in_dev",
+      "status": "ready",
       "branch": "sprint/lane-c-analytics",
-      "notes": "work order: run-id counter guard at all FOUR setter boundaries (issue said three); keep getRollingWindow() line standalone for lane A's deferred swap. Orchestrator added: focus-effect cleanup runs on blur, so liveness must survive re-focus; render test required."
+      "notes": "tester APPROVE r0. HISTORY WRINKLE: 3189d8f alone does not load (jest.mock scope error), fixed by bdbf4ea - disclosed by dev, not force-pushed over; flag in report. 339 tests/19 suites.",
+      "securityReview": "skipped-client-state-only",
+      "regressionProof": "cancellationGuard test fails with bdbf4ea screen source (stale squat run wins), passes at f97b321 (tester reproduced)"
     },
     "313": {
-      "roundTrips": 0,
+      "roundTrips": 1,
       "commits": [
         "7a9199a",
-        "490f75a"
+        "490f75a",
+        "d68c7f6",
+        "846aaef"
       ],
       "lane": "D",
       "status": "in_test",
       "branch": "sprint/lane-d-screens",
-      "notes": "dev: useDebouncedCommit hook (400ms, dirty-ref gated), flush on unmount+blur; 5/6 new tests fail pre-fix, hydration test is spec-only (passes both). 337 tests."
+      "notes": "r2 dev: AppState background/inactive flush (single subscription, removed on unmount) + runCommit catch/console.error; 4 new tests fail at 490f75a. 341 tests. Back to tester, then security.",
+      "securityReview": "required-deferred-write-path",
+      "regressionProof": "5 of 6 new tests fail with f132381 SettingsScreen.tsx, 7/7 pass at 490f75a (tester reproduced; hydration test spec-only)"
     },
     "318": {
       "roundTrips": 1,
@@ -288,6 +319,14 @@
       "securityReview": "required-src-api",
       "regressionProof": "mealdb tests fail at 1beee5e (settled=false; fetch x2) pass at def1e4f; backoff-abort test fails at def1e4f pass at 8f867a5 (tester reproduced both)",
       "mergeSha": 605533
+    },
+    "327": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "C",
+      "status": "in_dev",
+      "branch": "sprint/lane-c-analytics",
+      "notes": "work order: useMemo on computeStrengthProgression (deps windowStart,todayISO) and bestSetPerDay+min/max, measured by spy call counts across identical-props rerender + re-invoked-on-change check. Excluded: loadData batching, React.memo, DOT_COLORS hoist (orchestrator: not measurable). Park if spy test cannot fail on current code."
     },
     "332": {
       "roundTrips": 0,
@@ -315,7 +354,8 @@
   },
   "foundDuringSprint": [
     360,
-    361
+    361,
+    362
   ],
   "log": [
     {
@@ -563,6 +603,78 @@
       "at": "2026-09-18T23:06:30Z",
       "event": "merged lane E into sprint/auto-fixes; integration gates green: typecheck pass, 346 tests / 20 suites",
       "sha": "0605533"
+    },
+    {
+      "at": "2026-09-18T23:06:55Z",
+      "event": "#300: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-18T23:06:55Z",
+      "event": "lane A: done+=300 current=301"
+    },
+    {
+      "at": "2026-09-18T23:08:15Z",
+      "event": "#301: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T23:08:45Z",
+      "event": "#313: status=in_security securityReview=required-deferred-write-path regressionProof=5 of 6 new tests fail with f132381 SettingsScreen.tsx, 7/7 pass at 490f75a (tester reproduced; hydration test spec-only) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:09:09Z",
+      "event": "#312: status=in_test commits=[\"3189d8f\",\"bdbf4ea\",\"f97b321\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:10:54Z",
+      "event": "#310: status=in_test commits=[\"1edd492\",\"186cabf\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:13:01Z",
+      "event": "#313: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-18T23:13:22Z",
+      "event": "#312: status=ready securityReview=skipped-client-state-only regressionProof=cancellationGuard test fails with bdbf4ea screen source (stale squat run wins), passes at f97b321 (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:13:22Z",
+      "event": "lane C: done+=312 current=327"
+    },
+    {
+      "at": "2026-09-18T23:13:22Z",
+      "event": "#327: lane=C status=analysing branch=sprint/lane-c-analytics notes=…"
+    },
+    {
+      "at": "2026-09-18T23:15:22Z",
+      "event": "#310: status=in_security securityReview=required-backup-ts regressionProof=4 of 5 new backup tests fail with 398f733 backup.ts, 23/23 pass at 186cabf (tester reproduced); spy interception proven by error reference identity notes=…"
+    },
+    {
+      "at": "2026-09-18T23:15:22Z",
+      "event": "#311: lane=B status=analysing branch=sprint/lane-b-notify notes=…"
+    },
+    {
+      "at": "2026-09-18T23:15:51Z",
+      "event": "#301: status=in_test commits=[\"bfabfdb\",\"d9ff8d7\",\"ab6ae5e\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:17:13Z",
+      "event": "#327: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T23:17:43Z",
+      "event": "#310: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-18T23:17:43Z",
+      "event": "lane B: done+=310"
+    },
+    {
+      "at": "2026-09-18T23:17:43Z",
+      "event": "#313: status=in_test commits=[\"7a9199a\",\"490f75a\",\"d68c7f6\",\"846aaef\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:17:48Z",
+      "event": "filed found-during-sprint #362"
     }
   ]
 }
