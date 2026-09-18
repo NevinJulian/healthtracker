@@ -46,7 +46,7 @@ interface Deferred<T> {
   resolve: (value: T) => void;
 }
 
-function createDeferred<T>(): Deferred<T> {
+function mockCreateDeferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((res) => {
     resolve = res;
@@ -54,11 +54,11 @@ function createDeferred<T>(): Deferred<T> {
   return { promise, resolve };
 }
 
-const inventoryDeferreds: Array<Deferred<any>> = [];
-const exercisesDeferreds: Array<Deferred<string[]>> = [];
+const mockInventoryDeferreds: Array<Deferred<any>> = [];
+const mockExercisesDeferreds: Array<Deferred<string[]>> = [];
 
-function nextDeferred<T>(store: Array<Deferred<T>>): Promise<T> {
-  const d = createDeferred<T>();
+function mockNextDeferred<T>(store: Array<Deferred<T>>): Promise<T> {
+  const d = mockCreateDeferred<T>();
   store.push(d);
   return d.promise;
 }
@@ -112,8 +112,8 @@ jest.mock('../../db/database', () => ({
     )
   ),
   // Manually controlled, keyed by call order: 1st call = run A, 2nd = run B.
-  getInventorySnapshot: jest.fn(() => nextDeferred(inventoryDeferreds)),
-  getLoggedExercises: jest.fn(() => nextDeferred(exercisesDeferreds)),
+  getInventorySnapshot: jest.fn(() => mockNextDeferred(mockInventoryDeferreds)),
+  getLoggedExercises: jest.fn(() => mockNextDeferred(mockExercisesDeferreds)),
 }));
 
 import AnalyticsDashboardScreen from '../AnalyticsDashboardScreen';
@@ -125,8 +125,8 @@ const flush = () => act(async () => {
 describe('AnalyticsDashboardScreen — cancellation guard (#312)', () => {
   beforeEach(() => {
     latestFocusEffect = null;
-    inventoryDeferreds.length = 0;
-    exercisesDeferreds.length = 0;
+    mockInventoryDeferreds.length = 0;
+    mockExercisesDeferreds.length = 0;
   });
 
   it('applies only the newer run\'s values when an older run resolves later, across all four setter boundaries', async () => {
@@ -142,8 +142,8 @@ describe('AnalyticsDashboardScreen — cancellation guard (#312)', () => {
 
     // Run A is now parked awaiting getInventorySnapshot()/getLoggedExercises()
     // (1st call each). Start run B via pull-to-refresh before A resolves.
-    expect(inventoryDeferreds.length).toBe(1);
-    expect(exercisesDeferreds.length).toBe(1);
+    expect(mockInventoryDeferreds.length).toBe(1);
+    expect(mockExercisesDeferreds.length).toBe(1);
 
     const refreshControl = UNSAFE_getByType(RefreshControl);
     act(() => {
@@ -152,29 +152,29 @@ describe('AnalyticsDashboardScreen — cancellation guard (#312)', () => {
     await flush();
 
     // Run B has made its own 2nd calls and is parked too.
-    expect(inventoryDeferreds.length).toBe(2);
-    expect(exercisesDeferreds.length).toBe(2);
+    expect(mockInventoryDeferreds.length).toBe(2);
+    expect(mockExercisesDeferreds.length).toBe(2);
 
     // Resolve the NEWER run (B) first.
     await act(async () => {
-      inventoryDeferreds[1].resolve({
+      mockInventoryDeferreds[1].resolve({
         recipesInStock: 2,
         totalPortions: 9,
         items: [],
       });
-      exercisesDeferreds[1].resolve(['bench']);
+      mockExercisesDeferreds[1].resolve(['bench']);
       await new Promise((resolve) => setImmediate(resolve));
     });
     await flush();
 
     // Resolve the OLDER run (A) second — it must not overwrite B's state.
     await act(async () => {
-      inventoryDeferreds[0].resolve({
+      mockInventoryDeferreds[0].resolve({
         recipesInStock: 1,
         totalPortions: 3,
         items: [],
       });
-      exercisesDeferreds[0].resolve(['squat']);
+      mockExercisesDeferreds[0].resolve(['squat']);
       await new Promise((resolve) => setImmediate(resolve));
     });
     await flush();
@@ -209,15 +209,15 @@ describe('AnalyticsDashboardScreen — cancellation guard (#312)', () => {
     });
     await flush();
 
-    expect(inventoryDeferreds.length).toBe(1);
-    expect(exercisesDeferreds.length).toBe(1);
+    expect(mockInventoryDeferreds.length).toBe(1);
+    expect(mockExercisesDeferreds.length).toBe(1);
 
     utils.unmount();
 
     // Resolve the in-flight run after unmount — must not throw or warn.
     await act(async () => {
-      inventoryDeferreds[0].resolve({ recipesInStock: 1, totalPortions: 3, items: [] });
-      exercisesDeferreds[0].resolve(['squat']);
+      mockInventoryDeferreds[0].resolve({ recipesInStock: 1, totalPortions: 3, items: [] });
+      mockExercisesDeferreds[0].resolve(['squat']);
       await new Promise((resolve) => setImmediate(resolve));
     });
 
@@ -235,7 +235,7 @@ describe('AnalyticsDashboardScreen — cancellation guard (#312)', () => {
       cleanupA = latestFocusEffect!();
     });
     await flush();
-    expect(exercisesDeferreds.length).toBe(1);
+    expect(mockExercisesDeferreds.length).toBe(1);
 
     // Blur before run A resolves.
     act(() => {
@@ -244,8 +244,8 @@ describe('AnalyticsDashboardScreen — cancellation guard (#312)', () => {
 
     // Run A resolves after blur — must be ignored.
     await act(async () => {
-      inventoryDeferreds[0].resolve({ recipesInStock: 1, totalPortions: 3, items: [] });
-      exercisesDeferreds[0].resolve(['squat']);
+      mockInventoryDeferreds[0].resolve({ recipesInStock: 1, totalPortions: 3, items: [] });
+      mockExercisesDeferreds[0].resolve(['squat']);
       await new Promise((resolve) => setImmediate(resolve));
     });
     await flush();
@@ -255,11 +255,11 @@ describe('AnalyticsDashboardScreen — cancellation guard (#312)', () => {
       latestFocusEffect!();
     });
     await flush();
-    expect(exercisesDeferreds.length).toBe(2);
+    expect(mockExercisesDeferreds.length).toBe(2);
 
     await act(async () => {
-      inventoryDeferreds[1].resolve({ recipesInStock: 4, totalPortions: 12, items: [] });
-      exercisesDeferreds[1].resolve(['bench']);
+      mockInventoryDeferreds[1].resolve({ recipesInStock: 4, totalPortions: 12, items: [] });
+      mockExercisesDeferreds[1].resolve(['bench']);
       await new Promise((resolve) => setImmediate(resolve));
     });
     await flush();
