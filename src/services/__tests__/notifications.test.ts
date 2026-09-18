@@ -578,7 +578,7 @@ describe('reconcileScheduledNotifications — coalescing in-flight guard (#311)'
   });
 
   it('a pass that throws does not wedge the guard — the next call still runs a full pass', async () => {
-    // #309/#310 section isolation (below) means a single getter rejecting
+    // #311's per-reminder isolation (below) means a single getter rejecting
     // is normally contained inside its own try/catch and never escapes
     // _reconcile(). To prove the guard itself is resilient even if
     // something does slip past that isolation, force the escape
@@ -602,5 +602,68 @@ describe('reconcileScheduledNotifications — coalescing in-flight guard (#311)'
     await reconcileScheduledNotifications();
 
     expect(entries.has('workout-reminder')).toBe(true);
+  });
+});
+
+describe('reconcileScheduledNotifications — per-reminder isolation (#311)', () => {
+  it('getWeeklyCookDayEnabled rejecting mid-pass does not stop the workout, meal, or backup reminders from being reconciled in the same pass', async () => {
+    mockAppStateStore();
+    const entries = mockOsSchedule();
+
+    jest.mocked(db.getWorkoutReminderEnabled).mockResolvedValue(true);
+    jest.mocked(db.getWorkoutReminderTime).mockResolvedValue('07:00');
+    jest.mocked(db.getWeeklyCookDayEnabled).mockRejectedValue(new Error('cook-day getter exploded'));
+    jest.mocked(db.getMealReminderEnabled).mockResolvedValue(true);
+    jest.mocked(db.getMealReminderTime).mockResolvedValue('08:00');
+    jest.mocked(db.getBackupReminderEnabled).mockResolvedValue(true);
+    jest.mocked(db.getBackupReminderDay).mockResolvedValue(0);
+    jest.mocked(db.getBackupReminderTime).mockResolvedValue('18:00');
+
+    await reconcileScheduledNotifications(); // must not throw, and must not skip everything after cook-day
+
+    expect(entries.has('workout-reminder')).toBe(true);
+    expect(entries.has('meal-reminder-breakfast')).toBe(true);
+    expect(entries.has('meal-reminder-lunch')).toBe(true);
+    expect(entries.has('meal-reminder-dinner')).toBe(true);
+    expect(entries.has('backup-reminder')).toBe(true);
+    // Cook-day itself was skipped — its getter threw — not left half-scheduled.
+    expect(entries.has('cookday-reminder')).toBe(false);
+  });
+
+  it('one meal reminder getter rejecting does not stop the other two meals from being reconciled in the same pass', async () => {
+    mockAppStateStore();
+    const entries = mockOsSchedule();
+
+    jest.mocked(db.getMealReminderEnabled).mockImplementation(async (meal: MealType) => {
+      if (meal === 'lunch') throw new Error('lunch getter exploded');
+      return true;
+    });
+    jest.mocked(db.getMealReminderTime).mockImplementation(async (meal: MealType) =>
+      meal === 'breakfast' ? '08:00' : meal === 'dinner' ? '18:30' : '12:30'
+    );
+
+    await reconcileScheduledNotifications();
+
+    expect(entries.has('meal-reminder-breakfast')).toBe(true);
+    expect(entries.has('meal-reminder-dinner')).toBe(true);
+    expect(entries.has('meal-reminder-lunch')).toBe(false);
+  });
+
+  it('does not set the sweep-done flag when the sweep itself throws, and the rest of the pass still runs in that same pass', async () => {
+    const store = mockAppStateStore();
+    store.delete('notificationIdSweepV1Done'); // undo the pre-seed — we want the sweep to actually run here
+
+    jest.mocked(Notifications.cancelAllScheduledNotificationsAsync).mockRejectedValueOnce(
+      new Error('sweep exploded')
+    );
+    jest.mocked(db.getWorkoutReminderEnabled).mockResolvedValue(true);
+    jest.mocked(db.getWorkoutReminderTime).mockResolvedValue('07:00');
+
+    await reconcileScheduledNotifications();
+
+    expect(store.get('notificationIdSweepV1Done')).not.toBe('true');
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ identifier: 'workout-reminder' })
+    );
   });
 });
