@@ -88,6 +88,8 @@ import {
   setNutritionGoalProtein,
   setWorkoutReminderTime,
   getNutritionGoals,
+  setProfileHeightCm,
+  setProfileAge,
 } from '../../db/database';
 import { reconcileScheduledNotifications } from '../../services/notifications';
 
@@ -97,6 +99,8 @@ const mockSetWorkoutReminderTime = jest.mocked(setWorkoutReminderTime);
 const mockGetNutritionGoals = jest.mocked(getNutritionGoals);
 const mockReconcileScheduledNotifications = jest.mocked(reconcileScheduledNotifications);
 const mockAddEventListener = jest.mocked(AppState.addEventListener);
+const mockSetProfileHeightCm = jest.mocked(setProfileHeightCm);
+const mockSetProfileAge = jest.mocked(setProfileAge);
 
 /** The `'change'` listener SettingsScreen most recently registered with AppState. */
 function getAppStateListener(): (state: string) => void {
@@ -343,5 +347,105 @@ describe('SettingsScreen steppers (#313 — debounced writes)', () => {
     expect(consoleErrorSpy).toHaveBeenCalled();
 
     consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('SettingsScreen profile height/age validation (#323)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows an inline error and does not save when height is "18o"', async () => {
+    const { getByLabelText, getByText } = render(<SettingsScreen />);
+    await flushMicrotasks();
+
+    const input = getByLabelText('Height in centimetres');
+    fireEvent.changeText(input, '18o');
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+
+    expect(getByText('Enter a height between 50 and 250 cm')).toBeTruthy();
+    expect(input.props.value).toBe('18o');
+    expect(mockSetProfileHeightCm).not.toHaveBeenCalled();
+  });
+
+  it('rejects an out-of-range height and saves a comma-decimal height as a locale-correct number', async () => {
+    const { getByLabelText, getByText, queryByText } = render(<SettingsScreen />);
+    await flushMicrotasks();
+
+    const input = getByLabelText('Height in centimetres');
+    fireEvent.changeText(input, '300');
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+    expect(getByText('Enter a height between 50 and 250 cm')).toBeTruthy();
+    expect(mockSetProfileHeightCm).not.toHaveBeenCalled();
+
+    fireEvent.changeText(input, '178,5');
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+    expect(mockSetProfileHeightCm).toHaveBeenCalledWith(178.5);
+    expect(queryByText('Enter a height between 50 and 250 cm')).toBeNull();
+  });
+
+  it('rejects an out-of-range age and saves a valid age', async () => {
+    const { getByLabelText, getByText, queryByText } = render(<SettingsScreen />);
+    await flushMicrotasks();
+
+    const input = getByLabelText('Age in years');
+    fireEvent.changeText(input, '5');
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+    expect(getByText('Enter an age between 10 and 120 years')).toBeTruthy();
+    expect(mockSetProfileAge).not.toHaveBeenCalled();
+
+    fireEvent.changeText(input, '34');
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+    expect(mockSetProfileAge).toHaveBeenCalledWith(34);
+    expect(queryByText('Enter an age between 10 and 120 years')).toBeNull();
+  });
+
+  it('clears the error and saves once an invalid height is corrected', async () => {
+    const { getByLabelText, getByText, queryByText } = render(<SettingsScreen />);
+    await flushMicrotasks();
+
+    const input = getByLabelText('Height in centimetres');
+    fireEvent.changeText(input, '18o');
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+    expect(getByText('Enter a height between 50 and 250 cm')).toBeTruthy();
+
+    fireEvent.changeText(input, '180');
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+    expect(queryByText('Enter a height between 50 and 250 cm')).toBeNull();
+    expect(mockSetProfileHeightCm).toHaveBeenCalledWith(180);
+  });
+
+  it('blank height + blur shows no error and does not save (unchanged behaviour)', async () => {
+    const { getByLabelText, queryByText } = render(<SettingsScreen />);
+    await flushMicrotasks();
+
+    const input = getByLabelText('Height in centimetres');
+    fireEvent.changeText(input, '18o');
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+    expect(queryByText('Enter a height between 50 and 250 cm')).toBeTruthy();
+
+    fireEvent.changeText(input, '');
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+
+    expect(queryByText('Enter a height between 50 and 250 cm')).toBeNull();
+    expect(mockSetProfileHeightCm).not.toHaveBeenCalled();
   });
 });
