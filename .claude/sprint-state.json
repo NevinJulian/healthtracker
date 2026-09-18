@@ -93,18 +93,20 @@
     "B": {
       "branch": "sprint/lane-b-notify",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "in_progress",
+      "status": "merging",
       "order": [
         309,
         310,
         311
       ],
-      "current": 310,
+      "current": null,
       "done": [
         309,
-        310
+        310,
+        311
       ],
-      "parked": []
+      "parked": [],
+      "cleanup": "59ba330 comment-only (2 docblocks)"
     },
     "C": {
       "branch": "sprint/lane-c-analytics",
@@ -149,10 +151,11 @@
         "323-clear",
         304
       ],
-      "current": 323,
+      "current": 324,
       "done": [
         313,
-        322
+        322,
+        323
       ],
       "parked": []
     },
@@ -297,10 +300,12 @@
         "081f1fa"
       ],
       "lane": "B",
-      "status": "in_test",
+      "status": "ready",
       "branch": "sprint/lane-b-notify",
-      "notes": "dev: coalescing dispatcher (single .finally hand-off, closed a microtask race in own first design) + per-reminder isolation; 7 new tests fail on their pre-fix commits. 355 tests. Tester to check hand-off interleavings + in-flight reconcile during #310 restore. AC #4 excluded -> partial.",
-      "partial": true
+      "notes": "tester APPROVE r0. Adversarial: third-pass contract holds; #310x#311 restore race ends in restored-settings state (stable ids make each pass self-consistent). PARTIAL: AC #4 excluded -> Refs #311.",
+      "partial": true,
+      "securityReview": "skipped-notifications-only",
+      "regressionProof": "4 guard tests fail at 186cabf, 3 isolation tests fail at 457d423, all pass at 081f1fa (tester reproduced)"
     },
     "312": {
       "roundTrips": 0,
@@ -371,10 +376,20 @@
         "9b2445e"
       ],
       "lane": "D",
-      "status": "in_test",
+      "status": "ready_partial",
       "branch": "sprint/lane-d-screens",
       "splitAcrossPhases": true,
-      "notes": "part 1 dev: Number()+comma, inline errors, blank unchanged; 5 tests fail pre-fix. Hydration skips fields with unsaved invalid edit via refs - UNTESTED (mock fires once); tester probing stuck-ref cases. Part 2 (persisted clear) deferred until lane A merges."
+      "notes": "part 1 tester APPROVE r0; probed 5 focus-cycle scenarios incl stuck-ref - all correct. Follow-up test-only commit requested (separate file, focus-capable mock). Part 2 (persisted clear via deleteSetting) after lane A merges.",
+      "part1": "ready",
+      "securityReview": "skipped-device-owner-input",
+      "regressionProof": "5 new tests fail with 389c189 SettingsScreen.tsx, pass at 9b2445e (tester reproduced)"
+    },
+    "324": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "D",
+      "status": "analysing",
+      "branch": "sprint/lane-d-screens"
     },
     "327": {
       "roundTrips": 1,
@@ -905,6 +920,30 @@
     {
       "at": "2026-09-18T23:42:58Z",
       "event": "#305: status=in_dev"
+    },
+    {
+      "at": "2026-09-18T23:44:34Z",
+      "event": "#311: status=ready securityReview=skipped-notifications-only regressionProof=4 guard tests fail at 186cabf, 3 isolation tests fail at 457d423, all pass at 081f1fa (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:44:34Z",
+      "event": "lane B: done+=311 status=cleanup current=null"
+    },
+    {
+      "at": "2026-09-18T23:46:44Z",
+      "event": "#323: status=ready_partial part1=ready securityReview=skipped-device-owner-input regressionProof=5 new tests fail with 389c189 SettingsScreen.tsx, pass at 9b2445e (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:46:44Z",
+      "event": "lane D: done+=323 current=324"
+    },
+    {
+      "at": "2026-09-18T23:46:44Z",
+      "event": "#324: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-18T23:47:02Z",
+      "event": "lane B: status=merging cleanup=59ba330 comment-only (2 docblocks)"
     }
   ]
 }
