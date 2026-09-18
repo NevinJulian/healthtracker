@@ -2,10 +2,13 @@
  * TheMealDB — keyless public API client.
  *
  * Uses the free "test key" (`1`) in the URL path. No API key, no
- * environment variable, no new npm dependency — just built-in fetch.
+ * environment variable, no new npm dependency — just built-in fetch,
+ * wrapped by `fetchJson` for a timeout, one retry, and a readable error.
  *
  * Docs: https://www.themealdb.com/api.php
  */
+
+import { fetchJson } from './fetchJson';
 
 const BASE = 'https://www.themealdb.com/api/json/v1/1';
 
@@ -98,30 +101,41 @@ function toDetail(meal: MealDbMeal): MealDetail {
  * Search meals by name.
  *
  * Returns an empty array when no results match (`meals: null` from the API).
- * Throws on network error so callers can show a retry state.
+ * Throws (`FetchJsonError`) on a non-2xx response, a timeout, or a network
+ * error so callers can show a retry state.
  */
 export async function searchMeals(query: string): Promise<MealSummary[]> {
   const encoded = encodeURIComponent(query.trim());
-  const response = await fetch(`${BASE}/search.php?s=${encoded}`);
-  if (!response.ok) {
-    throw new Error(`TheMealDB search failed: ${response.status}`);
-  }
-  const data: MealDbResponse = await response.json();
+  const data = await fetchJson<MealDbResponse>(`${BASE}/search.php?s=${encoded}`);
   return data.meals ? data.meals.map(toSummary) : [];
 }
+
+/**
+ * In-memory cache of resolved lookups, keyed by TheMealDB id. A `null`
+ * value means "looked up, confirmed not found" — that's cached too, so a
+ * bad id doesn't get re-fetched either. Only successful lookups are
+ * cached; a thrown error (network/timeout) is not, so the next call
+ * retries the network. Process-lifetime only — no persistence, no schema
+ * change.
+ */
+const mealByIdCache = new Map<string, MealDetail | null>();
 
 /**
  * Fetch full meal detail by TheMealDB id.
  *
  * Returns `null` when the id is not found.
- * Throws on network error.
+ * Throws (`FetchJsonError`) on a non-2xx response, a timeout, or a network
+ * error.
+ *
+ * Repeated calls for the same id are served from an in-memory cache after
+ * the first successful lookup — no second network call.
  */
 export async function fetchMealById(id: string): Promise<MealDetail | null> {
-  const response = await fetch(`${BASE}/lookup.php?i=${encodeURIComponent(id)}`);
-  if (!response.ok) {
-    throw new Error(`TheMealDB lookup failed: ${response.status}`);
+  if (mealByIdCache.has(id)) {
+    return mealByIdCache.get(id) ?? null;
   }
-  const data: MealDbResponse = await response.json();
-  if (!data.meals || data.meals.length === 0) return null;
-  return toDetail(data.meals[0]);
+  const data = await fetchJson<MealDbResponse>(`${BASE}/lookup.php?i=${encodeURIComponent(id)}`);
+  const result = !data.meals || data.meals.length === 0 ? null : toDetail(data.meals[0]);
+  mealByIdCache.set(id, result);
+  return result;
 }
