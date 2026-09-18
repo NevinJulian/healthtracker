@@ -80,6 +80,7 @@ import {
   computePRs,
   bestSetPerDay,
   resolveSelectedExercise,
+  plausibleWeights,
   type HydrationDay,
   type WorkoutSetSlice,
 } from './analyticsHelpers';
@@ -120,7 +121,7 @@ function MetricCard({
 
 // ─── Weight trend (flat View-based chart with 30/90-day toggle) ───────────────
 
-function WeightTrendCard({
+export function WeightTrendCard({
   history30,
   history90,
 }: {
@@ -141,10 +142,16 @@ function WeightTrendCard({
     );
   }
 
-  const weights = history.length > 0 ? history.map((w) => w.weight) : [0];
+  // getWeightHistory() only filters IS NOT NULL, so a mis-typed entry (e.g.
+  // 9999 instead of 99.9) can still reach here. Keep the chart, the
+  // current-weight label, and the Min/Max text limited to plausible points
+  // (#322); excluded points are surfaced as a small muted note below.
+  const { valid: plausible, excludedCount } = plausibleWeights(history);
+
+  const weights = plausible.length > 0 ? plausible.map((w) => w.weight) : [0];
   const minW = Math.min(...weights) - 2;
   const maxW = Math.max(...weights) + 2;
-  const current = history.length > 0 ? weights[weights.length - 1] : null;
+  const current = plausible.length > 0 ? weights[weights.length - 1] : null;
   const range = maxW - minW || 1;
 
   return (
@@ -198,7 +205,7 @@ function WeightTrendCard({
         </TouchableOpacity>
       </View>
 
-      {history.length === 0 ? (
+      {plausible.length === 0 ? (
         <Text style={styles.emptyText}>No data for this period.</Text>
       ) : (
         <>
@@ -210,9 +217,9 @@ function WeightTrendCard({
 
             {/* Bars + last-point dot */}
             <View style={styles.lineLayer}>
-              {history.map((pt, i) => {
+              {plausible.map((pt, i) => {
                 const heightPct = Math.max(4, ((pt.weight - minW) / range) * 100);
-                const isLast = i === history.length - 1;
+                const isLast = i === plausible.length - 1;
                 return (
                   <View key={`bar-${i}`} style={styles.barColumn}>
                     {isLast ? (
@@ -249,6 +256,14 @@ function WeightTrendCard({
             </Text>
           </View>
         </>
+      )}
+
+      {excludedCount > 0 && (
+        <Text style={[styles.chartMetaText, { color: Colors.textMuted }]}>
+          {excludedCount === 1
+            ? '1 entry hidden — out of range'
+            : `${excludedCount} entries hidden — out of range`}
+        </Text>
       )}
     </Card>
   );
