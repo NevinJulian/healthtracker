@@ -568,21 +568,34 @@ function runPass(): Promise<void> {
     });
 }
 
+/**
+ * Runs the actual reconcile pass. Each reminder is isolated behind its own
+ * try/catch (#311) so one throwing getter only skips that reminder instead
+ * of aborting every reminder after it in the same pass — stable identifiers
+ * (#309) make (re)scheduling idempotent, so it's safe for the rest of the
+ * pass to keep going regardless of which step failed.
+ */
 async function _reconcile(): Promise<void> {
+  // One-shot post-upgrade sweep (#309): notifications scheduled before
+  // stable identifiers existed carry Expo-random UUIDs, so rescheduling
+  // under the new stable ids would leave those old entries orphaned in
+  // the OS. Clear everything exactly once, gated by an app_state flag,
+  // BEFORE any of the per-reminder (re)scheduling below in this same pass.
+  // If the sweep itself throws, the flag is deliberately left unset (so a
+  // later pass retries it) rather than being set in the catch block.
   try {
-    // One-shot post-upgrade sweep (#309): notifications scheduled before
-    // stable identifiers existed carry Expo-random UUIDs, so rescheduling
-    // under the new stable ids would leave those old entries orphaned in
-    // the OS. Clear everything exactly once, gated by an app_state flag,
-    // BEFORE any of the per-reminder (re)scheduling below in this same pass.
     const sweepDone = await getSetting(NOTIFICATION_ID_SWEEP_V1_KEY);
     if (sweepDone !== 'true') {
       await Notifications.cancelAllScheduledNotificationsAsync();
       await setSetting(NOTIFICATION_ID_SWEEP_V1_KEY, 'true');
       console.log('[Notifications] One-time notification-id sweep complete.');
     }
+  } catch (err) {
+    console.warn('[Notifications] reconcile: notification-id sweep failed:', err);
+  }
 
-    // Workout reminder
+  // Workout reminder
+  try {
     const workoutEnabled = await getWorkoutReminderEnabled();
     const workoutTime = await getWorkoutReminderTime();
 
@@ -591,8 +604,12 @@ async function _reconcile(): Promise<void> {
     } else {
       await cancelWorkoutReminder();
     }
+  } catch (err) {
+    console.warn('[Notifications] reconcile: workout reminder failed:', err);
+  }
 
-    // Weekly cook-day reminder
+  // Weekly cook-day reminder
+  try {
     const cookDayEnabled = await getWeeklyCookDayEnabled();
     const cookDay = await getWeeklyCookDay();
     const cookDayTime = await getWeeklyCookDayTime();
@@ -602,10 +619,15 @@ async function _reconcile(): Promise<void> {
     } else {
       await cancelWeeklyCookDay();
     }
+  } catch (err) {
+    console.warn('[Notifications] reconcile: weekly cook-day reminder failed:', err);
+  }
 
-    // Meal-time reminders (#287)
-    const meals: MealType[] = ['breakfast', 'lunch', 'dinner'];
-    for (const meal of meals) {
+  // Meal-time reminders (#287) — isolated per meal so one bad getter only
+  // skips that meal, not the other two.
+  const meals: MealType[] = ['breakfast', 'lunch', 'dinner'];
+  for (const meal of meals) {
+    try {
       const enabled = await getMealReminderEnabled(meal);
       const time = await getMealReminderTime(meal);
       const { hour, minute } = parseTimeString(time);
@@ -614,9 +636,13 @@ async function _reconcile(): Promise<void> {
       } else {
         await cancelMealReminder(meal);
       }
+    } catch (err) {
+      console.warn(`[Notifications] reconcile: meal reminder (${meal}) failed:`, err);
     }
+  }
 
-    // Backup reminder (#293)
+  // Backup reminder (#293)
+  try {
     const backupEnabled = await getBackupReminderEnabled();
     const backupDay = await getBackupReminderDay();
     const backupTime = await getBackupReminderTime();
@@ -627,6 +653,6 @@ async function _reconcile(): Promise<void> {
       await cancelBackupReminder();
     }
   } catch (err) {
-    console.warn('[Notifications] reconcileScheduledNotifications failed:', err);
+    console.warn('[Notifications] reconcile: backup reminder failed:', err);
   }
 }
