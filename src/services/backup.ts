@@ -258,6 +258,12 @@ export async function writeSafetySnapshot(): Promise<string> {
  *   - The returned RestoreResult includes the snapshot URI so the caller can
  *     offer to share it.
  *
+ * On a successful restore, scheduled OS notifications are also resynced to
+ * the restored settings (#310) — see the module docblock above for why that
+ * needs a full cancelAllScheduledNotificationsAsync() rather than just
+ * reconcileScheduledNotifications(). This resync is best-effort and never
+ * turns a successful restore into a reported failure.
+ *
  * @returns A RestoreResult summary (including safetySnapshotUri), or null
  *          when the user cancelled.
  * @throws  When the file is invalid, the schema is incompatible, or the

@@ -510,6 +510,7 @@ let queuedResolve: (() => void) | null = null;
  * Call this:
  *   1. From App.tsx after initDatabase() resolves (startup reconcile).
  *   2. From SettingsScreen after any toggle or time change.
+ *   3. From importBackup() after a successful restore (#310).
  *
  * This is intentionally defensive — any failure is logged, never thrown.
  *
