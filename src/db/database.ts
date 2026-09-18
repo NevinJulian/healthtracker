@@ -27,7 +27,7 @@ import {
   localDateKey,
   addDays as _addDaysKey,
   daysBetween as _daysBetweenKey,
-  localMidnightToday,
+  dateKeyToLocalDate,
 } from '../utils/dates';
 
 // Re-export NutritionGoals so screens only need to import from database.ts
@@ -337,6 +337,75 @@ async function resetIfIncompatibleSchema(
 // Rolling schedule sync — internal impl
 // ─────────────────────────────────────────────
 
+type WeeklyTemplateRow = {
+  day_of_week: number;
+  walking_task: string;
+  hammer_task: string;
+  is_rest_day: number;
+  is_meal_prep_day: number;
+  exercises: string;
+};
+
+/** The daily_log column values a freshly-generated row for a date should have. */
+interface DailyLogRowValues {
+  date: string;
+  walking_task: string;
+  hammer_task: string;
+  is_rest_day: number;
+  is_meal_prep_day: number;
+  exercises: string;
+}
+
+/**
+ * Pure per-date row-value computation — the weekly_template lookup by
+ * day_of_week, exercises reset, and buildHammerTask progression that used to
+ * live inline in _syncRollingSchedule()'s loop. Extracted (#305) so
+ * _syncRollingSchedule() and _ensureDailyLogRow() share exactly one
+ * implementation and can never drift apart.
+ *
+ * Takes exactly the inputs _syncRollingSchedule() has always used —
+ * `startDateISO` is the RAW value read from app_state (not the
+ * sanitised/clamped variant _syncRollingSchedule() computes for its own
+ * insert-range floor) — so the gym-weight progression's semantics are
+ * unchanged by this refactor. (#363 tracks any actual change to that
+ * formula separately.)
+ *
+ * Returns null when weekly_template has no row for `targetISO`'s weekday —
+ * shouldn't happen given the 7-row invariant (CLAUDE.md), but
+ * weekly_template is user-editable data, not a compile-time guarantee, so
+ * both callers must handle it rather than assume it.
+ */
+function _buildDailyLogRowValues(
+  targetISO: string,
+  templateMap: Map<number, WeeklyTemplateRow>,
+  startDateISO: string
+): DailyLogRowValues | null {
+  const dow = dateKeyToLocalDate(targetISO).getDay();
+  const template = templateMap.get(dow);
+  if (!template) return null;
+
+  // Parse template exercises (reset completed → false)
+  const templateExercises = parseExercises(template.exercises);
+  const baseExercises = templateExercises.map((ex) => ({ ...ex, completed: false }));
+  const baseExercisesJson = JSON.stringify(baseExercises);
+
+  const daysDiff = _daysBetweenKey(startDateISO, targetISO);
+  const hammerWithWeight = buildHammerTask(
+    template.hammer_task,
+    template.is_rest_day === 1,
+    daysDiff
+  );
+
+  return {
+    date: targetISO,
+    walking_task: template.walking_task,
+    hammer_task: hammerWithWeight,
+    is_rest_day: template.is_rest_day,
+    is_meal_prep_day: template.is_meal_prep_day,
+    exercises: baseExercisesJson,
+  };
+}
+
 async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   const startRow = await db.getFirstAsync<{ value: string }>(
     'SELECT value FROM app_state WHERE key = ?',
@@ -344,16 +413,9 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   );
   const startDateISO = startRow?.value ?? toISODate();
 
-  const templateRows = await db.getAllAsync<{
-    day_of_week: number;
-    walking_task: string;
-    hammer_task: string;
-    is_rest_day: number;
-    is_meal_prep_day: number;
-    exercises: string;
-  }>('SELECT * FROM weekly_template');
+  const templateRows = await db.getAllAsync<WeeklyTemplateRow>('SELECT * FROM weekly_template');
 
-  const templateMap = new Map<number, typeof templateRows[number]>();
+  const templateMap = new Map<number, WeeklyTemplateRow>();
   for (const row of templateRows) {
     templateMap.set(row.day_of_week, row);
   }
@@ -398,17 +460,8 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   const startOffset = _daysBetweenKey(todayISO, floorISO);
   for (let offset = startOffset; offset <= DAYS_AHEAD; offset++) {
     const targetISO = _addDaysKey(todayISO, offset);
-    // Derive day-of-week from the local-midnight Date for this key
-    const targetDate = localMidnightToday();
-    targetDate.setDate(targetDate.getDate() + offset);
-    const dow = targetDate.getDay();
-    const template = templateMap.get(dow);
-    if (!template) continue;
-
-    // Parse template exercises (reset completed → false)
-    const templateExercises = parseExercises(template.exercises);
-    const baseExercises = templateExercises.map((ex) => ({ ...ex, completed: false }));
-    const baseExercisesJson = JSON.stringify(baseExercises);
+    const rowValues = _buildDailyLogRowValues(targetISO, templateMap, startDateISO);
+    if (!rowValues) continue;
 
     if (existingDates.has(targetISO)) {
       // Row exists — check if exercises need to be backfilled. Restricted to
@@ -418,27 +471,21 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
       if (targetISO >= cutoffISO) {
         const existing = existingRows.find((r) => r.date === targetISO);
         const currentExercises = parseExercises(existing?.exercises);
-        if (currentExercises.length === 0 && templateExercises.length > 0) {
-          backfills.push([baseExercisesJson, targetISO]);
+        const templateExerciseCount = parseExercises(rowValues.exercises).length;
+        if (currentExercises.length === 0 && templateExerciseCount > 0) {
+          backfills.push([rowValues.exercises, targetISO]);
         }
       }
       continue;
     }
 
-    const daysDiff = _daysBetweenKey(startDateISO, targetISO);
-    const hammerWithWeight = buildHammerTask(
-      template.hammer_task,
-      template.is_rest_day === 1,
-      daysDiff
-    );
-
     inserts.push([
-      targetISO,
-      template.walking_task,
-      hammerWithWeight,
-      template.is_rest_day,
-      template.is_meal_prep_day,
-      baseExercisesJson,
+      rowValues.date,
+      rowValues.walking_task,
+      rowValues.hammer_task,
+      rowValues.is_rest_day,
+      rowValues.is_meal_prep_day,
+      rowValues.exercises,
     ]);
   }
 
