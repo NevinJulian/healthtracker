@@ -50,7 +50,11 @@ const mockWeightRows = [
 jest.mock('../../db/database', () => ({
   toISODate: jest.fn(() => '2024-06-15'),
   getRollingWindow: jest.fn().mockResolvedValue([]),
-  getWeightHistory: jest.fn().mockResolvedValue(mockWeightRows),
+  // Lazily reads mockWeightRows (evaluated at call time, not at factory-
+  // definition time) — the hoisted import of AnalyticsDashboardScreen
+  // otherwise requires this module before the module-scope `const
+  // mockWeightRows` below has run.
+  getWeightHistory: jest.fn(() => Promise.resolve(mockWeightRows)),
   getStartDate: jest.fn().mockResolvedValue('2020-01-01'),
   getConsumedMacrosByDay: jest.fn().mockResolvedValue([]),
   getMealAdherence: jest
