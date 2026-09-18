@@ -145,7 +145,7 @@
     "E": {
       "branch": "sprint/lane-e-api",
       "worktree": "C:/git/ht-lanes/lane-e",
-      "status": "merging",
+      "status": "merged",
       "order": [
         318
       ],
@@ -154,7 +154,8 @@
         318
       ],
       "parked": [],
-      "cleanup": "no changes needed"
+      "cleanup": "no changes needed",
+      "mergeSha": 605533
     },
     "F": {
       "branch": "sprint/lane-f-repo",
@@ -280,12 +281,13 @@
         "8f867a5"
       ],
       "lane": "E",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-e-api",
       "partial": true,
       "notes": "tester APPROVE r2, security APPROVE (no new trust boundary, no write path, URL encoding intact, errors carry no raw body). PARTIAL: abort-on-navigation + out-of-order search responses need DiscoverScreen/RecipeEditorScreen (unowned) -> PR must say Refs #318 not Closes.",
       "securityReview": "required-src-api",
-      "regressionProof": "mealdb tests fail at 1beee5e (settled=false; fetch x2) pass at def1e4f; backoff-abort test fails at def1e4f pass at 8f867a5 (tester reproduced both)"
+      "regressionProof": "mealdb tests fail at 1beee5e (settled=false; fetch x2) pass at def1e4f; backoff-abort test fails at def1e4f pass at 8f867a5 (tester reproduced both)",
+      "mergeSha": 605533
     },
     "332": {
       "roundTrips": 0,
@@ -548,6 +550,19 @@
     {
       "at": "2026-09-18T23:06:00Z",
       "event": "lane E: status=merging cleanup=no changes needed"
+    },
+    {
+      "at": "2026-09-18T23:06:30Z",
+      "event": "#318: status=merged mergeSha=0605533"
+    },
+    {
+      "at": "2026-09-18T23:06:30Z",
+      "event": "lane E: status=merged mergeSha=0605533"
+    },
+    {
+      "at": "2026-09-18T23:06:30Z",
+      "event": "merged lane E into sprint/auto-fixes; integration gates green: typecheck pass, 346 tests / 20 suites",
+      "sha": "0605533"
     }
   ]
 }
