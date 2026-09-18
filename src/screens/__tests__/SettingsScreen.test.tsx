@@ -9,6 +9,7 @@
 process.env.RNTL_SKIP_DEPS_CHECK = '1';
 
 import React from 'react';
+import { AppState } from 'react-native';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { render, fireEvent, act } = require('@testing-library/react-native');
@@ -95,6 +96,13 @@ const mockSetNutritionGoalProtein = jest.mocked(setNutritionGoalProtein);
 const mockSetWorkoutReminderTime = jest.mocked(setWorkoutReminderTime);
 const mockGetNutritionGoals = jest.mocked(getNutritionGoals);
 const mockReconcileScheduledNotifications = jest.mocked(reconcileScheduledNotifications);
+const mockAddEventListener = jest.mocked(AppState.addEventListener);
+
+/** The `'change'` listener SettingsScreen most recently registered with AppState. */
+function getAppStateListener(): (state: string) => void {
+  const call = mockAddEventListener.mock.calls[mockAddEventListener.mock.calls.length - 1];
+  return call[1] as (state: string) => void;
+}
 
 // Flush pending microtasks (the mocked DB promises) without relying on any
 // macrotask/timer, so it works the same whether fake timers are active.
@@ -246,5 +254,94 @@ describe('SettingsScreen steppers (#313 — debounced writes)', () => {
     expect(mockReconcileScheduledNotifications).not.toHaveBeenCalled();
     expect(mockSetNutritionGoalCalories).not.toHaveBeenCalled();
     expect(mockSetNutritionGoalProtein).not.toHaveBeenCalled();
+  });
+
+  it('flushes a pending debounced write immediately when AppState goes background', async () => {
+    const { getByLabelText } = render(<SettingsScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(getByLabelText('Increase calorie goal'));
+    expect(mockSetNutritionGoalCalories).not.toHaveBeenCalled();
+
+    const listener = getAppStateListener();
+    await act(async () => {
+      listener('background');
+    });
+
+    expect(mockSetNutritionGoalCalories).toHaveBeenCalledTimes(1);
+    expect(mockSetNutritionGoalCalories).toHaveBeenCalledWith(1850);
+
+    // The debounce timer for the same edit must not still be armed —
+    // advancing past it must not produce a second write.
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(mockSetNutritionGoalCalories).toHaveBeenCalledTimes(1);
+  });
+
+  it('flushes a pending debounced write immediately when AppState goes inactive', async () => {
+    const { getByLabelText } = render(<SettingsScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(getByLabelText('Increase calorie goal'));
+    expect(mockSetNutritionGoalCalories).not.toHaveBeenCalled();
+
+    const listener = getAppStateListener();
+    await act(async () => {
+      listener('inactive');
+    });
+
+    expect(mockSetNutritionGoalCalories).toHaveBeenCalledTimes(1);
+    expect(mockSetNutritionGoalCalories).toHaveBeenCalledWith(1850);
+
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(mockSetNutritionGoalCalories).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes the AppState subscription on unmount, so a later change does nothing', async () => {
+    const { getByLabelText, unmount } = render(<SettingsScreen />);
+    await flushMicrotasks();
+
+    const subscription = mockAddEventListener.mock.results[mockAddEventListener.mock.results.length - 1]
+      .value as { remove: jest.Mock };
+    const listener = getAppStateListener();
+
+    fireEvent.press(getByLabelText('Increase calorie goal'));
+
+    await act(async () => {
+      unmount();
+    });
+
+    // Unmounting flushes the pending write itself (covered elsewhere) and
+    // must also tear down the AppState subscription.
+    expect(subscription.remove).toHaveBeenCalledTimes(1);
+    expect(mockSetNutritionGoalCalories).toHaveBeenCalledTimes(1);
+
+    mockSetNutritionGoalCalories.mockClear();
+    listener('background');
+    expect(mockSetNutritionGoalCalories).not.toHaveBeenCalled();
+  });
+
+  it('logs and does not throw when a debounced commit rejects', async () => {
+    mockSetNutritionGoalCalories.mockRejectedValueOnce(new Error('boom'));
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { getByLabelText } = render(<SettingsScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(getByLabelText('Increase calorie goal'));
+
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    // Let the rejected promise's .catch handler run.
+    await flushMicrotasks();
+
+    expect(mockSetNutritionGoalCalories).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
   });
 });
