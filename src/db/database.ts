@@ -1228,23 +1228,38 @@ export async function getTodaysMealsWithRecipe(date: string): Promise<MealPlanWi
   }));
 }
 
+/**
+ * Assigns a recipe to a (date, meal_type) slot, creating the row if it
+ * doesn't exist yet. If the slot already holds a consumed meal, the portion
+ * it debited is credited back (#303) — reassigning a slot always resets its
+ * consumption, even when the incoming recipe_id is the same one that was
+ * already there, since the user is re-picking what's in that slot and the
+ * previous tick no longer describes anything real. Runs entirely inside one
+ * transaction: select, optional credit, and the insert/update must all
+ * succeed or none of them do.
+ */
 export async function assignMealToPlan(date: string, meal_type: string, recipe_id: string): Promise<void> {
   const db = getDatabase();
-  const existing = await db.getFirstAsync<any>(
-    'SELECT * FROM weekly_meal_plan WHERE date = ? AND meal_type = ?', 
-    [date, meal_type]
-  );
-  if (existing) {
-    await db.runAsync(
-      'UPDATE weekly_meal_plan SET recipe_id = ?, is_consumed = 0 WHERE id = ?',
-      [recipe_id, existing.id]
+  await db.withTransactionAsync(async () => {
+    const existing = await db.getFirstAsync<any>(
+      'SELECT * FROM weekly_meal_plan WHERE date = ? AND meal_type = ?',
+      [date, meal_type]
     );
-  } else {
-    await db.runAsync(
-      'INSERT INTO weekly_meal_plan (date, meal_type, recipe_id, is_consumed) VALUES (?, ?, ?, 0)',
-      [date, meal_type, recipe_id]
-    );
-  }
+    if (existing) {
+      if (existing.is_consumed === 1) {
+        await _creditPortion(db, existing);
+      }
+      await db.runAsync(
+        'UPDATE weekly_meal_plan SET recipe_id = ?, is_consumed = 0, consumed_from_inventory_id = NULL WHERE id = ?',
+        [recipe_id, existing.id]
+      );
+    } else {
+      await db.runAsync(
+        'INSERT INTO weekly_meal_plan (date, meal_type, recipe_id, is_consumed) VALUES (?, ?, ?, 0)',
+        [date, meal_type, recipe_id]
+      );
+    }
+  });
 }
 
 export async function removeMealFromPlan(id: number): Promise<void> {
