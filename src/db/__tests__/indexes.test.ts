@@ -105,7 +105,7 @@ describe('v36 indexes (#331)', () => {
     const detail = planDetail(
       db,
       `SELECT * FROM workout_set_log WHERE date = '2024-01-01'
-       ORDER BY exercise ASC, set_index ASC`
+       ORDER BY exercise ASC, created_at ASC, id ASC`
     );
     expect(usesIndex(detail, 'idx_workout_set_log_date')).toBe(true);
   });
@@ -114,7 +114,7 @@ describe('v36 indexes (#331)', () => {
     const detail = planDetail(
       db,
       `SELECT * FROM workout_set_log WHERE exercise = 'Bench Press' AND date >= '2024-01-01'
-       ORDER BY date ASC, set_index ASC`
+       ORDER BY date ASC, created_at ASC, id ASC`
     );
     expect(usesIndex(detail, 'idx_workout_set_log_exercise_date')).toBe(true);
   });

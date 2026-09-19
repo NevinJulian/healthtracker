@@ -109,11 +109,74 @@ afterEach(() => {
 });
 
 describe('logWorkoutSet() atomic set_index assignment (#317)', () => {
-  it('deletes a middle set, logs a new one, and never collides on (date, exercise, set_index)', async () => {
+  /**
+   * Reproduces exactly what DashboardScreen's handleLogSet did before the
+   * fix: compute setIndex as the current count of already-logged sets for
+   * this exercise, then pass it through to logWorkoutSet. The fixed
+   * logWorkoutSet's TYPE no longer accepts a setIndex field at all (the
+   * parameter was removed, not just ignored) — this cast to `any` is the
+   * only way to still exercise the pre-fix CALLING CONVENTION against
+   * whichever implementation (pre- or post-fix) is checked out, so the same
+   * test body proves the fix by behaviour rather than failing on a
+   * signature/type mismatch that never reaches the collision logic.
+   */
+  async function logLikeDashboardScreenUsedTo(
+    db: DatabaseModule,
+    date: string,
+    exercise: string,
+    reps: number,
+    weightKg: number
+  ): Promise<void> {
+    const existing = await db.getWorkoutSetsForDay(date);
+    const setIndex = existing.filter((s) => s.exercise === exercise).length;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (db.logWorkoutSet as any)(date, exercise, { reps, weightKg, setIndex });
+  }
+
+  it('deletes a middle set, logs a new one via a caller-supplied setIndex (the pre-fix DashboardScreen pattern), and never collides on (date, exercise, set_index)', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
 
     const date = '2024-07-01';
+    const exercise = 'Bench Press';
+
+    await logLikeDashboardScreenUsedTo(db, date, exercise, 5, 60);
+    await logLikeDashboardScreenUsedTo(db, date, exercise, 5, 62.5);
+    await logLikeDashboardScreenUsedTo(db, date, exercise, 5, 65);
+
+    let sets = await db.getWorkoutSetsForDay(date);
+    expect(sets.map((s) => s.weight_kg)).toEqual([60, 62.5, 65]);
+
+    // Delete the middle set (weight_kg 62.5) — the old bug's trigger.
+    const middle = sets.find((s) => s.weight_kg === 62.5)!;
+    await db.deleteWorkoutSet(middle.id);
+
+    const survivors = await db.getWorkoutSetsForDay(date);
+    const maxSurvivorIndex = Math.max(...survivors.map((s) => s.set_index));
+
+    // Log a new set the same (pre-fix-shaped) way. Pre-fix: existing.length
+    // is now 2 (one survivor was deleted), so the caller-supplied setIndex
+    // is 2 — which the OLD logWorkoutSet honours verbatim, colliding with
+    // the surviving set_index=2 row (no unique index existed pre-fix, so
+    // the duplicate insert succeeds silently). Post-fix: logWorkoutSet
+    // ignores the extra `setIndex` property on the object entirely and
+    // computes MAX(set_index)+1 itself from the table, so no collision is
+    // possible regardless of what the caller passes.
+    await logLikeDashboardScreenUsedTo(db, date, exercise, 5, 67.5);
+
+    sets = await db.getWorkoutSetsForDay(date);
+    const setIndexes = sets.map((s) => s.set_index);
+    expect(new Set(setIndexes).size).toBe(setIndexes.length); // no duplicates
+
+    const newSet = sets.find((s) => s.weight_kg === 67.5)!;
+    expect(newSet.set_index).toBeGreaterThan(maxSurvivorIndex);
+  });
+
+  it('using the fixed (new) signature directly: deletes a middle set, logs a new one, and never collides — pins the shipped API, not the regression proof above', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    const date = '2024-07-01b';
     const exercise = 'Bench Press';
 
     await db.logWorkoutSet(date, exercise, { reps: 5, weightKg: 60 });
@@ -123,13 +186,9 @@ describe('logWorkoutSet() atomic set_index assignment (#317)', () => {
     let sets = await db.getWorkoutSetsForDay(date);
     expect(sets.map((s) => s.set_index)).toEqual([0, 1, 2]);
 
-    // Delete the middle set (set_index 1) — the old bug's trigger.
     const middle = sets.find((s) => s.set_index === 1)!;
     await db.deleteWorkoutSet(middle.id);
 
-    // Log a new set. Pre-fix, DashboardScreen (and the old logWorkoutSet
-    // signature) would recompute setIndex from the now-shorter array
-    // (length 2) and collide with the surviving set_index=2 row.
     await db.logWorkoutSet(date, exercise, { reps: 5, weightKg: 67.5 });
 
     sets = await db.getWorkoutSetsForDay(date);
@@ -137,17 +196,41 @@ describe('logWorkoutSet() atomic set_index assignment (#317)', () => {
     expect(new Set(setIndexes).size).toBe(setIndexes.length); // no duplicates
     expect(setIndexes).toEqual([0, 2, 3]);
   });
+});
 
-  it('getWorkoutSetsForDay returns the same order on repeated reads', async () => {
+describe('getWorkoutSetsForDay() read ordering (#317)', () => {
+  it('returns rows in logged (created_at, id) order even when set_index disagrees with it, identically on repeated reads', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
 
-    const date = '2024-07-02';
-    await db.logWorkoutSet(date, 'Squat', { reps: 5, weightKg: 80 });
-    await db.logWorkoutSet(date, 'Squat', { reps: 5, weightKg: 82.5 });
-    await db.logWorkoutSet(date, 'Deadlift', { reps: 3, weightKg: 100 });
+    const raw = db.getDatabase();
+    const date = '2024-07-03';
+    const exercise = 'Overhead Press';
+
+    // Seeded directly via raw SQL — never through logWorkoutSet — so this
+    // test is independent of logWorkoutSet's signature entirely. Rows are
+    // listed here in LOGGED order (created_at ascending, matching insertion
+    // order), but their set_index values deliberately DISAGREE with that
+    // order — a legacy collision/out-of-order-caller pattern, the exact
+    // kind of data set_index was never safe to sort by.
+    const loggedOrder = [
+      { weight_kg: 40, set_index: 2, created_at: '2024-07-03T10:00:00.000Z' }, // logged 1st, set_index says "3rd"
+      { weight_kg: 42, set_index: 1, created_at: '2024-07-03T10:05:00.000Z' }, // logged 2nd, set_index says "2nd"
+      { weight_kg: 44, set_index: 0, created_at: '2024-07-03T10:10:00.000Z' }, // logged 3rd, set_index says "1st"
+    ];
+    for (const r of loggedOrder) {
+      await raw.runAsync(
+        `INSERT INTO workout_set_log (date, exercise, set_index, reps, weight_kg, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        [date, exercise, r.set_index, 5, r.weight_kg, r.created_at]
+      );
+    }
 
     const first = await db.getWorkoutSetsForDay(date);
+    // Pre-fix (ORDER BY set_index ASC) returns weight_kg as [44, 42, 40] —
+    // exactly reversed from logged order. Post-fix (ORDER BY created_at
+    // ASC, id ASC) returns logged order: [40, 42, 44].
+    expect(first.map((s) => s.weight_kg)).toEqual([40, 42, 44]);
+
     const second = await db.getWorkoutSetsForDay(date);
     expect(second).toEqual(first);
   });
