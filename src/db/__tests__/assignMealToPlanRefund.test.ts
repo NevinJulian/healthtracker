@@ -72,7 +72,10 @@ async function planRowCount(db: DatabaseModule, date: string, meal_type: string)
   return row?.count ?? 0;
 }
 
-async function inventoryPortions(raw: RawDb, id: number): Promise<number> {
+async function inventoryPortions(
+  raw: ReturnType<DatabaseModule['getDatabase']>,
+  id: number
+): Promise<number> {
   const row = await raw.getFirstAsync<{ portions_available: number }>(
     'SELECT portions_available FROM meal_inventory WHERE id = ?',
     [id]

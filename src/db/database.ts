@@ -1252,6 +1252,30 @@ export async function removeMealFromPlan(id: number): Promise<void> {
   await db.runAsync('DELETE FROM weekly_meal_plan WHERE id = ?', [id]);
 }
 
+/**
+ * Credits back the exact meal_inventory batch a weekly_meal_plan row's
+ * consumption was debited from (#302's consumed_from_inventory_id pointer).
+ * A no-op if the pointer is NULL (legacy row, or nothing was ever debited)
+ * or if the batch it points at no longer exists.
+ *
+ * Extracted from toggleMealConsumed's untick branch so assignMealToPlan
+ * (#303) can reuse the exact same credit logic when a consumed slot is
+ * reassigned. Does NOT open its own transaction — the adapter's
+ * withTransactionAsync is not reentrant, so every caller must already be
+ * inside one.
+ */
+async function _creditPortion(
+  db: SQLite.SQLiteDatabase,
+  planRow: { consumed_from_inventory_id: number | null }
+): Promise<void> {
+  if (planRow.consumed_from_inventory_id != null) {
+    await db.runAsync(
+      'UPDATE meal_inventory SET portions_available = portions_available + 1 WHERE id = ?',
+      [planRow.consumed_from_inventory_id]
+    );
+  }
+}
+
 export async function toggleMealConsumed(id: number, is_consumed: boolean): Promise<void> {
   const db = getDatabase();
   await db.withTransactionAsync(async () => {
@@ -1294,12 +1318,7 @@ export async function toggleMealConsumed(id: number, is_consumed: boolean): Prom
     // here. This is deliberately conservative — it can under-count one
     // portion once, but it can never fabricate stock from nothing.
     else if (!is_consumed && meal.is_consumed === 1) {
-      if (meal.consumed_from_inventory_id != null) {
-        await db.runAsync(
-          'UPDATE meal_inventory SET portions_available = portions_available + 1 WHERE id = ?',
-          [meal.consumed_from_inventory_id]
-        );
-      }
+      await _creditPortion(db, meal);
       consumedFromInventoryId = null;
     }
 
