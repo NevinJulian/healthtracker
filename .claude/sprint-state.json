@@ -158,7 +158,7 @@
     "D": {
       "branch": "sprint/lane-d-screens",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "merging",
+      "status": "merged",
       "order": [
         313,
         322,
@@ -193,7 +193,8 @@
       "reassigned": [
         326
       ],
-      "notes": "cleanup: no changes (afe044c). AssignMealModal early-return noted by cleanup checked by orchestrator: component has no hooks/state, so no stale-state bug (not filed). Merging ddb8cf9."
+      "notes": "merged 42d3e4e; integration gates green: typecheck clean, 581/52. schema.ts vs main: MIGRATIONS hunk pure append (v34-v37), only header comment line changed.",
+      "mergeSha": "42d3e4e"
     },
     "E": {
       "branch": "sprint/lane-e-api",
@@ -236,12 +237,12 @@
     "G": {
       "branch": "sprint/lane-g-tests",
       "worktree": "C:/git/ht-lanes/lane-g",
-      "status": "pending",
+      "status": "in_progress",
       "order": [
         336
       ],
       "waitsFor": "all other lanes merged",
-      "current": null,
+      "current": 336,
       "done": [],
       "parked": []
     }
@@ -338,7 +339,7 @@
         "ddb8cf9"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-d-screens",
       "notes": "tester APPROVE r2 at ddb8cf9: error-path repro now writes new date; happy path 1 round (was 2-round cascade); same-day 1 round; loadToday deps [] safe (only refs/setters/imports). Security n/a (DashboardScreen.tsx only). Residual (by design): screen focused+foregrounded across midnight with no trigger.",
       "securityReview": "skipped-ui-only"
@@ -471,7 +472,7 @@
         "846aaef"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-d-screens",
       "notes": "tester APPROVE r1+r2, security BLOCK r1 (no AppState flush) -> APPROVE r2. roundTrips=1. Residual (not blocking): force-stop/SIGKILL with no AppState transition; universal RN limit. 341 tests.",
       "securityReview": "required-deferred-write-path",
@@ -529,7 +530,7 @@
         "01e21c2"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-d-screens",
       "migration": "v37",
       "notes": "security APPROVE at 01e21c2: all SQL parameterised; replay SQL only from compiled MIGRATIONS; v37 no DELETE (6 rows in/out), NOT NULL date/exercise so unique index can't fail; expo-sqlite 16.0.10 vendors SQLite 3.50.3 (window fns safe); restore DROP+loop+replay in one tx, replay-failure rollback proven.",
@@ -603,7 +604,7 @@
         "389c189"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-d-screens",
       "notes": "BOTH HALVES READY. Lane D half on sprint/lane-d-screens (389c189), chart half on sprint/lane-c-analytics (a55de6b). Closes only when both lanes merged. Chart half tester APPROVE r0; security skipped (pure render).",
       "splitAcrossLanes": true,
@@ -634,7 +635,7 @@
         "2d792bd"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-d-screens",
       "splitAcrossPhases": true,
       "notes": "part2 security APPROVE at 2d792bd: deleteSetting parameterised, only callers pass constants, gated on trimmed==='' ; no schema change; failure leaves state consistent (same shape as valid-save branch). #323 complete (part1 b06a2d7..5cb4219, part2 e081ab5..2d792bd).",
@@ -649,7 +650,7 @@
         "29c01c4"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-d-screens",
       "notes": "tester APPROVE r0. Close animation already lost pre-fix (confirmed). On logCookedMeal failure modal stays open with no feedback (corrected #366 description). '1e1'/'0x5' paste-only quirk noted.",
       "securityReview": "skipped-device-owner-input",
@@ -663,7 +664,7 @@
         "0d44ecf"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-d-screens",
       "notes": "tester APPROVE r0. Spinner-on-first-load-only also protects extra-workout/set-logger modals. Midnight: stale prior-day content shown briefly during reload (was spinner) -> #304 note. Insert-path NULL for skipped fields pre-existing, not worsened -> filed.",
       "securityReview": "skipped-no-sql-or-external-input",
@@ -718,7 +719,7 @@
         "2c05479"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-d-screens",
       "notes": "tester APPROVE r0. Mutation (a) mountedRef-on-blur caught; (b) runId bump on blur redundant/inert (load's own bump suffices). Post-action refresh beats stale focus load (probe). Error path no worse than pre-fix.",
       "securityReview": "skipped-ui-load-sequencing",
@@ -732,7 +733,7 @@
         "57651c2"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-d-screens",
       "notes": "tester APPROVE r0. Mixed-outcome double-tap orderings end at DB truth (throwaway probe). No stale aggregates on screen. Integration watch: lane D still has pre-#302 toggleMealConsumed until lane A merges (compatible signature).",
       "securityReview": "skipped-ui-write-unchanged",
@@ -2193,6 +2194,55 @@
     {
       "at": "2026-09-19T03:51:42Z",
       "event": "lane D: status=merging notes=…"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "lane D: status=merged mergeSha=42d3e4e notes=…"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "#313: status=merged"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "#322: status=merged"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "#323: status=merged"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "#324: status=merged"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "#325: status=merged"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "#329: status=merged"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "#330: status=merged"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "#317: status=merged"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "#304: status=merged"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "lane D merged into sprint/auto-fixes; gates typecheck clean, 581 tests / 52 suites; migrations v34-v37 appended only",
+      "sha": "42d3e4e"
+    },
+    {
+      "at": "2026-09-19T03:52:11Z",
+      "event": "lane G: status=in_progress current=336"
     }
   ]
 }
