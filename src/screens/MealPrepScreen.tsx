@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -94,7 +94,28 @@ export default function MealPrepScreen() {
   // same pattern as DashboardScreen's hasLoadedOnceRef from #325).
   const hasLoadedOnceRef = useRef(false);
 
+  // mountedRef reflects the component's real lifetime; it is cleared only
+  // on true unmount below — NOT on blur, which also runs the focus
+  // effect's cleanup (the #312 lesson: don't conflate the two).
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // runIdRef guards against overlapping loads (the #312 pattern): it is
+  // bumped at the start of every loadData() call, and again when the focus
+  // effect's cleanup runs (i.e. on blur). A load only commits its results
+  // if it is still the current run when it resolves, so a stale in-flight
+  // load — whether superseded by a newer load or abandoned via blur — can
+  // never clobber newer state. Post-action refreshes (handleLogCookedMeal,
+  // handleAssignMeal, handleToggleConsumed) naturally win this way too,
+  // since each starts a new, higher run id.
+  const runIdRef = useRef(0);
+
   const loadData = useCallback(async () => {
+    const runId = ++runIdRef.current;
     if (!hasLoadedOnceRef.current) {
       setLoading(true);
     }
@@ -104,14 +125,18 @@ export default function MealPrepScreen() {
         getWeeklyMealPlan(),
         getRecipes(),
       ]);
+      if (!mountedRef.current || runIdRef.current !== runId) return;
       setInventory(inv);
       setWeeklyPlan(plan);
       setRecipes(allRecipes);
       hasLoadedOnceRef.current = true;
     } catch (err) {
+      if (!mountedRef.current || runIdRef.current !== runId) return;
       logDbError(err);
     } finally {
-      setLoading(false);
+      if (mountedRef.current && runIdRef.current === runId) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -122,6 +147,9 @@ export default function MealPrepScreen() {
       checkAndNotifyEmptyInventory().catch((err) =>
         console.warn('[MealPrepScreen] checkAndNotifyEmptyInventory failed:', err)
       );
+      return () => {
+        runIdRef.current++;
+      };
     }, [loadData])
   );
 
