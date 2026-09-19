@@ -934,6 +934,42 @@ export default function DashboardScreen() {
 
 // ─── Body Measurements Modal ──────────────────────────────────────────────────
 
+/** Valid cm range per measurement field (#325). */
+const MEASUREMENT_RANGES = {
+  waist_cm: [40, 200],
+  chest_cm: [40, 200],
+  hips_cm: [40, 200],
+  thigh_cm: [20, 100],
+  arm_cm: [15, 70],
+} as const;
+
+type MeasurementKey = keyof typeof MEASUREMENT_RANGES;
+
+/**
+ * Parse one measurement field's raw text.
+ *
+ * - Blank (after trimming) means "clear this field" -> `value: null`.
+ * - A number within range -> `value` holds the parsed number.
+ * - Non-numeric or out of range -> `value: undefined` (skip; leave the
+ *   stored value untouched) and `isError: true` so the caller can show an
+ *   inline error without losing what the user typed.
+ */
+function parseMeasurementField(
+  raw: string,
+  key: MeasurementKey
+): { value: number | null | undefined; isError: boolean } {
+  const trimmed = raw.trim();
+  if (trimmed === '') {
+    return { value: null, isError: false };
+  }
+  const [min, max] = MEASUREMENT_RANGES[key];
+  const parsed = Number(trimmed.replace(',', '.'));
+  if (Number.isNaN(parsed) || parsed < min || parsed > max) {
+    return { value: undefined, isError: true };
+  }
+  return { value: parsed, isError: false };
+}
+
 function MeasurementsModal({
   visible,
   onClose,
@@ -951,38 +987,64 @@ function MeasurementsModal({
   }) => Promise<void>;
   latest: BodyMeasurement | null;
 }) {
-  const [waist, setWaist] = useState('');
-  const [chest, setChest] = useState('');
-  const [hips, setHips]   = useState('');
-  const [thigh, setThigh] = useState('');
-  const [arm, setArm]     = useState('');
+  // The parent now mounts this component only while `visible` (#325), so
+  // this state is fresh on every open -- each field initialises once from
+  // `latest` at mount and no reset effect is needed. Previously this used a
+  // `useEffect(…, [visible, latest])` that re-ran whenever `latest` changed
+  // identity (e.g. on every loadToday() reload), clobbering in-progress
+  // typing.
+  const [waist, setWaist] = useState(() => (latest?.waist_cm != null ? String(latest.waist_cm) : ''));
+  const [chest, setChest] = useState(() => (latest?.chest_cm != null ? String(latest.chest_cm) : ''));
+  const [hips, setHips] = useState(() => (latest?.hips_cm != null ? String(latest.hips_cm) : ''));
+  const [thigh, setThigh] = useState(() => (latest?.thigh_cm != null ? String(latest.thigh_cm) : ''));
+  const [arm, setArm] = useState(() => (latest?.arm_cm != null ? String(latest.arm_cm) : ''));
 
-  // Pre-fill from latest measurements when the modal opens
-  useEffect(() => {
-    if (visible) {
-      setWaist(latest?.waist_cm != null ? String(latest.waist_cm) : '');
-      setChest(latest?.chest_cm != null ? String(latest.chest_cm) : '');
-      setHips(latest?.hips_cm != null  ? String(latest.hips_cm)  : '');
-      setThigh(latest?.thigh_cm != null ? String(latest.thigh_cm) : '');
-      setArm(latest?.arm_cm != null    ? String(latest.arm_cm)   : '');
-    }
-  }, [visible, latest]);
+  const waistResult = parseMeasurementField(waist, 'waist_cm');
+  const chestResult = parseMeasurementField(chest, 'chest_cm');
+  const hipsResult = parseMeasurementField(hips, 'hips_cm');
+  const thighResult = parseMeasurementField(thigh, 'thigh_cm');
+  const armResult = parseMeasurementField(arm, 'arm_cm');
 
-  const parseField = (s: string): number | null => {
-    const v = parseFloat(s);
-    return isNaN(v) || v <= 0 ? null : v;
+  const fieldResults = {
+    waist_cm: waistResult,
+    chest_cm: chestResult,
+    hips_cm: hipsResult,
+    thigh_cm: thighResult,
+    arm_cm: armResult,
   };
 
   const handleSave = async () => {
-    await onSave({
-      waist_cm: parseField(waist),
-      chest_cm: parseField(chest),
-      hips_cm:  parseField(hips),
-      thigh_cm: parseField(thigh),
-      arm_cm:   parseField(arm),
-    });
-    onClose();
+    const results = Object.values(fieldResults);
+    const hasError = results.some((r) => r.isError);
+    const hasValidField = results.some((r) => !r.isError);
+
+    // Save whatever is valid -- invalid keys are `undefined` (skip), so
+    // logBodyMeasurement leaves those columns untouched rather than erasing
+    // them with a typo (#325).
+    if (hasValidField) {
+      await onSave({
+        waist_cm: waistResult.value,
+        chest_cm: chestResult.value,
+        hips_cm: hipsResult.value,
+        thigh_cm: thighResult.value,
+        arm_cm: armResult.value,
+      });
+    }
+
+    // Only close once every field was valid -- otherwise the user would
+    // never see the inline error, and the typo would vanish silently.
+    if (!hasError) {
+      onClose();
+    }
   };
+
+  const fields = [
+    { key: 'waist_cm' as const, label: 'Waist', value: waist, onChange: setWaist, result: waistResult, testID: 'measurement-waist-input' },
+    { key: 'chest_cm' as const, label: 'Chest', value: chest, onChange: setChest, result: chestResult, testID: 'measurement-chest-input' },
+    { key: 'hips_cm' as const, label: 'Hips', value: hips, onChange: setHips, result: hipsResult, testID: 'measurement-hips-input' },
+    { key: 'thigh_cm' as const, label: 'Thigh', value: thigh, onChange: setThigh, result: thighResult, testID: 'measurement-thigh-input' },
+    { key: 'arm_cm' as const, label: 'Arm', value: arm, onChange: setArm, result: armResult, testID: 'measurement-arm-input' },
+  ];
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -993,30 +1055,31 @@ function MeasurementsModal({
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>Body Measurements</Text>
-          <Text style={styles.modalSubtitle}>Enter values in cm — leave blank to skip</Text>
+          <Text style={styles.modalSubtitle}>Enter values in cm — a blank field clears it</Text>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
-            {(
-              [
-                { label: 'Waist', value: waist, onChange: setWaist },
-                { label: 'Chest', value: chest, onChange: setChest },
-                { label: 'Hips',  value: hips,  onChange: setHips  },
-                { label: 'Thigh', value: thigh, onChange: setThigh },
-                { label: 'Arm',   value: arm,   onChange: setArm   },
-              ] as const
-            ).map((field) => (
-              <View key={field.label} style={styles.measureField}>
-                <Text style={styles.measureFieldLabel}>{field.label} (cm)</Text>
-                <TextInput
-                  style={styles.measureFieldInput}
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  keyboardType="decimal-pad"
-                  placeholder="—"
-                  placeholderTextColor={Colors.textMuted}
-                  returnKeyType="next"
-                />
-              </View>
-            ))}
+            {fields.map((field) => {
+              const [min, max] = MEASUREMENT_RANGES[field.key];
+              return (
+                <View key={field.key} style={styles.measureField}>
+                  <Text style={styles.measureFieldLabel}>{field.label} (cm)</Text>
+                  <TextInput
+                    testID={field.testID}
+                    style={styles.measureFieldInput}
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    keyboardType="decimal-pad"
+                    placeholder="—"
+                    placeholderTextColor={Colors.textMuted}
+                    returnKeyType="next"
+                  />
+                  {field.result.isError && (
+                    <Text style={styles.measureFieldError}>
+                      Enter {min}–{max} cm
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
           </ScrollView>
           <View style={styles.modalFooter}>
             <Button title="Cancel" variant="ghost" onPress={onClose} />
@@ -1617,6 +1680,12 @@ const styles = StyleSheet.create({
     fontFamily: Typography.body,
     fontSize: Typography.sizes.md,
     color: Colors.textPrimary,
+  },
+  measureFieldError: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.danger,
+    marginTop: Spacing.xs,
   },
 
   // ── Exercise row trailing area ─────────────────────────────────────────────
