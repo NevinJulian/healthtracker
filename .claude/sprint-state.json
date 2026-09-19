@@ -2,10 +2,56 @@
   "startedAt": "2026-09-18T22:39:45Z",
   "integrationBranch": "sprint/auto-fixes",
   "baseSha": "198a5f2",
-  "baseline": { "typecheck": "pass", "testSuites": 17, "tests": 331 },
-  "frozenScope": [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 335, 336],
-  "excluded": { "334": "SPRINT.md §3 — .gitattributes renormalisation lands alone, by hand" },
-  "budget": { "maxRoundTripsPerIssue": 3, "maxParkedBeforeAbort": 8 },
+  "baseline": {
+    "typecheck": "pass",
+    "testSuites": 17,
+    "tests": 331
+  },
+  "frozenScope": [
+    300,
+    301,
+    302,
+    303,
+    304,
+    305,
+    306,
+    307,
+    308,
+    309,
+    310,
+    311,
+    312,
+    313,
+    314,
+    315,
+    316,
+    317,
+    318,
+    319,
+    320,
+    321,
+    322,
+    323,
+    324,
+    325,
+    326,
+    327,
+    328,
+    329,
+    330,
+    331,
+    332,
+    333,
+    335,
+    336
+  ],
+  "excluded": {
+    "334": "SPRINT.md §3 — .gitattributes renormalisation lands alone, by hand"
+  },
+  "budget": {
+    "maxRoundTripsPerIssue": 3,
+    "maxParkedBeforeAbort": 8
+  },
   "worktreeRoot": "C:/git/ht-lanes",
   "orchestratorDecisions": [
     "Each lane runs in its own git worktree outside the repo (C:/git/ht-lanes/lane-<x>) so parallel lanes never switch branches under each other and jest in the main tree never scans lane copies.",
@@ -17,19 +63,1000 @@
     "#310 (lane B): the SettingsScreen success-alert wording is lane D territory; lane B stays in backup.ts/notifications.ts and reports any criterion it cannot meet in-lane."
   ],
   "lanes": {
-    "A": { "branch": "sprint/lane-a-db", "worktree": "C:/git/ht-lanes/lane-a", "status": "pending", "order": [300, 301, 305, 302, 303, 319, 320, 321, 314, 315, 316, 306, 307, 331], "current": null, "done": [], "parked": [] },
-    "B": { "branch": "sprint/lane-b-notify", "worktree": "C:/git/ht-lanes/lane-b", "status": "pending", "order": [309, 310, 311], "current": null, "done": [], "parked": [] },
-    "C": { "branch": "sprint/lane-c-analytics", "worktree": "C:/git/ht-lanes/lane-c", "status": "pending", "order": [308, 312, 327, 328], "current": null, "done": [], "parked": [] },
-    "D": { "branch": "sprint/lane-d-screens", "worktree": "C:/git/ht-lanes/lane-d", "status": "pending", "order": [313, 322, 323, 324, 325, 326, 329, 330, 317, 304], "waitsForLaneA": [317, 304], "current": null, "done": [], "parked": [] },
-    "E": { "branch": "sprint/lane-e-api", "worktree": "C:/git/ht-lanes/lane-e", "status": "pending", "order": [318], "current": null, "done": [], "parked": [] },
-    "F": { "branch": "sprint/lane-f-repo", "worktree": "C:/git/ht-lanes/lane-f", "status": "pending", "order": [332, 333, 335], "waitsForLaneA": [335], "current": null, "done": [], "parked": [] },
-    "G": { "branch": "sprint/lane-g-tests", "worktree": "C:/git/ht-lanes/lane-g", "status": "pending", "order": [336], "waitsFor": "all other lanes merged", "current": null, "done": [], "parked": [] }
+    "A": {
+      "branch": "sprint/lane-a-db",
+      "worktree": "C:/git/ht-lanes/lane-a",
+      "status": "in_progress",
+      "order": [
+        300,
+        301,
+        305,
+        302,
+        303,
+        319,
+        320,
+        321,
+        314,
+        315,
+        316,
+        306,
+        307,
+        331
+      ],
+      "current": 305,
+      "done": [
+        300,
+        301
+      ],
+      "parked": []
+    },
+    "B": {
+      "branch": "sprint/lane-b-notify",
+      "worktree": "C:/git/ht-lanes/lane-b",
+      "status": "merged",
+      "order": [
+        309,
+        310,
+        311
+      ],
+      "current": null,
+      "done": [
+        309,
+        310,
+        311
+      ],
+      "parked": [],
+      "cleanup": "59ba330 comment-only (2 docblocks)",
+      "mergeSha": "c424709"
+    },
+    "C": {
+      "branch": "sprint/lane-c-analytics",
+      "worktree": "C:/git/ht-lanes/lane-c",
+      "status": "merged",
+      "order": [
+        308,
+        312,
+        327,
+        328,
+        "322-chart"
+      ],
+      "current": null,
+      "done": [
+        308,
+        312,
+        327,
+        "\"322-chart\""
+      ],
+      "parked": [
+        328
+      ],
+      "cleanup": "no changes needed",
+      "mergeSha": "5de3b4c"
+    },
+    "D": {
+      "branch": "sprint/lane-d-screens",
+      "worktree": "C:/git/ht-lanes/lane-d",
+      "status": "in_progress",
+      "order": [
+        313,
+        322,
+        323,
+        324,
+        325,
+        326,
+        329,
+        330,
+        317,
+        "323-clear",
+        304
+      ],
+      "waitsForLaneA": [
+        317,
+        "323-clear",
+        304
+      ],
+      "current": 324,
+      "done": [
+        313,
+        322,
+        323
+      ],
+      "parked": []
+    },
+    "E": {
+      "branch": "sprint/lane-e-api",
+      "worktree": "C:/git/ht-lanes/lane-e",
+      "status": "merged",
+      "order": [
+        318
+      ],
+      "current": null,
+      "done": [
+        318
+      ],
+      "parked": [],
+      "cleanup": "no changes needed",
+      "mergeSha": 605533
+    },
+    "F": {
+      "branch": "sprint/lane-f-repo",
+      "worktree": "C:/git/ht-lanes/lane-f",
+      "status": "waiting_for_lane_A",
+      "order": [
+        332,
+        333,
+        335
+      ],
+      "waitsForLaneA": [
+        335
+      ],
+      "current": 335,
+      "done": [
+        332
+      ],
+      "parked": [
+        333
+      ]
+    },
+    "G": {
+      "branch": "sprint/lane-g-tests",
+      "worktree": "C:/git/ht-lanes/lane-g",
+      "status": "pending",
+      "order": [
+        336
+      ],
+      "waitsFor": "all other lanes merged",
+      "current": null,
+      "done": [],
+      "parked": []
+    }
   },
-  "issues": {},
-  "foundDuringSprint": [],
+  "issues": {
+    "300": {
+      "roundTrips": 0,
+      "commits": [
+        "266cf76",
+        "66d3f58",
+        "e46607f",
+        "313877b",
+        "91e7932",
+        "231d644",
+        "0aad077"
+      ],
+      "lane": "A",
+      "status": "ready",
+      "branch": "sprint/lane-a-db",
+      "notes": "tester APPROVE + security APPROVE. Security notes: getDailyLogsBetween has no shape check on keys (no live external caller - add when analytics wires it); schema.ts header still says 'pruned to +/-7 days' -> lane A cleanup / #335. AC #3/#4 DEFERRED: analytics switch to getDailyLogsBetween after lane C merges.",
+      "deferredStep": "after lane C merges: merge integration into lane A, switch AnalyticsDashboardScreen loadData getRollingWindow() -> getDailyLogsBetween(today-90, today) (covers AC #3/#4)",
+      "securityReview": "required-src-db",
+      "regressionProof": "retention test fails 66d3f58/passes e46607f; bounded-window test fails 313877b/passes 91e7932; range test fails 231d644/passes 0aad077 (tester reproduced all three; also TZ=UTC+14/UTC-12)"
+    },
+    "301": {
+      "roundTrips": 2,
+      "commits": [
+        "bfabfdb",
+        "d9ff8d7",
+        "ab6ae5e",
+        "263a593",
+        "d1890de",
+        "382b62a"
+      ],
+      "lane": "A",
+      "status": "ready",
+      "branch": "sprint/lane-a-db",
+      "notes": "tester REJECT r1, REJECT r2, APPROVE r3; security APPROVE (probed 9999-12-31, 0000-0099 years, numeric via TEXT affinity). roundTrips=2. Security note: raw startDateISO in hammer-task daysDiff now hits up to 98 rows (#363 comment added).",
+      "securityReview": "required-src-db",
+      "regressionProof": "backfillGap fails at 0aad077 (3/6), backfillStartDateGuard fails at ab6ae5e (3/4) + calendar-overflow case sole failure w/o validator; tester generalised across 6 month/year boundaries x 3 TZs"
+    },
+    "305": {
+      "roundTrips": 0,
+      "commits": [
+        "77fc8ae",
+        "cdc5a90",
+        "52409f4"
+      ],
+      "lane": "A",
+      "status": "in_test",
+      "branch": "sprint/lane-a-db",
+      "notes": "dev: pure-refactor shared row builder (all #300/#301 tests green at cdc5a90), _ensureDailyLogRow + _assertWrote on 6 writers; upsertExerciseCompleted ensure+assert only (no early return exists). 9/10 new tests fail pre-fix. 355 tests/23 suites."
+    },
+    "308": {
+      "roundTrips": 0,
+      "commits": [
+        "577e79b",
+        "8efa95c"
+      ],
+      "lane": "C",
+      "status": "merged",
+      "branch": "sprint/lane-c-analytics",
+      "notes": "tester APPROVE round 0; 336 tests/18 suites",
+      "securityReview": "skipped-pure-ui",
+      "regressionProof": "helper tests fail at 577e79b (not a function); component rerender test fails on selected=false when only behavioural fix reverted (tester reproduced); pass at 8efa95c",
+      "mergeSha": "5de3b4c"
+    },
+    "309": {
+      "roundTrips": 0,
+      "commits": [
+        "2c171a8",
+        "398f733"
+      ],
+      "lane": "B",
+      "status": "merged",
+      "branch": "sprint/lane-b-notify",
+      "notes": "tester APPROVE round 0; 343 tests. Needs device verification: expo-notifications upsert-by-identifier on Android; scheduleNotificationAsync resolving with the given identifier. Tester note: reconcile's single shared try/catch means a throwing getter skips later reminders (pre-existing; first post-upgrade pass now also has the sweep behind it; self-heals on next reconcile) - handed to #311 analyst to decide coverage before filing.",
+      "securityReview": "skipped-notifications-only",
+      "regressionProof": "12 of 40 notification tests fail at 2c171a8, 40/40 at 398f733 (tester reproduced); test file diff is additions only",
+      "mergeSha": "c424709"
+    },
+    "310": {
+      "roundTrips": 0,
+      "commits": [
+        "1edd492",
+        "186cabf"
+      ],
+      "lane": "B",
+      "status": "merged",
+      "branch": "sprint/lane-b-notify",
+      "notes": "tester APPROVE + security APPROVE r0. Security: diff changes timing not reachability (App.tsx reconciles restored settings at startup anyway); if cancelAll rejects, old schedule remains (not zero reminders). Pre-existing getWeeklyCookDay range gap filed. Honest-alert criterion judged moot by orchestrator (flag for human).",
+      "securityReview": "required-backup-ts",
+      "regressionProof": "4 of 5 new backup tests fail with 398f733 backup.ts, 23/23 pass at 186cabf (tester reproduced); spy interception proven by error reference identity",
+      "mergeSha": "c424709"
+    },
+    "311": {
+      "roundTrips": 0,
+      "commits": [
+        "6f0bb27",
+        "457d423",
+        "b1aeb91",
+        "081f1fa"
+      ],
+      "lane": "B",
+      "status": "merged",
+      "branch": "sprint/lane-b-notify",
+      "notes": "tester APPROVE r0. Adversarial: third-pass contract holds; #310x#311 restore race ends in restored-settings state (stable ids make each pass self-consistent). PARTIAL: AC #4 excluded -> Refs #311.",
+      "partial": true,
+      "securityReview": "skipped-notifications-only",
+      "regressionProof": "4 guard tests fail at 186cabf, 3 isolation tests fail at 457d423, all pass at 081f1fa (tester reproduced)",
+      "mergeSha": "c424709"
+    },
+    "312": {
+      "roundTrips": 0,
+      "commits": [
+        "3189d8f",
+        "bdbf4ea",
+        "f97b321"
+      ],
+      "lane": "C",
+      "status": "merged",
+      "branch": "sprint/lane-c-analytics",
+      "notes": "tester APPROVE r0. HISTORY WRINKLE: 3189d8f alone does not load (jest.mock scope error), fixed by bdbf4ea - disclosed by dev, not force-pushed over; flag in report. 339 tests/19 suites.",
+      "securityReview": "skipped-client-state-only",
+      "regressionProof": "cancellationGuard test fails with bdbf4ea screen source (stale squat run wins), passes at f97b321 (tester reproduced)",
+      "mergeSha": "5de3b4c"
+    },
+    "313": {
+      "roundTrips": 1,
+      "commits": [
+        "7a9199a",
+        "490f75a",
+        "d68c7f6",
+        "846aaef"
+      ],
+      "lane": "D",
+      "status": "ready",
+      "branch": "sprint/lane-d-screens",
+      "notes": "tester APPROVE r1+r2, security BLOCK r1 (no AppState flush) -> APPROVE r2. roundTrips=1. Residual (not blocking): force-stop/SIGKILL with no AppState transition; universal RN limit. 341 tests.",
+      "securityReview": "required-deferred-write-path",
+      "regressionProof": "r1: 5/6 stepper tests fail with f132381 source, pass 490f75a; r2: 4 AppState/rejection tests fail with 490f75a source, pass 846aaef (tester reproduced both)"
+    },
+    "318": {
+      "roundTrips": 1,
+      "commits": [
+        "1beee5e",
+        "1a59e42",
+        "def1e4f",
+        "1ee6a8a",
+        "8f867a5"
+      ],
+      "lane": "E",
+      "status": "merged",
+      "branch": "sprint/lane-e-api",
+      "partial": true,
+      "notes": "tester APPROVE r2, security APPROVE (no new trust boundary, no write path, URL encoding intact, errors carry no raw body). PARTIAL: abort-on-navigation + out-of-order search responses need DiscoverScreen/RecipeEditorScreen (unowned) -> PR must say Refs #318 not Closes.",
+      "securityReview": "required-src-api",
+      "regressionProof": "mealdb tests fail at 1beee5e (settled=false; fetch x2) pass at def1e4f; backoff-abort test fails at def1e4f pass at 8f867a5 (tester reproduced both)",
+      "mergeSha": 605533
+    },
+    "322": {
+      "roundTrips": 0,
+      "commits": [
+        "ee4fbb0",
+        "389c189"
+      ],
+      "lane": "D",
+      "status": "ready",
+      "branch": "sprint/lane-d-screens",
+      "notes": "BOTH HALVES READY. Lane D half on sprint/lane-d-screens (389c189), chart half on sprint/lane-c-analytics (a55de6b). Closes only when both lanes merged. Chart half tester APPROVE r0; security skipped (pure render).",
+      "splitAcrossLanes": true,
+      "laneDHalf": "ready",
+      "securityReview": "skipped-device-owner-input",
+      "regressionProof": "10/14 new body-weight tests fail with 846aaef DashboardScreen.tsx, 14/14 at 389c189 (tester reproduced)",
+      "chartHalfCommits": [
+        "733de02",
+        "4b74b42",
+        "c7c8292",
+        "1481f7b",
+        "4fde986",
+        "a55de6b"
+      ],
+      "chartHalf": "ready",
+      "regressionProofChart": "card tests fail on assertions with export kept + raw history (tester trap check); full-screen delta fails at 31348f5 (-9924.0); helper tests fail at base",
+      "chartHalfMergeSha": "5de3b4c"
+    },
+    "323": {
+      "roundTrips": 0,
+      "commits": [
+        "b06a2d7",
+        "9b2445e",
+        "5cb4219"
+      ],
+      "lane": "D",
+      "status": "ready_partial",
+      "branch": "sprint/lane-d-screens",
+      "splitAcrossPhases": true,
+      "notes": "part 1 ready: tester APPROVE r0 + follow-up test-only commit 5cb4219 (separate file, focus-capable mock; mutation proof: removing ref reset -> field stuck blank; source byte-identical) accepted by orchestrator without re-test. Part 2 (persisted clear) after lane A merges.",
+      "part1": "ready",
+      "securityReview": "skipped-device-owner-input",
+      "regressionProof": "5 new tests fail with 389c189 SettingsScreen.tsx, pass at 9b2445e (tester reproduced)"
+    },
+    "324": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "D",
+      "status": "in_dev",
+      "branch": "sprint/lane-d-screens",
+      "notes": "work order: Number()+comma, integer 1-50, Save disabled when invalid/empty, inline 'Enter 1-50 portions' for non-empty invalid, modal mounted only while visible (fresh state per open). Save path = logCookedMeal (additive; not lane A's #302/#303 writers). MeasurementsModal same pattern = #325 (lane D next), not new. Developer held: #323 follow-up test committing in same worktree."
+    },
+    "327": {
+      "roundTrips": 1,
+      "commits": [
+        "1a874bf",
+        "d9f76cc",
+        "31348f5"
+      ],
+      "lane": "C",
+      "status": "merged",
+      "branch": "sprint/lane-c-analytics",
+      "notes": "tester REJECT r1 (coverage), APPROVE r2. roundTrips=1. Parent passes stable state identities -> real prod improvement. DOT_COLORS/React.memo/loadData batching excluded per 'measurable parts only'.",
+      "securityReview": "skipped-pure-render-perf",
+      "regressionProof": "3/5 memo tests fail at 1a874bf on call counts, pass d9f76cc; r2 coverage tests each sole failure under deps mutations (tester reproduced both)",
+      "mergeSha": "5de3b4c"
+    },
+    "328": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "C",
+      "status": "parked",
+      "branch": "sprint/lane-c-analytics",
+      "stalledAt": "analysis",
+      "parkReason": "Issue premise partly stale: the chart that reads getWorkoutHistory (LiftingSectionCard progression) is ALL-TIME, so bounding it silently truncates visible data (product decision). PRSummaryCard needs lifetime history for correct PRs and no aggregate PR query exists -> needs new query in database.ts (lane A). Human needs: decide all-time vs windowed chart; add getExercisePRs() aggregate. Screen-side change then mechanical.",
+      "notes": "issue comment posted"
+    },
+    "332": {
+      "roundTrips": 0,
+      "commits": [
+        "19ecb0c",
+        "a6e5813"
+      ],
+      "lane": "F",
+      "status": "ready",
+      "branch": "sprint/lane-f-repo",
+      "securityReview": "skipped-no-data-flow",
+      "notes": "tester APPROVE round 0; security skipped (no data flow)",
+      "regressionProof": "mechanical: 4 git ls-files/check-ignore checks fail at f132381, pass at a6e5813 (tester re-ran)"
+    },
+    "333": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "F",
+      "status": "parked",
+      "branch": "sprint/lane-f-repo",
+      "notes": "issue comment posted with exact commands and enumeration",
+      "stalledAt": "analysis",
+      "parkReason": "All acceptance criteria are local git state or a GitHub repo setting; nothing travels through the reviewable PR; sprint does not delete branches on the user's machine unreviewed. fix-recipe-detail-safe-area is NOT merged (1 commit, 7d7ba67) despite the issue grouping it as a leftover. Human needs: run -d sweep after sprint PR resolves, enable auto-delete head branches, decide on unmerged branches."
+    }
+  },
+  "foundDuringSprint": [
+    360,
+    361,
+    362,
+    363,
+    364
+  ],
   "log": [
-    { "at": "2026-09-18T22:39:45Z", "event": "preflight green on main: typecheck pass, 331 tests / 17 suites" },
-    { "at": "2026-09-18T22:39:45Z", "event": "created and pushed sprint/auto-fixes from main", "sha": "198a5f2" },
-    { "at": "2026-09-18T22:39:45Z", "event": "scope frozen: 36 open issues in #300-#336, #334 excluded" }
+    {
+      "at": "2026-09-18T22:39:45Z",
+      "event": "preflight green on main: typecheck pass, 331 tests / 17 suites"
+    },
+    {
+      "at": "2026-09-18T22:39:45Z",
+      "event": "created and pushed sprint/auto-fixes from main",
+      "sha": "198a5f2"
+    },
+    {
+      "at": "2026-09-18T22:39:45Z",
+      "event": "scope frozen: 36 open issues in #300-#336, #334 excluded"
+    },
+    {
+      "at": "2026-09-18T22:41:44Z",
+      "event": "worktrees created at C:/git/ht-lanes/lane-{a..f}, lane branches pushed, npm ci running"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane A: status=in_progress current=300"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#300: lane=A status=analysing branch=sprint/lane-a-db"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane B: status=in_progress current=309"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#309: lane=B status=analysing branch=sprint/lane-b-notify"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane C: status=in_progress current=308"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#308: lane=C status=analysing branch=sprint/lane-c-analytics"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane D: status=in_progress current=313"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#313: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane E: status=in_progress current=318"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#318: lane=E status=analysing branch=sprint/lane-e-api"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "lane F: status=in_progress current=332"
+    },
+    {
+      "at": "2026-09-18T22:41:45Z",
+      "event": "#332: lane=F status=analysing branch=sprint/lane-f-repo"
+    },
+    {
+      "at": "2026-09-18T22:42:55Z",
+      "event": "npm ci done in all six worktrees; lane-b sanity run 331/17 green"
+    },
+    {
+      "at": "2026-09-18T22:42:55Z",
+      "event": "#309: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T22:42:55Z",
+      "event": "#308: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T22:44:10Z",
+      "event": "#313: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T22:44:10Z",
+      "event": "#318: status=in_dev partial=true notes=…"
+    },
+    {
+      "at": "2026-09-18T22:44:10Z",
+      "event": "#300: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T22:44:36Z",
+      "event": "#332: status=in_dev securityReview=skipped-no-data-flow notes=…"
+    },
+    {
+      "at": "2026-09-18T22:46:10Z",
+      "event": "#332: status=in_test commits=[\"19ecb0c\",\"a6e5813\"]"
+    },
+    {
+      "at": "2026-09-18T22:46:10Z",
+      "event": "#333: lane=F status=analysing branch=sprint/lane-f-repo notes=…"
+    },
+    {
+      "at": "2026-09-18T22:47:21Z",
+      "event": "#332: status=ready regressionProof=mechanical: 4 git ls-files/check-ignore checks fail at f132381, pass at a6e5813 (tester re-ran) notes=…"
+    },
+    {
+      "at": "2026-09-18T22:47:21Z",
+      "event": "lane F: done+=332 current=333"
+    },
+    {
+      "at": "2026-09-18T22:47:55Z",
+      "event": "#333: status=parked stalledAt=analysis parkReason=All acceptance criteria are local git state or a GitHub repo setting; nothing travels through the reviewable PR; sprint does not delete branches on the user's machine unreviewed. fix-recipe-detail-safe-area is NOT merged (1 commit, 7d7ba67) despite the issue grouping it as a leftover. Human needs: run -d sweep after sprint PR resolves, enable auto-delete head branches, decide on unmerged branches. notes=…"
+    },
+    {
+      "at": "2026-09-18T22:47:55Z",
+      "event": "lane F: parked+=333 current=335 status=waiting_for_lane_A"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "SESSION INTERRUPTED ~00:49 local: 4 agents stopped (dev #309/#313/#300, tester #308). refs/heads/sprint/lane-a-db was left NUL-filled; restored from branch reflog to 66d3f58 (no commits lost; fix line uncommitted in worktree). No NUL corruption in in-flight files; git fsck connectivity clean. All four agents resumed via SendMessage."
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "RULE ADDED: agents must not use git stash — stash stack is shared across all worktrees (found lane C spike stash 9982099 in the shared stack)"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "filed found-during-sprint #360"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "#308: status=in_test commits=[\"577e79b\",\"8efa95c\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "#318: status=in_test commits=[\"1beee5e\",\"1a59e42\",\"def1e4f\"]"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "#300: commits=[\"266cf76\",\"66d3f58\"]"
+    },
+    {
+      "at": "2026-09-18T22:53:31Z",
+      "event": "#309: commits=[\"2c171a8\",\"398f733\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T22:54:22Z",
+      "event": "#309: status=in_test securityReview=skipped-notifications-only notes=…"
+    },
+    {
+      "at": "2026-09-18T22:56:03Z",
+      "event": "#308: status=ready securityReview=skipped-pure-ui regressionProof=helper tests fail at 577e79b (not a function); component rerender test fails on selected=false when only behavioural fix reverted (tester reproduced); pass at 8efa95c notes=…"
+    },
+    {
+      "at": "2026-09-18T22:56:03Z",
+      "event": "lane C: done+=308 current=312"
+    },
+    {
+      "at": "2026-09-18T22:56:03Z",
+      "event": "#312: lane=C status=analysing branch=sprint/lane-c-analytics"
+    },
+    {
+      "at": "2026-09-18T22:56:03Z",
+      "event": "#300: status=in_dev commits=[\"266cf76\",\"66d3f58\",\"e46607f\"] deferredStep=after lane C merges: merge integration into lane A, switch AnalyticsDashboardScreen loadData getRollingWindow() -> getDailyLogsBetween(today-90, today) (covers AC #3/#4) notes=…"
+    },
+    {
+      "at": "2026-09-18T22:56:03Z",
+      "event": "orchestrator decision: #300 amended to bound getRollingWindow and add getDailyLogsBetween; lane A granted the one-line AnalyticsDashboardScreen call swap only after lane C merges (same pattern as #315)"
+    },
+    {
+      "at": "2026-09-18T22:57:25Z",
+      "event": "#318: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-18T22:58:25Z",
+      "event": "#312: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T22:59:17Z",
+      "event": "#309: status=ready securityReview=skipped-notifications-only regressionProof=12 of 40 notification tests fail at 2c171a8, 40/40 at 398f733 (tester reproduced); test file diff is additions only notes=…"
+    },
+    {
+      "at": "2026-09-18T22:59:17Z",
+      "event": "lane B: done+=309 current=310"
+    },
+    {
+      "at": "2026-09-18T22:59:17Z",
+      "event": "#310: lane=B status=analysing branch=sprint/lane-b-notify"
+    },
+    {
+      "at": "2026-09-18T22:59:38Z",
+      "event": "#318: status=in_test commits=[\"1beee5e\",\"1a59e42\",\"def1e4f\",\"1ee6a8a\",\"8f867a5\"]"
+    },
+    {
+      "at": "2026-09-18T23:01:07Z",
+      "event": "#300: status=in_test commits=[\"266cf76\",\"66d3f58\",\"e46607f\",\"313877b\",\"91e7932\",\"231d644\",\"0aad077\"]"
+    },
+    {
+      "at": "2026-09-18T23:03:10Z",
+      "event": "#318: status=in_security securityReview=required-src-api regressionProof=mealdb tests fail at 1beee5e (settled=false; fetch x2) pass at def1e4f; backoff-abort test fails at def1e4f pass at 8f867a5 (tester reproduced both) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:03:10Z",
+      "event": "#313: status=in_test commits=[\"7a9199a\",\"490f75a\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:03:11Z",
+      "event": "#310: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T23:03:11Z",
+      "event": "filed found-during-sprint #361"
+    },
+    {
+      "at": "2026-09-18T23:04:41Z",
+      "event": "#318: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-18T23:04:41Z",
+      "event": "lane E: done+=318 status=cleanup current=null"
+    },
+    {
+      "at": "2026-09-18T23:05:12Z",
+      "event": "#300: status=in_security securityReview=required-src-db regressionProof=retention test fails 66d3f58/passes e46607f; bounded-window test fails 313877b/passes 91e7932; range test fails 231d644/passes 0aad077 (tester reproduced all three; also TZ=UTC+14/UTC-12) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:05:12Z",
+      "event": "#301: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-18T23:06:00Z",
+      "event": "lane E: status=merging cleanup=no changes needed"
+    },
+    {
+      "at": "2026-09-18T23:06:30Z",
+      "event": "#318: status=merged mergeSha=0605533"
+    },
+    {
+      "at": "2026-09-18T23:06:30Z",
+      "event": "lane E: status=merged mergeSha=0605533"
+    },
+    {
+      "at": "2026-09-18T23:06:30Z",
+      "event": "merged lane E into sprint/auto-fixes; integration gates green: typecheck pass, 346 tests / 20 suites",
+      "sha": "0605533"
+    },
+    {
+      "at": "2026-09-18T23:06:55Z",
+      "event": "#300: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-18T23:06:55Z",
+      "event": "lane A: done+=300 current=301"
+    },
+    {
+      "at": "2026-09-18T23:08:15Z",
+      "event": "#301: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T23:08:45Z",
+      "event": "#313: status=in_security securityReview=required-deferred-write-path regressionProof=5 of 6 new tests fail with f132381 SettingsScreen.tsx, 7/7 pass at 490f75a (tester reproduced; hydration test spec-only) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:09:09Z",
+      "event": "#312: status=in_test commits=[\"3189d8f\",\"bdbf4ea\",\"f97b321\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:10:54Z",
+      "event": "#310: status=in_test commits=[\"1edd492\",\"186cabf\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:13:01Z",
+      "event": "#313: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-18T23:13:22Z",
+      "event": "#312: status=ready securityReview=skipped-client-state-only regressionProof=cancellationGuard test fails with bdbf4ea screen source (stale squat run wins), passes at f97b321 (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:13:22Z",
+      "event": "lane C: done+=312 current=327"
+    },
+    {
+      "at": "2026-09-18T23:13:22Z",
+      "event": "#327: lane=C status=analysing branch=sprint/lane-c-analytics notes=…"
+    },
+    {
+      "at": "2026-09-18T23:15:22Z",
+      "event": "#310: status=in_security securityReview=required-backup-ts regressionProof=4 of 5 new backup tests fail with 398f733 backup.ts, 23/23 pass at 186cabf (tester reproduced); spy interception proven by error reference identity notes=…"
+    },
+    {
+      "at": "2026-09-18T23:15:22Z",
+      "event": "#311: lane=B status=analysing branch=sprint/lane-b-notify notes=…"
+    },
+    {
+      "at": "2026-09-18T23:15:51Z",
+      "event": "#301: status=in_test commits=[\"bfabfdb\",\"d9ff8d7\",\"ab6ae5e\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:17:13Z",
+      "event": "#327: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-18T23:17:43Z",
+      "event": "#310: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-18T23:17:43Z",
+      "event": "lane B: done+=310"
+    },
+    {
+      "at": "2026-09-18T23:17:43Z",
+      "event": "#313: status=in_test commits=[\"7a9199a\",\"490f75a\",\"d68c7f6\",\"846aaef\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:17:48Z",
+      "event": "filed found-during-sprint #362"
+    },
+    {
+      "at": "2026-09-18T23:20:51Z",
+      "event": "#313: status=in_security notes=…"
+    },
+    {
+      "at": "2026-09-18T23:20:51Z",
+      "event": "#322: lane=D status=analysing branch=sprint/lane-d-screens notes=…"
+    },
+    {
+      "at": "2026-09-18T23:21:44Z",
+      "event": "#311: status=in_dev partial=true notes=…"
+    },
+    {
+      "at": "2026-09-18T23:22:10Z",
+      "event": "#313: status=ready regressionProof=r1: 5/6 stepper tests fail with f132381 source, pass 490f75a; r2: 4 AppState/rejection tests fail with 490f75a source, pass 846aaef (tester reproduced both) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:22:10Z",
+      "event": "lane D: done+=313 current=322"
+    },
+    {
+      "at": "2026-09-18T23:23:06Z",
+      "event": "#301: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-18T23:23:24Z",
+      "event": "#327: status=in_test commits=[\"1a874bf\",\"d9f76cc\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:24:04Z",
+      "event": "#322: status=in_dev splitAcrossLanes=true notes=…"
+    },
+    {
+      "at": "2026-09-18T23:24:05Z",
+      "event": "lane C: order=[308,312,327,328,\"322-chart\"]"
+    },
+    {
+      "at": "2026-09-18T23:24:05Z",
+      "event": "orchestrator decision: #322 split - input half in lane D, WeightTrendCard outlier half appended to lane C after #328 (lane C owns AnalyticsDashboardScreen.tsx; no cross-lane edit)"
+    },
+    {
+      "at": "2026-09-18T23:27:55Z",
+      "event": "#327: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-18T23:27:55Z",
+      "event": "#301: status=in_test commits=[\"bfabfdb\",\"d9ff8d7\",\"ab6ae5e\",\"263a593\",\"d1890de\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:27:55Z",
+      "event": "filed found-during-sprint #363"
+    },
+    {
+      "at": "2026-09-18T23:28:43Z",
+      "event": "filed found-during-sprint #364"
+    },
+    {
+      "at": "2026-09-18T23:28:43Z",
+      "event": "#322: status=in_test commits=[\"ee4fbb0\",\"389c189\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:31:59Z",
+      "event": "#322: status=ready_partial laneDHalf=ready securityReview=skipped-device-owner-input regressionProof=10/14 new body-weight tests fail with 846aaef DashboardScreen.tsx, 14/14 at 389c189 (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:31:59Z",
+      "event": "lane D: done+=322 current=323"
+    },
+    {
+      "at": "2026-09-18T23:31:59Z",
+      "event": "#323: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-18T23:32:10Z",
+      "event": "#327: status=in_test commits=[\"1a874bf\",\"d9f76cc\",\"31348f5\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:33:40Z",
+      "event": "#301: status=in_dev roundTrips=2 notes=…"
+    },
+    {
+      "at": "2026-09-18T23:34:14Z",
+      "event": "#327: status=ready securityReview=skipped-pure-render-perf regressionProof=3/5 memo tests fail at 1a874bf on call counts, pass d9f76cc; r2 coverage tests each sole failure under deps mutations (tester reproduced both) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:34:14Z",
+      "event": "lane C: done+=327 current=328"
+    },
+    {
+      "at": "2026-09-18T23:34:14Z",
+      "event": "#328: lane=C status=analysing branch=sprint/lane-c-analytics"
+    },
+    {
+      "at": "2026-09-18T23:35:20Z",
+      "event": "#323: status=in_dev splitAcrossPhases=true notes=…"
+    },
+    {
+      "at": "2026-09-18T23:35:20Z",
+      "event": "lane D: order=[313,322,323,324,325,326,329,330,317,\"323-clear\",304] waitsForLaneA=[317,\"323-clear\",304]"
+    },
+    {
+      "at": "2026-09-18T23:35:20Z",
+      "event": "orchestrator decision: #323 split - validation now; persisted clear (needs new deleteSetting in database.ts) done by lane D after lane A merges, under the same database.ts grant as #317"
+    },
+    {
+      "at": "2026-09-18T23:35:38Z",
+      "event": "#301: status=in_test commits=[\"bfabfdb\",\"d9ff8d7\",\"ab6ae5e\",\"263a593\",\"d1890de\",\"382b62a\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:37:11Z",
+      "event": "#328: status=parked stalledAt=analysis parkReason=Issue premise partly stale: the chart that reads getWorkoutHistory (LiftingSectionCard progression) is ALL-TIME, so bounding it silently truncates visible data (product decision). PRSummaryCard needs lifetime history for correct PRs and no aggregate PR query exists -> needs new query in database.ts (lane A). Human needs: decide all-time vs windowed chart; add getExercisePRs() aggregate. Screen-side change then mechanical. notes=…"
+    },
+    {
+      "at": "2026-09-18T23:37:11Z",
+      "event": "lane C: parked+=328 current=\"322-chart\""
+    },
+    {
+      "at": "2026-09-18T23:37:11Z",
+      "event": "#322: notes=…"
+    },
+    {
+      "at": "2026-09-18T23:37:39Z",
+      "event": "#311: status=in_test commits=[\"6f0bb27\",\"457d423\",\"b1aeb91\",\"081f1fa\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:38:33Z",
+      "event": "#301: status=in_security securityReview=required-src-db regressionProof=backfillGap fails at 0aad077 (3/6), backfillStartDateGuard fails at ab6ae5e (3/4) + calendar-overflow case sole failure w/o validator; tester generalised across 6 month/year boundaries x 3 TZs notes=…"
+    },
+    {
+      "at": "2026-09-18T23:38:33Z",
+      "event": "#305: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-18T23:38:59Z",
+      "event": "#322: notes=…"
+    },
+    {
+      "at": "2026-09-18T23:40:29Z",
+      "event": "#305: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-18T23:40:52Z",
+      "event": "#323: status=in_test commits=[\"b06a2d7\",\"9b2445e\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:42:57Z",
+      "event": "#301: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-18T23:42:58Z",
+      "event": "lane A: done+=301 current=305"
+    },
+    {
+      "at": "2026-09-18T23:42:58Z",
+      "event": "#305: status=in_dev"
+    },
+    {
+      "at": "2026-09-18T23:44:34Z",
+      "event": "#311: status=ready securityReview=skipped-notifications-only regressionProof=4 guard tests fail at 186cabf, 3 isolation tests fail at 457d423, all pass at 081f1fa (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:44:34Z",
+      "event": "lane B: done+=311 status=cleanup current=null"
+    },
+    {
+      "at": "2026-09-18T23:46:44Z",
+      "event": "#323: status=ready_partial part1=ready securityReview=skipped-device-owner-input regressionProof=5 new tests fail with 389c189 SettingsScreen.tsx, pass at 9b2445e (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:46:44Z",
+      "event": "lane D: done+=323 current=324"
+    },
+    {
+      "at": "2026-09-18T23:46:44Z",
+      "event": "#324: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-18T23:47:02Z",
+      "event": "lane B: status=merging cleanup=59ba330 comment-only (2 docblocks)"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "#309: status=merged mergeSha=c424709"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "#310: status=merged mergeSha=c424709"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "#311: status=merged mergeSha=c424709"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "lane B: status=merged mergeSha=c424709"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "merged lane B into sprint/auto-fixes; integration gates green: typecheck pass, 370 tests / 20 suites (346 + 24 from lane B)",
+      "sha": "c424709"
+    },
+    {
+      "at": "2026-09-18T23:47:22Z",
+      "event": "#315 prerequisite met: lane B merged into integration; lane A must merge integration before starting #315 (backup.ts validatePayload grant)"
+    },
+    {
+      "at": "2026-09-18T23:48:29Z",
+      "event": "#322: chartHalfCommits=[\"733de02\",\"4b74b42\",\"c7c8292\",\"1481f7b\",\"4fde986\",\"a55de6b\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:49:30Z",
+      "event": "#324: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-18T23:51:53Z",
+      "event": "#305: status=in_test commits=[\"77fc8ae\",\"cdc5a90\",\"52409f4\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:52:16Z",
+      "event": "#323: commits=[\"b06a2d7\",\"9b2445e\",\"5cb4219\"] notes=…"
+    },
+    {
+      "at": "2026-09-18T23:52:16Z",
+      "event": "#324: status=in_dev"
+    },
+    {
+      "at": "2026-09-18T23:52:34Z",
+      "event": "#322: status=ready chartHalf=ready regressionProofChart=card tests fail on assertions with export kept + raw history (tester trap check); full-screen delta fails at 31348f5 (-9924.0); helper tests fail at base notes=…"
+    },
+    {
+      "at": "2026-09-18T23:52:34Z",
+      "event": "lane C: done+=\"322-chart\" status=cleanup current=null"
+    },
+    {
+      "at": "2026-09-18T23:55:18Z",
+      "event": "lane C: status=merging cleanup=no changes needed"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "#308: status=merged mergeSha=5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "#312: status=merged mergeSha=5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "#327: status=merged mergeSha=5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "#322: chartHalfMergeSha=5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "lane C: status=merged mergeSha=5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "merged lane C into sprint/auto-fixes; integration green: typecheck pass, 394 tests / 24 suites (370 + 24 from lane C)",
+      "sha": "5de3b4c"
+    },
+    {
+      "at": "2026-09-18T23:55:41Z",
+      "event": "#300 deferred-step prerequisite met: lane C merged; lane A may now merge integration and swap AnalyticsDashboardScreen's getRollingWindow() -> getDailyLogsBetween(today-90, today)"
+    }
   ]
 }
