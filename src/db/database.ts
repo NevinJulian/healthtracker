@@ -2366,14 +2366,28 @@ export async function getLatestBodyWeight(): Promise<number | null> {
 
 const SETTING_HYDRATION_GOAL_ML = 'hydrationGoalMl';
 const DEFAULT_HYDRATION_GOAL_ML = 2000;
+// Mirrors HYDRATION_MIN/HYDRATION_MAX in SettingsScreen.tsx (the hydration
+// stepper's own clamp bounds, #313). Keep these two in sync if either changes.
+const HYDRATION_GOAL_MIN_ML = 250;
+const HYDRATION_GOAL_MAX_ML = 6000;
 
 /**
  * Read the user's daily hydration goal in ml from app_state.
- * Defaults to 2000 ml when not yet set.
+ * Falls back to the 2000 ml default when not yet set, or when the stored
+ * value is empty/whitespace, non-numeric, or outside the Settings hydration
+ * stepper's own bounds (250-6000 ml) — see HYDRATION_GOAL_MIN_ML/MAX_ML.
  */
 export async function getHydrationGoal(): Promise<number> {
   const raw = await getSetting(SETTING_HYDRATION_GOAL_ML);
-  if (raw !== null && !isNaN(Number(raw))) return Number(raw);
+  if (raw === null || raw.trim() === '') return DEFAULT_HYDRATION_GOAL_ML;
+  const parsed = Number(raw);
+  if (
+    Number.isFinite(parsed) &&
+    parsed >= HYDRATION_GOAL_MIN_ML &&
+    parsed <= HYDRATION_GOAL_MAX_ML
+  ) {
+    return parsed;
+  }
   return DEFAULT_HYDRATION_GOAL_ML;
 }
 
