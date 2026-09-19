@@ -2093,18 +2093,36 @@ export async function dumpTable(
  *     already-deduped (post-v35) backup is unaffected: nothing matches the
  *     credit or delete, and the index is simply recreated.
  *
+ * A row's own keys are NOT trusted as column identifiers: unlike values,
+ * column names can't be parameterised, so a backup file (user-supplied,
+ * JSON.parse'd from a picked file) with a crafted row key would otherwise
+ * be interpolated straight into the INSERT's column list — a SQL injection
+ * path (#315). Each table's real columns are read once via
+ * `PRAGMA table_info(<table>)` (table name is already whitelisted against
+ * listUserTables() above) and every row is filtered down to only the keys
+ * that are real columns before the INSERT is built. A row left with zero
+ * known keys is skipped entirely — not inserted, not counted in
+ * rowsRestored. What got dropped is reported per table, both via
+ * console.warn (this module's existing best-effort logging style) and via
+ * the optional `skipped` field on the return value.
+ *
  * @param payloadTables  The `tables` object from the BackupPayload.
- * @returns A summary of what was restored.
+ * @returns A summary of what was restored, plus optionally what was skipped.
  */
 export async function restoreFromPayload(
   payloadTables: Record<string, Record<string, unknown>[]>
-): Promise<{ tablesRestored: number; rowsRestored: number }> {
+): Promise<{
+  tablesRestored: number;
+  rowsRestored: number;
+  skipped?: { table: string; columns: string[]; rows: number }[];
+}> {
   const db = getDatabase();
   const liveTableNames = await listUserTables();
   const liveTableSet = new Set(liveTableNames);
 
   let tablesRestored = 0;
   let rowsRestored = 0;
+  const skipped: { table: string; columns: string[]; rows: number }[] = [];
 
   await db.withTransactionAsync(async () => {
     // Drop first so a legacy backup's duplicate weekly_meal_plan rows (see
@@ -2119,10 +2137,30 @@ export async function restoreFromPayload(
       // Wipe existing rows
       await db.runAsync(`DELETE FROM ${tableName}`);
 
-      // Re-insert each row using that row's own column list
+      // Whitelist this table's real columns (table name is already
+      // whitelisted against liveTableSet above; PRAGMA table_info is safe
+      // to interpolate a live table name into).
+      const columnInfo = await db.getAllAsync<{ name: string }>(
+        `PRAGMA table_info(${tableName})`
+      );
+      const liveColumnSet = new Set(columnInfo.map((c) => c.name));
+
+      const droppedColumns = new Set<string>();
+      let skippedRowCount = 0;
+
+      // Re-insert each row using only the keys that are real columns
       for (const row of rows) {
-        const keys = Object.keys(row);
-        if (keys.length === 0) continue;
+        const allKeys = Object.keys(row);
+        const keys = allKeys.filter((k) => liveColumnSet.has(k));
+
+        for (const k of allKeys) {
+          if (!liveColumnSet.has(k)) droppedColumns.add(k);
+        }
+
+        if (keys.length === 0) {
+          if (allKeys.length > 0) skippedRowCount += 1;
+          continue;
+        }
 
         const columns = keys.join(', ');
         const placeholders = keys.map(() => '?').join(', ');
@@ -2133,6 +2171,18 @@ export async function restoreFromPayload(
           values as (string | number | null)[]
         );
         rowsRestored += 1;
+      }
+
+      if (droppedColumns.size > 0 || skippedRowCount > 0) {
+        const entry = {
+          table: tableName,
+          columns: Array.from(droppedColumns).sort(),
+          rows: skippedRowCount,
+        };
+        skipped.push(entry);
+        console.warn(
+          `[restoreFromPayload] Table "${tableName}": dropped unknown column(s) [${entry.columns.join(', ')}]; ${skippedRowCount} row(s) skipped entirely (no known columns).`
+        );
       }
 
       tablesRestored += 1;
@@ -2150,7 +2200,11 @@ export async function restoreFromPayload(
     await db.execAsync(v35.sql);
   });
 
-  return { tablesRestored, rowsRestored };
+  return {
+    tablesRestored,
+    rowsRestored,
+    ...(skipped.length > 0 ? { skipped } : {}),
+  };
 }
 
 // ── Nutrition goal settings (#274) ────────────────────────────────────────────
