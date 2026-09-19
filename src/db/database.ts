@@ -1969,6 +1969,22 @@ export async function dumpTable(
  *     in older/newer backups are silently skipped).
  *   - Per-row INSERT uses that row's own column list so new columns added by
  *     later migrations default-fill rather than error.
+ *   - A backup made before #303's migration v35 shipped can legitimately
+ *     contain duplicate (date, meal_type) rows in weekly_meal_plan (v35's
+ *     own unique index didn't exist yet when it was taken, and
+ *     validatePayload() accepts any backup at or below the current schema
+ *     version). v35's idx_weekly_meal_plan_date_meal_type index always
+ *     exists on the live DB by the time restore runs, so the second INSERT
+ *     of such a pair would throw — and since restore is one transaction,
+ *     that would roll back every table, not just this one. So: drop the
+ *     index before restoring, restore every table exactly as before, then
+ *     re-run v35's own SQL (looked up at runtime, never copied or
+ *     reimplemented, so it can't drift from the migration) against the
+ *     just-restored data — crediting any consumed loser's batch in the
+ *     just-restored meal_inventory, deleting losers per the same survivor
+ *     rule the migration uses, and recreating the index. A clean,
+ *     already-deduped (post-v35) backup is unaffected: nothing matches the
+ *     credit or delete, and the index is simply recreated.
  *
  * @param payloadTables  The `tables` object from the BackupPayload.
  * @returns A summary of what was restored.
@@ -1984,6 +2000,11 @@ export async function restoreFromPayload(
   let rowsRestored = 0;
 
   await db.withTransactionAsync(async () => {
+    // Drop first so a legacy backup's duplicate weekly_meal_plan rows (see
+    // above) can all be inserted below; recreated by v35's own SQL after
+    // the restore loop.
+    await db.execAsync('DROP INDEX IF EXISTS idx_weekly_meal_plan_date_meal_type');
+
     for (const [tableName, rows] of Object.entries(payloadTables)) {
       // Skip tables that don't exist in the current schema
       if (!liveTableSet.has(tableName)) continue;
@@ -2009,6 +2030,17 @@ export async function restoreFromPayload(
 
       tablesRestored += 1;
     }
+
+    // Re-apply v35's dedupe/credit/index-creation SQL against the
+    // just-restored data, as if v35 had run on it. Looked up at runtime
+    // rather than duplicated so this can never drift from the migration.
+    const v35 = MIGRATIONS.find((m) => m.version === 35);
+    if (!v35) {
+      throw new Error(
+        'restoreFromPayload: migration v35 not found in MIGRATIONS — cannot rebuild the weekly_meal_plan unique index after restore.'
+      );
+    }
+    await db.execAsync(v35.sql);
   });
 
   return { tablesRestored, rowsRestored };
