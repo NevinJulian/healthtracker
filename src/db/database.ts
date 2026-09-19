@@ -235,8 +235,17 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   for (const migration of MIGRATIONS) {
     if (applied.has(migration.version)) continue;
     console.log(`[DB] Applying migration v${migration.version}…`);
-    await db.execAsync(migration.sql);
-    await db.runAsync('INSERT INTO schema_version (version) VALUES (?)', [migration.version]);
+    // Each migration's SQL and its schema_version bookkeeping row commit or
+    // roll back together (#314). A per-migration transaction — not one
+    // transaction around the whole loop — so a kill/throw partway through
+    // this migration can't leave its schema/data change applied without a
+    // recorded version (which would re-apply it forever on relaunch, or
+    // double-apply a data migration like v35), while migrations that already
+    // committed on an earlier run stay committed.
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(migration.sql);
+      await db.runAsync('INSERT INTO schema_version (version) VALUES (?)', [migration.version]);
+    });
     console.log(`[DB] Migration v${migration.version} applied ✓`);
   }
 }
