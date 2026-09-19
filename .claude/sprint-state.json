@@ -153,7 +153,7 @@
     "D": {
       "branch": "sprint/lane-d-screens",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "waiting_for_lane_A",
+      "status": "in_progress",
       "order": [
         313,
         322,
@@ -171,7 +171,7 @@
         "323-clear",
         304
       ],
-      "current": "\"317 (after lane A merge)\"",
+      "current": 317,
       "done": [
         313,
         322,
@@ -204,7 +204,7 @@
     "F": {
       "branch": "sprint/lane-f-repo",
       "worktree": "C:/git/ht-lanes/lane-f",
-      "status": "waiting_for_lane_A",
+      "status": "merging",
       "order": [
         332,
         333,
@@ -213,13 +213,15 @@
       "waitsForLaneA": [
         335
       ],
-      "current": 335,
+      "current": null,
       "done": [
-        332
+        332,
+        335
       ],
       "parked": [
         333
-      ]
+      ],
+      "notes": "cleanup: no changes needed (a1c69f5). Merging bd598e3 into sprint/auto-fixes."
     },
     "G": {
       "branch": "sprint/lane-g-tests",
@@ -315,6 +317,14 @@
       "securityReview": "required-data-migration",
       "regressionProof": "assignMealToPlanRefund fails 8/10 at 606cdcb; v35 kill-safety via #314 runner; restoreLegacyDuplicates fails 2/3 at 92ddba3 with UNIQUE error, 3/3 at d74da00",
       "mergeSha": "c2fe262"
+    },
+    "304": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "D",
+      "status": "analysed_waiting",
+      "branch": "sprint/lane-d-screens",
+      "notes": "work order: useFocusEffect + AppState 'active' reload, runIdRef/mountedRef guard (#312/#329 pattern), keep #325 spinner-once; writers use per-render today (fresh after reload). Residual: screen focused across midnight with no bg/fg event -> no trigger (phone lock/unlock fires 'active'; note for human). Queued after #317 and #323 p2."
     },
     "305": {
       "roundTrips": 0,
@@ -492,6 +502,20 @@
       "stalledAt": "analysis",
       "parkReason": "Pragma alone makes deleteRecipe throw (no ON DELETE CASCADE declared); cascade needs table rebuild AND restoreFromPayload's alphabetical DELETE+INSERT order would cascade-wipe just-restored cooking_tasks/meal_inventory (silent data loss every restore; defer_foreign_keys doesn't stop cascades). cook_log has no FK and is intentional history. Human decides: destroy/keep/block history on recipe delete; refund consumed portions? Recommended after decision: explicit child deletes in deleteRecipe (option b) in one txn; no pragma until restore restructured."
     },
+    "317": {
+      "roundTrips": 0,
+      "commits": [
+        "905aa98",
+        "277fb67",
+        "33c4635",
+        "878eda5"
+      ],
+      "lane": "D",
+      "status": "in_test",
+      "branch": "sprint/lane-d-screens",
+      "migration": "v37",
+      "notes": "dev: logWorkoutSet atomic MAX+1 (setIndex param dropped), readers ORDER BY created_at,id, v37 renumber+UNIQUE index (append-only verified by orchestrator: schema.ts 46+/0-), restore replays [35,37]. 555/49."
+    },
     "318": {
       "roundTrips": 1,
       "commits": [
@@ -587,10 +611,10 @@
         "5cb4219"
       ],
       "lane": "D",
-      "status": "ready_partial",
+      "status": "part2_analysed_waiting",
       "branch": "sprint/lane-d-screens",
       "splitAcrossPhases": true,
-      "notes": "part 1 ready: tester APPROVE r0 + follow-up test-only commit 5cb4219 (separate file, focus-capable mock; mutation proof: removing ref reset -> field stuck blank; source byte-identical) accepted by orchestrator without re-test. Part 2 (persisted clear) after lane A merges.",
+      "notes": "part 1 ready. Part 2 work order: deleteSetting(key) + clearProfileHeightCm/clearProfileAge wrappers; blank+blur persists clear + local null; getUserProfile already null for absent key (#373 not implicated). Held until #317 dev done (same worktree).",
       "part1": "ready",
       "securityReview": "skipped-device-owner-input",
       "regressionProof": "5 new tests fail with 389c189 SettingsScreen.tsx, pass at 9b2445e (tester reproduced)"
@@ -681,14 +705,16 @@
       "roundTrips": 0,
       "commits": [
         "0c6b989",
-        "832cd45"
+        "832cd45",
+        "57651c2"
       ],
       "lane": "D",
       "status": "ready",
       "branch": "sprint/lane-d-screens",
       "notes": "tester APPROVE r0. Mixed-outcome double-tap orderings end at DB truth (throwaway probe). No stale aggregates on screen. Integration watch: lane D still has pre-#302 toggleMealConsumed until lane A merges (compatible signature).",
       "securityReview": "skipped-ui-write-unchanged",
-      "regressionProof": "4/4 fail with 2c05479 DashboardScreen.tsx, pass at 832cd45; test commit precedes fix (tester verified)"
+      "regressionProof": "4/4 fail with 2c05479 DashboardScreen.tsx, pass at 832cd45; test commit precedes fix (tester verified)",
+      "integrationFix": "done 57651c2 (1-line fixture, verified by orchestrator: typecheck clean, test-only diff; tests 547/48 per dev)"
     },
     "331": {
       "roundTrips": 0,
@@ -727,6 +753,24 @@
       "notes": "issue comment posted with exact commands and enumeration",
       "stalledAt": "analysis",
       "parkReason": "All acceptance criteria are local git state or a GitHub repo setting; nothing travels through the reviewable PR; sprint does not delete branches on the user's machine unreviewed. fix-recipe-detail-safe-area is NOT merged (1 commit, 7d7ba67) despite the issue grouping it as a leftover. Human needs: run -d sweep after sprint PR resolves, enable auto-delete head branches, decide on unmerged branches."
+    },
+    "335": {
+      "roundTrips": 1,
+      "commits": [
+        "4ddcd6e",
+        "e019e3c",
+        "290f9a8",
+        "88e5d15",
+        "5871f0c",
+        "87b764c",
+        "2346d16",
+        "bd598e3"
+      ],
+      "lane": "F",
+      "status": "ready",
+      "branch": "sprint/lane-f-repo",
+      "notes": "tester APPROVE r2 at bd598e3 (docs-only; security n/a). All ACs re-verified; 492/43.",
+      "securityReview": "skipped-docs-only"
     }
   },
   "foundDuringSprint": [
@@ -743,7 +787,8 @@
     370,
     371,
     372,
-    373
+    373,
+    374
   ],
   "log": [
     {
@@ -1943,6 +1988,98 @@
       "at": "2026-09-19T02:24:26Z",
       "event": "merged lane A into sprint/auto-fixes; integration green: typecheck pass, 492 tests / 43 suites",
       "sha": "c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:25:48Z",
+      "event": "merged integration into lane D (d7d05f8) and lane F (12c0aa2). Lane F green 492/43. Lane D tests 547/48 but TYPECHECK RED: #330 test fixture missing consumed_from_inventory_id (added by lane A #302) - semantic cross-lane conflict; sent back to #330 developer for fixture fix."
+    },
+    {
+      "at": "2026-09-19T02:25:48Z",
+      "event": "#330: integrationFix=pending: mealToggle test fixture missing consumed_from_inventory_id after lane A merge"
+    },
+    {
+      "at": "2026-09-19T02:26:10Z",
+      "event": "lane F: status=in_progress current=335"
+    },
+    {
+      "at": "2026-09-19T02:26:10Z",
+      "event": "#335: lane=F status=analysing branch=sprint/lane-f-repo notes=…"
+    },
+    {
+      "at": "2026-09-19T02:26:32Z",
+      "event": "lane D: status=in_progress current=317"
+    },
+    {
+      "at": "2026-09-19T02:26:32Z",
+      "event": "#317: lane=D status=analysing branch=sprint/lane-d-screens migration=v37 notes=…"
+    },
+    {
+      "at": "2026-09-19T02:26:50Z",
+      "event": "#330: integrationFix=done 57651c2 (1-line fixture, verified by orchestrator: typecheck clean, test-only diff; tests 547/48 per dev) commits=[\"0c6b989\",\"832cd45\",\"57651c2\"]"
+    },
+    {
+      "at": "2026-09-19T02:26:50Z",
+      "event": "lane D gates green after fixture fix 57651c2 (orchestrator re-ran typecheck: pass)"
+    },
+    {
+      "at": "2026-09-19T02:29:43Z",
+      "event": "#317: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-19T02:30:10Z",
+      "event": "#335: status=in_dev securityReview=skipped-docs-only notes=…"
+    },
+    {
+      "at": "2026-09-19T02:30:44Z",
+      "event": "#323: status=analysing_part2 notes=…"
+    },
+    {
+      "at": "2026-09-19T02:30:44Z",
+      "event": "#304: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-19T02:31:49Z",
+      "event": "#323: status=part2_analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-19T02:33:00Z",
+      "event": "#304: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-19T02:37:35Z",
+      "event": "#335: status=in_test commits=[\"4ddcd6e\",\"e019e3c\",\"290f9a8\",\"88e5d15\",\"5871f0c\",\"87b764c\",\"2346d16\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T02:39:01Z",
+      "event": "filed found-during-sprint #374"
+    },
+    {
+      "at": "2026-09-19T02:39:31Z",
+      "event": "#317: status=in_test commits=[\"905aa98\",\"277fb67\",\"33c4635\",\"878eda5\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T02:40:54Z",
+      "event": "#335: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-19T02:42:03Z",
+      "event": "#335: status=in_test commits+=bd598e3 notes=…"
+    },
+    {
+      "at": "2026-09-19T02:43:05Z",
+      "event": "#335: status=done notes=…"
+    },
+    {
+      "at": "2026-09-19T02:43:18Z",
+      "event": "#335: status=ready"
+    },
+    {
+      "at": "2026-09-19T02:43:18Z",
+      "event": "lane F: done+=335 current=null status=cleanup"
+    },
+    {
+      "at": "2026-09-19T02:46:31Z",
+      "event": "lane F: status=merging notes=…"
     }
   ]
 }
