@@ -86,7 +86,8 @@
       "current": 305,
       "done": [
         300,
-        301
+        301,
+        305
       ],
       "parked": []
     },
@@ -155,11 +156,12 @@
         "323-clear",
         304
       ],
-      "current": 324,
+      "current": 325,
       "done": [
         313,
         322,
-        323
+        323,
+        324
       ],
       "parked": []
     },
@@ -226,10 +228,15 @@
       "lane": "A",
       "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "tester APPROVE + security APPROVE. Security notes: getDailyLogsBetween has no shape check on keys (no live external caller - add when analytics wires it); schema.ts header still says 'pruned to +/-7 days' -> lane A cleanup / #335. AC #3/#4 DEFERRED: analytics switch to getDailyLogsBetween after lane C merges.",
+      "notes": "ALL 4 ACs met. Core: prune removed, getRollingWindow bounded, getDailyLogsBetween. Deferred step (04434c3): analytics logs <- getDailyLogsBetween(today-90,today); tester proved render-level (of 30 days) not just wiring; -7 mutation caught. USER-VISIBLE: Best/Current streaks + 30-day grid jump from ~8d to up to 90d of history. Security for deferred step skipped (range query already reviewed).",
       "deferredStep": "after lane C merges: merge integration into lane A, switch AnalyticsDashboardScreen loadData getRollingWindow() -> getDailyLogsBetween(today-90, today) (covers AC #3/#4)",
       "securityReview": "required-src-db",
-      "regressionProof": "retention test fails 66d3f58/passes e46607f; bounded-window test fails 313877b/passes 91e7932; range test fails 231d644/passes 0aad077 (tester reproduced all three; also TZ=UTC+14/UTC-12)"
+      "regressionProof": "retention test fails 66d3f58/passes e46607f; bounded-window test fails 313877b/passes 91e7932; range test fails 231d644/passes 0aad077 (tester reproduced all three; also TZ=UTC+14/UTC-12)",
+      "deferredStepStatus": "ready",
+      "deferredStepCommits": [
+        "b83a2fe",
+        "04434c3"
+      ]
     },
     "301": {
       "roundTrips": 2,
@@ -248,6 +255,15 @@
       "securityReview": "required-src-db",
       "regressionProof": "backfillGap fails at 0aad077 (3/6), backfillStartDateGuard fails at ab6ae5e (3/4) + calendar-overflow case sole failure w/o validator; tester generalised across 6 month/year boundaries x 3 TZs"
     },
+    "302": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "in_dev",
+      "branch": "sprint/lane-a-db",
+      "notes": "NOT a park: issue picks Option 1 (record source batch). Work order: migration v34 ADD COLUMN weekly_meal_plan.consumed_from_inventory_id (nullable); debit records inv.id; credit increments exactly that row (no INSERT fallback), clears pointer; transactional. Orchestrator: legacy rows ticked pre-upgrade (NULL pointer) -> untick gives NO credit (conservative: may under-count once, never creates inventory) - flag for human. deleteRecipe orphans = #316 (in scope later). Developer held until #300 deferred step finishes (same worktree). #303 depends on #302.",
+      "migration": "v34"
+    },
     "305": {
       "roundTrips": 0,
       "commits": [
@@ -256,9 +272,11 @@
         "52409f4"
       ],
       "lane": "A",
-      "status": "in_test",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "dev: pure-refactor shared row builder (all #300/#301 tests green at cdc5a90), _ensureDailyLogRow + _assertWrote on 6 writers; upsertExerciseCompleted ensure+assert only (no early return exists). 9/10 new tests fail pre-fix. 355 tests/23 suites."
+      "notes": "tester APPROVE + security APPROVE r0. Notes: ensure+update not in one transaction (pre-existing shared-connection interleave, widened window; theoretical); Onboarding no-catch unreachable (#365). Also found: upsertExerciseCompleted issue in #319 untouched.",
+      "securityReview": "required-src-db",
+      "regressionProof": "9/10 dailyLogUpserts tests fail with 382b62a database.ts, 10/10 at 52409f4; refactor proven byte-identical sync output (tester)"
     },
     "308": {
       "roundTrips": 0,
@@ -411,11 +429,24 @@
     },
     "324": {
       "roundTrips": 0,
+      "commits": [
+        "da96911",
+        "29c01c4"
+      ],
+      "lane": "D",
+      "status": "ready",
+      "branch": "sprint/lane-d-screens",
+      "notes": "tester APPROVE r0. Close animation already lost pre-fix (confirmed). On logCookedMeal failure modal stays open with no feedback (corrected #366 description). '1e1'/'0x5' paste-only quirk noted.",
+      "securityReview": "skipped-device-owner-input",
+      "regressionProof": "6/8 fail at 5cb4219; with only accessibilityLabel added to pre-fix code, 5/6 still fail behaviourally (tester)"
+    },
+    "325": {
+      "roundTrips": 0,
       "commits": [],
       "lane": "D",
       "status": "in_dev",
       "branch": "sprint/lane-d-screens",
-      "notes": "work order: Number()+comma, integer 1-50, Save disabled when invalid/empty, inline 'Enter 1-50 portions' for non-empty invalid, modal mounted only while visible (fresh state per open). Save path = logCookedMeal (additive; not lane A's #302/#303 writers). MeasurementsModal same pattern = #325 (lane D next), not new. Developer held: #323 follow-up test committing in same worktree."
+      "notes": "analyst: WORSE than issue - parseField maps blank AND invalid to null; logBodyMeasurement treats null as clear -> a typo silently ERASES a saved measurement. Fix: mount per open (drop reset effect keyed on latest identity), per-field Number()+comma+ranges, invalid key=undefined (skip) + inline error, blank=null (clear). Orchestrator: keep modal open whenever any field invalid (else error never seen)."
     },
     "327": {
       "roundTrips": 1,
@@ -471,7 +502,9 @@
     361,
     362,
     363,
-    364
+    364,
+    365,
+    366
   ],
   "log": [
     {
@@ -1057,6 +1090,79 @@
     {
       "at": "2026-09-18T23:55:41Z",
       "event": "#300 deferred-step prerequisite met: lane C merged; lane A may now merge integration and swap AnalyticsDashboardScreen's getRollingWindow() -> getDailyLogsBetween(today-90, today)"
+    },
+    {
+      "at": "2026-09-18T23:58:21Z",
+      "event": "filed found-during-sprint #365"
+    },
+    {
+      "at": "2026-09-18T23:58:21Z",
+      "event": "#305: status=in_security securityReview=required-src-db regressionProof=9/10 dailyLogUpserts tests fail with 382b62a database.ts, 10/10 at 52409f4; refactor proven byte-identical sync output (tester) notes=…"
+    },
+    {
+      "at": "2026-09-18T23:58:21Z",
+      "event": "WATCH: transient single test failure in src/db suite reported by #305 tester (not reproduced x3). sql.js tests derive 'today' from wall clock at multiple points; flake plausible across UTC midnight (23:57 UTC at time of report). Lane G #336 should pin system time in date-dependent tests."
+    },
+    {
+      "at": "2026-09-19T00:02:02Z",
+      "event": "#305: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T00:02:02Z",
+      "event": "lane A: done+=305"
+    },
+    {
+      "at": "2026-09-19T00:03:29Z",
+      "event": "filed found-during-sprint #366"
+    },
+    {
+      "at": "2026-09-19T00:03:29Z",
+      "event": "merged sprint/auto-fixes into lane A at a5a70cd (lanes B,C,E); lane A gates green 418/30 on rerun. First run exited 139 (jest segfault, no output) - 2nd occurrence tonight, concurrent jest in another worktree; WATCH: serialise gate runs if it recurs",
+      "sha": "a5a70cd"
+    },
+    {
+      "at": "2026-09-19T00:03:29Z",
+      "event": "#300: status=in_dev deferredStepStatus=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-19T00:03:29Z",
+      "event": "#324: status=in_test commits=[\"da96911\",\"29c01c4\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T00:03:49Z",
+      "event": "#302: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-19T00:06:03Z",
+      "event": "#302: status=analysed_waiting migration=v34 notes=…"
+    },
+    {
+      "at": "2026-09-19T00:07:25Z",
+      "event": "#324: status=ready securityReview=skipped-device-owner-input regressionProof=6/8 fail at 5cb4219; with only accessibilityLabel added to pre-fix code, 5/6 still fail behaviourally (tester) notes=…"
+    },
+    {
+      "at": "2026-09-19T00:07:25Z",
+      "event": "lane D: done+=324 current=325"
+    },
+    {
+      "at": "2026-09-19T00:07:25Z",
+      "event": "#325: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-19T00:11:32Z",
+      "event": "#300: deferredStepStatus=in_test deferredStepCommits=[\"b83a2fe\",\"04434c3\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T00:12:04Z",
+      "event": "#325: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-19T00:15:37Z",
+      "event": "#300: status=ready deferredStepStatus=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T00:15:37Z",
+      "event": "#302: status=in_dev"
     }
   ]
 }
