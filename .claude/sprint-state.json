@@ -84,12 +84,13 @@
         331,
         326
       ],
-      "current": 314,
+      "current": 303,
       "done": [
         300,
         301,
         305,
-        302
+        302,
+        314
       ],
       "parked": []
     },
@@ -139,7 +140,7 @@
     "D": {
       "branch": "sprint/lane-d-screens",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "in_progress",
+      "status": "waiting_for_lane_A",
       "order": [
         313,
         322,
@@ -157,14 +158,15 @@
         "323-clear",
         304
       ],
-      "current": 330,
+      "current": "\"317 (after lane A merge)\"",
       "done": [
         313,
         322,
         323,
         324,
         325,
-        329
+        329,
+        330
       ],
       "parked": [],
       "reassigned": [
@@ -284,13 +286,16 @@
         "c392949",
         "fc61361",
         "01e0175",
-        "ba049bc"
+        "ba049bc",
+        "92ddba3"
       ],
       "lane": "A",
-      "status": "blocked_on_314",
+      "status": "in_security",
       "branch": "sprint/lane-a-db",
-      "notes": "tester REJECT r1: v35 not kill-safe - runner writes schema_version after execAsync; credit UPDATE autocommits; kill before DELETE -> relaunch re-runs v35 -> double credit (repro: 2 instead of 1). Schema comment claiming idempotence is false. ORCHESTRATOR: fix systemically via #314 (atomic runner) moved up; BEGIN inside v35 would brick upgrades once #314 wraps migrations in a txn. Round 2 after #314: correct comment + kill-safety test under new runner. Fallback if #314 parks: temp-trigger atomic DELETE.",
-      "migration": "v35"
+      "notes": "tester REJECT r1 (kill double-credit), APPROVE r2 after #314 atomic runner + comment fix 92ddba3. roundTrips=1.",
+      "migration": "v35",
+      "securityReview": "required-data-migration",
+      "regressionProof": "assignMealToPlanRefund fails 8/10 at 606cdcb; kill-safety via #314 runner (tester's own independent repro: 0 after kill, 1 after relaunch)"
     },
     "305": {
       "roundTrips": 0,
@@ -397,12 +402,17 @@
     },
     "314": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "778dcbd",
+        "a5f9276"
+      ],
       "lane": "A",
-      "status": "in_dev",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "work order: wrap each migration's execAsync + schema_version insert in withTransactionAsync (per migration). No v1-v35 statement incompatible with txn. Test includes v35 kill-after-credit -> rollback -> relaunch applies once (unblocks #303). PARTIAL: App.tsx dead-end error screen (unowned, issue defers to Option 3) + recovery of already-bricked devices out of scope -> Refs #314.",
-      "partial": true
+      "notes": "tester APPROVE + security APPROVE r0. Security: only DELETE in v1-v35 is v35 dedupe; schema_version excluded from restore; no nested txn; getDatabase throws until migrations done. PARTIAL: App.tsx dead-end screen + already-bricked devices out of scope -> Refs #314.",
+      "partial": true,
+      "securityReview": "required-migration-runner",
+      "regressionProof": "throwing-migration + v35-kill tests fail with ba049bc database.ts, 4/4 pass at a5f9276 (tester reproduced)"
     },
     "318": {
       "roundTrips": 1,
@@ -421,6 +431,14 @@
       "securityReview": "required-src-api",
       "regressionProof": "mealdb tests fail at 1beee5e (settled=false; fetch x2) pass at def1e4f; backoff-abort test fails at def1e4f pass at 8f867a5 (tester reproduced both)",
       "mergeSha": 605533
+    },
+    "319": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "analysing",
+      "branch": "sprint/lane-a-db",
+      "notes": "analysis pipelined with #303 security (read-only)"
     },
     "322": {
       "roundTrips": 0,
@@ -542,10 +560,16 @@
     },
     "330": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "0c6b989",
+        "832cd45"
+      ],
       "lane": "D",
-      "status": "analysing",
-      "branch": "sprint/lane-d-screens"
+      "status": "ready",
+      "branch": "sprint/lane-d-screens",
+      "notes": "tester APPROVE r0. Mixed-outcome double-tap orderings end at DB truth (throwaway probe). No stale aggregates on screen. Integration watch: lane D still has pre-#302 toggleMealConsumed until lane A merges (compatible signature).",
+      "securityReview": "skipped-ui-write-unchanged",
+      "regressionProof": "4/4 fail with 2c05479 DashboardScreen.tsx, pass at 832cd45; test commit precedes fix (tester verified)"
     },
     "332": {
       "roundTrips": 0,
@@ -1355,6 +1379,58 @@
     {
       "at": "2026-09-19T00:48:22Z",
       "event": "#330: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-19T00:51:03Z",
+      "event": "#330: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-19T00:53:13Z",
+      "event": "#314: status=in_test commits=[\"778dcbd\",\"a5f9276\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T00:56:49Z",
+      "event": "#314: status=in_security securityReview=required-migration-runner regressionProof=throwing-migration + v35-kill tests fail with ba049bc database.ts, 4/4 pass at a5f9276 (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-19T00:56:49Z",
+      "event": "#303: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-19T00:57:31Z",
+      "event": "#330: status=in_test commits=[\"0c6b989\",\"832cd45\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T00:58:18Z",
+      "event": "#303: status=in_test commits=[\"4c8662d\",\"854787f\",\"c392949\",\"fc61361\",\"01e0175\",\"ba049bc\",\"92ddba3\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T00:58:28Z",
+      "event": "#314: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T00:58:28Z",
+      "event": "lane A: done+=314 current=303"
+    },
+    {
+      "at": "2026-09-19T01:01:03Z",
+      "event": "#303: status=in_security securityReview=required-data-migration regressionProof=assignMealToPlanRefund fails 8/10 at 606cdcb; kill-safety via #314 runner (tester's own independent repro: 0 after kill, 1 after relaunch) notes=…"
+    },
+    {
+      "at": "2026-09-19T01:01:03Z",
+      "event": "#319: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-19T01:02:49Z",
+      "event": "#330: status=ready securityReview=skipped-ui-write-unchanged regressionProof=4/4 fail with 2c05479 DashboardScreen.tsx, pass at 832cd45; test commit precedes fix (tester verified) notes=…"
+    },
+    {
+      "at": "2026-09-19T01:02:49Z",
+      "event": "lane D: done+=330 status=waiting_for_lane_A current=\"317 (after lane A merge)\""
+    },
+    {
+      "at": "2026-09-19T01:02:49Z",
+      "event": "lane D idle: all independent issues done (#313,#322-D,#323-p1,#324,#325,#329,#330); #317, #323-clear, #304 wait for lane A merge (migration numbering + SPRINT.md ordering)"
     }
   ]
 }
