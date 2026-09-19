@@ -6,9 +6,10 @@ This folder guarantees aesthetic uniformity across all screens and components wi
 
 The definitive source of truth for styles. Always use properties defined here over ad-hoc numeric offsets or hex color codes:
 
-- **Colors**: Standardized palette (`Colors.background`, `Colors.surface`, `Colors.primary`).
+- **Colors**: Standardized palette (`Colors.background`, `Colors.surface`, `Colors.accent`).
 - **Typography**: Shared text sizes and font weights.
 - **Spacing**: Predictable layout increments (e.g. `Spacing.sm` or `Spacing.xl`).
+- **Radius**: Shared corner radii (e.g. `Radius.md` or `Radius.full`).
 
 ## Usage
 Instead of:
