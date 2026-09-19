@@ -508,10 +508,11 @@ export default function DashboardScreen() {
     reps: number,
     weightKg: number
   ) => {
-    const existingSets = workoutSets[exerciseName] ?? [];
-    const setIndex = existingSets.length;
     try {
-      await logWorkoutSet(today, exerciseName, { setIndex, reps, weightKg });
+      // set_index is assigned atomically by logWorkoutSet itself (#317) —
+      // no longer computed from the current in-memory array length, which
+      // collided with a surviving set after deleting one mid-session.
+      await logWorkoutSet(today, exerciseName, { reps, weightKg });
       // Optimistically refresh from DB so IDs are correct
       const updated = await getWorkoutSetsForDay(today);
       const grouped: Record<string, WorkoutSet[]> = {};

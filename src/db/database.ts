@@ -2595,27 +2595,40 @@ export interface WorkoutSet {
 /**
  * Insert one logged set for an exercise on `date`.
  *
+ * `set_index` is NOT caller-supplied (#317): it's assigned atomically as one
+ * past the current max set_index for this (date, exercise) pair, via a
+ * single INSERT…SELECT rather than a separate read-then-write. The previous
+ * design took a caller-computed index (DashboardScreen used
+ * `existingSets.length`), which collided with a surviving row's set_index
+ * whenever a set was deleted before the next one was logged. v37 (schema.ts)
+ * enforces UNIQUE(date, exercise, set_index) at the schema level, so any
+ * remaining race would throw here rather than silently duplicate.
+ *
  * @param date      - YYYY-MM-DD date key (use toISODate() / localDateKey()).
  * @param exercise  - Exercise name (matches Exercise.name from daily_log.exercises).
- * @param set       - Set details: index within the session, reps performed, weight in kg.
+ * @param set       - Set details: reps performed, weight in kg.
  */
 export async function logWorkoutSet(
   date: string,
   exercise: string,
-  set: { setIndex: number; reps: number; weightKg: number }
+  set: { reps: number; weightKg: number }
 ): Promise<void> {
   const db = getDatabase();
   const createdAt = new Date().toISOString();
   await db.runAsync(
     `INSERT INTO workout_set_log (date, exercise, set_index, reps, weight_kg, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [date, exercise, set.setIndex, set.reps, set.weightKg, createdAt]
+     SELECT ?, ?, COALESCE(MAX(set_index), -1) + 1, ?, ?, ?
+     FROM workout_set_log WHERE date = ? AND exercise = ?`,
+    [date, exercise, set.reps, set.weightKg, createdAt, date, exercise]
   );
 }
 
 /**
- * Return all sets logged for `date`, ordered by exercise name then set_index.
- * Used on the Dashboard to display already-logged sets for today's session.
+ * Return all sets logged for `date`, ordered by exercise name then by
+ * logging order (created_at, then id to break exact-timestamp ties).
+ * set_index (#317) is a uniqueness key, not an ordering key — it isn't used
+ * here. Used on the Dashboard to display already-logged sets for today's
+ * session.
  *
  * @param date - YYYY-MM-DD date key.
  */
@@ -2623,15 +2636,16 @@ export async function getWorkoutSetsForDay(date: string): Promise<WorkoutSet[]> 
   const db = getDatabase();
   return db.getAllAsync<WorkoutSet>(
     `SELECT * FROM workout_set_log WHERE date = ?
-     ORDER BY exercise ASC, set_index ASC`,
+     ORDER BY exercise ASC, created_at ASC, id ASC`,
     [date]
   );
 }
 
 /**
  * Return all sets logged for `exercise` since `sinceDateKey` (inclusive),
- * ordered chronologically (date ASC, set_index ASC). Used to build progression
- * charts and compute PRs.
+ * ordered chronologically (date ASC, created_at ASC, id ASC — #317: set_index
+ * is a uniqueness key, not an ordering key). Used to build progression charts
+ * and compute PRs.
  *
  * @param exercise      - Exercise name.
  * @param sinceDateKey  - Optional earliest date (YYYY-MM-DD). Defaults to all history.
@@ -2644,13 +2658,13 @@ export async function getWorkoutHistory(
   if (sinceDateKey) {
     return db.getAllAsync<WorkoutSet>(
       `SELECT * FROM workout_set_log WHERE exercise = ? AND date >= ?
-       ORDER BY date ASC, set_index ASC`,
+       ORDER BY date ASC, created_at ASC, id ASC`,
       [exercise, sinceDateKey]
     );
   }
   return db.getAllAsync<WorkoutSet>(
     `SELECT * FROM workout_set_log WHERE exercise = ?
-     ORDER BY date ASC, set_index ASC`,
+     ORDER BY date ASC, created_at ASC, id ASC`,
     [exercise]
   );
 }
