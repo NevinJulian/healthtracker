@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,9 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  AppState,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import {
@@ -279,6 +281,17 @@ export default function DashboardScreen() {
   const [todaysMeals, setTodaysMeals] = useState<MealPlanWithRecipe[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Mirrors `todaysMeals` synchronously (#330). handleToggleMeal reads this
+  // instead of a render-closure value: React applies setState updates on its
+  // own schedule, so a second tap issued before the first has re-rendered
+  // must not derive its "new" value from a stale render (the #313
+  // stale-closure bug). This assignment runs every render, picking up any
+  // DB-truth reload from loadToday(); handleToggleMeal also writes it
+  // eagerly and synchronously so a same-tick second tap sees the first
+  // tap's optimistic result immediately.
+  const todaysMealsRef = useRef<MealPlanWithRecipe[]>(todaysMeals);
+  todaysMealsRef.current = todaysMeals;
+
   // New features state
   const [weightInput, setWeightInput] = useState('');
   const [isExtraModalVisible, setExtraModalVisible] = useState(false);
@@ -299,18 +312,71 @@ export default function DashboardScreen() {
 
   const today = toISODate();
 
+  // Forces a re-render with a fresh `today` whenever a focus/AppState
+  // trigger fires, independent of whether the reload that follows below
+  // succeeds or fails (#304 round 2). A failed `loadToday` makes no state
+  // change of its own (`setLoading(false)` is a same-value no-op on a
+  // non-first load), so without this nothing would re-render, and every
+  // handler below would keep closing over yesterday's `today` until some
+  // later trigger happened to succeed -- exactly the silent wrong-day write
+  // #304 exists to kill. `today` itself stays the single per-render
+  // `toISODate()` above; this piece of state is never read, only written,
+  // purely to make React re-render. Because `useState`'s setter bails out
+  // on a same-value update, an ordinary same-day focus/active event costs
+  // no extra render.
+  const [, setDayKeyTick] = useState(() => toISODate());
+
+  // Tracks whether the screen has completed its first load. Several handlers
+  // below call loadToday() again as an error-recovery reload (e.g.
+  // handleToggle's catch). Only the very first load should show the
+  // full-screen spinner (`if (loading) return <ActivityIndicator />` unmounts
+  // this whole subtree, including any open modal) -- a background reload
+  // must not do that, or it silently wipes out in-progress state in any
+  // mounted child, such as text being typed in the measurements modal (#325).
+  const hasLoadedOnceRef = useRef(false);
+
+  // mountedRef reflects the component's real lifetime; it is cleared only on
+  // true unmount below -- NOT on blur, which also runs the focus effect's
+  // cleanup (the #312 lesson: don't conflate the two).
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // runIdRef guards against overlapping loads (the #312/#329 pattern, also
+  // used by MealPrepScreen): bumped at the start of every loadToday() call,
+  // and again when the focus effect's cleanup runs (i.e. on blur). A load
+  // only commits its results if it is still the current run when it
+  // resolves, so a stale in-flight load -- whether superseded by a newer
+  // load or abandoned via blur -- can never clobber newer state.
+  const runIdRef = useRef(0);
+
   const loadToday = useCallback(async () => {
-    setLoading(true);
+    const runId = ++runIdRef.current;
+    // Read the date at call time, not the outer per-render `today`
+    // (#304 round 2): a focus/AppState trigger's own reload must land on
+    // whatever day it is the moment it actually runs, without depending on
+    // react-navigation re-invoking `useFocusEffect`'s callback when its
+    // identity changes (it does in the real library, but this screen's own
+    // tests deliberately don't model that, and correctness shouldn't lean
+    // on it either).
+    const date = toISODate();
+    if (!hasLoadedOnceRef.current) {
+      setLoading(true);
+    }
     try {
       await syncRollingSchedule();
       const [data, meals, water, goal, measurements, setsToday] = await Promise.all([
-        getLogByDate(today),
-        getTodaysMealsWithRecipe(today),
-        getWaterForDay(today),
+        getLogByDate(date),
+        getTodaysMealsWithRecipe(date),
+        getWaterForDay(date),
         getHydrationGoal(),
         getLatestMeasurements(),
-        getWorkoutSetsForDay(today),
+        getWorkoutSetsForDay(date),
       ]);
+      if (!mountedRef.current || runIdRef.current !== runId) return;
 
       setEntry(data);
       setTodaysMeals(meals);
@@ -328,15 +394,55 @@ export default function DashboardScreen() {
         grouped[s.exercise].push(s);
       }
       setWorkoutSets(grouped);
+      hasLoadedOnceRef.current = true;
     } catch (err) {
+      if (!mountedRef.current || runIdRef.current !== runId) return;
       console.error('DashboardScreen: loadToday error', err);
     } finally {
-      setLoading(false);
+      if (mountedRef.current && runIdRef.current === runId) {
+        setLoading(false);
+      }
     }
-  }, [today]);
+    // No `today`/date dependency: the date is read fresh at call time above,
+    // so this callback's identity is stable across renders.
+  }, []);
 
+  // Reload on every focus (navigating back to Dashboard) -- this REPLACES
+  // the old mount-only `useEffect(() => { loadToday(); }, [loadToday])`
+  // rather than adding a second load: `useFocusEffect` also fires on the
+  // screen's first focus, so keeping both would double-load on mount (#304).
+  useFocusEffect(
+    useCallback(() => {
+      // Force a fresh `today` on this render pass regardless of how the
+      // reload below turns out (#304 round 2 -- see setDayKeyTick above).
+      setDayKeyTick(toISODate());
+      loadToday();
+      return () => {
+        runIdRef.current++;
+      };
+    }, [loadToday])
+  );
+
+  // Reload when the app comes back to the foreground. The drawer keeps this
+  // screen mounted indefinitely, so a focus effect alone misses the
+  // overnight case: leaving the app open (or backgrounded) across local
+  // midnight and returning never re-focuses Dashboard, so `today` and every
+  // writer that closes over it silently stay on yesterday's date (#304).
+  // Note: a screen that stays focused AND foregrounded across midnight still
+  // gets no trigger -- that residual gap is accepted rather than adding a
+  // timer.
   useEffect(() => {
-    loadToday();
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        // Force a fresh `today` regardless of how the reload turns out
+        // (#304 round 2 -- see setDayKeyTick above).
+        setDayKeyTick(toISODate());
+        loadToday();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
   }, [loadToday]);
 
   const handleToggle = async (
@@ -373,9 +479,21 @@ export default function DashboardScreen() {
   };
 
   const handleSaveWeight = async () => {
-    const val = parseFloat(weightInput);
+    const trimmed = weightInput.trim();
+    if (trimmed === '') {
+      Alert.alert('Invalid Weight', 'Enter a weight before saving');
+      return;
+    }
+    // A comma decimal separator ("78,4") is plausible input here: the
+    // numeric/decimal-pad keyboard's separator key is locale-aware, and
+    // fr-CH / it-CH (both official Swiss locales) use a comma.
+    const val = Number(trimmed.replace(',', '.'));
     if (isNaN(val)) {
-      Alert.alert('Invalid Weight', 'Please enter a valid number.');
+      Alert.alert('Invalid Weight', 'Please enter a valid number');
+      return;
+    }
+    if (val < 20 || val > 400) {
+      Alert.alert('Invalid Weight', 'Enter a weight between 20 and 400 kg');
       return;
     }
     try {
@@ -420,12 +538,20 @@ export default function DashboardScreen() {
     }
   };
 
-  const handleToggleMeal = async (planId: number, currentVal: boolean) => {
+  const handleToggleMeal = async (planId: number) => {
+    const meal = todaysMealsRef.current.find((m) => m.id === planId);
+    if (!meal) return;
+    const newValue = !meal.is_consumed;
+    const next = todaysMealsRef.current.map((m) =>
+      m.id === planId ? { ...m, is_consumed: newValue } : m
+    );
+    todaysMealsRef.current = next;
+    setTodaysMeals(next);
     try {
-      await toggleMealConsumed(planId, !currentVal);
-      loadToday();
+      await toggleMealConsumed(planId, newValue);
     } catch (err) {
       console.error('toggleMeal error', err);
+      loadToday();
     }
   };
 
@@ -465,10 +591,11 @@ export default function DashboardScreen() {
     reps: number,
     weightKg: number
   ) => {
-    const existingSets = workoutSets[exerciseName] ?? [];
-    const setIndex = existingSets.length;
     try {
-      await logWorkoutSet(today, exerciseName, { setIndex, reps, weightKg });
+      // set_index is assigned atomically by logWorkoutSet itself (#317) —
+      // no longer computed from the current in-memory array length, which
+      // collided with a surviving set after deleting one mid-session.
+      await logWorkoutSet(today, exerciseName, { reps, weightKg });
       // Optimistically refresh from DB so IDs are correct
       const updated = await getWorkoutSetsForDay(today);
       const grouped: Record<string, WorkoutSet[]> = {};
@@ -663,7 +790,7 @@ export default function DashboardScreen() {
                 leading={
                   <CircleCheck
                     checked={meal.is_consumed}
-                    onToggle={() => handleToggleMeal(meal.id, meal.is_consumed)}
+                    onToggle={() => handleToggleMeal(meal.id)}
                     accessibilityLabel={`Mark ${meal.recipe?.title ?? meal.meal_type} ${meal.is_consumed ? 'not consumed' : 'consumed'}`}
                   />
                 }
@@ -702,7 +829,7 @@ export default function DashboardScreen() {
                   keyboardType="numeric"
                   value={weightInput}
                   onChangeText={setWeightInput}
-                  onBlur={handleSaveWeight}
+                  onSubmitEditing={handleSaveWeight}
                   returnKeyType="done"
                 />
               </View>
@@ -885,12 +1012,14 @@ export default function DashboardScreen() {
       />
 
       {/* ── Body Measurements Modal ──────────────────────────────────────── */}
-      <MeasurementsModal
-        visible={measurementsModalVisible}
-        onClose={() => setMeasurementsModalVisible(false)}
-        onSave={handleSaveMeasurements}
-        latest={latestMeasurements}
-      />
+      {measurementsModalVisible && (
+        <MeasurementsModal
+          visible={measurementsModalVisible}
+          onClose={() => setMeasurementsModalVisible(false)}
+          onSave={handleSaveMeasurements}
+          latest={latestMeasurements}
+        />
+      )}
 
       {/* ── Set Logger Modal (#285) ──────────────────────────────────────── */}
       {activeSetLogger !== null && (
@@ -907,6 +1036,42 @@ export default function DashboardScreen() {
 }
 
 // ─── Body Measurements Modal ──────────────────────────────────────────────────
+
+/** Valid cm range per measurement field (#325). */
+const MEASUREMENT_RANGES = {
+  waist_cm: [40, 200],
+  chest_cm: [40, 200],
+  hips_cm: [40, 200],
+  thigh_cm: [20, 100],
+  arm_cm: [15, 70],
+} as const;
+
+type MeasurementKey = keyof typeof MEASUREMENT_RANGES;
+
+/**
+ * Parse one measurement field's raw text.
+ *
+ * - Blank (after trimming) means "clear this field" -> `value: null`.
+ * - A number within range -> `value` holds the parsed number.
+ * - Non-numeric or out of range -> `value: undefined` (skip; leave the
+ *   stored value untouched) and `isError: true` so the caller can show an
+ *   inline error without losing what the user typed.
+ */
+function parseMeasurementField(
+  raw: string,
+  key: MeasurementKey
+): { value: number | null | undefined; isError: boolean } {
+  const trimmed = raw.trim();
+  if (trimmed === '') {
+    return { value: null, isError: false };
+  }
+  const [min, max] = MEASUREMENT_RANGES[key];
+  const parsed = Number(trimmed.replace(',', '.'));
+  if (Number.isNaN(parsed) || parsed < min || parsed > max) {
+    return { value: undefined, isError: true };
+  }
+  return { value: parsed, isError: false };
+}
 
 function MeasurementsModal({
   visible,
@@ -925,38 +1090,64 @@ function MeasurementsModal({
   }) => Promise<void>;
   latest: BodyMeasurement | null;
 }) {
-  const [waist, setWaist] = useState('');
-  const [chest, setChest] = useState('');
-  const [hips, setHips]   = useState('');
-  const [thigh, setThigh] = useState('');
-  const [arm, setArm]     = useState('');
+  // The parent now mounts this component only while `visible` (#325), so
+  // this state is fresh on every open -- each field initialises once from
+  // `latest` at mount and no reset effect is needed. Previously this used a
+  // `useEffect(…, [visible, latest])` that re-ran whenever `latest` changed
+  // identity (e.g. on every loadToday() reload), clobbering in-progress
+  // typing.
+  const [waist, setWaist] = useState(() => (latest?.waist_cm != null ? String(latest.waist_cm) : ''));
+  const [chest, setChest] = useState(() => (latest?.chest_cm != null ? String(latest.chest_cm) : ''));
+  const [hips, setHips] = useState(() => (latest?.hips_cm != null ? String(latest.hips_cm) : ''));
+  const [thigh, setThigh] = useState(() => (latest?.thigh_cm != null ? String(latest.thigh_cm) : ''));
+  const [arm, setArm] = useState(() => (latest?.arm_cm != null ? String(latest.arm_cm) : ''));
 
-  // Pre-fill from latest measurements when the modal opens
-  useEffect(() => {
-    if (visible) {
-      setWaist(latest?.waist_cm != null ? String(latest.waist_cm) : '');
-      setChest(latest?.chest_cm != null ? String(latest.chest_cm) : '');
-      setHips(latest?.hips_cm != null  ? String(latest.hips_cm)  : '');
-      setThigh(latest?.thigh_cm != null ? String(latest.thigh_cm) : '');
-      setArm(latest?.arm_cm != null    ? String(latest.arm_cm)   : '');
-    }
-  }, [visible, latest]);
+  const waistResult = parseMeasurementField(waist, 'waist_cm');
+  const chestResult = parseMeasurementField(chest, 'chest_cm');
+  const hipsResult = parseMeasurementField(hips, 'hips_cm');
+  const thighResult = parseMeasurementField(thigh, 'thigh_cm');
+  const armResult = parseMeasurementField(arm, 'arm_cm');
 
-  const parseField = (s: string): number | null => {
-    const v = parseFloat(s);
-    return isNaN(v) || v <= 0 ? null : v;
+  const fieldResults = {
+    waist_cm: waistResult,
+    chest_cm: chestResult,
+    hips_cm: hipsResult,
+    thigh_cm: thighResult,
+    arm_cm: armResult,
   };
 
   const handleSave = async () => {
-    await onSave({
-      waist_cm: parseField(waist),
-      chest_cm: parseField(chest),
-      hips_cm:  parseField(hips),
-      thigh_cm: parseField(thigh),
-      arm_cm:   parseField(arm),
-    });
-    onClose();
+    const results = Object.values(fieldResults);
+    const hasError = results.some((r) => r.isError);
+    const hasValidField = results.some((r) => !r.isError);
+
+    // Save whatever is valid -- invalid keys are `undefined` (skip), so
+    // logBodyMeasurement leaves those columns untouched rather than erasing
+    // them with a typo (#325).
+    if (hasValidField) {
+      await onSave({
+        waist_cm: waistResult.value,
+        chest_cm: chestResult.value,
+        hips_cm: hipsResult.value,
+        thigh_cm: thighResult.value,
+        arm_cm: armResult.value,
+      });
+    }
+
+    // Only close once every field was valid -- otherwise the user would
+    // never see the inline error, and the typo would vanish silently.
+    if (!hasError) {
+      onClose();
+    }
   };
+
+  const fields = [
+    { key: 'waist_cm' as const, label: 'Waist', value: waist, onChange: setWaist, result: waistResult, testID: 'measurement-waist-input' },
+    { key: 'chest_cm' as const, label: 'Chest', value: chest, onChange: setChest, result: chestResult, testID: 'measurement-chest-input' },
+    { key: 'hips_cm' as const, label: 'Hips', value: hips, onChange: setHips, result: hipsResult, testID: 'measurement-hips-input' },
+    { key: 'thigh_cm' as const, label: 'Thigh', value: thigh, onChange: setThigh, result: thighResult, testID: 'measurement-thigh-input' },
+    { key: 'arm_cm' as const, label: 'Arm', value: arm, onChange: setArm, result: armResult, testID: 'measurement-arm-input' },
+  ];
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -967,30 +1158,31 @@ function MeasurementsModal({
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>Body Measurements</Text>
-          <Text style={styles.modalSubtitle}>Enter values in cm — leave blank to skip</Text>
+          <Text style={styles.modalSubtitle}>Enter values in cm — a blank field clears it</Text>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
-            {(
-              [
-                { label: 'Waist', value: waist, onChange: setWaist },
-                { label: 'Chest', value: chest, onChange: setChest },
-                { label: 'Hips',  value: hips,  onChange: setHips  },
-                { label: 'Thigh', value: thigh, onChange: setThigh },
-                { label: 'Arm',   value: arm,   onChange: setArm   },
-              ] as const
-            ).map((field) => (
-              <View key={field.label} style={styles.measureField}>
-                <Text style={styles.measureFieldLabel}>{field.label} (cm)</Text>
-                <TextInput
-                  style={styles.measureFieldInput}
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  keyboardType="decimal-pad"
-                  placeholder="—"
-                  placeholderTextColor={Colors.textMuted}
-                  returnKeyType="next"
-                />
-              </View>
-            ))}
+            {fields.map((field) => {
+              const [min, max] = MEASUREMENT_RANGES[field.key];
+              return (
+                <View key={field.key} style={styles.measureField}>
+                  <Text style={styles.measureFieldLabel}>{field.label} (cm)</Text>
+                  <TextInput
+                    testID={field.testID}
+                    style={styles.measureFieldInput}
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    keyboardType="decimal-pad"
+                    placeholder="—"
+                    placeholderTextColor={Colors.textMuted}
+                    returnKeyType="next"
+                  />
+                  {field.result.isError && (
+                    <Text style={styles.measureFieldError}>
+                      Enter {min}–{max} cm
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
           </ScrollView>
           <View style={styles.modalFooter}>
             <Button title="Cancel" variant="ghost" onPress={onClose} />
@@ -1591,6 +1783,12 @@ const styles = StyleSheet.create({
     fontFamily: Typography.body,
     fontSize: Typography.sizes.md,
     color: Colors.textPrimary,
+  },
+  measureFieldError: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.danger,
+    marginTop: Spacing.xs,
   },
 
   // ── Exercise row trailing area ─────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -86,6 +86,60 @@ export default function MealPrepScreen() {
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
 
+  // Tracks whether the screen has completed its first load. Post-action
+  // refreshes (handleLogCookedMeal, handleAssignMeal, handleToggleConsumed)
+  // and every re-focus call loadData() again — only the very first load
+  // should show the full-screen "Loading meals…" state; a background
+  // reload must update the list in place instead of blanking it out (#329,
+  // same pattern as DashboardScreen's hasLoadedOnceRef from #325).
+  const hasLoadedOnceRef = useRef(false);
+
+  // mountedRef reflects the component's real lifetime; it is cleared only
+  // on true unmount below — NOT on blur, which also runs the focus
+  // effect's cleanup (the #312 lesson: don't conflate the two).
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // runIdRef guards against overlapping loads (the #312 pattern): it is
+  // bumped at the start of every loadData() call, and again when the focus
+  // effect's cleanup runs (i.e. on blur). A load only commits its results
+  // if it is still the current run when it resolves, so a stale in-flight
+  // load — whether superseded by a newer load or abandoned via blur — can
+  // never clobber newer state. Post-action refreshes (handleLogCookedMeal,
+  // handleAssignMeal, handleToggleConsumed) naturally win this way too,
+  // since each starts a new, higher run id.
+  const runIdRef = useRef(0);
+
+  const loadData = useCallback(async () => {
+    const runId = ++runIdRef.current;
+    if (!hasLoadedOnceRef.current) {
+      setLoading(true);
+    }
+    try {
+      const [inv, plan, allRecipes] = await Promise.all([
+        getMealInventory(),
+        getWeeklyMealPlan(),
+        getRecipes(),
+      ]);
+      if (!mountedRef.current || runIdRef.current !== runId) return;
+      setInventory(inv);
+      setWeeklyPlan(plan);
+      setRecipes(allRecipes);
+      hasLoadedOnceRef.current = true;
+    } catch (err) {
+      if (!mountedRef.current || runIdRef.current !== runId) return;
+      logDbError(err);
+    } finally {
+      if (mountedRef.current && runIdRef.current === runId) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -93,29 +147,18 @@ export default function MealPrepScreen() {
       checkAndNotifyEmptyInventory().catch((err) =>
         console.warn('[MealPrepScreen] checkAndNotifyEmptyInventory failed:', err)
       );
-    }, [])
+      return () => {
+        runIdRef.current++;
+      };
+    }, [loadData])
   );
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const inv = await getMealInventory();
-      const plan = await getWeeklyMealPlan();
-      const allRecipes = await getRecipes();
-      setInventory(inv);
-      setWeeklyPlan(plan);
-      setRecipes(allRecipes);
-    } catch (err) {
-      logDbError(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // ─── Actions ─────────────────────────────────────────────────
 
   const handleLogCookedMeal = async (recipe_id: string, portions: number) => {
-    if (portions <= 0) return;
+    // Backstop — the modal's own Save button is disabled for anything
+    // outside this range, but never trust the caller alone (#324).
+    if (!Number.isInteger(portions) || portions < 1 || portions > 50) return;
     try {
       await logCookedMeal(recipe_id, portions);
       // Inventory just grew — clear the empty-episode debounce flag so the
@@ -352,12 +395,14 @@ export default function MealPrepScreen() {
         </View>
       ) : activeTab === 'weekly' ? renderWeeklyTab() : renderInventoryTab()}
 
-      <LogMealModal
-        visible={logModalVisible}
-        onClose={() => setLogModalVisible(false)}
-        recipes={recipes}
-        onSave={handleLogCookedMeal}
-      />
+      {logModalVisible && (
+        <LogMealModal
+          visible={logModalVisible}
+          onClose={() => setLogModalVisible(false)}
+          recipes={recipes}
+          onSave={handleLogCookedMeal}
+        />
+      )}
 
       <AssignMealModal
         visible={assignModalVisible}
@@ -470,7 +515,16 @@ function LogMealModal({ visible, onClose, recipes, onSave }: {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [portions, setPortions] = useState('4');
 
-  if (!visible) return null;
+  // Portions are whole meals: "2.5"/"2,5" don't make sense here, so only
+  // integers 1–50 are valid (#324). The parent now mounts this component
+  // only while `visible`, so this state is fresh on every open — no reset
+  // effect needed.
+  const trimmedPortions = portions.trim();
+  const parsedPortions = Number(trimmedPortions.replace(',', '.'));
+  const isPortionsValid =
+    Number.isInteger(parsedPortions) && parsedPortions >= 1 && parsedPortions <= 50;
+  const showPortionsError = trimmedPortions.length > 0 && !isPortionsValid;
+  const canSave = !!selectedRecipeId && isPortionsValid;
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -509,8 +563,12 @@ function LogMealModal({ visible, onClose, recipes, onSave }: {
               keyboardType="number-pad"
               value={portions}
               onChangeText={setPortions}
+              accessibilityLabel="Portions cooked"
             />
           </View>
+          {showPortionsError && (
+            <Text style={styles.portionsError}>Enter 1–50 portions</Text>
+          )}
 
           <View style={styles.modalBtnRow}>
             <Button
@@ -522,10 +580,12 @@ function LogMealModal({ visible, onClose, recipes, onSave }: {
             <Button
               title="Save"
               variant="primary"
-              onPress={() =>
-                selectedRecipeId && onSave(selectedRecipeId, parseInt(portions, 10) || 0)
-              }
-              disabled={!selectedRecipeId}
+              onPress={() => {
+                if (selectedRecipeId && isPortionsValid) {
+                  onSave(selectedRecipeId, parsedPortions);
+                }
+              }}
+              disabled={!canSave}
               style={styles.modalBtnHalf}
             />
           </View>
@@ -976,6 +1036,12 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     width: 72,
     textAlign: 'center',
+  },
+  portionsError: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.danger,
+    textAlign: 'right',
   },
   modalBtnRow: {
     flexDirection: 'row',

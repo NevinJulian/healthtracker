@@ -27,7 +27,7 @@ import {
   localDateKey,
   addDays as _addDaysKey,
   daysBetween as _daysBetweenKey,
-  localMidnightToday,
+  dateKeyToLocalDate,
 } from '../utils/dates';
 
 // Re-export NutritionGoals so screens only need to import from database.ts
@@ -96,6 +96,14 @@ export interface WeeklyMealPlanItem {
   meal_type: string;
   recipe_id: string;
   is_consumed: boolean;
+  /**
+   * meal_inventory.id this row's tick debited (v34, #302). Set when a tick
+   * finds stock to debit; NULL when ticked with no stock, when never
+   * consumed, or on legacy rows ticked before this column existed. Untick
+   * credits back exactly this batch (never "most recent") and never an
+   * INSERT fallback — see toggleMealConsumed.
+   */
+  consumed_from_inventory_id: number | null;
 }
 
 // Re-export Exercise so screens only import from database.ts
@@ -112,6 +120,7 @@ const KG_PER_CYCLE = 5;
 const CYCLE_DAYS = 21;
 const DAYS_AHEAD = 7;
 const DAYS_HISTORY = 7;
+const BACKFILL_CAP_DAYS = 90;
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -175,6 +184,23 @@ function buildHammerTask(base: string, isRestDay: boolean, daysDiff: number): st
   return `${base} @ Baseline + ${cycle * KG_PER_CYCLE}kg`;
 }
 
+/**
+ * True when `value` is a syntactically valid YYYY-MM-DD date key that
+ * round-trips through the Date constructor to the same calendar day
+ * (rejects both the wrong shape and overflow like "2026-13-40").
+ *
+ * Guards `_syncRollingSchedule()`'s rolling-window floor against a garbled
+ * `app_start_date` — e.g. restored verbatim from a corrupted backup — which
+ * would otherwise turn `_daysBetweenKey()` into NaN arithmetic and silently
+ * generate zero rows (#301).
+ */
+function isValidDateKey(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
 /** Safely parse a JSON string as Exercise[]; returns [] on any error. */
 function parseExercises(raw: string | null | undefined): Exercise[] {
   try {
@@ -182,6 +208,27 @@ function parseExercises(raw: string | null | undefined): Exercise[] {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Strict counterpart to parseExercises(), used ONLY by the write path in
+ * upsertExerciseCompleted() (#319). parseExercises() is the read path and
+ * stays lenient on purpose (returns [] on malformed input — screens rely on
+ * that). But upsertExerciseCompleted() reads, patches, and writes the array
+ * back: if it used the lenient parse, malformed stored JSON would silently
+ * become [] and then get persisted, permanently destroying whatever was
+ * actually stored. This returns a discriminated result instead of throwing
+ * so the caller decides how to fail (console.error + throw, see below).
+ */
+function _tryParseExercisesForWrite(
+  raw: string | null | undefined
+): { ok: true; value: Exercise[] } | { ok: false } {
+  try {
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? { ok: true, value: parsed } : { ok: false };
+  } catch {
+    return { ok: false };
   }
 }
 
@@ -209,8 +256,17 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   for (const migration of MIGRATIONS) {
     if (applied.has(migration.version)) continue;
     console.log(`[DB] Applying migration v${migration.version}…`);
-    await db.execAsync(migration.sql);
-    await db.runAsync('INSERT INTO schema_version (version) VALUES (?)', [migration.version]);
+    // Each migration's SQL and its schema_version bookkeeping row commit or
+    // roll back together (#314). A per-migration transaction — not one
+    // transaction around the whole loop — so a kill/throw partway through
+    // this migration can't leave its schema/data change applied without a
+    // recorded version (which would re-apply it forever on relaunch, or
+    // double-apply a data migration like v35), while migrations that already
+    // committed on an earlier run stay committed.
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(migration.sql);
+      await db.runAsync('INSERT INTO schema_version (version) VALUES (?)', [migration.version]);
+    });
     console.log(`[DB] Migration v${migration.version} applied ✓`);
   }
 }
@@ -227,20 +283,22 @@ async function seedBioForceLibrary(db: SQLite.SQLiteDatabase): Promise<void> {
     'INSERT INTO bio_force_library (id, name, muscle_group, description, video_url, data) VALUES (?, ?, ?, ?, ?, ?)'
   );
   
-  await db.withTransactionAsync(async () => {
-    for (const ex of bioForceExercises) {
-      await insertStmt.executeAsync([
-        ex.id,
-        ex.title,
-        ex.muscleGroup,
-        ex.description,
-        ex.videoId ? `https://www.youtube.com/watch?v=${ex.videoId}` : '',
-        JSON.stringify(ex),
-      ]);
-    }
-  });
-  
-  await insertStmt.finalizeAsync();
+  try {
+    await db.withTransactionAsync(async () => {
+      for (const ex of bioForceExercises) {
+        await insertStmt.executeAsync([
+          ex.id,
+          ex.title,
+          ex.muscleGroup,
+          ex.description,
+          ex.videoId ? `https://www.youtube.com/watch?v=${ex.videoId}` : '',
+          JSON.stringify(ex),
+        ]);
+      }
+    });
+  } finally {
+    await insertStmt.finalizeAsync().catch((e) => console.warn('[DB] finalize failed:', e));
+  }
   console.log('[DB] Bio Force Library seeded ✓');
 }
 
@@ -257,26 +315,28 @@ async function seedRecipeLibrary(db: SQLite.SQLiteDatabase): Promise<void> {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   
-  await db.withTransactionAsync(async () => {
-    for (const r of recipes) {
-      await insertStmt.executeAsync([
-        r.id,
-        r.title,
-        r.category,
-        r.calories,
-        r.protein,
-        r.carbs,
-        r.fat,
-        r.prepTimeMinutes,
-        r.defaultServings,
-        JSON.stringify(r.ingredients),
-        r.instructions,
-        r.freezerTips || '',
-      ]);
-    }
-  });
-  
-  await insertStmt.finalizeAsync();
+  try {
+    await db.withTransactionAsync(async () => {
+      for (const r of recipes) {
+        await insertStmt.executeAsync([
+          r.id,
+          r.title,
+          r.category,
+          r.calories,
+          r.protein,
+          r.carbs,
+          r.fat,
+          r.prepTimeMinutes,
+          r.defaultServings,
+          JSON.stringify(r.ingredients),
+          r.instructions,
+          r.freezerTips || '',
+        ]);
+      }
+    });
+  } finally {
+    await insertStmt.finalizeAsync().catch((e) => console.warn('[DB] finalize failed:', e));
+  }
   console.log('[DB] Recipe Library seeded ✓');
 }
 
@@ -319,6 +379,75 @@ async function resetIfIncompatibleSchema(
 // Rolling schedule sync — internal impl
 // ─────────────────────────────────────────────
 
+type WeeklyTemplateRow = {
+  day_of_week: number;
+  walking_task: string;
+  hammer_task: string;
+  is_rest_day: number;
+  is_meal_prep_day: number;
+  exercises: string;
+};
+
+/** The daily_log column values a freshly-generated row for a date should have. */
+interface DailyLogRowValues {
+  date: string;
+  walking_task: string;
+  hammer_task: string;
+  is_rest_day: number;
+  is_meal_prep_day: number;
+  exercises: string;
+}
+
+/**
+ * Pure per-date row-value computation — the weekly_template lookup by
+ * day_of_week, exercises reset, and buildHammerTask progression that used to
+ * live inline in _syncRollingSchedule()'s loop. Extracted (#305) so
+ * _syncRollingSchedule() and _ensureDailyLogRow() share exactly one
+ * implementation and can never drift apart.
+ *
+ * Takes exactly the inputs _syncRollingSchedule() has always used —
+ * `startDateISO` is the RAW value read from app_state (not the
+ * sanitised/clamped variant _syncRollingSchedule() computes for its own
+ * insert-range floor) — so the gym-weight progression's semantics are
+ * unchanged by this refactor. (#363 tracks any actual change to that
+ * formula separately.)
+ *
+ * Returns null when weekly_template has no row for `targetISO`'s weekday —
+ * shouldn't happen given the 7-row invariant (CLAUDE.md), but
+ * weekly_template is user-editable data, not a compile-time guarantee, so
+ * both callers must handle it rather than assume it.
+ */
+function _buildDailyLogRowValues(
+  targetISO: string,
+  templateMap: Map<number, WeeklyTemplateRow>,
+  startDateISO: string
+): DailyLogRowValues | null {
+  const dow = dateKeyToLocalDate(targetISO).getDay();
+  const template = templateMap.get(dow);
+  if (!template) return null;
+
+  // Parse template exercises (reset completed → false)
+  const templateExercises = parseExercises(template.exercises);
+  const baseExercises = templateExercises.map((ex) => ({ ...ex, completed: false }));
+  const baseExercisesJson = JSON.stringify(baseExercises);
+
+  const daysDiff = _daysBetweenKey(startDateISO, targetISO);
+  const hammerWithWeight = buildHammerTask(
+    template.hammer_task,
+    template.is_rest_day === 1,
+    daysDiff
+  );
+
+  return {
+    date: targetISO,
+    walking_task: template.walking_task,
+    hammer_task: hammerWithWeight,
+    is_rest_day: template.is_rest_day,
+    is_meal_prep_day: template.is_meal_prep_day,
+    exercises: baseExercisesJson,
+  };
+}
+
 async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   const startRow = await db.getFirstAsync<{ value: string }>(
     'SELECT value FROM app_state WHERE key = ?',
@@ -326,27 +455,40 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   );
   const startDateISO = startRow?.value ?? toISODate();
 
-  const templateRows = await db.getAllAsync<{
-    day_of_week: number;
-    walking_task: string;
-    hammer_task: string;
-    is_rest_day: number;
-    is_meal_prep_day: number;
-    exercises: string;
-  }>('SELECT * FROM weekly_template');
+  const templateRows = await db.getAllAsync<WeeklyTemplateRow>('SELECT * FROM weekly_template');
 
-  const templateMap = new Map<number, typeof templateRows[number]>();
+  const templateMap = new Map<number, WeeklyTemplateRow>();
   for (const row of templateRows) {
     templateMap.set(row.day_of_week, row);
   }
 
   const todayISO = toISODate();
+  // cutoffISO gates the *existing-row* exercises backfill further below —
+  // kept at its pre-#301 range (today - DAYS_HISTORY) on purpose. Widening
+  // the INSERT range (below) must not also widen this: retroactively handing
+  // an old row today's template exercises would invent history the user
+  // never had (#301, orchestrator amendment).
   const cutoffISO = _addDaysKey(todayISO, -DAYS_HISTORY);
+  // floorISO gates how far back MISSING rows get inserted: up to
+  // BACKFILL_CAP_DAYS in the past, but never before the app's own start date
+  // — there's no schedule to backfill before the user started using the app.
+  const backfillFloorISO = _addDaysKey(todayISO, -BACKFILL_CAP_DAYS);
+  // A garbled/legacy startDateISO (e.g. restored from a corrupted backup)
+  // must not poison the range with NaN arithmetic — fall back to the
+  // 90-day cap instead (#301).
+  const safeStartDateISO = isValidDateKey(startDateISO) ? startDateISO : backfillFloorISO;
+  const lowerBoundISO =
+    safeStartDateISO > backfillFloorISO ? safeStartDateISO : backfillFloorISO;
+  // A startDateISO in the future (e.g. restored from a device whose clock
+  // ran fast, or that crossed a timezone) must not push the floor past
+  // today — today..today+DAYS_AHEAD always has to generate regardless of
+  // what startDateISO claims (#301).
+  const floorISO = lowerBoundISO < todayISO ? lowerBoundISO : todayISO;
 
   // Pre-fetch existing rows with their exercises OUTSIDE the transaction (#37)
   const existingRows = await db.getAllAsync<{ date: string; exercises: string }>(
     'SELECT date, exercises FROM daily_log WHERE date >= ?',
-    [cutoffISO]
+    [floorISO]
   );
   const existingDates = new Set(existingRows.map((r) => r.date));
 
@@ -357,44 +499,35 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   type BackfillParams = [string, string]; // [exercisesJson, date]
   const backfills: BackfillParams[] = [];
 
-  for (let offset = 0; offset <= DAYS_AHEAD; offset++) {
+  const startOffset = _daysBetweenKey(todayISO, floorISO);
+  for (let offset = startOffset; offset <= DAYS_AHEAD; offset++) {
     const targetISO = _addDaysKey(todayISO, offset);
-    // Derive day-of-week from the local-midnight Date for this key
-    const targetDate = localMidnightToday();
-    targetDate.setDate(targetDate.getDate() + offset);
-    const dow = targetDate.getDay();
-    const template = templateMap.get(dow);
-    if (!template) continue;
-
-    // Parse template exercises (reset completed → false)
-    const templateExercises = parseExercises(template.exercises);
-    const baseExercises = templateExercises.map((ex) => ({ ...ex, completed: false }));
-    const baseExercisesJson = JSON.stringify(baseExercises);
+    const rowValues = _buildDailyLogRowValues(targetISO, templateMap, startDateISO);
+    if (!rowValues) continue;
 
     if (existingDates.has(targetISO)) {
-      // Row exists — check if exercises need to be backfilled
-      const existing = existingRows.find((r) => r.date === targetISO);
-      const currentExercises = parseExercises(existing?.exercises);
-      if (currentExercises.length === 0 && templateExercises.length > 0) {
-        backfills.push([baseExercisesJson, targetISO]);
+      // Row exists — check if exercises need to be backfilled. Restricted to
+      // the pre-#301 range (cutoffISO..today+DAYS_AHEAD): dates further back
+      // than that were never visited by this pass before #301 widened the
+      // insert range below, and must stay untouched (see cutoffISO comment).
+      if (targetISO >= cutoffISO) {
+        const existing = existingRows.find((r) => r.date === targetISO);
+        const currentExercises = parseExercises(existing?.exercises);
+        const templateExerciseCount = parseExercises(rowValues.exercises).length;
+        if (currentExercises.length === 0 && templateExerciseCount > 0) {
+          backfills.push([rowValues.exercises, targetISO]);
+        }
       }
       continue;
     }
 
-    const daysDiff = _daysBetweenKey(startDateISO, targetISO);
-    const hammerWithWeight = buildHammerTask(
-      template.hammer_task,
-      template.is_rest_day === 1,
-      daysDiff
-    );
-
     inserts.push([
-      targetISO,
-      template.walking_task,
-      hammerWithWeight,
-      template.is_rest_day,
-      template.is_meal_prep_day,
-      baseExercisesJson,
+      rowValues.date,
+      rowValues.walking_task,
+      rowValues.hammer_task,
+      rowValues.is_rest_day,
+      rowValues.is_meal_prep_day,
+      rowValues.exercises,
     ]);
   }
 
@@ -414,8 +547,78 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
         [exercisesJson, date]
       );
     }
-    await db.runAsync('DELETE FROM daily_log WHERE date < ?', [cutoffISO]);
   });
+}
+
+// ─────────────────────────────────────────────
+// Ensure-row helper for daily_log writers (#305)
+// ─────────────────────────────────────────────
+
+/**
+ * Ensure a daily_log row exists for `date`. If missing, inserts one using
+ * exactly the column values _syncRollingSchedule() would generate for that
+ * date — same weekly_template lookup, same (raw, unsanitised) startDateISO
+ * handling, same exercises reset — via the shared _buildDailyLogRowValues()
+ * builder, so an on-demand row can never drift from what the next sync
+ * would have produced for it. `INSERT OR IGNORE` makes this safe to call
+ * unconditionally before every daily_log UPDATE: a no-op when the row is
+ * already there.
+ *
+ * Every column outside the builder's set (walk_completed, hammer_completed,
+ * fasting_completed, body_weight, water_ml, additional_workouts) takes its
+ * schema DEFAULT — identical to a row _syncRollingSchedule() itself inserts.
+ *
+ * Silently inserts nothing if weekly_template has no row for `date`'s
+ * weekday — shouldn't happen given the 7-row invariant (CLAUDE.md), but
+ * this helper must not throw over user-editable template data. The caller's
+ * own UPDATE then simply won't find the row, and _assertWrote() surfaces
+ * that loudly instead of the previous silent no-op.
+ */
+async function _ensureDailyLogRow(db: SQLite.SQLiteDatabase, date: string): Promise<void> {
+  const startRow = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM app_state WHERE key = ?',
+    [START_DATE_KEY]
+  );
+  const startDateISO = startRow?.value ?? toISODate();
+
+  const templateRows = await db.getAllAsync<WeeklyTemplateRow>('SELECT * FROM weekly_template');
+  const templateMap = new Map<number, WeeklyTemplateRow>();
+  for (const row of templateRows) {
+    templateMap.set(row.day_of_week, row);
+  }
+
+  const rowValues = _buildDailyLogRowValues(date, templateMap, startDateISO);
+  if (!rowValues) return;
+
+  await db.runAsync(
+    `INSERT OR IGNORE INTO daily_log
+       (date, walking_task, hammer_task, is_rest_day, is_meal_prep_day, exercises)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      rowValues.date,
+      rowValues.walking_task,
+      rowValues.hammer_task,
+      rowValues.is_rest_day,
+      rowValues.is_meal_prep_day,
+      rowValues.exercises,
+    ]
+  );
+}
+
+/**
+ * Throws a clear error when a daily_log writer's UPDATE didn't touch exactly
+ * one row. Called immediately after each writer's UPDATE, once
+ * _ensureDailyLogRow() has guaranteed the row exists for any date whose
+ * weekday has a weekly_template row — so `changes !== 1` here means
+ * something is actually wrong (e.g. weekly_template is missing a row for
+ * that weekday), surfaced loudly instead of the previous silent no-op (#305).
+ */
+function _assertWrote(result: SQLite.SQLiteRunResult, fnName: string, date: string): void {
+  if (result.changes !== 1) {
+    throw new Error(
+      `[DB] ${fnName}: expected to update exactly 1 daily_log row for date=${date}, but ${result.changes} row(s) changed`
+    );
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -497,7 +700,36 @@ export async function getLogByDate(date: string): Promise<DailyLogEntry | null> 
   return mapLogRow(row);
 }
 
+/**
+ * Returns daily_log rows for the current 7-day rolling window only
+ * (today - DAYS_HISTORY .. today + DAYS_AHEAD, inclusive), using the same
+ * todayISO/_addDaysKey arithmetic _syncRollingSchedule() uses to generate
+ * that window — so this always matches what sync just produced.
+ *
+ * Before #300's amendment this was an unbounded `SELECT * FROM daily_log`;
+ * it only ever *looked* windowed because _syncRollingSchedule() used to
+ * delete everything outside the window on every sync. Now that history is
+ * retained, this query does the bounding itself instead.
+ */
 export async function getRollingWindow(): Promise<DailyLogEntry[]> {
+  const todayISO = toISODate();
+  const fromISO = _addDaysKey(todayISO, -DAYS_HISTORY);
+  const toISO = _addDaysKey(todayISO, DAYS_AHEAD);
+  return getDailyLogsBetween(fromISO, toISO);
+}
+
+/**
+ * Returns daily_log rows with date in [fromKey, toKey], inclusive on both
+ * ends, ordered ascending by date. Row shape matches getRollingWindow().
+ *
+ * Intended for callers (e.g. analytics) that need an explicit date range
+ * rather than the current rolling window — added in #300 for later
+ * adoption; not yet wired into any screen.
+ */
+export async function getDailyLogsBetween(
+  fromKey: string,
+  toKey: string
+): Promise<DailyLogEntry[]> {
   const db = getDatabase();
   const rows = await db.getAllAsync<{
     date: string;
@@ -511,7 +743,10 @@ export async function getRollingWindow(): Promise<DailyLogEntry[]> {
     exercises: string;
     body_weight: number | null;
     additional_workouts: string;
-  }>('SELECT * FROM daily_log ORDER BY date ASC');
+  }>(
+    'SELECT * FROM daily_log WHERE date >= ? AND date <= ? ORDER BY date ASC',
+    [fromKey, toKey]
+  );
 
   return rows.map(mapLogRow);
 }
@@ -522,36 +757,91 @@ export async function upsertLogField(
   value: boolean
 ): Promise<void> {
   const db = getDatabase();
-  await db.runAsync(`UPDATE daily_log SET ${field} = ? WHERE date = ?`, [value ? 1 : 0, date]);
+  await _ensureDailyLogRow(db, date);
+  const result = await db.runAsync(
+    `UPDATE daily_log SET ${field} = ? WHERE date = ?`,
+    [value ? 1 : 0, date]
+  );
+  _assertWrote(result, 'upsertLogField', date);
 }
+
+/**
+ * Serialisation queue for upsertExerciseCompleted() (#319). It's a
+ * read-modify-write: read daily_log.exercises, toggle one entry, write the
+ * whole array back. Two overlapping calls for the same date can both read
+ * the pre-toggle array and the second write clobbers the first toggle
+ * (lost update). Chaining every call onto this module-level promise forces
+ * the read-modify-write sequences to run one at a time, so they can't
+ * interleave — each call awaits the previous one's settlement (including a
+ * rejection) before its own body starts.
+ *
+ * Deliberately NOT `withTransactionAsync`: a single UPDATE statement is
+ * already atomic by itself, and the real expo-sqlite withTransactionAsync
+ * is a bare, non-queued BEGIN/COMMIT on the shared connection — overlapping
+ * transactions can roll back each other's work (filed as #369, a systemic
+ * issue out of scope here). Wrapping this in another non-queued transaction
+ * would only widen that exposure; the plain queue below avoids it entirely.
+ */
+let _upsertExerciseCompletedQueue: Promise<void> = Promise.resolve();
 
 /**
  * Toggles the `completed` flag on a single exercise within daily_log.exercises
  * for the given date. Reads the current JSON, patches it, then writes back.
+ *
+ * Malformed stored JSON is refused rather than coerced to [] and persisted
+ * (which would destroy the original) — see _tryParseExercisesForWrite().
+ * Calls are serialised per-process; see _upsertExerciseCompletedQueue above.
  */
-export async function upsertExerciseCompleted(
+export function upsertExerciseCompleted(
+  date: string,
+  exerciseId: string,
+  value: boolean
+): Promise<void> {
+  const run = _upsertExerciseCompletedQueue.then(() =>
+    _upsertExerciseCompletedImpl(date, exerciseId, value)
+  );
+  // Swallow the rejection on the CHAIN link only (not on `run`, which the
+  // caller still sees) so a failed call doesn't wedge later queued calls.
+  _upsertExerciseCompletedQueue = run.catch(() => {});
+  return run;
+}
+
+async function _upsertExerciseCompletedImpl(
   date: string,
   exerciseId: string,
   value: boolean
 ): Promise<void> {
   const db = getDatabase();
+  await _ensureDailyLogRow(db, date);
   const row = await db.getFirstAsync<{ exercises: string }>(
     'SELECT exercises FROM daily_log WHERE date = ?',
     [date]
   );
-  const exercises = parseExercises(row?.exercises);
-  const updated = exercises.map((ex) =>
+  const parsed = _tryParseExercisesForWrite(row?.exercises);
+  if (!parsed.ok) {
+    console.error(
+      `[DB] upsertExerciseCompleted: malformed exercises JSON for date=${date} — refusing to write, stored value left unchanged`
+    );
+    throw new Error(`[DB] upsertExerciseCompleted: malformed exercises JSON for date=${date}`);
+  }
+  const updated = parsed.value.map((ex) =>
     ex.id === exerciseId ? { ...ex, completed: value } : ex
   );
-  await db.runAsync(
+  const result = await db.runAsync(
     'UPDATE daily_log SET exercises = ? WHERE date = ?',
     [JSON.stringify(updated), date]
   );
+  _assertWrote(result, 'upsertExerciseCompleted', date);
 }
 
 export async function upsertBodyWeight(date: string, weight: number): Promise<void> {
   const db = getDatabase();
-  await db.runAsync('UPDATE daily_log SET body_weight = ? WHERE date = ?', [weight, date]);
+  await _ensureDailyLogRow(db, date);
+  const result = await db.runAsync(
+    'UPDATE daily_log SET body_weight = ? WHERE date = ?',
+    [weight, date]
+  );
+  _assertWrote(result, 'upsertBodyWeight', date);
 }
 
 export async function upsertAdditionalWorkouts(
@@ -559,10 +849,12 @@ export async function upsertAdditionalWorkouts(
   workouts: AdditionalWorkout[]
 ): Promise<void> {
   const db = getDatabase();
-  await db.runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [
+  await _ensureDailyLogRow(db, date);
+  const result = await db.runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [
     JSON.stringify(workouts),
     date,
   ]);
+  _assertWrote(result, 'upsertAdditionalWorkouts', date);
 }
 
 export async function getWeightHistory(days: number): Promise<{ date: string; weight: number }[]> {
@@ -1013,23 +1305,38 @@ export async function getTodaysMealsWithRecipe(date: string): Promise<MealPlanWi
   }));
 }
 
+/**
+ * Assigns a recipe to a (date, meal_type) slot, creating the row if it
+ * doesn't exist yet. If the slot already holds a consumed meal, the portion
+ * it debited is credited back (#303) — reassigning a slot always resets its
+ * consumption, even when the incoming recipe_id is the same one that was
+ * already there, since the user is re-picking what's in that slot and the
+ * previous tick no longer describes anything real. Runs entirely inside one
+ * transaction: select, optional credit, and the insert/update must all
+ * succeed or none of them do.
+ */
 export async function assignMealToPlan(date: string, meal_type: string, recipe_id: string): Promise<void> {
   const db = getDatabase();
-  const existing = await db.getFirstAsync<any>(
-    'SELECT * FROM weekly_meal_plan WHERE date = ? AND meal_type = ?', 
-    [date, meal_type]
-  );
-  if (existing) {
-    await db.runAsync(
-      'UPDATE weekly_meal_plan SET recipe_id = ?, is_consumed = 0 WHERE id = ?',
-      [recipe_id, existing.id]
+  await db.withTransactionAsync(async () => {
+    const existing = await db.getFirstAsync<any>(
+      'SELECT * FROM weekly_meal_plan WHERE date = ? AND meal_type = ?',
+      [date, meal_type]
     );
-  } else {
-    await db.runAsync(
-      'INSERT INTO weekly_meal_plan (date, meal_type, recipe_id, is_consumed) VALUES (?, ?, ?, 0)',
-      [date, meal_type, recipe_id]
-    );
-  }
+    if (existing) {
+      if (existing.is_consumed === 1) {
+        await _creditPortion(db, existing);
+      }
+      await db.runAsync(
+        'UPDATE weekly_meal_plan SET recipe_id = ?, is_consumed = 0, consumed_from_inventory_id = NULL WHERE id = ?',
+        [recipe_id, existing.id]
+      );
+    } else {
+      await db.runAsync(
+        'INSERT INTO weekly_meal_plan (date, meal_type, recipe_id, is_consumed) VALUES (?, ?, ?, 0)',
+        [date, meal_type, recipe_id]
+      );
+    }
+  });
 }
 
 export async function removeMealFromPlan(id: number): Promise<void> {
@@ -1037,16 +1344,49 @@ export async function removeMealFromPlan(id: number): Promise<void> {
   await db.runAsync('DELETE FROM weekly_meal_plan WHERE id = ?', [id]);
 }
 
+/**
+ * Credits back the exact meal_inventory batch a weekly_meal_plan row's
+ * consumption was debited from (#302's consumed_from_inventory_id pointer).
+ * A no-op if the pointer is NULL (legacy row, or nothing was ever debited)
+ * or if the batch it points at no longer exists.
+ *
+ * Extracted from toggleMealConsumed's untick branch so assignMealToPlan
+ * (#303) can reuse the exact same credit logic when a consumed slot is
+ * reassigned. Does NOT open its own transaction — the adapter's
+ * withTransactionAsync is not reentrant, so every caller must already be
+ * inside one.
+ */
+async function _creditPortion(
+  db: SQLite.SQLiteDatabase,
+  planRow: { consumed_from_inventory_id: number | null }
+): Promise<void> {
+  if (planRow.consumed_from_inventory_id != null) {
+    await db.runAsync(
+      'UPDATE meal_inventory SET portions_available = portions_available + 1 WHERE id = ?',
+      [planRow.consumed_from_inventory_id]
+    );
+  }
+}
+
 export async function toggleMealConsumed(id: number, is_consumed: boolean): Promise<void> {
   const db = getDatabase();
   await db.withTransactionAsync(async () => {
     const meal = await db.getFirstAsync<any>('SELECT * FROM weekly_meal_plan WHERE id = ?', [id]);
     if (!meal) return;
-    
-    // Changing to consumed
+
+    // Tracks which meal_inventory row (if any) this plan row's consumption
+    // is attributed to. Defaults to whatever was already recorded, so a
+    // toggle to the same state (a no-op transition below) leaves it alone.
+    let consumedFromInventoryId: number | null = meal.consumed_from_inventory_id ?? null;
+
+    // Changing to consumed: debit FIFO from the oldest batch with stock,
+    // and record which batch it came from (#302) so a later untick can
+    // credit back that exact row instead of guessing. If there's no stock,
+    // don't debit anything and leave the pointer NULL — never pretend a
+    // portion was consumed from inventory that doesn't exist.
     if (is_consumed && meal.is_consumed === 0) {
       const inv = await db.getFirstAsync<any>(
-        'SELECT * FROM meal_inventory WHERE recipe_id = ? AND portions_available > 0 ORDER BY date_cooked ASC LIMIT 1', 
+        'SELECT * FROM meal_inventory WHERE recipe_id = ? AND portions_available > 0 ORDER BY date_cooked ASC LIMIT 1',
         [meal.recipe_id]
       );
       if (inv) {
@@ -1054,30 +1394,32 @@ export async function toggleMealConsumed(id: number, is_consumed: boolean): Prom
           'UPDATE meal_inventory SET portions_available = portions_available - 1 WHERE id = ?',
           [inv.id]
         );
-      }
-    } 
-    // Reverting from consumed back to planned
-    else if (!is_consumed && meal.is_consumed === 1) {
-       const inv = await db.getFirstAsync<any>(
-        'SELECT * FROM meal_inventory WHERE recipe_id = ? ORDER BY date_cooked DESC LIMIT 1', 
-        [meal.recipe_id]
-      );
-      if (inv) {
-         await db.runAsync(
-          'UPDATE meal_inventory SET portions_available = portions_available + 1 WHERE id = ?',
-          [inv.id]
-        );
+        consumedFromInventoryId = inv.id;
       } else {
-         await db.runAsync(
-          'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, 1, ?)',
-          [meal.recipe_id, toISODate()]
-        );
+        consumedFromInventoryId = null;
       }
     }
-    
-    await db.runAsync('UPDATE weekly_meal_plan SET is_consumed = ? WHERE id = ?', [is_consumed ? 1 : 0, id]);
+    // Reverting from consumed back to planned: credit back ONLY the exact
+    // batch this row was debited from — never the most-recently-cooked
+    // batch, and never an INSERT fallback (#302); both of those used to
+    // create inventory that was never actually cooked. A no-op if that
+    // batch row no longer exists (e.g. deleted elsewhere).
+    //
+    // Orchestrator decision (#302): a row ticked before migration v34 has
+    // a NULL consumed_from_inventory_id (legacy data) and gets NO credit
+    // here. This is deliberately conservative — it can under-count one
+    // portion once, but it can never fabricate stock from nothing.
+    else if (!is_consumed && meal.is_consumed === 1) {
+      await _creditPortion(db, meal);
+      consumedFromInventoryId = null;
+    }
+
+    await db.runAsync(
+      'UPDATE weekly_meal_plan SET is_consumed = ?, consumed_from_inventory_id = ? WHERE id = ?',
+      [is_consumed ? 1 : 0, consumedFromInventoryId, id]
+    );
   });
-} 
+}
 
 // ─────────────────────────────────────────────
 // Cooking Tasks CRUD
@@ -1106,6 +1448,45 @@ export async function insertCookingTask(
     'INSERT INTO cooking_tasks (recipe_id, servings_to_cook) VALUES (?, ?)',
     [recipe_id, servings_to_cook]
   );
+}
+
+/**
+ * Atomically adds every ingredient of a recipe to the shopping list and
+ * queues it as a cooking task (#320).
+ *
+ * Previously RecipeDetailScreen's handleAddToShoppingList looped
+ * addShoppingListItem() per ingredient (each an autocommitted single-row
+ * INSERT) and then made a separate call to insertCookingTask(). A failure
+ * partway through the loop left a half-written shopping list with no
+ * matching cooking task, and the screen's catch only surfaced an Alert —
+ * nothing rolled back. This wraps the whole batch in one
+ * db.withTransactionAsync, same pattern as finishCooking() below.
+ *
+ * addShoppingListItem() and insertCookingTask() are called directly here
+ * (reusing their existing single-row SQL) because neither opens its own
+ * transaction — each is just one runAsync — so they're safe to call from
+ * inside this one.
+ *
+ * Note on #369: the real expo-sqlite withTransactionAsync is a bare,
+ * non-queued BEGIN/COMMIT on the shared connection, so two overlapping
+ * transactions can roll back each other's work. The overlap risk here is
+ * low in practice: RecipeDetailScreen's success/failure Alert blocks
+ * navigation before the screen loses focus, and syncRollingSchedule only
+ * runs on initial load and on focus — so nothing else starts a second
+ * transaction while this one is in flight.
+ */
+export async function addRecipeToShoppingList(
+  items: { name: string; quantity: number; unit: string }[],
+  recipeId: string,
+  servings: number
+): Promise<void> {
+  const db = getDatabase();
+  await db.withTransactionAsync(async () => {
+    for (const item of items) {
+      await addShoppingListItem(item.name, item.quantity, item.unit);
+    }
+    await insertCookingTask(recipeId, servings);
+  });
 }
 
 /**
@@ -1281,19 +1662,25 @@ export interface MealAdherenceSummary {
  * Compute meal plan adherence: how many planned meals were actually consumed
  * over the past `days` calendar days.
  *
+ * Bounded above by today (#307) — without an upper bound, meals planned
+ * ahead of time for future dates would count as "planned" with no chance of
+ * having been consumed yet, dragging the ratio down for reasons unrelated
+ * to actual adherence. Today's still-unconsumed meals continue to count.
+ *
  * @param days - Window size in days (default 30).
  */
 export async function getMealAdherence(days: number = 30): Promise<MealAdherenceSummary> {
   const db = getDatabase();
-  const cutoffISO = _addDaysKey(toISODate(), -days);
+  const todayISO = toISODate();
+  const cutoffISO = _addDaysKey(todayISO, -days);
 
   const row = await db.getFirstAsync<{ planned: number; consumed: number }>(
     `SELECT
        COUNT(*) AS planned,
        SUM(CASE WHEN is_consumed = 1 THEN 1 ELSE 0 END) AS consumed
      FROM weekly_meal_plan
-     WHERE date >= ?`,
-    [cutoffISO]
+     WHERE date >= ? AND date <= ?`,
+    [cutoffISO, todayISO]
   );
 
   const planned = row?.planned ?? 0;
@@ -1496,6 +1883,16 @@ export async function setSetting(key: string, value: string): Promise<void> {
   );
 }
 
+/**
+ * Remove a key from app_state entirely, so getSetting() subsequently
+ * returns null rather than a stored string. Deleting an absent key is a
+ * harmless no-op.
+ */
+export async function deleteSetting(key: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('DELETE FROM app_state WHERE key = ?', [key]);
+}
+
 // ── Typed setting keys ────────────────────────
 
 const SETTING_WORKOUT_REMINDER_ENABLED = 'workoutReminderEnabled';
@@ -1695,21 +2092,87 @@ export async function dumpTable(
  *     in older/newer backups are silently skipped).
  *   - Per-row INSERT uses that row's own column list so new columns added by
  *     later migrations default-fill rather than error.
+ *   - A backup can legitimately contain rows that violate a UNIQUE index
+ *     added by a later migration than the one the backup was taken under
+ *     (validatePayload() accepts any backup at or below the current schema
+ *     version): pre-#303 backups can have duplicate (date, meal_type) rows
+ *     in weekly_meal_plan, and pre-#317 backups (or ones taken before
+ *     v37's renumber ever ran) can have colliding/gapped set_index values
+ *     in workout_set_log. Both unique indexes always exist on the live DB
+ *     by the time restore runs, so the second offending INSERT would throw
+ *     — and since restore is one transaction, that would roll back every
+ *     table, not just the offending one. So: drop both indexes before
+ *     restoring, restore every table exactly as before, then re-run each
+ *     affected migration's own SQL — looked up at runtime via
+ *     POST_RESTORE_MIGRATION_VERSIONS, never copied or reimplemented, so it
+ *     can't drift from the migration — against the just-restored data, in
+ *     order, inside the same transaction. v35 (#303) credits any consumed
+ *     loser's batch in the just-restored meal_inventory, deletes losers per
+ *     its survivor rule, and recreates its index. v37 (#317) renumbers
+ *     workout_set_log densely per (date, exercise) by (created_at, id) and
+ *     recreates its index — the SAME ordering requirement the migration
+ *     itself relies on (the renumber must run before its own index is
+ *     (re)created) holds here for the same reason: it runs after the
+ *     index was dropped above, never while it exists. A clean,
+ *     already-migrated backup is unaffected by either re-run: nothing
+ *     matches v35's credit/delete WHERE clauses, and v37's renumber
+ *     reassigns every row the value it already has.
+ *
+ * A row's own keys are NOT trusted as column identifiers: unlike values,
+ * column names can't be parameterised, so a backup file (user-supplied,
+ * JSON.parse'd from a picked file) with a crafted row key would otherwise
+ * be interpolated straight into the INSERT's column list — a SQL injection
+ * path (#315). Each table's real columns are read once via
+ * `PRAGMA table_info(<table>)` (table name is already whitelisted against
+ * listUserTables() above) and every row is filtered down to only the keys
+ * that are real columns before the INSERT is built. A row left with zero
+ * known keys is skipped entirely — not inserted, not counted in
+ * rowsRestored. What got dropped is reported per table, both via
+ * console.warn (this module's existing best-effort logging style) and via
+ * the optional `skipped` field on the return value.
  *
  * @param payloadTables  The `tables` object from the BackupPayload.
- * @returns A summary of what was restored.
+ * @returns A summary of what was restored, plus optionally what was skipped.
  */
+
+/**
+ * Migrations whose own SQL must be re-applied, in this order, against
+ * freshly-restored data every time restoreFromPayload() runs — because each
+ * one is a data-repair step (not just DDL) that a backup taken before it
+ * shipped, or before it happened to run, can legitimately still need. Their
+ * unique indexes are dropped before the restore loop (see the restoreFromPayload
+ * doc comment above) and recreated by re-running the listed migration's SQL
+ * here, looked up from MIGRATIONS at runtime so this can never drift from
+ * the real migration.
+ *
+ *   - v35 (#303): weekly_meal_plan (date, meal_type) dedupe + unique index.
+ *   - v37 (#317): workout_set_log set_index renumber + unique index.
+ */
+const POST_RESTORE_MIGRATION_VERSIONS = [35, 37];
+
 export async function restoreFromPayload(
   payloadTables: Record<string, Record<string, unknown>[]>
-): Promise<{ tablesRestored: number; rowsRestored: number }> {
+): Promise<{
+  tablesRestored: number;
+  rowsRestored: number;
+  skipped?: { table: string; columns: string[]; rows: number }[];
+}> {
   const db = getDatabase();
   const liveTableNames = await listUserTables();
   const liveTableSet = new Set(liveTableNames);
 
   let tablesRestored = 0;
   let rowsRestored = 0;
+  const skipped: { table: string; columns: string[]; rows: number }[] = [];
 
   await db.withTransactionAsync(async () => {
+    // Drop first so a legacy backup's duplicate weekly_meal_plan rows or
+    // colliding/gapped workout_set_log rows (see above) can all be inserted
+    // below; both are recreated by re-running their migrations' own SQL
+    // (POST_RESTORE_MIGRATION_VERSIONS) after the restore loop.
+    await db.execAsync('DROP INDEX IF EXISTS idx_weekly_meal_plan_date_meal_type');
+    await db.execAsync('DROP INDEX IF EXISTS idx_workout_set_log_date_exercise_set_index');
+
     for (const [tableName, rows] of Object.entries(payloadTables)) {
       // Skip tables that don't exist in the current schema
       if (!liveTableSet.has(tableName)) continue;
@@ -1717,10 +2180,30 @@ export async function restoreFromPayload(
       // Wipe existing rows
       await db.runAsync(`DELETE FROM ${tableName}`);
 
-      // Re-insert each row using that row's own column list
+      // Whitelist this table's real columns (table name is already
+      // whitelisted against liveTableSet above; PRAGMA table_info is safe
+      // to interpolate a live table name into).
+      const columnInfo = await db.getAllAsync<{ name: string }>(
+        `PRAGMA table_info(${tableName})`
+      );
+      const liveColumnSet = new Set(columnInfo.map((c) => c.name));
+
+      const droppedColumns = new Set<string>();
+      let skippedRowCount = 0;
+
+      // Re-insert each row using only the keys that are real columns
       for (const row of rows) {
-        const keys = Object.keys(row);
-        if (keys.length === 0) continue;
+        const allKeys = Object.keys(row);
+        const keys = allKeys.filter((k) => liveColumnSet.has(k));
+
+        for (const k of allKeys) {
+          if (!liveColumnSet.has(k)) droppedColumns.add(k);
+        }
+
+        if (keys.length === 0) {
+          if (allKeys.length > 0) skippedRowCount += 1;
+          continue;
+        }
 
         const columns = keys.join(', ');
         const placeholders = keys.map(() => '?').join(', ');
@@ -1733,11 +2216,42 @@ export async function restoreFromPayload(
         rowsRestored += 1;
       }
 
+      if (droppedColumns.size > 0 || skippedRowCount > 0) {
+        const entry = {
+          table: tableName,
+          columns: Array.from(droppedColumns).sort(),
+          rows: skippedRowCount,
+        };
+        skipped.push(entry);
+        console.warn(
+          `[restoreFromPayload] Table "${tableName}": dropped unknown column(s) [${entry.columns.join(', ')}]; ${skippedRowCount} row(s) skipped entirely (no known columns).`
+        );
+      }
+
       tablesRestored += 1;
+    }
+
+    // Re-apply each post-restore migration's own SQL against the
+    // just-restored data, in order, as if it had just run on it. Each
+    // migration's index was dropped above, before this loop ran — never
+    // while it existed — matching the ordering both migrations require of
+    // their own renumber/dedupe step.
+    for (const version of POST_RESTORE_MIGRATION_VERSIONS) {
+      const migration = MIGRATIONS.find((m) => m.version === version);
+      if (!migration) {
+        throw new Error(
+          `restoreFromPayload: migration v${version} not found in MIGRATIONS — cannot rebuild its post-restore state.`
+        );
+      }
+      await db.execAsync(migration.sql);
     }
   });
 
-  return { tablesRestored, rowsRestored };
+  return {
+    tablesRestored,
+    rowsRestored,
+    ...(skipped.length > 0 ? { skipped } : {}),
+  };
 }
 
 // ── Nutrition goal settings (#274) ────────────────────────────────────────────
@@ -1846,6 +2360,16 @@ export async function setProfileAge(years: number): Promise<void> {
   await setSetting(SETTING_PROFILE_AGE, String(years));
 }
 
+/** Clear the user's stored height, so getUserProfile() reads it as null. */
+export async function clearProfileHeightCm(): Promise<void> {
+  await deleteSetting(SETTING_PROFILE_HEIGHT_CM);
+}
+
+/** Clear the user's stored age, so getUserProfile() reads it as null. */
+export async function clearProfileAge(): Promise<void> {
+  await deleteSetting(SETTING_PROFILE_AGE);
+}
+
 /** Persist the user's biological sex. */
 export async function setProfileSex(sex: Sex): Promise<void> {
   await setSetting(SETTING_PROFILE_SEX, sex);
@@ -1893,14 +2417,28 @@ export async function getLatestBodyWeight(): Promise<number | null> {
 
 const SETTING_HYDRATION_GOAL_ML = 'hydrationGoalMl';
 const DEFAULT_HYDRATION_GOAL_ML = 2000;
+// Mirrors HYDRATION_MIN/HYDRATION_MAX in SettingsScreen.tsx (the hydration
+// stepper's own clamp bounds, #313). Keep these two in sync if either changes.
+const HYDRATION_GOAL_MIN_ML = 250;
+const HYDRATION_GOAL_MAX_ML = 6000;
 
 /**
  * Read the user's daily hydration goal in ml from app_state.
- * Defaults to 2000 ml when not yet set.
+ * Falls back to the 2000 ml default when not yet set, or when the stored
+ * value is empty/whitespace, non-numeric, or outside the Settings hydration
+ * stepper's own bounds (250-6000 ml) — see HYDRATION_GOAL_MIN_ML/MAX_ML.
  */
 export async function getHydrationGoal(): Promise<number> {
   const raw = await getSetting(SETTING_HYDRATION_GOAL_ML);
-  if (raw !== null && !isNaN(Number(raw))) return Number(raw);
+  if (raw === null || raw.trim() === '') return DEFAULT_HYDRATION_GOAL_ML;
+  const parsed = Number(raw);
+  if (
+    Number.isFinite(parsed) &&
+    parsed >= HYDRATION_GOAL_MIN_ML &&
+    parsed <= HYDRATION_GOAL_MAX_ML
+  ) {
+    return parsed;
+  }
   return DEFAULT_HYDRATION_GOAL_ML;
 }
 
@@ -1928,27 +2466,34 @@ export async function getWaterForDay(dateKey: string): Promise<number> {
  * Increment (or decrement) the water total for `dateKey` by `ml`.
  * The result is clamped to a minimum of 0 — it never goes negative.
  *
- * Upsert-safe: if no row exists for the date (e.g. outside the rolling
- * window) it inserts one with water_ml = max(0, ml).
+ * Ensures a daily_log row exists for `dateKey` first (#305) — e.g. when
+ * `dateKey` is outside the current rolling window — using the same
+ * template/hammer-task values syncRollingSchedule() would generate for it,
+ * then applies the increment to that row's (default 0) water_ml.
  */
 export async function addWater(dateKey: string, ml: number): Promise<void> {
   const db = getDatabase();
-  await db.runAsync(
+  await _ensureDailyLogRow(db, dateKey);
+  const result = await db.runAsync(
     `UPDATE daily_log SET water_ml = MAX(0, water_ml + ?) WHERE date = ?`,
     [ml, dateKey]
   );
+  _assertWrote(result, 'addWater', dateKey);
 }
 
 /**
  * Overwrite the water total for `dateKey` to exactly `ml` (clamped ≥ 0).
+ * Ensures a daily_log row exists for `dateKey` first (#305).
  */
 export async function setWaterForDay(dateKey: string, ml: number): Promise<void> {
   const db = getDatabase();
+  await _ensureDailyLogRow(db, dateKey);
   const clamped = Math.max(0, ml);
-  await db.runAsync(
+  const result = await db.runAsync(
     `UPDATE daily_log SET water_ml = ? WHERE date = ?`,
     [clamped, dateKey]
   );
+  _assertWrote(result, 'setWaterForDay', dateKey);
 }
 
 /**
@@ -1956,14 +2501,19 @@ export async function setWaterForDay(dateKey: string, ml: number): Promise<void>
  * Days with no row (outside the rolling window) are omitted.
  *
  * @param sinceDateKey - Earliest date to include (YYYY-MM-DD).
+ * @param untilDateKey - Latest date to include (YYYY-MM-DD), inclusive.
+ *   Defaults to today. Without this bound, the future daily_log rows
+ *   _syncRollingSchedule() pre-creates (today+1..+7, water_ml = 0) would be
+ *   included and silently drag down a "last N days" average (#306).
  */
 export async function getWaterHistory(
-  sinceDateKey: string
+  sinceDateKey: string,
+  untilDateKey: string = toISODate()
 ): Promise<{ date: string; water_ml: number }[]> {
   const db = getDatabase();
   const rows = await db.getAllAsync<{ date: string; water_ml: number }>(
-    'SELECT date, water_ml FROM daily_log WHERE date >= ? ORDER BY date ASC',
-    [sinceDateKey]
+    'SELECT date, water_ml FROM daily_log WHERE date >= ? AND date <= ? ORDER BY date ASC',
+    [sinceDateKey, untilDateKey]
   );
   return rows;
 }
@@ -2096,27 +2646,40 @@ export interface WorkoutSet {
 /**
  * Insert one logged set for an exercise on `date`.
  *
+ * `set_index` is NOT caller-supplied (#317): it's assigned atomically as one
+ * past the current max set_index for this (date, exercise) pair, via a
+ * single INSERT…SELECT rather than a separate read-then-write. The previous
+ * design took a caller-computed index (DashboardScreen used
+ * `existingSets.length`), which collided with a surviving row's set_index
+ * whenever a set was deleted before the next one was logged. v37 (schema.ts)
+ * enforces UNIQUE(date, exercise, set_index) at the schema level, so any
+ * remaining race would throw here rather than silently duplicate.
+ *
  * @param date      - YYYY-MM-DD date key (use toISODate() / localDateKey()).
  * @param exercise  - Exercise name (matches Exercise.name from daily_log.exercises).
- * @param set       - Set details: index within the session, reps performed, weight in kg.
+ * @param set       - Set details: reps performed, weight in kg.
  */
 export async function logWorkoutSet(
   date: string,
   exercise: string,
-  set: { setIndex: number; reps: number; weightKg: number }
+  set: { reps: number; weightKg: number }
 ): Promise<void> {
   const db = getDatabase();
   const createdAt = new Date().toISOString();
   await db.runAsync(
     `INSERT INTO workout_set_log (date, exercise, set_index, reps, weight_kg, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [date, exercise, set.setIndex, set.reps, set.weightKg, createdAt]
+     SELECT ?, ?, COALESCE(MAX(set_index), -1) + 1, ?, ?, ?
+     FROM workout_set_log WHERE date = ? AND exercise = ?`,
+    [date, exercise, set.reps, set.weightKg, createdAt, date, exercise]
   );
 }
 
 /**
- * Return all sets logged for `date`, ordered by exercise name then set_index.
- * Used on the Dashboard to display already-logged sets for today's session.
+ * Return all sets logged for `date`, ordered by exercise name then by
+ * logging order (created_at, then id to break exact-timestamp ties).
+ * set_index (#317) is a uniqueness key, not an ordering key — it isn't used
+ * here. Used on the Dashboard to display already-logged sets for today's
+ * session.
  *
  * @param date - YYYY-MM-DD date key.
  */
@@ -2124,15 +2687,16 @@ export async function getWorkoutSetsForDay(date: string): Promise<WorkoutSet[]> 
   const db = getDatabase();
   return db.getAllAsync<WorkoutSet>(
     `SELECT * FROM workout_set_log WHERE date = ?
-     ORDER BY exercise ASC, set_index ASC`,
+     ORDER BY exercise ASC, created_at ASC, id ASC`,
     [date]
   );
 }
 
 /**
  * Return all sets logged for `exercise` since `sinceDateKey` (inclusive),
- * ordered chronologically (date ASC, set_index ASC). Used to build progression
- * charts and compute PRs.
+ * ordered chronologically (date ASC, created_at ASC, id ASC — #317: set_index
+ * is a uniqueness key, not an ordering key). Used to build progression charts
+ * and compute PRs.
  *
  * @param exercise      - Exercise name.
  * @param sinceDateKey  - Optional earliest date (YYYY-MM-DD). Defaults to all history.
@@ -2145,13 +2709,13 @@ export async function getWorkoutHistory(
   if (sinceDateKey) {
     return db.getAllAsync<WorkoutSet>(
       `SELECT * FROM workout_set_log WHERE exercise = ? AND date >= ?
-       ORDER BY date ASC, set_index ASC`,
+       ORDER BY date ASC, created_at ASC, id ASC`,
       [exercise, sinceDateKey]
     );
   }
   return db.getAllAsync<WorkoutSet>(
     `SELECT * FROM workout_set_log WHERE exercise = ?
-     ORDER BY date ASC, set_index ASC`,
+     ORDER BY date ASC, created_at ASC, id ASC`,
     [exercise]
   );
 }

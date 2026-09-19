@@ -28,6 +28,17 @@
  *   - cancelBackupReminder()
  *   - getBackupReminderIdentifier()
  *   - reconcileScheduledNotifications() extended to sync backup reminder
+ *
+ * #309 additions:
+ *   - All 4 recurring scheduleNotificationAsync calls (workout, cook-day,
+ *     meal, backup) now pass a stable `identifier` instead of letting
+ *     expo-notifications assign a random UUID, so rescheduling the same
+ *     reminder replaces the OS entry instead of duplicating it.
+ *   - reconcileScheduledNotifications() runs a one-shot
+ *     cancelAllScheduledNotificationsAsync() sweep on the first call after
+ *     upgrade (gated by the notificationIdSweepV1Done app_state flag),
+ *     before any per-reminder rescheduling in that same pass, to clear out
+ *     notifications scheduled under the old random-UUID scheme.
  */
 
 import * as Notifications from 'expo-notifications';
@@ -57,10 +68,21 @@ const ANDROID_CHANNEL_ID = 'reminders';
 const WORKOUT_REMINDER_ID_KEY = 'workoutReminderNotificationId';
 const WEEKLY_COOK_DAY_ID_KEY = 'weeklyCookDayNotificationId';
 
+/** Stable notification identifier for the workout reminder (#309). */
+const WORKOUT_REMINDER_IDENTIFIER = 'workout-reminder';
+/** Stable notification identifier for the weekly cook-day reminder (#309). */
+const COOKDAY_REMINDER_IDENTIFIER = 'cookday-reminder';
+
 /** Stable notification identifier for the backup reminder. */
 const BACKUP_REMINDER_IDENTIFIER = 'backup-reminder';
 /** app_state key for the OS-scheduled notification id. */
 const BACKUP_REMINDER_ID_KEY = 'backupReminderNotificationId';
+
+/**
+ * app_state flag gating the one-shot post-upgrade sweep in
+ * reconcileScheduledNotifications() — see #309.
+ */
+const NOTIFICATION_ID_SWEEP_V1_KEY = 'notificationIdSweepV1Done';
 
 // ─── Foreground display handler ────────────────────────────────────────────
 
@@ -161,6 +183,7 @@ export async function scheduleWorkoutReminder(time: string): Promise<void> {
     const { hour, minute } = parseTimeString(time);
 
     const id = await Notifications.scheduleNotificationAsync({
+      identifier: WORKOUT_REMINDER_IDENTIFIER,
       content: {
         title: 'Time to train',
         body: "Your workout is waiting. Let's do this.",
@@ -224,6 +247,7 @@ export async function scheduleWeeklyCookDay(day: number, time: string): Promise<
     const weekday = mapWeekdayToExpo(day);
 
     const id = await Notifications.scheduleNotificationAsync({
+      identifier: COOKDAY_REMINDER_IDENTIFIER,
       content: {
         title: 'Cook day',
         body: 'Time to restock your meals for the week.',
@@ -295,6 +319,7 @@ export async function scheduleMealReminder(meal: MealType, hour: number, minute:
     const { title, body } = MEAL_REMINDER_CONTENT[meal];
 
     const id = await Notifications.scheduleNotificationAsync({
+      identifier: getMealReminderIdentifier(meal),
       content: {
         title,
         body,
@@ -431,6 +456,7 @@ export async function scheduleBackupReminder(day: number, time: string): Promise
     const weekday = mapWeekdayToExpo(day);
 
     const id = await Notifications.scheduleNotificationAsync({
+      identifier: getBackupReminderIdentifier(),
       content: {
         title: 'Back up your data',
         body: "It's been a while — save a backup so you don't lose your history.",
@@ -471,18 +497,106 @@ export async function cancelBackupReminder(): Promise<void> {
 
 // ─── Reconcile ───────────────────────────────────────────────────────────────
 
+/** The `_reconcile()` pass currently in flight, if any (#311). */
+let inFlightPass: Promise<void> | null = null;
+/** A single trailing pass queued to start once `inFlightPass` finishes (#311). */
+let queuedPass: Promise<void> | null = null;
+/** Resolver for the promise handed out to every caller sharing `queuedPass`. */
+let queuedResolve: (() => void) | null = null;
+
 /**
  * Read persisted settings and bring the OS scheduled notifications into sync.
  *
  * Call this:
  *   1. From App.tsx after initDatabase() resolves (startup reconcile).
  *   2. From SettingsScreen after any toggle or time change.
+ *   3. From importBackup() after a successful restore (#310).
  *
  * This is intentionally defensive — any failure is logged, never thrown.
+ *
+ * Coalescing in-flight guard (#311): at most one `_reconcile()` pass runs at
+ * a time. A call made while a pass is already running does not start a
+ * second, overlapping pass — every such call joins a single trailing pass
+ * (shared by all of them), which starts only once the current pass finishes
+ * and re-reads live settings at that point.
+ *
+ * CONTRACT: the promise returned to a caller resolves only once a pass that
+ * STARTED AFTER that call has completed — never the promise of a pass that
+ * was already running when the call was made. This matters because
+ * importBackup() (#310) awaits this immediately after restoring settings and
+ * must observe a pass that actually read the restored values, not a stale
+ * one that may have already read the old ones before the restore happened.
  */
-export async function reconcileScheduledNotifications(): Promise<void> {
+export function reconcileScheduledNotifications(): Promise<void> {
+  if (!inFlightPass) {
+    inFlightPass = runPass();
+    return inFlightPass;
+  }
+  if (!queuedPass) {
+    queuedPass = new Promise<void>((resolve) => {
+      queuedResolve = resolve;
+    });
+  }
+  return queuedPass;
+}
+
+/**
+ * Runs one `_reconcile()` pass and, once it settles, atomically either
+ * clears the in-flight guard or hands off to the queued trailing pass (if
+ * any caller joined one while this pass was running). The hand-off happens
+ * synchronously inside a single `.finally()` callback so there is no window
+ * where another caller could observe an inconsistent guard state.
+ */
+function runPass(): Promise<void> {
+  return _reconcile()
+    .catch((err) => {
+      // _reconcile() isolates every reminder behind its own try/catch (see
+      // below), so this should never actually fire — but it's the backstop
+      // that guarantees the guard can't get stuck on `inFlightPass` if
+      // something unexpected still slips through (#311).
+      console.warn('[Notifications] reconcileScheduledNotifications failed:', err);
+    })
+    .finally(() => {
+      if (queuedResolve) {
+        const resolve = queuedResolve;
+        queuedPass = null;
+        queuedResolve = null;
+        inFlightPass = runPass();
+        inFlightPass.then(resolve, resolve);
+      } else {
+        inFlightPass = null;
+      }
+    });
+}
+
+/**
+ * Runs the actual reconcile pass. Each reminder is isolated behind its own
+ * try/catch (#311) so one throwing getter only skips that reminder instead
+ * of aborting every reminder after it in the same pass — stable identifiers
+ * (#309) make (re)scheduling idempotent, so it's safe for the rest of the
+ * pass to keep going regardless of which step failed.
+ */
+async function _reconcile(): Promise<void> {
+  // One-shot post-upgrade sweep (#309): notifications scheduled before
+  // stable identifiers existed carry Expo-random UUIDs, so rescheduling
+  // under the new stable ids would leave those old entries orphaned in
+  // the OS. Clear everything exactly once, gated by an app_state flag,
+  // BEFORE any of the per-reminder (re)scheduling below in this same pass.
+  // If the sweep itself throws, the flag is deliberately left unset (so a
+  // later pass retries it) rather than being set in the catch block.
   try {
-    // Workout reminder
+    const sweepDone = await getSetting(NOTIFICATION_ID_SWEEP_V1_KEY);
+    if (sweepDone !== 'true') {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      await setSetting(NOTIFICATION_ID_SWEEP_V1_KEY, 'true');
+      console.log('[Notifications] One-time notification-id sweep complete.');
+    }
+  } catch (err) {
+    console.warn('[Notifications] reconcile: notification-id sweep failed:', err);
+  }
+
+  // Workout reminder
+  try {
     const workoutEnabled = await getWorkoutReminderEnabled();
     const workoutTime = await getWorkoutReminderTime();
 
@@ -491,8 +605,12 @@ export async function reconcileScheduledNotifications(): Promise<void> {
     } else {
       await cancelWorkoutReminder();
     }
+  } catch (err) {
+    console.warn('[Notifications] reconcile: workout reminder failed:', err);
+  }
 
-    // Weekly cook-day reminder
+  // Weekly cook-day reminder
+  try {
     const cookDayEnabled = await getWeeklyCookDayEnabled();
     const cookDay = await getWeeklyCookDay();
     const cookDayTime = await getWeeklyCookDayTime();
@@ -502,10 +620,15 @@ export async function reconcileScheduledNotifications(): Promise<void> {
     } else {
       await cancelWeeklyCookDay();
     }
+  } catch (err) {
+    console.warn('[Notifications] reconcile: weekly cook-day reminder failed:', err);
+  }
 
-    // Meal-time reminders (#287)
-    const meals: MealType[] = ['breakfast', 'lunch', 'dinner'];
-    for (const meal of meals) {
+  // Meal-time reminders (#287) — isolated per meal so one bad getter only
+  // skips that meal, not the other two.
+  const meals: MealType[] = ['breakfast', 'lunch', 'dinner'];
+  for (const meal of meals) {
+    try {
       const enabled = await getMealReminderEnabled(meal);
       const time = await getMealReminderTime(meal);
       const { hour, minute } = parseTimeString(time);
@@ -514,9 +637,13 @@ export async function reconcileScheduledNotifications(): Promise<void> {
       } else {
         await cancelMealReminder(meal);
       }
+    } catch (err) {
+      console.warn(`[Notifications] reconcile: meal reminder (${meal}) failed:`, err);
     }
+  }
 
-    // Backup reminder (#293)
+  // Backup reminder (#293)
+  try {
     const backupEnabled = await getBackupReminderEnabled();
     const backupDay = await getBackupReminderDay();
     const backupTime = await getBackupReminderTime();
@@ -527,6 +654,6 @@ export async function reconcileScheduledNotifications(): Promise<void> {
       await cancelBackupReminder();
     }
   } catch (err) {
-    console.warn('[Notifications] reconcileScheduledNotifications failed:', err);
+    console.warn('[Notifications] reconcile: backup reminder failed:', err);
   }
 }

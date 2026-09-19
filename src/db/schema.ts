@@ -5,7 +5,8 @@
  *   - schema_version   — applied migration versions (never use user_version PRAGMA)
  *   - app_state        — key-value store (e.g., app_start_date)
  *   - weekly_template  — 7 base rows, one per weekday (seeded in v4-v10)
- *   - daily_log        — rolling tracker, date-keyed, pruned to +/-7 days
+ *   - daily_log        — rolling tracker, date-keyed; history is retained (not pruned, #300) —
+ *                        callers bound their own reads via getRollingWindow()/getDailyLogsBetween()
  *                        body_weight column (v20) stores weight — there is no weight_log table
  *
  * Selected migration notes:
@@ -610,5 +611,173 @@ export const MIGRATIONS: Migration[] = [
     weight_kg  REAL    NOT NULL,
     created_at TEXT    NOT NULL
   );
+` },
+  // v34: Track which meal_inventory batch a weekly_meal_plan row's tick
+  // debited, so unticking can credit back that exact batch instead of
+  // guessing (#302). Nullable, no REFERENCES: a row ticked before this
+  // migration has no recorded source batch (see toggleMealConsumed's
+  // handling of the legacy-NULL case in database.ts), and the pointer must
+  // also survive its source batch being deleted without a FK violation.
+  { version: 34, sql: `ALTER TABLE weekly_meal_plan ADD COLUMN consumed_from_inventory_id INTEGER;` },
+  // v35 (#303): weekly_meal_plan could accumulate duplicate rows for the
+  // same (date, meal_type) slot — there was never a UNIQUE constraint (v26
+  // DDL only; v34 only added a column), and assignMealToPlan's pre-fix
+  // UPDATE branch never refunded or cleared a consumed slot's inventory
+  // pointer, so a reassignment could leave both an orphaned pointer and,
+  // via other code paths, a duplicate row.
+  //
+  // For each (date, meal_type) group with more than one row, survivor
+  // selection (orchestrator rule) is: the consumed row (is_consumed = 1)
+  // with the highest id if the group has any consumed row, otherwise the
+  // highest id overall — never delete a row the user ticked as eaten while
+  // keeping an unticked one. Every other row in the group is a loser; a
+  // loser that was itself consumed with a recorded
+  // consumed_from_inventory_id credits +1 back to that meal_inventory row
+  // (count-based — two losers pointing at the same batch both credit)
+  // before any row is deleted.
+  //
+  // Kill-safety relies entirely on runMigrations() (database.ts), not on
+  // anything in this SQL: it runs this migration's whole SQL string AND its
+  // schema_version bookkeeping row inside one withTransactionAsync (#314).
+  // A kill/crash at any point during this migration rolls the whole thing
+  // back — including a partially-applied credit UPDATE — so the next launch
+  // re-runs it from scratch instead of resuming partway through.
+  //
+  // This migration's three statements are NOT individually idempotent: the
+  // credit UPDATE is unconditional on "this loser is consumed and points at
+  // a batch", not on "hasn't been credited yet", so executing it a second
+  // time against already-credited, already-deduped data (e.g. by running
+  // this SQL directly, outside runMigrations()'s transaction, the way
+  // migrationAtomicity.test.ts's "v35 kill-safety" case does to simulate a
+  // kill) would double-credit meal_inventory. Do not wrap this migration's
+  // SQL in its own BEGIN/COMMIT to try to make it self-contained — nested
+  // inside runMigrations()'s transaction, that would throw and brick
+  // upgrades. The three steps are still ordered credit-then-delete-then-index
+  // for readability (so the intended data flow is visible statement by
+  // statement), and the index is CREATE ... IF NOT EXISTS purely so it
+  // can't collide with itself if this SQL is ever re-executed directly
+  // (as tests do) rather than through the version-gated runner.
+  { version: 35, sql: `
+  WITH survivors AS (
+    SELECT g.date AS date, g.meal_type AS meal_type,
+      COALESCE(
+        (SELECT w2.id FROM weekly_meal_plan w2
+         WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
+         ORDER BY w2.id DESC LIMIT 1),
+        (SELECT w3.id FROM weekly_meal_plan w3
+         WHERE w3.date = g.date AND w3.meal_type = g.meal_type
+         ORDER BY w3.id DESC LIMIT 1)
+      ) AS survivor_id
+    FROM weekly_meal_plan g
+    GROUP BY g.date, g.meal_type
+  )
+  UPDATE meal_inventory
+  SET portions_available = portions_available + (
+    SELECT COUNT(*)
+    FROM weekly_meal_plan loser
+    JOIN survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
+    WHERE loser.consumed_from_inventory_id = meal_inventory.id
+      AND loser.is_consumed = 1
+      AND loser.id != s.survivor_id
+  )
+  WHERE EXISTS (
+    SELECT 1
+    FROM weekly_meal_plan loser
+    JOIN survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
+    WHERE loser.consumed_from_inventory_id = meal_inventory.id
+      AND loser.is_consumed = 1
+      AND loser.id != s.survivor_id
+  );
+
+  WITH survivors AS (
+    SELECT g.date AS date, g.meal_type AS meal_type,
+      COALESCE(
+        (SELECT w2.id FROM weekly_meal_plan w2
+         WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
+         ORDER BY w2.id DESC LIMIT 1),
+        (SELECT w3.id FROM weekly_meal_plan w3
+         WHERE w3.date = g.date AND w3.meal_type = g.meal_type
+         ORDER BY w3.id DESC LIMIT 1)
+      ) AS survivor_id
+    FROM weekly_meal_plan g
+    GROUP BY g.date, g.meal_type
+  )
+  DELETE FROM weekly_meal_plan
+  WHERE id NOT IN (SELECT survivor_id FROM survivors);
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_meal_plan_date_meal_type ON weekly_meal_plan(date, meal_type);
+` },
+  // v36 (#331): three real full-table-scan gaps, found by checking every
+  // WHERE clause against the 35 indexes that existed before this one (not
+  // by re-litigating the original issue's list, which was stale — v35/#303
+  // already added weekly_meal_plan's (date, meal_type) unique index).
+  // workout_set_log in particular grows without bound (one row per logged
+  // set, forever), so its scans only get worse over time:
+  //   - getWorkoutSetsForDay: WHERE date = ?
+  //   - getWorkoutHistory:    WHERE exercise = ? [AND date >= ?] ORDER BY date
+  //   - logCookedMeal / toggleMealConsumed / the inventory upsert:
+  //                           WHERE recipe_id = ? AND portions_available > 0
+  // daily_log needs nothing — `date` is already its PRIMARY KEY.
+  //
+  // Deliberately cut, so as not to add indexes nothing queries by:
+  //   - weekly_meal_plan(date) — redundant with v35's UNIQUE (date,
+  //     meal_type), which already serves date-prefix scans.
+  //   - cook_log(recipe_id) — no query in database.ts filters on it.
+  //
+  // Plain, non-unique indexes only: lane D's #317 will append v37 with a
+  // UNIQUE(date, exercise, set_index) on workout_set_log, so this migration
+  // doesn't pre-empt that constraint. All three CREATE INDEX statements are
+  // IF NOT EXISTS, so re-running this SQL (directly, or via the
+  // schema_version-gated runner) is a no-op.
+  { version: 36, sql: `
+  CREATE INDEX IF NOT EXISTS idx_workout_set_log_date ON workout_set_log(date);
+  CREATE INDEX IF NOT EXISTS idx_workout_set_log_exercise_date ON workout_set_log(exercise, date);
+  CREATE INDEX IF NOT EXISTS idx_meal_inventory_recipe ON meal_inventory(recipe_id);
+` },
+  // v37 (#317): workout_set_log.set_index was never a uniqueness key — it
+  // was whatever the sole caller (DashboardScreen's handleLogSet, via
+  // logWorkoutSet) computed client-side as `existingSets.length` at call
+  // time. Deleting a middle set shortened that array, so the next logged
+  // set recomputed a set_index a surviving row already had. logWorkoutSet
+  // (database.ts) is fixed alongside this migration to assign set_index
+  // atomically via INSERT…SELECT MAX(set_index)+1 instead of trusting a
+  // caller-supplied value — but that fix does nothing for rows already on
+  // disk. This migration renumbers every existing row densely (0, 1, 2, …)
+  // per (date, exercise), ordered by (created_at, id) — the same order
+  // getWorkoutSetsForDay/getWorkoutHistory now read by (set_index is no
+  // longer an ORDER BY column) — then adds a UNIQUE index on
+  // (date, exercise, set_index) so the database itself rejects any future
+  // collision, not just logWorkoutSet's new INSERT…SELECT.
+  //
+  // Idempotent: the renumber UPDATE recomputes new_index from (created_at,
+  // id) order every time, and that order doesn't change between runs, so
+  // re-running it against already-renumbered data assigns every row the
+  // value it already has — a genuine no-op, not one that merely happens not
+  // to throw. CREATE UNIQUE INDEX IF NOT EXISTS is idempotent on its own.
+  //
+  // Ordering constraint (orchestrator addition, #317): the renumber UPDATE
+  // must only ever run while idx_workout_set_log_date_exercise_set_index
+  // does NOT exist. Run row-by-row with the index already present, a table
+  // with real gaps could have an intermediate row transiently collide with
+  // another row's not-yet-updated value, even though the fully-applied
+  // result never has a real duplicate. Two call sites run this SQL, and
+  // both uphold that invariant structurally, not by convention:
+  //   - A fresh install or upgrade (runMigrations, database.ts): this
+  //     migration's own SQL creates the index itself, AFTER the UPDATE, in
+  //     the same string — no device has the index until this migration
+  //     finishes.
+  //   - Restore (restoreFromPayload, database.ts): DROPs the index before
+  //     its restore loop (so a legacy backup's colliding/gapped
+  //     workout_set_log rows can be inserted at all) and only re-runs this
+  //     migration's SQL — looked up at runtime via
+  //     POST_RESTORE_MIGRATION_VERSIONS, never copied or reimplemented,
+  //     same pattern as v35/#303 — after every table has been restored.
+  { version: 37, sql: `
+  WITH ranked AS (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY date, exercise ORDER BY created_at ASC, id ASC) - 1 AS new_index
+    FROM workout_set_log
+  )
+  UPDATE workout_set_log SET set_index = (SELECT new_index FROM ranked WHERE ranked.id = workout_set_log.id);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_set_log_date_exercise_set_index ON workout_set_log(date, exercise, set_index);
 ` },
 ];
