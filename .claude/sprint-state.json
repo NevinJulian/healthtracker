@@ -237,7 +237,7 @@
     "G": {
       "branch": "sprint/lane-g-tests",
       "worktree": "C:/git/ht-lanes/lane-g",
-      "status": "merging",
+      "status": "merged",
       "order": [
         336
       ],
@@ -247,7 +247,8 @@
         336
       ],
       "parked": [],
-      "notes": "cleanup: no changes (ac5855a). Merging 7e16b78."
+      "notes": "merged 71cfcea; integration gates green: typecheck clean, 584/55 (default, CI=true TZ=UTC, Europe/Zurich).",
+      "mergeSha": "71cfcea"
     }
   },
   "issues": {
@@ -813,7 +814,7 @@
         "7e16b78"
       ],
       "lane": "G",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-g-tests",
       "notes": "tester APPROVE r2 at 7e16b78: realistic mutations a/b/c/d caught (steps 43/11/28/23) + finishCooking always-insert mutation caught (non-circular); op counts tick 80 untick 52 assign 20 reassign 20 finishCooking 11, 14 null-pointer ticks; test1 time pinned; CLAUDE.md accurate (15 RNTL files). All #336 ACs met -> Closes.",
       "securityReview": "skipped-tests-ci-docs-only"
@@ -2301,6 +2302,19 @@
     {
       "at": "2026-09-19T04:45:54Z",
       "event": "lane G: status=merging notes=…"
+    },
+    {
+      "at": "2026-09-19T04:46:29Z",
+      "event": "lane G: status=merged mergeSha=71cfcea notes=…"
+    },
+    {
+      "at": "2026-09-19T04:46:29Z",
+      "event": "#336: status=merged"
+    },
+    {
+      "at": "2026-09-19T04:46:29Z",
+      "event": "lane G merged; FINAL gates on sprint/auto-fixes: typecheck clean, 584 tests / 55 suites (also CI=true TZ=UTC and TZ=Europe/Zurich)",
+      "sha": "71cfcea"
     }
   ],
   "duplicatesClosed": [
@@ -2309,5 +2323,12 @@
       "duplicateOf": 360,
       "note": "sprint filed the #308 react-test-renderer finding twice (22:49Z and 22:53Z); closed #359 as duplicate with comment"
     }
-  ]
+  ],
+  "final": {
+    "integrationSha": "71cfcea",
+    "typecheck": "pass",
+    "tests": 584,
+    "testSuites": 55,
+    "step": "4-pr"
+  }
 }
