@@ -15,23 +15,42 @@
  * asserted anyway as a cheap, direct check of that guarantee.
  *
  * No new dependencies (no fast-check): an inline mulberry32(seed) PRNG at a
- * fixed seed drives 200 steps drawn from {tick, untick, assign, reassign,
+ * fixed seed drives a weighted sequence of {tick, untick, assign, reassign,
  * finishCooking}, each op's target chosen from the CURRENT DB state (e.g.
- * tick only ever targets a currently-unconsumed plan row). After every step,
- * four invariants are checked against the real DB:
- *   (a) no portions_available is negative
- *   (b) no fabrication: per recipe, portions available never exceed the
- *       total ever cooked (tracked in JS, incremented only by this test's
- *       own finishCooking() calls)
- *   (c) conservation: per recipe, SUM(portions_available) + count of
- *       currently-consumed plan rows whose consumed_from_inventory_id
- *       points at a batch of that recipe == total cooked. (A ticked row
- *       with a NULL pointer — toggleMealConsumed found no stock to debit —
- *       is deliberately excluded from the "debited" count, matching the
- *       documented "never pretend a portion was consumed from inventory
- *       that doesn't exist" behaviour; see toggleMealConsumed's comment.)
- *   (d) every non-null consumed_from_inventory_id resolves to an existing
- *       meal_inventory row (see guarantee note above)
+ * tick only ever targets a currently-unconsumed plan row). Ticks and unticks
+ * are weighted well above cooking so consumption reliably outpaces
+ * production — stock actually runs out (reaching the null-pointer-tick
+ * path, i.e. "the code found no stock to debit"), and a recipe reliably
+ * accumulates a second meal_inventory batch once its first is drained and
+ * cooked again. Both are asserted at the end so a future change can't make
+ * either path silently vacuous.
+ *
+ * Two independent kinds of invariant are checked after EVERY step:
+ *
+ *   Per-recipe (aggregate, cheap, catches gross violations):
+ *     (a) no portions_available is negative
+ *     (b) no fabrication: per recipe, portions available never exceed the
+ *         total ever cooked (tracked in JS, incremented only by this
+ *         test's own finishCooking() calls)
+ *     (c) conservation: per recipe, SUM(portions_available) + count of
+ *         currently-consumed plan rows whose consumed_from_inventory_id
+ *         points at a batch of that recipe == total cooked
+ *     (d) every non-null consumed_from_inventory_id resolves to an
+ *         existing meal_inventory row (see guarantee note above)
+ *
+ *   Per-batch (exact, catches #336's literal target — "the credit returns
+ *   to the debited batch", not just to *some* batch of the right recipe):
+ *   before and after every mutating call, every meal_inventory row's
+ *   portions_available is snapshotted. The op's ground truth is read
+ *   directly from the DB around the call (e.g. a tick's actual
+ *   consumed_from_inventory_id, read back immediately after
+ *   toggleMealConsumed — not guessed), producing an *expected* per-batch
+ *   delta map. That is compared, batch id by batch id, against the
+ *   *actual* delta map. A bug that credits the wrong batch of the same
+ *   recipe (main's pre-#302 "ORDER BY date_cooked DESC LIMIT 1" behaviour)
+ *   leaves every per-recipe SUM invariant above untouched — the recipe
+ *   total is identical either way — which is exactly why this second,
+ *   per-batch layer exists.
  *
  * Uses the same sql.js-backed adapter and fresh-module-per-test pattern as
  * syncRollingSchedule.test.ts. Recipes are the real, seeded recipe_library
@@ -44,6 +63,7 @@ import { addDays, todayKey } from '../../utils/dates';
 import { createSqljsDb } from '../testHelpers/sqljsExpoAdapter';
 
 type DatabaseModule = typeof import('../database');
+type RawDb = ReturnType<DatabaseModule['getDatabase']>;
 
 function loadFreshDatabaseModule(): DatabaseModule {
   jest.resetModules();
@@ -81,13 +101,38 @@ function mulberry32(seed: number): () => number {
 
 const SEED = 0xc0ffee;
 const N_STEPS = 200;
+
 const OPS = ['tick', 'untick', 'assign', 'reassign', 'finishCooking'] as const;
 type Op = (typeof OPS)[number];
+
+// Ticks/unticks weighted well above cooking so consumption reliably
+// outpaces production — see file header. finishCooking's servings are also
+// deliberately small (1-2, not 1-3) for the same reason: smaller batches
+// drain faster.
+const OP_WEIGHTS: { op: Op; weight: number }[] = [
+  { op: 'tick', weight: 6 },
+  { op: 'untick', weight: 3 },
+  { op: 'assign', weight: 1 },
+  { op: 'reassign', weight: 1 },
+  { op: 'finishCooking', weight: 1 },
+];
+
+function weightedPick(rand: () => number): Op {
+  const total = OP_WEIGHTS.reduce((s, w) => s + w.weight, 0);
+  let r = rand() * total;
+  for (const { op, weight } of OP_WEIGHTS) {
+    if (r < weight) return op;
+    r -= weight;
+  }
+  return OP_WEIGHTS[OP_WEIGHTS.length - 1].op;
+}
 
 interface StepLogEntry {
   step: number;
   op: Op | `${Op}(skipped: no target)`;
   args: Record<string, unknown>;
+  expectedDeltas: Record<string, number>;
+  actualDeltas: Record<string, number>;
   totals: Record<string, { available: number; totalCooked: number }>;
 }
 
@@ -102,13 +147,40 @@ function failWithLog(log: StepLogEntry[], message: string): never {
   );
 }
 
-describe('meal inventory debit/credit invariants under a random tick/untick/assign/reassign/finishCooking sequence (#336)', () => {
+type BatchSnapshot = Map<number, { recipe_id: string; portions_available: number }>;
+
+async function snapshotBatches(rawDb: RawDb): Promise<BatchSnapshot> {
+  const rows = await rawDb.getAllAsync<{ id: number; recipe_id: string; portions_available: number }>(
+    'SELECT id, recipe_id, portions_available FROM meal_inventory'
+  );
+  return new Map(rows.map((r) => [r.id, { recipe_id: r.recipe_id, portions_available: r.portions_available }]));
+}
+
+function computeActualDeltas(before: BatchSnapshot, after: BatchSnapshot): Record<string, number> {
+  const ids = new Set<number>([...before.keys(), ...after.keys()]);
+  const deltas: Record<string, number> = {};
+  for (const id of ids) {
+    const b = before.get(id)?.portions_available ?? 0;
+    const a = after.get(id)?.portions_available ?? 0;
+    if (a !== b) deltas[String(id)] = a - b;
+  }
+  return deltas;
+}
+
+function deltasEqual(expected: Record<string, number>, actual: Record<string, number>): boolean {
+  const expectedKeys = Object.keys(expected).sort();
+  const actualKeys = Object.keys(actual).sort();
+  if (expectedKeys.length !== actualKeys.length) return false;
+  return expectedKeys.every((k, i) => k === actualKeys[i] && expected[k] === actual[k]);
+}
+
+describe('meal inventory debit/credit invariants under a weighted random tick/untick/assign/reassign/finishCooking sequence (#336)', () => {
   afterEach(() => {
     jest.dontMock('expo-sqlite');
     jest.useRealTimers();
   });
 
-  it(`holds portions_available >= 0, no fabrication, and conservation for every recipe after each of ${N_STEPS} steps (seed=0xC0FFEE)`, async () => {
+  it(`holds per-recipe conservation AND per-batch credit-goes-to-the-debited-batch for ${N_STEPS} steps (seed=0xC0FFEE)`, async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase(); // real time
 
@@ -130,7 +202,12 @@ describe('meal inventory debit/credit invariants under a random tick/untick/assi
     const mealTypes = ['breakfast', 'lunch', 'dinner'];
 
     const totalCooked: Record<string, number> = {};
-    for (const r of recipeIds) totalCooked[r] = 0;
+    const batchesEverSeenByRecipe: Record<string, Set<number>> = {};
+    for (const r of recipeIds) {
+      totalCooked[r] = 0;
+      batchesEverSeenByRecipe[r] = new Set();
+    }
+    let nullPointerTickCount = 0;
 
     const rand = mulberry32(SEED);
     const log: StepLogEntry[] = [];
@@ -147,7 +224,7 @@ describe('meal inventory debit/credit invariants under a random tick/untick/assi
       return out;
     }
 
-    async function assertInvariants(step: number): Promise<void> {
+    async function assertPerRecipeInvariants(step: number): Promise<void> {
       for (const r of recipeIds) {
         const availRow = await rawDb.getFirstAsync<{ total: number | null }>(
           'SELECT COALESCE(SUM(portions_available), 0) as total FROM meal_inventory WHERE recipe_id = ?',
@@ -196,10 +273,33 @@ describe('meal inventory debit/credit invariants under a random tick/untick/assi
       }
     }
 
+    function assertPerBatchDeltas(
+      step: number,
+      op: string,
+      expectedDeltas: Record<string, number>,
+      actualDeltas: Record<string, number>
+    ): void {
+      if (!deltasEqual(expectedDeltas, actualDeltas)) {
+        failWithLog(
+          log,
+          `step ${step} (${op}): per-batch delta mismatch — expected ${JSON.stringify(expectedDeltas)}, ` +
+            `got ${JSON.stringify(actualDeltas)} (credit/debit landed on the wrong batch, or the wrong amount)`
+        );
+      }
+    }
+
+    function recordBatchSightings(snapshot: BatchSnapshot): void {
+      for (const [id, { recipe_id }] of snapshot) {
+        if (batchesEverSeenByRecipe[recipe_id]) batchesEverSeenByRecipe[recipe_id].add(id);
+      }
+    }
+
     for (let step = 0; step < N_STEPS; step++) {
-      const op = pick([...OPS], rand);
+      const op = weightedPick(rand);
       let args: Record<string, unknown> = {};
       let performed: Op | `${Op}(skipped: no target)` = op;
+      let expectedDeltas: Record<string, number> = {};
+      let actualDeltas: Record<string, number> = {};
 
       if (op === 'tick') {
         const candidates = await rawDb.getAllAsync<{ id: number }>(
@@ -209,8 +309,23 @@ describe('meal inventory debit/credit invariants under a random tick/untick/assi
           performed = 'tick(skipped: no target)';
         } else {
           const target = pick(candidates, rand);
-          args = { id: target.id };
+          const before = await snapshotBatches(rawDb);
           await db.toggleMealConsumed(target.id, true);
+          const after = await snapshotBatches(rawDb);
+
+          // Ground truth: what the code actually recorded it debited from —
+          // read back, never guessed.
+          const planAfter = await rawDb.getFirstAsync<{ consumed_from_inventory_id: number | null }>(
+            'SELECT consumed_from_inventory_id FROM weekly_meal_plan WHERE id = ?',
+            [target.id]
+          );
+          const debitedBatchId = planAfter?.consumed_from_inventory_id ?? null;
+          if (debitedBatchId == null) nullPointerTickCount += 1;
+
+          expectedDeltas = debitedBatchId != null ? { [String(debitedBatchId)]: -1 } : {};
+          actualDeltas = computeActualDeltas(before, after);
+          args = { id: target.id, debitedBatchId };
+          recordBatchSightings(after);
         }
       } else if (op === 'untick') {
         const candidates = await rawDb.getAllAsync<{ id: number }>(
@@ -220,49 +335,129 @@ describe('meal inventory debit/credit invariants under a random tick/untick/assi
           performed = 'untick(skipped: no target)';
         } else {
           const target = pick(candidates, rand);
-          args = { id: target.id };
+          // Ground truth: the batch this row's OWN prior tick actually
+          // debited from, read straight from its stored pointer before the
+          // untick runs — this is exactly what a correct credit must return
+          // to, and exactly what "ORDER BY date_cooked DESC LIMIT 1"-style
+          // guessing (main's pre-#302 shape) would get wrong whenever it
+          // isn't the same as the most-recently-cooked batch.
+          const priorRow = await rawDb.getFirstAsync<{ consumed_from_inventory_id: number | null }>(
+            'SELECT consumed_from_inventory_id FROM weekly_meal_plan WHERE id = ?',
+            [target.id]
+          );
+          const expectedCreditBatchId = priorRow?.consumed_from_inventory_id ?? null;
+
+          const before = await snapshotBatches(rawDb);
           await db.toggleMealConsumed(target.id, false);
+          const after = await snapshotBatches(rawDb);
+
+          expectedDeltas = expectedCreditBatchId != null ? { [String(expectedCreditBatchId)]: 1 } : {};
+          actualDeltas = computeActualDeltas(before, after);
+          args = { id: target.id, expectedCreditBatchId };
+          recordBatchSightings(after);
         }
-      } else if (op === 'assign') {
-        const date = pick(dates, rand);
-        const mealType = pick(mealTypes, rand);
-        const recipeId = pick(recipeIds, rand);
-        args = { date, mealType, recipeId };
-        await db.assignMealToPlan(date, mealType, recipeId);
-      } else if (op === 'reassign') {
-        const candidates = await rawDb.getAllAsync<{ id: number; date: string; meal_type: string }>(
-          'SELECT id, date, meal_type FROM weekly_meal_plan'
-        );
-        if (candidates.length === 0) {
-          performed = 'reassign(skipped: no target)';
-        } else {
+      } else if (op === 'assign' || op === 'reassign') {
+        let date: string;
+        let mealType: string;
+
+        if (op === 'reassign') {
+          const candidates = await rawDb.getAllAsync<{ date: string; meal_type: string }>(
+            'SELECT date, meal_type FROM weekly_meal_plan'
+          );
+          if (candidates.length === 0) {
+            performed = 'reassign(skipped: no target)';
+            log.push({ step, op: performed, args, expectedDeltas, actualDeltas, totals: await currentTotals() });
+            await assertPerRecipeInvariants(step);
+            continue;
+          }
           const target = pick(candidates, rand);
-          const recipeId = pick(recipeIds, rand);
-          args = { id: target.id, date: target.date, mealType: target.meal_type, recipeId };
-          await db.assignMealToPlan(target.date, target.meal_type, recipeId);
+          date = target.date;
+          mealType = target.meal_type;
+        } else {
+          date = pick(dates, rand);
+          mealType = pick(mealTypes, rand);
         }
-      } else {
-        // finishCooking — always valid: a fresh cooking_tasks row every time.
+
         const recipeId = pick(recipeIds, rand);
-        const servings = 1 + Math.floor(rand() * 3); // 1-3
+
+        // Ground truth: read the slot's CURRENT state before assigning —
+        // assignMealToPlan credits back the batch a currently-consumed
+        // slot was debited from (#302/#303), regardless of whether we
+        // found this slot via the 'assign' or 'reassign' branch above.
+        const existing = await rawDb.getFirstAsync<{
+          is_consumed: number;
+          consumed_from_inventory_id: number | null;
+        }>('SELECT is_consumed, consumed_from_inventory_id FROM weekly_meal_plan WHERE date = ? AND meal_type = ?', [
+          date,
+          mealType,
+        ]);
+        const expectedCreditBatchId =
+          existing && existing.is_consumed === 1 ? existing.consumed_from_inventory_id : null;
+
+        const before = await snapshotBatches(rawDb);
+        await db.assignMealToPlan(date, mealType, recipeId);
+        const after = await snapshotBatches(rawDb);
+
+        expectedDeltas = expectedCreditBatchId != null ? { [String(expectedCreditBatchId)]: 1 } : {};
+        actualDeltas = computeActualDeltas(before, after);
+        args = { date, mealType, recipeId, expectedCreditBatchId };
+        recordBatchSightings(after);
+      } else {
+        // finishCooking — always valid: a fresh cooking_tasks row every
+        // time. Servings kept small (1-2) so stock drains faster — see
+        // file header.
+        const recipeId = pick(recipeIds, rand);
+        const servings = 1 + Math.floor(rand() * 2); // 1-2
+
+        // Ground truth prediction using the SAME query finishCooking()
+        // itself runs (database.ts) — mirrored, not reimplemented logic:
+        // whichever batch is currently "active" (portions_available > 0)
+        // for this recipe gets the increment; otherwise a fresh row.
+        const activeBatch = await rawDb.getFirstAsync<{ id: number }>(
+          'SELECT id FROM meal_inventory WHERE recipe_id = ? AND portions_available > 0',
+          [recipeId]
+        );
+        const maxIdRow = await rawDb.getFirstAsync<{ maxId: number | null }>(
+          'SELECT MAX(id) as maxId FROM meal_inventory'
+        );
+        const predictedNewId = (maxIdRow?.maxId ?? 0) + 1;
+
+        const before = await snapshotBatches(rawDb);
         const insertResult = await rawDb.runAsync(
           'INSERT INTO cooking_tasks (recipe_id, servings_to_cook) VALUES (?, ?)',
           [recipeId, servings]
         );
         const taskId = insertResult.lastInsertRowId;
-        args = { taskId, recipeId, servings };
         await db.finishCooking(taskId, recipeId, servings);
+        const after = await snapshotBatches(rawDb);
+
+        const targetBatchId = activeBatch ? activeBatch.id : predictedNewId;
+        expectedDeltas = { [String(targetBatchId)]: servings };
+        actualDeltas = computeActualDeltas(before, after);
+        args = { taskId, recipeId, servings, targetBatchId };
         totalCooked[recipeId] += servings;
+        recordBatchSightings(after);
       }
 
-      log.push({ step, op: performed, args, totals: await currentTotals() });
-      await assertInvariants(step);
+      log.push({ step, op: performed, args, expectedDeltas, actualDeltas, totals: await currentTotals() });
+      if (!performed.toString().includes('skipped')) {
+        assertPerBatchDeltas(step, performed, expectedDeltas, actualDeltas);
+      }
+      await assertPerRecipeInvariants(step);
     }
 
-    // Sanity: the run actually exercised state, not 200 no-ops.
+    // Sanity: the run actually exercised state, not (mostly) no-ops.
     const performedSteps = log.filter((e) => !e.op.toString().includes('skipped'));
     expect(performedSteps.length).toBeGreaterThan(0);
     const totalEverCooked = Object.values(totalCooked).reduce((a, b) => a + b, 0);
     expect(totalEverCooked).toBeGreaterThan(0);
+
+    // The two preconditions the strengthened invariants above depend on to
+    // be meaningful, not vacuous — asserted explicitly so a future change
+    // to the op mix or weights can't silently stop exercising either path.
+    expect(nullPointerTickCount).toBeGreaterThanOrEqual(1);
+    for (const r of recipeIds) {
+      expect(batchesEverSeenByRecipe[r].size).toBeGreaterThanOrEqual(2);
+    }
   });
 });
