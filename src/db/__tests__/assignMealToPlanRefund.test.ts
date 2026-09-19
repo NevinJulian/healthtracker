@@ -151,10 +151,29 @@ describe('assignMealToPlan() refund + transaction (#303)', () => {
 });
 
 describe('migration v35 — dedupe weekly_meal_plan + unique index (#303)', () => {
-  it('v35 is the next integer version after v34', () => {
+  it('migration versions stay append-safe: v35 exists exactly once, versions are unique and strictly increasing, and v35 = v34 + 1', () => {
+    // Deliberately not `Math.max(...versions) === 35` — that "is-latest"
+    // framing breaks the moment a later issue legitimately appends v36
+    // (#331), v37 (#317), etc. These checks stay true forever, regardless
+    // of how many more migrations land after this one.
     const versions = MIGRATIONS.map((m) => m.version);
-    expect(Math.max(...versions)).toBe(35);
+
+    // v35 exists exactly once.
     expect(versions.filter((v) => v === 35)).toHaveLength(1);
+
+    // Versions are unique...
+    expect(new Set(versions).size).toBe(versions.length);
+
+    // ...and strictly increasing in MIGRATIONS' array order (the order
+    // runMigrations() applies them in).
+    for (let i = 1; i < versions.length; i++) {
+      expect(versions[i]).toBeGreaterThan(versions[i - 1]);
+    }
+
+    // v35 immediately follows v34 — no gap.
+    const v34Index = versions.indexOf(34);
+    expect(v34Index).toBeGreaterThanOrEqual(0);
+    expect(versions[v34Index + 1]).toBe(35);
   });
 
   async function migrateToV34(raw: RawDb): Promise<void> {
