@@ -66,7 +66,7 @@
     "A": {
       "branch": "sprint/lane-a-db",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "in_progress",
+      "status": "cleanup",
       "order": [
         300,
         301,
@@ -84,7 +84,7 @@
         331,
         326
       ],
-      "current": 315,
+      "current": null,
       "done": [
         300,
         301,
@@ -94,7 +94,12 @@
         303,
         319,
         320,
-        321
+        321,
+        315,
+        307,
+        306,
+        326,
+        331
       ],
       "parked": [
         316
@@ -320,20 +325,32 @@
       "regressionProof": "9/10 dailyLogUpserts tests fail with 382b62a database.ts, 10/10 at 52409f4; refactor proven byte-identical sync output (tester)"
     },
     "306": {
-      "roundTrips": 0,
-      "commits": [],
+      "roundTrips": 1,
+      "commits": [
+        "97dfdd6",
+        "7e4831c",
+        "64c24ed",
+        "bcae28a"
+      ],
       "lane": "A",
-      "status": "in_dev",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "work order: getWaterHistory(since, until = toISODate()) adds AND date <= ?; sole caller Analytics (7-day card) fixed by default param. '7-day' label => average over 7 calendar days (zero days count) - unchanged semantics, #301's 90d backfill never reaches this 7-day query. Held until #315 tester done."
+      "notes": "tester APPROVE r2 + security APPROVE. roundTrips=1.",
+      "securityReview": "required-src-db",
+      "regressionProof": "getWaterHistory test fails at 97dfdd6 (14 rows); empty-state test fails at 0e1fee3; both pass at bcae28a (tester)"
     },
     "307": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "130cadd",
+        "0e1fee3"
+      ],
       "lane": "A",
-      "status": "in_dev",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "work order: getMealAdherence adds AND date <= toISODate() (issue's Option 1; today's unconsumed still count). Sole consumer Analytics 'Plan adherence' 30d, no screen change. Will be implemented by same developer session as #306 (separate commits, separate verdicts). Held until #315 tester done."
+      "notes": "tester + security APPROVE r0.",
+      "securityReview": "required-src-db",
+      "regressionProof": "getMealAdherence test fails at 130cadd (planned 4), passes 0e1fee3; 3 TZs (tester)"
     },
     "308": {
       "roundTrips": 0,
@@ -448,9 +465,9 @@
         "89c23ed"
       ],
       "lane": "A",
-      "status": "in_security",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "tester APPROVE r0 (after rate-limit interruption resume). Probed quoted/comma/empty/case/__proto__ keys - all dropped. buildInsertColumns confirmed dead. #303 composition verified. Skipped info not yet shown in SettingsScreen (lane D) - AC partially met.",
+      "notes": "tester + security APPROVE r0. Security: no backup-derived text reaches SQL; validation before snapshot+wipe; no RENAME in v1-v35 so skip logic can't drop legit legacy columns. PARTIAL AC: 'reports what was skipped' - returned + warned but SettingsScreen alert (lane D) doesn't display it.",
       "securityReview": "required-backup-restore",
       "regressionProof": "restoreInjection 4/4 fail at 9ef7fb6 with real SQL syntax error from injected key; 12 validatePayload cases fail at 9ef7fb6; all pass at 89c23ed (tester reproduced)"
     },
@@ -593,12 +610,17 @@
     },
     "326": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "b52bd5c",
+        "8baa245"
+      ],
       "lane": "A",
-      "status": "analysed_waiting",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
       "reassignedFrom": "D",
-      "notes": "lane A work order: getHydrationGoal accepts only finite 250..6000 (mirrors Settings stepper #313), else 2000. Satisfies issue AC2+AC3; AC1 (Dashboard guard) moot (branch unreachable). Sibling Number('') getters (nutrition goals, profile) filed separately. Queued after #306/#307."
+      "notes": "tester + security APPROVE r0 (lane A portion). AC1 (Dashboard guard) moot, AC2+AC3 met -> Closes #326.",
+      "securityReview": "required-src-db",
+      "regressionProof": "7/12 fail with bcae28a database.ts, 12/12 at 8baa245 (tester)"
     },
     "327": {
       "roundTrips": 1,
@@ -655,12 +677,17 @@
     },
     "331": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "04ab5b1",
+        "554a945"
+      ],
       "lane": "A",
-      "status": "analysed_waiting",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "work order: v36 = idx_workout_set_log_date, idx_workout_set_log_exercise_date(exercise,date), idx_meal_inventory_recipe; EXPLAIN QUERY PLAN proof. Cut issue's weekly_meal_plan(date) (redundant w/ v35 unique leftmost prefix) and cook_log(recipe_id) (no query). Orchestrator: replace 'last version === 36' snapshot with append-safe checks (#317 adds v37). Analyst also-found (getLoggedExercises) rejected: (exercise,date) index already covers it.",
-      "migration": "v36"
+      "notes": "tester + security APPROVE r0.",
+      "migration": "v36",
+      "securityReview": "required-migration",
+      "regressionProof": "indexes.test.ts 6/6 fail with 8baa245 schema.ts (SCAN plans), pass at 554a945; real query text verified char-for-char (tester)"
     },
     "332": {
       "roundTrips": 0,
@@ -1739,6 +1766,98 @@
     {
       "at": "2026-09-19T01:56:05Z",
       "event": "#307: status=in_dev"
+    },
+    {
+      "at": "2026-09-19T01:57:43Z",
+      "event": "#315: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T01:57:43Z",
+      "event": "lane A: done+=315"
+    },
+    {
+      "at": "2026-09-19T01:59:34Z",
+      "event": "#306: status=in_test commits=[\"97dfdd6\",\"7e4831c\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T01:59:34Z",
+      "event": "#307: status=in_test commits=[\"130cadd\",\"0e1fee3\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T02:04:31Z",
+      "event": "#306: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-19T02:04:31Z",
+      "event": "#307: status=in_security securityReview=required-src-db regressionProof=getMealAdherence test fails at 130cadd (planned 4), passes 0e1fee3; 3 TZs (tester) notes=…"
+    },
+    {
+      "at": "2026-09-19T02:04:57Z",
+      "event": "#307: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T02:04:57Z",
+      "event": "lane A: done+=307"
+    },
+    {
+      "at": "2026-09-19T02:06:59Z",
+      "event": "#306: status=in_test commits=[\"97dfdd6\",\"7e4831c\",\"64c24ed\",\"bcae28a\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T02:08:34Z",
+      "event": "#306: status=in_security securityReview=required-src-db regressionProof=getWaterHistory test fails at 97dfdd6 (14 rows); empty-state test fails at 0e1fee3; both pass at bcae28a (tester) notes=…"
+    },
+    {
+      "at": "2026-09-19T02:08:34Z",
+      "event": "#326: status=in_dev"
+    },
+    {
+      "at": "2026-09-19T02:08:47Z",
+      "event": "#306: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T02:08:47Z",
+      "event": "lane A: done+=306 current=326"
+    },
+    {
+      "at": "2026-09-19T02:10:18Z",
+      "event": "#326: status=in_test commits=[\"b52bd5c\",\"8baa245\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T02:13:01Z",
+      "event": "#326: status=in_security securityReview=required-src-db regressionProof=7/12 fail with bcae28a database.ts, 12/12 at 8baa245 (tester) notes=…"
+    },
+    {
+      "at": "2026-09-19T02:13:01Z",
+      "event": "#331: status=in_dev"
+    },
+    {
+      "at": "2026-09-19T02:13:11Z",
+      "event": "#326: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T02:13:11Z",
+      "event": "lane A: done+=326 current=331"
+    },
+    {
+      "at": "2026-09-19T02:16:06Z",
+      "event": "#331: status=in_test commits=[\"04ab5b1\",\"554a945\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T02:18:52Z",
+      "event": "#331: status=in_security securityReview=required-migration regressionProof=indexes.test.ts 6/6 fail with 8baa245 schema.ts (SCAN plans), pass at 554a945; real query text verified char-for-char (tester) notes=…"
+    },
+    {
+      "at": "2026-09-19T02:19:39Z",
+      "event": "#331: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T02:19:39Z",
+      "event": "lane A: done+=331 status=cleanup current=null"
+    },
+    {
+      "at": "2026-09-19T02:19:39Z",
+      "event": "lane A queue complete: 14 ready (#300,#301,#305,#302,#314,#303,#319,#320,#321,#315,#306,#307,#326,#331), 1 parked (#316). Cleanup dispatched."
     }
   ]
 }
