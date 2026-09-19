@@ -611,4 +611,11 @@ export const MIGRATIONS: Migration[] = [
     created_at TEXT    NOT NULL
   );
 ` },
+  // v34: Track which meal_inventory batch a weekly_meal_plan row's tick
+  // debited, so unticking can credit back that exact batch instead of
+  // guessing (#302). Nullable, no REFERENCES: a row ticked before this
+  // migration has no recorded source batch (see toggleMealConsumed's
+  // handling of the legacy-NULL case in database.ts), and the pointer must
+  // also survive its source batch being deleted without a FK violation.
+  { version: 34, sql: `ALTER TABLE weekly_meal_plan ADD COLUMN consumed_from_inventory_id INTEGER;` },
 ];
