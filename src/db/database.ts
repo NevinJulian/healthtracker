@@ -1662,19 +1662,25 @@ export interface MealAdherenceSummary {
  * Compute meal plan adherence: how many planned meals were actually consumed
  * over the past `days` calendar days.
  *
+ * Bounded above by today (#307) — without an upper bound, meals planned
+ * ahead of time for future dates would count as "planned" with no chance of
+ * having been consumed yet, dragging the ratio down for reasons unrelated
+ * to actual adherence. Today's still-unconsumed meals continue to count.
+ *
  * @param days - Window size in days (default 30).
  */
 export async function getMealAdherence(days: number = 30): Promise<MealAdherenceSummary> {
   const db = getDatabase();
-  const cutoffISO = _addDaysKey(toISODate(), -days);
+  const todayISO = toISODate();
+  const cutoffISO = _addDaysKey(todayISO, -days);
 
   const row = await db.getFirstAsync<{ planned: number; consumed: number }>(
     `SELECT
        COUNT(*) AS planned,
        SUM(CASE WHEN is_consumed = 1 THEN 1 ELSE 0 END) AS consumed
      FROM weekly_meal_plan
-     WHERE date >= ?`,
-    [cutoffISO]
+     WHERE date >= ? AND date <= ?`,
+    [cutoffISO, todayISO]
   );
 
   const planned = row?.planned ?? 0;
