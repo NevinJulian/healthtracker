@@ -66,7 +66,7 @@
     "A": {
       "branch": "sprint/lane-a-db",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "merging",
+      "status": "merged",
       "order": [
         300,
         301,
@@ -104,7 +104,8 @@
       "parked": [
         316
       ],
-      "cleanup": "f3c774a comment-only (2 fixes)"
+      "cleanup": "f3c774a comment-only (2 fixes)",
+      "mergeSha": "c2fe262"
     },
     "B": {
       "branch": "sprint/lane-b-notify",
@@ -246,7 +247,7 @@
         "0aad077"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "ALL 4 ACs met. Core: prune removed, getRollingWindow bounded, getDailyLogsBetween. Deferred step (04434c3): analytics logs <- getDailyLogsBetween(today-90,today); tester proved render-level (of 30 days) not just wiring; -7 mutation caught. USER-VISIBLE: Best/Current streaks + 30-day grid jump from ~8d to up to 90d of history. Security for deferred step skipped (range query already reviewed).",
       "deferredStep": "after lane C merges: merge integration into lane A, switch AnalyticsDashboardScreen loadData getRollingWindow() -> getDailyLogsBetween(today-90, today) (covers AC #3/#4)",
@@ -256,7 +257,8 @@
       "deferredStepCommits": [
         "b83a2fe",
         "04434c3"
-      ]
+      ],
+      "mergeSha": "c2fe262"
     },
     "301": {
       "roundTrips": 2,
@@ -269,11 +271,12 @@
         "382b62a"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester REJECT r1, REJECT r2, APPROVE r3; security APPROVE (probed 9999-12-31, 0000-0099 years, numeric via TEXT affinity). roundTrips=2. Security note: raw startDateISO in hammer-task daysDiff now hits up to 98 rows (#363 comment added).",
       "securityReview": "required-src-db",
-      "regressionProof": "backfillGap fails at 0aad077 (3/6), backfillStartDateGuard fails at ab6ae5e (3/4) + calendar-overflow case sole failure w/o validator; tester generalised across 6 month/year boundaries x 3 TZs"
+      "regressionProof": "backfillGap fails at 0aad077 (3/6), backfillStartDateGuard fails at ab6ae5e (3/4) + calendar-overflow case sole failure w/o validator; tester generalised across 6 month/year boundaries x 3 TZs",
+      "mergeSha": "c2fe262"
     },
     "302": {
       "roundTrips": 0,
@@ -283,12 +286,13 @@
         "606cdcb"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester APPROVE + security APPROVE r0. Security note: crafted backup can set consumed_from_inventory_id -> +1 to arbitrary meal_inventory row per manual untick; strictly weaker than restore setting portions_available directly (pre-existing #315 territory). Legacy NULL pointer -> no credit (orchestrator decision, flag for human).",
       "migration": "v34",
       "securityReview": "required-src-db-migration",
-      "regressionProof": "7/8 fail with 04434c3 database.ts+schema.ts, 8/8 at 606cdcb (tester reproduced)"
+      "regressionProof": "7/8 fail with 04434c3 database.ts+schema.ts, 8/8 at 606cdcb (tester reproduced)",
+      "mergeSha": "c2fe262"
     },
     "303": {
       "roundTrips": 2,
@@ -304,12 +308,13 @@
         "d74da00"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "roundTrips=2 (tester REJECT r1 kill double-credit -> fixed via #314; security BLOCK r2 legacy backups unrestorable -> restoreFromPayload drops index, restores, re-runs v35 SQL from MIGRATIONS). Tester + security APPROVE r3. HUMAN REVIEW: v35 is a data migration deleting duplicate plan rows (survivor = consumed-if-any else MAX(id), orchestrator rule); same-recipe reassign refunds (un-eats).",
       "migration": "v35",
       "securityReview": "required-data-migration",
-      "regressionProof": "assignMealToPlanRefund fails 8/10 at 606cdcb; v35 kill-safety via #314 runner; restoreLegacyDuplicates fails 2/3 at 92ddba3 with UNIQUE error, 3/3 at d74da00"
+      "regressionProof": "assignMealToPlanRefund fails 8/10 at 606cdcb; v35 kill-safety via #314 runner; restoreLegacyDuplicates fails 2/3 at 92ddba3 with UNIQUE error, 3/3 at d74da00",
+      "mergeSha": "c2fe262"
     },
     "305": {
       "roundTrips": 0,
@@ -319,11 +324,12 @@
         "52409f4"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester APPROVE + security APPROVE r0. Notes: ensure+update not in one transaction (pre-existing shared-connection interleave, widened window; theoretical); Onboarding no-catch unreachable (#365). Also found: upsertExerciseCompleted issue in #319 untouched.",
       "securityReview": "required-src-db",
-      "regressionProof": "9/10 dailyLogUpserts tests fail with 382b62a database.ts, 10/10 at 52409f4; refactor proven byte-identical sync output (tester)"
+      "regressionProof": "9/10 dailyLogUpserts tests fail with 382b62a database.ts, 10/10 at 52409f4; refactor proven byte-identical sync output (tester)",
+      "mergeSha": "c2fe262"
     },
     "306": {
       "roundTrips": 1,
@@ -334,11 +340,12 @@
         "bcae28a"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester APPROVE r2 + security APPROVE. roundTrips=1.",
       "securityReview": "required-src-db",
-      "regressionProof": "getWaterHistory test fails at 97dfdd6 (14 rows); empty-state test fails at 0e1fee3; both pass at bcae28a (tester)"
+      "regressionProof": "getWaterHistory test fails at 97dfdd6 (14 rows); empty-state test fails at 0e1fee3; both pass at bcae28a (tester)",
+      "mergeSha": "c2fe262"
     },
     "307": {
       "roundTrips": 0,
@@ -347,11 +354,12 @@
         "0e1fee3"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester + security APPROVE r0.",
       "securityReview": "required-src-db",
-      "regressionProof": "getMealAdherence test fails at 130cadd (planned 4), passes 0e1fee3; 3 TZs (tester)"
+      "regressionProof": "getMealAdherence test fails at 130cadd (planned 4), passes 0e1fee3; 3 TZs (tester)",
+      "mergeSha": "c2fe262"
     },
     "308": {
       "roundTrips": 0,
@@ -449,12 +457,13 @@
         "a5f9276"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester APPROVE + security APPROVE r0. Security: only DELETE in v1-v35 is v35 dedupe; schema_version excluded from restore; no nested txn; getDatabase throws until migrations done. PARTIAL: App.tsx dead-end screen + already-bricked devices out of scope -> Refs #314.",
       "partial": true,
       "securityReview": "required-migration-runner",
-      "regressionProof": "throwing-migration + v35-kill tests fail with ba049bc database.ts, 4/4 pass at a5f9276 (tester reproduced)"
+      "regressionProof": "throwing-migration + v35-kill tests fail with ba049bc database.ts, 4/4 pass at a5f9276 (tester reproduced)",
+      "mergeSha": "c2fe262"
     },
     "315": {
       "roundTrips": 0,
@@ -466,11 +475,12 @@
         "89c23ed"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester + security APPROVE r0. Security: no backup-derived text reaches SQL; validation before snapshot+wipe; no RENAME in v1-v35 so skip logic can't drop legit legacy columns. PARTIAL AC: 'reports what was skipped' - returned + warned but SettingsScreen alert (lane D) doesn't display it.",
       "securityReview": "required-backup-restore",
-      "regressionProof": "restoreInjection 4/4 fail at 9ef7fb6 with real SQL syntax error from injected key; 12 validatePayload cases fail at 9ef7fb6; all pass at 89c23ed (tester reproduced)"
+      "regressionProof": "restoreInjection 4/4 fail at 9ef7fb6 with real SQL syntax error from injected key; 12 validatePayload cases fail at 9ef7fb6; all pass at 89c23ed (tester reproduced)",
+      "mergeSha": "c2fe262"
     },
     "316": {
       "roundTrips": 0,
@@ -507,11 +517,12 @@
         "37e70a4"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester + security APPROVE r0. Security notes: exercise toggle on corrupt day silently reverts (no Alert) - UI follow-up; sync backfill not in the queue (pre-existing, #369/#371 territory).",
       "securityReview": "required-src-db",
-      "regressionProof": "3 regression tests fail with d74da00 database.ts, pass at 37e70a4 (tester reproduced)"
+      "regressionProof": "3 regression tests fail with d74da00 database.ts, pass at 37e70a4 (tester reproduced)",
+      "mergeSha": "c2fe262"
     },
     "320": {
       "roundTrips": 0,
@@ -521,11 +532,12 @@
         "5c206b2"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester + security APPROVE r0. Security: all parameterised; no notification-driven DB writes exist -> no realistic #369 overlap on recipe screen.",
       "securityReview": "required-src-db",
-      "regressionProof": "induced-failure test fails at a6fc1ca (not a function, wrapped); MUTATION: removing txn wrapper at 5c206b2 -> test fails with 2 leftover rows (tester) -> proves atomicity"
+      "regressionProof": "induced-failure test fails at a6fc1ca (not a function, wrapped); MUTATION: removing txn wrapper at 5c206b2 -> test fails with 2 leftover rows (tester) -> proves atomicity",
+      "mergeSha": "c2fe262"
     },
     "321": {
       "roundTrips": 0,
@@ -534,11 +546,12 @@
         "9ef7fb6"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester + security APPROVE r0 (security: swallowed rejection is cleanup-only, write still throws).",
       "securityReview": "required-src-db",
-      "regressionProof": "3/4 fail with 5c206b2 database.ts (finalize spy 0 calls), 4/4 at 9ef7fb6; mutation: removing .catch -> finalize error masks original, test fails (tester)"
+      "regressionProof": "3/4 fail with 5c206b2 database.ts (finalize spy 0 calls), 4/4 at 9ef7fb6; mutation: removing .catch -> finalize error masks original, test fails (tester)",
+      "mergeSha": "c2fe262"
     },
     "322": {
       "roundTrips": 0,
@@ -616,12 +629,13 @@
         "8baa245"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "reassignedFrom": "D",
       "notes": "tester + security APPROVE r0 (lane A portion). AC1 (Dashboard guard) moot, AC2+AC3 met -> Closes #326.",
       "securityReview": "required-src-db",
-      "regressionProof": "7/12 fail with bcae28a database.ts, 12/12 at 8baa245 (tester)"
+      "regressionProof": "7/12 fail with bcae28a database.ts, 12/12 at 8baa245 (tester)",
+      "mergeSha": "c2fe262"
     },
     "327": {
       "roundTrips": 1,
@@ -683,12 +697,13 @@
         "554a945"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-a-db",
       "notes": "tester + security APPROVE r0.",
       "migration": "v36",
       "securityReview": "required-migration",
-      "regressionProof": "indexes.test.ts 6/6 fail with 8baa245 schema.ts (SCAN plans), pass at 554a945; real query text verified char-for-char (tester)"
+      "regressionProof": "indexes.test.ts 6/6 fail with 8baa245 schema.ts (SCAN plans), pass at 554a945; real query text verified char-for-char (tester)",
+      "mergeSha": "c2fe262"
     },
     "332": {
       "roundTrips": 0,
@@ -1863,6 +1878,71 @@
     {
       "at": "2026-09-19T02:23:42Z",
       "event": "lane A: status=merging cleanup=f3c774a comment-only (2 fixes)"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#300: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#301: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#305: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#302: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#314: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#303: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#319: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#320: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#321: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#315: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#306: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#307: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#326: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "#331: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "lane A: status=merged mergeSha=c2fe262"
+    },
+    {
+      "at": "2026-09-19T02:24:26Z",
+      "event": "merged lane A into sprint/auto-fixes; integration green: typecheck pass, 492 tests / 43 suites",
+      "sha": "c2fe262"
     }
   ]
 }
