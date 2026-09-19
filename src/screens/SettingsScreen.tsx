@@ -53,6 +53,8 @@ import {
   getUserProfile,
   setProfileHeightCm,
   setProfileAge,
+  clearProfileHeightCm,
+  clearProfileAge,
   setProfileSex,
   setProfileActivityLevel,
   setProfileGoalType,
@@ -757,11 +759,15 @@ export default function SettingsScreen() {
   async function handleProfileHeightBlur() {
     const trimmed = profileHeightStr.trim();
     if (trimmed === '') {
-      // Blank stays blank: nothing to validate, nothing to save, and
-      // nothing persisted gets cleared here (#323 part 1 — clearing a
-      // saved value is part 2, once a dedicated db function exists).
+      // Blank + blur persists the clear (#323 part 2): a previously-saved
+      // height is removed via deleteSetting, not left in place. Local
+      // state only goes null once the delete resolves — same "await then
+      // update state" shape as the valid-save path below, so a rejected
+      // write leaves the saved value (and displayed state) untouched.
       profileHeightInvalidRef.current = false;
       setProfileHeightError(null);
+      await clearProfileHeightCm();
+      setProfile((prev) => ({ ...prev, heightCm: null }));
       return;
     }
     // A comma decimal separator ("178,5") is plausible input here: the
@@ -782,8 +788,11 @@ export default function SettingsScreen() {
   async function handleProfileAgeBlur() {
     const trimmed = profileAgeStr.trim();
     if (trimmed === '') {
+      // Same clear-and-persist shape as the height handler above (#323 part 2).
       profileAgeInvalidRef.current = false;
       setProfileAgeError(null);
+      await clearProfileAge();
+      setProfile((prev) => ({ ...prev, age: null }));
       return;
     }
     const val = Number(trimmed.replace(',', '.'));
