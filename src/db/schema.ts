@@ -734,4 +734,50 @@ export const MIGRATIONS: Migration[] = [
   CREATE INDEX IF NOT EXISTS idx_workout_set_log_exercise_date ON workout_set_log(exercise, date);
   CREATE INDEX IF NOT EXISTS idx_meal_inventory_recipe ON meal_inventory(recipe_id);
 ` },
+  // v37 (#317): workout_set_log.set_index was never a uniqueness key — it
+  // was whatever the sole caller (DashboardScreen's handleLogSet, via
+  // logWorkoutSet) computed client-side as `existingSets.length` at call
+  // time. Deleting a middle set shortened that array, so the next logged
+  // set recomputed a set_index a surviving row already had. logWorkoutSet
+  // (database.ts) is fixed alongside this migration to assign set_index
+  // atomically via INSERT…SELECT MAX(set_index)+1 instead of trusting a
+  // caller-supplied value — but that fix does nothing for rows already on
+  // disk. This migration renumbers every existing row densely (0, 1, 2, …)
+  // per (date, exercise), ordered by (created_at, id) — the same order
+  // getWorkoutSetsForDay/getWorkoutHistory now read by (set_index is no
+  // longer an ORDER BY column) — then adds a UNIQUE index on
+  // (date, exercise, set_index) so the database itself rejects any future
+  // collision, not just logWorkoutSet's new INSERT…SELECT.
+  //
+  // Idempotent: the renumber UPDATE recomputes new_index from (created_at,
+  // id) order every time, and that order doesn't change between runs, so
+  // re-running it against already-renumbered data assigns every row the
+  // value it already has — a genuine no-op, not one that merely happens not
+  // to throw. CREATE UNIQUE INDEX IF NOT EXISTS is idempotent on its own.
+  //
+  // Ordering constraint (orchestrator addition, #317): the renumber UPDATE
+  // must only ever run while idx_workout_set_log_date_exercise_set_index
+  // does NOT exist. Run row-by-row with the index already present, a table
+  // with real gaps could have an intermediate row transiently collide with
+  // another row's not-yet-updated value, even though the fully-applied
+  // result never has a real duplicate. Two call sites run this SQL, and
+  // both uphold that invariant structurally, not by convention:
+  //   - A fresh install or upgrade (runMigrations, database.ts): this
+  //     migration's own SQL creates the index itself, AFTER the UPDATE, in
+  //     the same string — no device has the index until this migration
+  //     finishes.
+  //   - Restore (restoreFromPayload, database.ts): DROPs the index before
+  //     its restore loop (so a legacy backup's colliding/gapped
+  //     workout_set_log rows can be inserted at all) and only re-runs this
+  //     migration's SQL — looked up at runtime via
+  //     POST_RESTORE_MIGRATION_VERSIONS, never copied or reimplemented,
+  //     same pattern as v35/#303 — after every table has been restored.
+  { version: 37, sql: `
+  WITH ranked AS (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY date, exercise ORDER BY created_at ASC, id ASC) - 1 AS new_index
+    FROM workout_set_log
+  )
+  UPDATE workout_set_log SET set_index = (SELECT new_index FROM ranked WHERE ranked.id = workout_set_log.id);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_set_log_date_exercise_set_index ON workout_set_log(date, exercise, set_index);
+` },
 ];
