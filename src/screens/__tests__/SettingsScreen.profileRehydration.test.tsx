@@ -73,6 +73,8 @@ jest.mock('../../db/database', () => ({
   }),
   setProfileHeightCm: jest.fn().mockResolvedValue(undefined),
   setProfileAge: jest.fn().mockResolvedValue(undefined),
+  clearProfileHeightCm: jest.fn().mockResolvedValue(undefined),
+  clearProfileAge: jest.fn().mockResolvedValue(undefined),
   setProfileSex: jest.fn().mockResolvedValue(undefined),
   setProfileActivityLevel: jest.fn().mockResolvedValue(undefined),
   setProfileGoalType: jest.fn().mockResolvedValue(undefined),

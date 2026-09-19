@@ -61,6 +61,8 @@ jest.mock('../../db/database', () => ({
   }),
   setProfileHeightCm: jest.fn().mockResolvedValue(undefined),
   setProfileAge: jest.fn().mockResolvedValue(undefined),
+  clearProfileHeightCm: jest.fn().mockResolvedValue(undefined),
+  clearProfileAge: jest.fn().mockResolvedValue(undefined),
   setProfileSex: jest.fn().mockResolvedValue(undefined),
   setProfileActivityLevel: jest.fn().mockResolvedValue(undefined),
   setProfileGoalType: jest.fn().mockResolvedValue(undefined),
@@ -90,6 +92,7 @@ import {
   getNutritionGoals,
   setProfileHeightCm,
   setProfileAge,
+  clearProfileHeightCm,
 } from '../../db/database';
 import { reconcileScheduledNotifications } from '../../services/notifications';
 
@@ -100,6 +103,7 @@ const mockGetNutritionGoals = jest.mocked(getNutritionGoals);
 const mockReconcileScheduledNotifications = jest.mocked(reconcileScheduledNotifications);
 const mockAddEventListener = jest.mocked(AppState.addEventListener);
 const mockSetProfileHeightCm = jest.mocked(setProfileHeightCm);
+const mockClearProfileHeightCm = jest.mocked(clearProfileHeightCm);
 const mockSetProfileAge = jest.mocked(setProfileAge);
 
 /** The `'change'` listener SettingsScreen most recently registered with AppState. */
@@ -429,7 +433,7 @@ describe('SettingsScreen profile height/age validation (#323)', () => {
     expect(mockSetProfileHeightCm).toHaveBeenCalledWith(180);
   });
 
-  it('blank height + blur shows no error and does not save (unchanged behaviour)', async () => {
+  it('blank height + blur after an invalid edit clears the error and persists the clear, not a save (#323 part 2)', async () => {
     const { getByLabelText, queryByText } = render(<SettingsScreen />);
     await flushMicrotasks();
 
@@ -447,5 +451,9 @@ describe('SettingsScreen profile height/age validation (#323)', () => {
 
     expect(queryByText('Enter a height between 50 and 250 cm')).toBeNull();
     expect(mockSetProfileHeightCm).not.toHaveBeenCalled();
+    // Blank + blur now persists the clear (#323 part 2) instead of being a
+    // pure no-op. See SettingsScreen.profileClear.test.tsx for the fuller
+    // "calls the clear wrapper, not the setter" coverage of this path.
+    expect(mockClearProfileHeightCm).toHaveBeenCalledTimes(1);
   });
 });
