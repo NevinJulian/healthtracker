@@ -60,7 +60,12 @@
     "#315 (lane A) spans database.ts and backup.ts validatePayload. Lane A is granted validatePayload in src/services/backup.ts + its tests in src/services/__tests__/backup.test.ts ONLY after lane B has merged into integration and integration has been merged into lane A. If lane B has not merged when lane A reaches #315, lane A defers #315 and continues.",
     "#317 (lane D) is a database.ts/schema.ts fix. It runs after lane A merges, on a lane D branch refreshed from integration, and is granted the workout_set_log functions in src/db/database.ts, an appended migration in src/db/schema.ts, and src/db/__tests__/** for its test. No concurrent lane-A editor exists by then, so migration numbering cannot collide.",
     "#335 (lane F) edits src/db/README.md and the schema.ts header. It runs after lane A merges, on a lane F branch refreshed from integration, so the docs describe the post-sprint db layer. Granted: src/**/README.md, the header comment of src/db/schema.ts only, CLAUDE.md.",
-    "#310 (lane B): the SettingsScreen success-alert wording is lane D territory; lane B stays in backup.ts/notifications.ts and reports any criterion it cannot meet in-lane."
+    "#310 (lane B): the SettingsScreen success-alert wording is lane D territory; lane B stays in backup.ts/notifications.ts and reports any criterion it cannot meet in-lane.",
+    {
+      "at": "2026-09-19T03:48:35Z",
+      "issue": 336,
+      "decision": "No new dependencies in lane G: #336 option 3 (fast-check) implemented as a seeded deterministic random-sequence test on the sql.js harness instead. Rationale: adding a devDependency changes package.json/package-lock (legacy-peer-deps resolution risk, triggers build-check.yml) for no capability the harness lacks. Lane G starts only after lane D merges; gap audit against the integrated branch, not main."
+    }
   ],
   "lanes": {
     "A": {
@@ -153,7 +158,7 @@
     "D": {
       "branch": "sprint/lane-d-screens",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "in_progress",
+      "status": "merging",
       "order": [
         313,
         322,
@@ -171,7 +176,7 @@
         "323-clear",
         304
       ],
-      "current": 317,
+      "current": null,
       "done": [
         313,
         322,
@@ -179,12 +184,16 @@
         324,
         325,
         329,
-        330
+        330,
+        317,
+        "\"323-clear\"",
+        304
       ],
       "parked": [],
       "reassigned": [
         326
-      ]
+      ],
+      "notes": "cleanup: no changes (afe044c). AssignMealModal early-return noted by cleanup checked by orchestrator: component has no hooks/state, so no stale-state bug (not filed). Merging ddb8cf9."
     },
     "E": {
       "branch": "sprint/lane-e-api",
@@ -320,12 +329,19 @@
       "mergeSha": "c2fe262"
     },
     "304": {
-      "roundTrips": 0,
-      "commits": [],
+      "roundTrips": 1,
+      "commits": [
+        "50feac5",
+        "f6091e8",
+        "5bb2c10",
+        "ac89374",
+        "ddb8cf9"
+      ],
       "lane": "D",
-      "status": "analysed_waiting",
+      "status": "ready",
       "branch": "sprint/lane-d-screens",
-      "notes": "work order: useFocusEffect + AppState 'active' reload, runIdRef/mountedRef guard (#312/#329 pattern), keep #325 spinner-once; writers use per-render today (fresh after reload). Residual: screen focused across midnight with no bg/fg event -> no trigger (phone lock/unlock fires 'active'; note for human). Queued after #317 and #323 p2."
+      "notes": "tester APPROVE r2 at ddb8cf9: error-path repro now writes new date; happy path 1 round (was 2-round cascade); same-day 1 round; loadToday deps [] safe (only refs/setters/imports). Security n/a (DashboardScreen.tsx only). Residual (by design): screen focused+foregrounded across midnight with no trigger.",
+      "securityReview": "skipped-ui-only"
     },
     "305": {
       "roundTrips": 0,
@@ -504,18 +520,20 @@
       "parkReason": "Pragma alone makes deleteRecipe throw (no ON DELETE CASCADE declared); cascade needs table rebuild AND restoreFromPayload's alphabetical DELETE+INSERT order would cascade-wipe just-restored cooking_tasks/meal_inventory (silent data loss every restore; defer_foreign_keys doesn't stop cascades). cook_log has no FK and is intentional history. Human decides: destroy/keep/block history on recipe delete; refund consumed portions? Recommended after decision: explicit child deletes in deleteRecipe (option b) in one txn; no pragma until restore restructured."
     },
     "317": {
-      "roundTrips": 0,
+      "roundTrips": 1,
       "commits": [
         "905aa98",
         "277fb67",
         "33c4635",
-        "878eda5"
+        "878eda5",
+        "01e21c2"
       ],
       "lane": "D",
-      "status": "in_test",
+      "status": "ready",
       "branch": "sprint/lane-d-screens",
       "migration": "v37",
-      "notes": "dev: logWorkoutSet atomic MAX+1 (setIndex param dropped), readers ORDER BY created_at,id, v37 renumber+UNIQUE index (append-only verified by orchestrator: schema.ts 46+/0-), restore replays [35,37]. 555/49."
+      "notes": "security APPROVE at 01e21c2: all SQL parameterised; replay SQL only from compiled MIGRATIONS; v37 no DELETE (6 rows in/out), NOT NULL date/exercise so unique index can't fail; expo-sqlite 16.0.10 vendors SQLite 3.50.3 (window fns safe); restore DROP+loop+replay in one tx, replay-failure rollback proven.",
+      "securityReview": "approve"
     },
     "318": {
       "roundTrips": 1,
@@ -609,13 +627,17 @@
       "commits": [
         "b06a2d7",
         "9b2445e",
-        "5cb4219"
+        "5cb4219",
+        "e081ab5",
+        "57ceca1",
+        "30a7833",
+        "2d792bd"
       ],
       "lane": "D",
-      "status": "part2_analysed_waiting",
+      "status": "ready",
       "branch": "sprint/lane-d-screens",
       "splitAcrossPhases": true,
-      "notes": "part 1 ready. Part 2 work order: deleteSetting(key) + clearProfileHeightCm/clearProfileAge wrappers; blank+blur persists clear + local null; getUserProfile already null for absent key (#373 not implicated). Held until #317 dev done (same worktree).",
+      "notes": "part2 security APPROVE at 2d792bd: deleteSetting parameterised, only callers pass constants, gated on trimmed==='' ; no schema change; failure leaves state consistent (same shape as valid-save branch). #323 complete (part1 b06a2d7..5cb4219, part2 e081ab5..2d792bd).",
       "part1": "ready",
       "securityReview": "skipped-device-owner-input",
       "regressionProof": "5 new tests fail with 389c189 SettingsScreen.tsx, pass at 9b2445e (tester reproduced)"
@@ -789,7 +811,8 @@
     371,
     372,
     373,
-    374
+    374,
+    375
   ],
   "log": [
     {
@@ -2098,6 +2121,78 @@
       "at": "2026-09-19T02:46:46Z",
       "event": "lane F merged into sprint/auto-fixes; gates typecheck clean, 492 tests / 43 suites",
       "sha": "f53ba09"
+    },
+    {
+      "at": "2026-09-19T02:48:23Z",
+      "event": "#317: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-19T02:51:41Z",
+      "event": "#317: status=in_test commits+=01e21c2 notes=…"
+    },
+    {
+      "at": "2026-09-19T02:53:46Z",
+      "event": "#317: status=in_security notes=…"
+    },
+    {
+      "at": "2026-09-19T02:59:22Z",
+      "event": "#317: status=ready securityReview=approve notes=…"
+    },
+    {
+      "at": "2026-09-19T02:59:22Z",
+      "event": "lane D: done+=317 current=323-clear"
+    },
+    {
+      "at": "2026-09-19T02:59:22Z",
+      "event": "#323: status=part2_in_dev"
+    },
+    {
+      "at": "2026-09-19T03:09:25Z",
+      "event": "#323: status=part2_in_test commits+=e081ab5 commits+=57ceca1 commits+=30a7833 commits+=2d792bd notes=…"
+    },
+    {
+      "at": "2026-09-19T03:14:33Z",
+      "event": "filed found-during-sprint #375"
+    },
+    {
+      "at": "2026-09-19T03:14:33Z",
+      "event": "#323: status=part2_in_security notes=…"
+    },
+    {
+      "at": "2026-09-19T03:15:40Z",
+      "event": "#323: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T03:15:40Z",
+      "event": "lane D: done+=\"323-clear\" current=304"
+    },
+    {
+      "at": "2026-09-19T03:15:40Z",
+      "event": "#304: status=in_dev"
+    },
+    {
+      "at": "2026-09-19T03:29:59Z",
+      "event": "#304: status=in_test commits=[\"50feac5\",\"f6091e8\",\"5bb2c10\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T03:38:09Z",
+      "event": "#304: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-19T03:45:11Z",
+      "event": "#304: status=in_test commits+=ac89374 commits+=ddb8cf9 notes=…"
+    },
+    {
+      "at": "2026-09-19T03:48:00Z",
+      "event": "#304: status=ready securityReview=skipped-ui-only notes=…"
+    },
+    {
+      "at": "2026-09-19T03:48:00Z",
+      "event": "lane D: done+=304 current=null status=cleanup"
+    },
+    {
+      "at": "2026-09-19T03:51:42Z",
+      "event": "lane D: status=merging notes=…"
     }
   ]
 }
