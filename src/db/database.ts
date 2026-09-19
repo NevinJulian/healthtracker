@@ -96,6 +96,14 @@ export interface WeeklyMealPlanItem {
   meal_type: string;
   recipe_id: string;
   is_consumed: boolean;
+  /**
+   * meal_inventory.id this row's tick debited (v34, #302). Set when a tick
+   * finds stock to debit; NULL when ticked with no stock, when never
+   * consumed, or on legacy rows ticked before this column existed. Untick
+   * credits back exactly this batch (never "most recent") and never an
+   * INSERT fallback — see toggleMealConsumed.
+   */
+  consumed_from_inventory_id: number | null;
 }
 
 // Re-export Exercise so screens only import from database.ts
@@ -1249,11 +1257,20 @@ export async function toggleMealConsumed(id: number, is_consumed: boolean): Prom
   await db.withTransactionAsync(async () => {
     const meal = await db.getFirstAsync<any>('SELECT * FROM weekly_meal_plan WHERE id = ?', [id]);
     if (!meal) return;
-    
-    // Changing to consumed
+
+    // Tracks which meal_inventory row (if any) this plan row's consumption
+    // is attributed to. Defaults to whatever was already recorded, so a
+    // toggle to the same state (a no-op transition below) leaves it alone.
+    let consumedFromInventoryId: number | null = meal.consumed_from_inventory_id ?? null;
+
+    // Changing to consumed: debit FIFO from the oldest batch with stock,
+    // and record which batch it came from (#302) so a later untick can
+    // credit back that exact row instead of guessing. If there's no stock,
+    // don't debit anything and leave the pointer NULL — never pretend a
+    // portion was consumed from inventory that doesn't exist.
     if (is_consumed && meal.is_consumed === 0) {
       const inv = await db.getFirstAsync<any>(
-        'SELECT * FROM meal_inventory WHERE recipe_id = ? AND portions_available > 0 ORDER BY date_cooked ASC LIMIT 1', 
+        'SELECT * FROM meal_inventory WHERE recipe_id = ? AND portions_available > 0 ORDER BY date_cooked ASC LIMIT 1',
         [meal.recipe_id]
       );
       if (inv) {
@@ -1261,30 +1278,37 @@ export async function toggleMealConsumed(id: number, is_consumed: boolean): Prom
           'UPDATE meal_inventory SET portions_available = portions_available - 1 WHERE id = ?',
           [inv.id]
         );
-      }
-    } 
-    // Reverting from consumed back to planned
-    else if (!is_consumed && meal.is_consumed === 1) {
-       const inv = await db.getFirstAsync<any>(
-        'SELECT * FROM meal_inventory WHERE recipe_id = ? ORDER BY date_cooked DESC LIMIT 1', 
-        [meal.recipe_id]
-      );
-      if (inv) {
-         await db.runAsync(
-          'UPDATE meal_inventory SET portions_available = portions_available + 1 WHERE id = ?',
-          [inv.id]
-        );
+        consumedFromInventoryId = inv.id;
       } else {
-         await db.runAsync(
-          'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, 1, ?)',
-          [meal.recipe_id, toISODate()]
-        );
+        consumedFromInventoryId = null;
       }
     }
-    
-    await db.runAsync('UPDATE weekly_meal_plan SET is_consumed = ? WHERE id = ?', [is_consumed ? 1 : 0, id]);
+    // Reverting from consumed back to planned: credit back ONLY the exact
+    // batch this row was debited from — never the most-recently-cooked
+    // batch, and never an INSERT fallback (#302); both of those used to
+    // create inventory that was never actually cooked. A no-op if that
+    // batch row no longer exists (e.g. deleted elsewhere).
+    //
+    // Orchestrator decision (#302): a row ticked before migration v34 has
+    // a NULL consumed_from_inventory_id (legacy data) and gets NO credit
+    // here. This is deliberately conservative — it can under-count one
+    // portion once, but it can never fabricate stock from nothing.
+    else if (!is_consumed && meal.is_consumed === 1) {
+      if (meal.consumed_from_inventory_id != null) {
+        await db.runAsync(
+          'UPDATE meal_inventory SET portions_available = portions_available + 1 WHERE id = ?',
+          [meal.consumed_from_inventory_id]
+        );
+      }
+      consumedFromInventoryId = null;
+    }
+
+    await db.runAsync(
+      'UPDATE weekly_meal_plan SET is_consumed = ?, consumed_from_inventory_id = ? WHERE id = ?',
+      [is_consumed ? 1 : 0, consumedFromInventoryId, id]
+    );
   });
-} 
+}
 
 // ─────────────────────────────────────────────
 // Cooking Tasks CRUD
