@@ -50,6 +50,11 @@ const mockWeightRows = [
 jest.mock('../../db/database', () => ({
   toISODate: jest.fn(() => '2024-06-15'),
   getRollingWindow: jest.fn().mockResolvedValue([]),
+  // loadData now sources `logs` from getDailyLogsBetween instead of
+  // getRollingWindow (#300 deferred step); this suite only exercises the
+  // weight-delta path (getWeightHistory), so an empty resolved array is
+  // enough to keep loadData from throwing.
+  getDailyLogsBetween: jest.fn().mockResolvedValue([]),
   // Lazily reads mockWeightRows (evaluated at call time, not at factory-
   // definition time) — the hoisted import of AnalyticsDashboardScreen
   // otherwise requires this module before the module-scope `const
