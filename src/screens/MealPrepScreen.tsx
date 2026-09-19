@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -86,6 +86,33 @@ export default function MealPrepScreen() {
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
 
+  // Tracks whether the screen has completed its first load. Post-action
+  // refreshes (handleLogCookedMeal, handleAssignMeal, handleToggleConsumed)
+  // and every re-focus call loadData() again — only the very first load
+  // should show the full-screen "Loading meals…" state; a background
+  // reload must update the list in place instead of blanking it out (#329,
+  // same pattern as DashboardScreen's hasLoadedOnceRef from #325).
+  const hasLoadedOnceRef = useRef(false);
+
+  const loadData = useCallback(async () => {
+    if (!hasLoadedOnceRef.current) {
+      setLoading(true);
+    }
+    try {
+      const inv = await getMealInventory();
+      const plan = await getWeeklyMealPlan();
+      const allRecipes = await getRecipes();
+      setInventory(inv);
+      setWeeklyPlan(plan);
+      setRecipes(allRecipes);
+      hasLoadedOnceRef.current = true;
+    } catch (err) {
+      logDbError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -93,24 +120,8 @@ export default function MealPrepScreen() {
       checkAndNotifyEmptyInventory().catch((err) =>
         console.warn('[MealPrepScreen] checkAndNotifyEmptyInventory failed:', err)
       );
-    }, [])
+    }, [loadData])
   );
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const inv = await getMealInventory();
-      const plan = await getWeeklyMealPlan();
-      const allRecipes = await getRecipes();
-      setInventory(inv);
-      setWeeklyPlan(plan);
-      setRecipes(allRecipes);
-    } catch (err) {
-      logDbError(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // ─── Actions ─────────────────────────────────────────────────
 
