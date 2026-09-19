@@ -51,12 +51,12 @@ Note: `src/test/setup.ts` is **not** wired into `jest.config.js` (there is no `s
 ## Gotchas
 
 - **`react-native-reanimated` is pinned to 3.16.7 and worklets were removed** to fix a TurboModule crash under the New Architecture (#219–221). Be very cautious upgrading reanimated or reintroducing worklets.
-- **The per-folder `README.md` files under `src/` are partially stale.** `src/db/README.md` and `schema.ts`'s header describe an `openDb()` function, a `user_version` PRAGMA migration scheme, `migrateV<N>()` functions, and a `weight_log` table — **none of these exist**. The real code uses `initDatabase()`, a `schema_version` table + `MIGRATIONS` array, and stores weight as a `body_weight` column on `daily_log`. Trust the code over those READMEs.
 - `npm install` / `npm ci` require `--legacy-peer-deps`.
 
 ## CI & releases
 
 - `.github/workflows/test.yml` — runs `npm test` on PRs to `main` and on pushes to non-`main` branches.
+- `.github/workflows/build-check.yml` — verifies the Android APK actually compiles (the JS-only merge gate can't catch native/Gradle breakage). Runs on PRs to `main` that touch `package.json`, `package-lock.json`, `app.json`, `eas.json`, `babel.config.js`, or the workflow file itself, plus on-demand via `workflow_dispatch`; builds the APK locally through EAS (`eas build -p android --profile preview --local`) without publishing a release.
 - `.github/workflows/release.yml` — on push to `main`, builds the APK locally via EAS and publishes a GitHub Release tagged `v<run_number>` with a download link + QR code.
 
 ## Contribution conventions
