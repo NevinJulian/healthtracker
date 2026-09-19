@@ -706,4 +706,31 @@ export const MIGRATIONS: Migration[] = [
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_meal_plan_date_meal_type ON weekly_meal_plan(date, meal_type);
 ` },
+  // v36 (#331): three real full-table-scan gaps, found by checking every
+  // WHERE clause against the 35 indexes that existed before this one (not
+  // by re-litigating the original issue's list, which was stale — v35/#303
+  // already added weekly_meal_plan's (date, meal_type) unique index).
+  // workout_set_log in particular grows without bound (one row per logged
+  // set, forever), so its scans only get worse over time:
+  //   - getWorkoutSetsForDay: WHERE date = ?
+  //   - getWorkoutHistory:    WHERE exercise = ? [AND date >= ?] ORDER BY date
+  //   - logCookedMeal / toggleMealConsumed / the inventory upsert:
+  //                           WHERE recipe_id = ? AND portions_available > 0
+  // daily_log needs nothing — `date` is already its PRIMARY KEY.
+  //
+  // Deliberately cut, so as not to add indexes nothing queries by:
+  //   - weekly_meal_plan(date) — redundant with v35's UNIQUE (date,
+  //     meal_type), which already serves date-prefix scans.
+  //   - cook_log(recipe_id) — no query in database.ts filters on it.
+  //
+  // Plain, non-unique indexes only: lane D's #317 will append v37 with a
+  // UNIQUE(date, exercise, set_index) on workout_set_log, so this migration
+  // doesn't pre-empt that constraint. All three CREATE INDEX statements are
+  // IF NOT EXISTS, so re-running this SQL (directly, or via the
+  // schema_version-gated runner) is a no-op.
+  { version: 36, sql: `
+  CREATE INDEX IF NOT EXISTS idx_workout_set_log_date ON workout_set_log(date);
+  CREATE INDEX IF NOT EXISTS idx_workout_set_log_exercise_date ON workout_set_log(exercise, date);
+  CREATE INDEX IF NOT EXISTS idx_meal_inventory_recipe ON meal_inventory(recipe_id);
+` },
 ];
