@@ -283,20 +283,22 @@ async function seedBioForceLibrary(db: SQLite.SQLiteDatabase): Promise<void> {
     'INSERT INTO bio_force_library (id, name, muscle_group, description, video_url, data) VALUES (?, ?, ?, ?, ?, ?)'
   );
   
-  await db.withTransactionAsync(async () => {
-    for (const ex of bioForceExercises) {
-      await insertStmt.executeAsync([
-        ex.id,
-        ex.title,
-        ex.muscleGroup,
-        ex.description,
-        ex.videoId ? `https://www.youtube.com/watch?v=${ex.videoId}` : '',
-        JSON.stringify(ex),
-      ]);
-    }
-  });
-  
-  await insertStmt.finalizeAsync();
+  try {
+    await db.withTransactionAsync(async () => {
+      for (const ex of bioForceExercises) {
+        await insertStmt.executeAsync([
+          ex.id,
+          ex.title,
+          ex.muscleGroup,
+          ex.description,
+          ex.videoId ? `https://www.youtube.com/watch?v=${ex.videoId}` : '',
+          JSON.stringify(ex),
+        ]);
+      }
+    });
+  } finally {
+    await insertStmt.finalizeAsync().catch((e) => console.warn('[DB] finalize failed:', e));
+  }
   console.log('[DB] Bio Force Library seeded ✓');
 }
 
@@ -313,26 +315,28 @@ async function seedRecipeLibrary(db: SQLite.SQLiteDatabase): Promise<void> {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   
-  await db.withTransactionAsync(async () => {
-    for (const r of recipes) {
-      await insertStmt.executeAsync([
-        r.id,
-        r.title,
-        r.category,
-        r.calories,
-        r.protein,
-        r.carbs,
-        r.fat,
-        r.prepTimeMinutes,
-        r.defaultServings,
-        JSON.stringify(r.ingredients),
-        r.instructions,
-        r.freezerTips || '',
-      ]);
-    }
-  });
-  
-  await insertStmt.finalizeAsync();
+  try {
+    await db.withTransactionAsync(async () => {
+      for (const r of recipes) {
+        await insertStmt.executeAsync([
+          r.id,
+          r.title,
+          r.category,
+          r.calories,
+          r.protein,
+          r.carbs,
+          r.fat,
+          r.prepTimeMinutes,
+          r.defaultServings,
+          JSON.stringify(r.ingredients),
+          r.instructions,
+          r.freezerTips || '',
+        ]);
+      }
+    });
+  } finally {
+    await insertStmt.finalizeAsync().catch((e) => console.warn('[DB] finalize failed:', e));
+  }
   console.log('[DB] Recipe Library seeded ✓');
 }
 
