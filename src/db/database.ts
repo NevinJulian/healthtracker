@@ -1460,7 +1460,7 @@ export async function insertCookingTask(
  * partway through the loop left a half-written shopping list with no
  * matching cooking task, and the screen's catch only surfaced an Alert —
  * nothing rolled back. This wraps the whole batch in one
- * db.withTransactionAsync, same pattern as finishCooking() above.
+ * db.withTransactionAsync, same pattern as finishCooking() below.
  *
  * addShoppingListItem() and insertCookingTask() are called directly here
  * (reusing their existing single-row SQL) because neither opens its own

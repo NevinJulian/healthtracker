@@ -5,7 +5,8 @@
  *   - schema_version   — applied migration versions (never use user_version PRAGMA)
  *   - app_state        — key-value store (e.g., app_start_date)
  *   - weekly_template  — 7 base rows, one per weekday (seeded in v4-v10)
- *   - daily_log        — rolling tracker, date-keyed, pruned to +/-7 days
+ *   - daily_log        — rolling tracker, date-keyed; history is retained (not pruned, #300) —
+ *                        callers bound their own reads via getRollingWindow()/getDailyLogsBetween()
  *                        body_weight column (v20) stores weight — there is no weight_log table
  *
  * Selected migration notes:
