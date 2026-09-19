@@ -279,6 +279,17 @@ export default function DashboardScreen() {
   const [todaysMeals, setTodaysMeals] = useState<MealPlanWithRecipe[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Mirrors `todaysMeals` synchronously (#330). handleToggleMeal reads this
+  // instead of a render-closure value: React applies setState updates on its
+  // own schedule, so a second tap issued before the first has re-rendered
+  // must not derive its "new" value from a stale render (the #313
+  // stale-closure bug). This assignment runs every render, picking up any
+  // DB-truth reload from loadToday(); handleToggleMeal also writes it
+  // eagerly and synchronously so a same-tick second tap sees the first
+  // tap's optimistic result immediately.
+  const todaysMealsRef = useRef<MealPlanWithRecipe[]>(todaysMeals);
+  todaysMealsRef.current = todaysMeals;
+
   // New features state
   const [weightInput, setWeightInput] = useState('');
   const [isExtraModalVisible, setExtraModalVisible] = useState(false);
@@ -444,12 +455,20 @@ export default function DashboardScreen() {
     }
   };
 
-  const handleToggleMeal = async (planId: number, currentVal: boolean) => {
+  const handleToggleMeal = async (planId: number) => {
+    const meal = todaysMealsRef.current.find((m) => m.id === planId);
+    if (!meal) return;
+    const newValue = !meal.is_consumed;
+    const next = todaysMealsRef.current.map((m) =>
+      m.id === planId ? { ...m, is_consumed: newValue } : m
+    );
+    todaysMealsRef.current = next;
+    setTodaysMeals(next);
     try {
-      await toggleMealConsumed(planId, !currentVal);
-      loadToday();
+      await toggleMealConsumed(planId, newValue);
     } catch (err) {
       console.error('toggleMeal error', err);
+      loadToday();
     }
   };
 
@@ -687,7 +706,7 @@ export default function DashboardScreen() {
                 leading={
                   <CircleCheck
                     checked={meal.is_consumed}
-                    onToggle={() => handleToggleMeal(meal.id, meal.is_consumed)}
+                    onToggle={() => handleToggleMeal(meal.id)}
                     accessibilityLabel={`Mark ${meal.recipe?.title ?? meal.meal_type} ${meal.is_consumed ? 'not consumed' : 'consumed'}`}
                   />
                 }
