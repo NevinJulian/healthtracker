@@ -2430,14 +2430,19 @@ export async function setWaterForDay(dateKey: string, ml: number): Promise<void>
  * Days with no row (outside the rolling window) are omitted.
  *
  * @param sinceDateKey - Earliest date to include (YYYY-MM-DD).
+ * @param untilDateKey - Latest date to include (YYYY-MM-DD), inclusive.
+ *   Defaults to today. Without this bound, the future daily_log rows
+ *   _syncRollingSchedule() pre-creates (today+1..+7, water_ml = 0) would be
+ *   included and silently drag down a "last N days" average (#306).
  */
 export async function getWaterHistory(
-  sinceDateKey: string
+  sinceDateKey: string,
+  untilDateKey: string = toISODate()
 ): Promise<{ date: string; water_ml: number }[]> {
   const db = getDatabase();
   const rows = await db.getAllAsync<{ date: string; water_ml: number }>(
-    'SELECT date, water_ml FROM daily_log WHERE date >= ? ORDER BY date ASC',
-    [sinceDateKey]
+    'SELECT date, water_ml FROM daily_log WHERE date >= ? AND date <= ? ORDER BY date ASC',
+    [sinceDateKey, untilDateKey]
   );
   return rows;
 }
