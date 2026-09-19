@@ -75,23 +75,6 @@ export interface RestoreResult {
 // ─── Pure helpers (exported for unit tests) ──────────────────────────────────
 
 /**
- * Build the (col1, col2, ...) list and VALUES (?, ?, ...) placeholders for a
- * single row's keys. This is a pure function with no side-effects.
- */
-export function buildInsertColumns(row: Record<string, unknown>): {
-  columns: string;
-  placeholders: string;
-  values: unknown[];
-} {
-  const keys = Object.keys(row);
-  return {
-    columns: keys.join(', '),
-    placeholders: keys.map(() => '?').join(', '),
-    values: keys.map((k) => row[k]),
-  };
-}
-
-/**
  * Validate a parsed object as a BackupPayload. Returns the typed payload or
  * throws an Error with a user-facing message.
  *

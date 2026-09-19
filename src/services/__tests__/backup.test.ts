@@ -7,7 +7,6 @@
  * (expo-sqlite is mocked).
  *
  * Coverage:
- *   - buildInsertColumns: pure column/placeholder/values builder
  *   - validatePayload: format check, schema version compatibility gate
  *   - exportBackup / importBackup / buildBackupPayload / writeSafetySnapshot
  *     smoke: confirm the service exports the expected functions (consistent
@@ -25,7 +24,6 @@ import { readAsStringAsync } from 'expo-file-system/legacy';
 import * as db from '../../db/database';
 import * as notificationsModule from '../notifications';
 import {
-  buildInsertColumns,
   validatePayload,
   exportBackup,
   importBackup,
@@ -60,43 +58,6 @@ jest.mock('../../db/database', () => ({
   getBackupReminderTime: jest.fn(),
   getCookWhenEmptyEnabled: jest.fn(),
 }));
-
-// ─── buildInsertColumns ───────────────────────────────────────────────────────
-
-describe('buildInsertColumns', () => {
-  it('builds columns, placeholders, and values for a single-key row', () => {
-    const result = buildInsertColumns({ name: 'Alice' });
-    expect(result.columns).toBe('name');
-    expect(result.placeholders).toBe('?');
-    expect(result.values).toEqual(['Alice']);
-  });
-
-  it('builds columns, placeholders, and values for a multi-key row', () => {
-    const row = { id: 1, date: '2024-01-01', value: 42.5 };
-    const result = buildInsertColumns(row);
-    expect(result.columns).toBe('id, date, value');
-    expect(result.placeholders).toBe('?, ?, ?');
-    expect(result.values).toEqual([1, '2024-01-01', 42.5]);
-  });
-
-  it('handles null values', () => {
-    const row = { id: 1, weight: null };
-    const result = buildInsertColumns(row);
-    expect(result.columns).toBe('id, weight');
-    expect(result.placeholders).toBe('?, ?');
-    expect(result.values).toEqual([1, null]);
-  });
-
-  it('returns the same number of columns, placeholders, and values', () => {
-    const row = { a: 1, b: 2, c: 3, d: 4, e: 5 };
-    const result = buildInsertColumns(row);
-    const colCount = result.columns.split(',').length;
-    const phCount = result.placeholders.split(',').length;
-    expect(colCount).toBe(5);
-    expect(phCount).toBe(5);
-    expect(result.values).toHaveLength(5);
-  });
-});
 
 // ─── validatePayload ─────────────────────────────────────────────────────────
 
