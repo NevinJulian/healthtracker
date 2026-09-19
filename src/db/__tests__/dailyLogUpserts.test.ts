@@ -250,3 +250,137 @@ describe('calling a writer twice for the same missing date creates exactly one r
     expect(rows[0].body_weight).toBe(65);
   });
 });
+
+/**
+ * Regression tests for #319.
+ *
+ * upsertExerciseCompleted() reads daily_log.exercises, parses it with the
+ * lenient parseExercises() (returns [] on any malformed JSON), toggles one
+ * entry, and writes JSON.stringify(...) back. Two problems:
+ *
+ *  1. If the stored text is malformed, the lenient parse silently treats it
+ *     as [], and the write-back then replaces the corrupted-but-maybe-
+ *     recoverable original with a *destroyed* value (typically just the
+ *     one toggled entry, or []) — the write path must never do this.
+ *
+ *  2. Read-modify-write with no serialisation: two overlapping calls for
+ *     the same date can both read the same pre-toggle array; the second
+ *     write clobbers the first toggle (lost update).
+ *
+ * The fix adds a strict write-only parse (_tryParseExercisesForWrite) that
+ * rejects instead of coercing to [], and chains every call onto a
+ * module-level promise so read-modify-write sequences never interleave.
+ */
+describe('upsertExerciseCompleted rejects on malformed stored JSON instead of destroying it (#319)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  it('rejects, logs the date via console.error, and leaves the stored text byte-for-byte unchanged', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey(); // initDatabase()'s startup sync already created today's row
+
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const rawDb = db.getDatabase();
+    const corrupted = '{not valid json';
+    await rawDb.runAsync('UPDATE daily_log SET exercises = ? WHERE date = ?', [corrupted, date]);
+
+    await expect(db.upsertExerciseCompleted(date, 'some-exercise-id', true)).rejects.toThrow();
+
+    const mentionsDate = consoleErrorSpy.mock.calls.some((args) =>
+      args.some((arg) => typeof arg === 'string' && arg.includes(date))
+    );
+    expect(mentionsDate).toBe(true);
+
+    const row = await rawDb.getFirstAsync<{ exercises: string }>(
+      'SELECT exercises FROM daily_log WHERE date = ?',
+      [date]
+    );
+    expect(row?.exercises).toBe(corrupted);
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('read path (parseExercises, via getLogByDate) is unaffected by the write-path change: still returns [] for the same malformed text', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+
+    const rawDb = db.getDatabase();
+    await rawDb.runAsync('UPDATE daily_log SET exercises = ? WHERE date = ?', [
+      '{not valid json',
+      date,
+    ]);
+
+    const entry = await db.getLogByDate(date);
+    expect(entry?.exercises).toEqual([]);
+  });
+});
+
+describe('concurrent upsertExerciseCompleted calls for the same date are serialised, not lost (#319)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  it('two calls for different exercise ids, started without awaiting each other, both persist', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+
+    const rawDb = db.getDatabase();
+    const seeded = [
+      { id: 'ex-a', name: 'Exercise A', sets: '3', reps: '10', videoUrl: '', completed: false },
+      { id: 'ex-b', name: 'Exercise B', sets: '3', reps: '10', videoUrl: '', completed: false },
+    ];
+    await rawDb.runAsync('UPDATE daily_log SET exercises = ? WHERE date = ?', [
+      JSON.stringify(seeded),
+      date,
+    ]);
+
+    // Deliberately NOT awaited one-at-a-time — both start before either
+    // finishes, exercising the read-modify-write race.
+    const p1 = db.upsertExerciseCompleted(date, 'ex-a', true);
+    const p2 = db.upsertExerciseCompleted(date, 'ex-b', true);
+    await Promise.all([p1, p2]);
+
+    const after = await db.getLogByDate(date);
+    const a = after?.exercises.find((ex) => ex.id === 'ex-a');
+    const b = after?.exercises.find((ex) => ex.id === 'ex-b');
+    expect(a?.completed).toBe(true);
+    expect(b?.completed).toBe(true);
+  });
+});
+
+describe('a rejected upsertExerciseCompleted call does not wedge the serialisation queue (#319)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  it('a later queued call for a different date still resolves after an earlier one rejected', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const badDate = todayKey();
+    const goodDate = FAR_PAST(); // no row yet — _ensureDailyLogRow creates one with valid exercises='[]'
+
+    const rawDb = db.getDatabase();
+    await rawDb.runAsync('UPDATE daily_log SET exercises = ? WHERE date = ?', [
+      '{not valid json',
+      badDate,
+    ]);
+
+    // Queued back-to-back, neither awaited individually first.
+    const badCall = db.upsertExerciseCompleted(badDate, 'some-id', true);
+    const goodCall = db.upsertExerciseCompleted(goodDate, 'some-other-id', true);
+
+    await expect(badCall).rejects.toThrow();
+    await expect(goodCall).resolves.not.toThrow();
+
+    consoleErrorSpy.mockRestore();
+  });
+});
