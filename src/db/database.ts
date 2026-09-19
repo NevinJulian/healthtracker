@@ -1447,6 +1447,45 @@ export async function insertCookingTask(
 }
 
 /**
+ * Atomically adds every ingredient of a recipe to the shopping list and
+ * queues it as a cooking task (#320).
+ *
+ * Previously RecipeDetailScreen's handleAddToShoppingList looped
+ * addShoppingListItem() per ingredient (each an autocommitted single-row
+ * INSERT) and then made a separate call to insertCookingTask(). A failure
+ * partway through the loop left a half-written shopping list with no
+ * matching cooking task, and the screen's catch only surfaced an Alert —
+ * nothing rolled back. This wraps the whole batch in one
+ * db.withTransactionAsync, same pattern as finishCooking() above.
+ *
+ * addShoppingListItem() and insertCookingTask() are called directly here
+ * (reusing their existing single-row SQL) because neither opens its own
+ * transaction — each is just one runAsync — so they're safe to call from
+ * inside this one.
+ *
+ * Note on #369: the real expo-sqlite withTransactionAsync is a bare,
+ * non-queued BEGIN/COMMIT on the shared connection, so two overlapping
+ * transactions can roll back each other's work. The overlap risk here is
+ * low in practice: RecipeDetailScreen's success/failure Alert blocks
+ * navigation before the screen loses focus, and syncRollingSchedule only
+ * runs on initial load and on focus — so nothing else starts a second
+ * transaction while this one is in flight.
+ */
+export async function addRecipeToShoppingList(
+  items: { name: string; quantity: number; unit: string }[],
+  recipeId: string,
+  servings: number
+): Promise<void> {
+  const db = getDatabase();
+  await db.withTransactionAsync(async () => {
+    for (const item of items) {
+      await addShoppingListItem(item.name, item.quantity, item.unit);
+    }
+    await insertCookingTask(recipeId, servings);
+  });
+}
+
+/**
  * Returns all cooking tasks joined with their corresponding recipe metadata.
  * Results are ordered by insertion order (oldest task first) so the user
  * cooks in the order they planned their shopping.
