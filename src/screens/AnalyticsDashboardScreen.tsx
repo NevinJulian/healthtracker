@@ -37,7 +37,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
-  getRollingWindow,
+  getDailyLogsBetween,
   getWeightHistory,
   getStartDate,
   toISODate,
@@ -666,7 +666,7 @@ function HydrationSummaryCard({
           <Text style={styles.cardSectionTrailing}>Last 7 days</Text>
         </View>
 
-        {days.length === 0 ? (
+        {days.length === 0 || days.every((d) => d.water_ml === 0) ? (
           <Text style={styles.emptyText}>No hydration data logged yet.</Text>
         ) : (
           <>
@@ -1362,7 +1362,17 @@ export default function AnalyticsDashboardScreen() {
 
     setLoading(true);
     try {
-      const logs = await getRollingWindow();
+      // `logs` below feeds computeStats(7/30), the fasting-streak scan,
+      // computeStreaks, and the 30-day consistency grid — every one of
+      // which only ever looks at dates <= today, unlike getRollingWindow()
+      // (which also reaches today+DAYS_AHEAD for OverviewScreen's own
+      // rolling-schedule needs, and — after #300 bounded it to ±7 days —
+      // no longer has enough history for the 30-day stats/grid on this
+      // screen). Bound explicitly to the last 90 days instead: wide enough
+      // for the 30-day consumers with headroom, and consistent with the
+      // other 90-day windows already used on this screen (getWeightHistory
+      // (90), the strength progression chart) (#300).
+      const logs = await getDailyLogsBetween(addDaysKey(toISODate(), -90), toISODate());
       const weightData30 = await getWeightHistory(30);
       const weightData90 = await getWeightHistory(90);
       const startDate = await getStartDate();

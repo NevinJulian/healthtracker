@@ -63,26 +63,16 @@ export interface RestoreResult {
   rowsRestored: number;
   /** URI of the pre-restore safety snapshot written to cache. */
   safetySnapshotUri: string;
+  /**
+   * Per-table report of rows/columns dropped by restoreFromPayload's column
+   * whitelist (#315) — unknown columns in a row are silently ignored rather
+   * than inserted, and a row left with no known columns isn't inserted at
+   * all. Present only when something was actually skipped.
+   */
+  skipped?: { table: string; columns: string[]; rows: number }[];
 }
 
 // ─── Pure helpers (exported for unit tests) ──────────────────────────────────
-
-/**
- * Build the (col1, col2, ...) list and VALUES (?, ?, ...) placeholders for a
- * single row's keys. This is a pure function with no side-effects.
- */
-export function buildInsertColumns(row: Record<string, unknown>): {
-  columns: string;
-  placeholders: string;
-  values: unknown[];
-} {
-  const keys = Object.keys(row);
-  return {
-    columns: keys.join(', '),
-    placeholders: keys.map(() => '?').join(', '),
-    values: keys.map((k) => row[k]),
-  };
-}
 
 /**
  * Validate a parsed object as a BackupPayload. Returns the typed payload or
@@ -112,14 +102,47 @@ export function validatePayload(
     );
   }
 
+  if (obj['version'] !== 1) {
+    throw new Error(
+      'Invalid backup file: unsupported backup format version.'
+    );
+  }
+
   if (typeof obj['tables'] !== 'object' || obj['tables'] === null) {
     throw new Error('Invalid backup file: missing tables data.');
   }
 
-  const payloadSchema = Number(obj['schemaVersion']);
-  if (isNaN(payloadSchema)) {
+  if (Array.isArray(obj['tables'])) {
+    throw new Error(
+      'Invalid backup file: tables must be an object, not a list.'
+    );
+  }
+
+  const tables = obj['tables'] as Record<string, unknown>;
+  for (const [tableName, body] of Object.entries(tables)) {
+    if (!Array.isArray(body)) {
+      throw new Error(
+        `Invalid backup file: table "${tableName}" data must be a list of rows.`
+      );
+    }
+    for (const row of body) {
+      if (typeof row !== 'object' || row === null || Array.isArray(row)) {
+        throw new Error(
+          `Invalid backup file: table "${tableName}" contains a row that is not an object.`
+        );
+      }
+    }
+  }
+
+  const rawSchemaVersion = obj['schemaVersion'];
+  if (
+    typeof rawSchemaVersion !== 'number' ||
+    !Number.isFinite(rawSchemaVersion) ||
+    !Number.isInteger(rawSchemaVersion)
+  ) {
     throw new Error('Invalid backup file: missing schema version.');
   }
+  const payloadSchema = rawSchemaVersion;
 
   if (payloadSchema > currentSchemaVersion) {
     throw new Error(
@@ -325,7 +348,7 @@ export async function importBackup(
     // Caller chose to proceed despite failed snapshot — continue without URI.
   }
 
-  const { tablesRestored, rowsRestored } = await restoreFromPayload(payload.tables);
+  const { tablesRestored, rowsRestored, skipped } = await restoreFromPayload(payload.tables);
 
   // ── Resync scheduled notifications to the restored settings (#310) ──────
   // Runs only after a successful restore; nothing above this point touches
@@ -339,7 +362,12 @@ export async function importBackup(
     console.warn('[Backup] Failed to resync notifications after restore:', err);
   }
 
-  return { tablesRestored, rowsRestored, safetySnapshotUri };
+  return {
+    tablesRestored,
+    rowsRestored,
+    safetySnapshotUri,
+    ...(skipped ? { skipped } : {}),
+  };
 }
 
 /**

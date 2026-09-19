@@ -7,7 +7,6 @@
  * (expo-sqlite is mocked).
  *
  * Coverage:
- *   - buildInsertColumns: pure column/placeholder/values builder
  *   - validatePayload: format check, schema version compatibility gate
  *   - exportBackup / importBackup / buildBackupPayload / writeSafetySnapshot
  *     smoke: confirm the service exports the expected functions (consistent
@@ -25,7 +24,6 @@ import { readAsStringAsync } from 'expo-file-system/legacy';
 import * as db from '../../db/database';
 import * as notificationsModule from '../notifications';
 import {
-  buildInsertColumns,
   validatePayload,
   exportBackup,
   importBackup,
@@ -60,43 +58,6 @@ jest.mock('../../db/database', () => ({
   getBackupReminderTime: jest.fn(),
   getCookWhenEmptyEnabled: jest.fn(),
 }));
-
-// ─── buildInsertColumns ───────────────────────────────────────────────────────
-
-describe('buildInsertColumns', () => {
-  it('builds columns, placeholders, and values for a single-key row', () => {
-    const result = buildInsertColumns({ name: 'Alice' });
-    expect(result.columns).toBe('name');
-    expect(result.placeholders).toBe('?');
-    expect(result.values).toEqual(['Alice']);
-  });
-
-  it('builds columns, placeholders, and values for a multi-key row', () => {
-    const row = { id: 1, date: '2024-01-01', value: 42.5 };
-    const result = buildInsertColumns(row);
-    expect(result.columns).toBe('id, date, value');
-    expect(result.placeholders).toBe('?, ?, ?');
-    expect(result.values).toEqual([1, '2024-01-01', 42.5]);
-  });
-
-  it('handles null values', () => {
-    const row = { id: 1, weight: null };
-    const result = buildInsertColumns(row);
-    expect(result.columns).toBe('id, weight');
-    expect(result.placeholders).toBe('?, ?');
-    expect(result.values).toEqual([1, null]);
-  });
-
-  it('returns the same number of columns, placeholders, and values', () => {
-    const row = { a: 1, b: 2, c: 3, d: 4, e: 5 };
-    const result = buildInsertColumns(row);
-    const colCount = result.columns.split(',').length;
-    const phCount = result.placeholders.split(',').length;
-    expect(colCount).toBe(5);
-    expect(phCount).toBe(5);
-    expect(result.values).toHaveLength(5);
-  });
-});
 
 // ─── validatePayload ─────────────────────────────────────────────────────────
 
@@ -175,6 +136,141 @@ describe('validatePayload', () => {
     expect(result.format).toBe('healthtracker-backup');
     expect(result.schemaVersion).toBe(10);
     expect(result.tables).toEqual({ daily_log: [] });
+  });
+
+  // ── #315: tightened validation ──────────────────────────────────────────
+  // The pre-#315 checks were: `typeof tables === 'object'` (which accepts
+  // both arrays and per-table string bodies), `Number(payload.schemaVersion)`
+  // (which coerces null/[]/''  to 0, silently passing), and `payload.version`
+  // was never read at all. Each of the below must be rejected with a
+  // distinct, readable "Invalid backup file: ..." message, matching the
+  // existing style, so SettingsScreen (which shows err.message verbatim)
+  // gives the user something specific.
+
+  it('rejects tables that is an array, not an object', () => {
+    const payload = makePayload({ tables: [1, 2, 3] });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('rejects a table body that is not an array (a string)', () => {
+    const payload = makePayload({ tables: { daily_log: 'hello' } });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('rejects a row that is a string', () => {
+    const payload = makePayload({ tables: { daily_log: ['not a row'] } });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('rejects a row that is a number', () => {
+    const payload = makePayload({ tables: { daily_log: [42] } });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('rejects a row that is an array', () => {
+    const payload = makePayload({ tables: { daily_log: [[1, 2, 3]] } });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('rejects a row that is null', () => {
+    const payload = makePayload({ tables: { daily_log: [null] } });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('rejects schemaVersion: null (Number(null) === 0 previously slipped through)', () => {
+    const payload = makePayload({ schemaVersion: null });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('rejects schemaVersion: [] (Number([]) === 0 previously slipped through)', () => {
+    const payload = makePayload({ schemaVersion: [] });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it("rejects schemaVersion: '' (Number('') === 0 previously slipped through)", () => {
+    const payload = makePayload({ schemaVersion: '' });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('rejects schemaVersion: 1.5 (not an integer)', () => {
+    const payload = makePayload({ schemaVersion: 1.5 });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('rejects version: 2 (payload.version was never read before #315)', () => {
+    const payload = makePayload({ version: 2 });
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('rejects a missing version field', () => {
+    const payload = makePayload() as Record<string, unknown>;
+    delete payload['version'];
+    expect(() => validatePayload(payload, currentSchemaVersion)).toThrow(
+      'Invalid backup file'
+    );
+  });
+
+  it('accepts a current-format payload shaped exactly like buildBackupPayload()’s output', () => {
+    const payload = {
+      format: 'healthtracker-backup',
+      version: 1,
+      appVersion: '1.1.0',
+      schemaVersion: 20,
+      createdAt: new Date().toISOString(),
+      tables: {
+        daily_log: [
+          { date: '2024-06-01', walking_task: 'walk', hammer_task: 'hammer' },
+        ],
+        app_state: [{ key: 'app_start_date', value: '2024-01-01' }],
+      },
+    };
+    expect(() => validatePayload(payload, currentSchemaVersion)).not.toThrow();
+  });
+
+  it('accepts a legacy-format payload (envelope shape unchanged since be5b235, pre-v35 duplicate weekly_meal_plan rows)', () => {
+    // Same envelope shape as today (format/version/appVersion/schemaVersion/
+    // createdAt/tables) — the analyst confirmed via `git log -p` that this
+    // hasn't changed since the first backup commit. "Legacy" here is an old
+    // schemaVersion plus the kind of duplicate weekly_meal_plan rows a
+    // pre-#303 app version could produce (see restoreLegacyDuplicates.test.ts).
+    const legacyPayload = {
+      format: 'healthtracker-backup',
+      version: 1,
+      appVersion: '0.9.0',
+      schemaVersion: 5,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      tables: {
+        weekly_meal_plan: [
+          { id: 10, date: '2024-06-01', meal_type: 'dinner', recipe_id: 'r001', is_consumed: 0, consumed_from_inventory_id: null },
+          { id: 11, date: '2024-06-01', meal_type: 'dinner', recipe_id: 'r001', is_consumed: 1, consumed_from_inventory_id: 1 },
+        ],
+      },
+    };
+    expect(() =>
+      validatePayload(legacyPayload, currentSchemaVersion)
+    ).not.toThrow();
   });
 });
 

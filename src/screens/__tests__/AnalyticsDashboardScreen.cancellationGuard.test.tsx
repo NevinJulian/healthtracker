@@ -67,6 +67,11 @@ function mockNextDeferred<T>(store: Array<Deferred<T>>): Promise<T> {
 jest.mock('../../db/database', () => ({
   toISODate: jest.fn(() => '2024-06-15'),
   getRollingWindow: jest.fn().mockResolvedValue([]),
+  // loadData now sources `logs` from getDailyLogsBetween instead of
+  // getRollingWindow (#300 deferred step); this test doesn't exercise
+  // `logs` itself, only the four cancellation-guard setter boundaries, so
+  // an empty resolved array is enough to keep loadData from throwing.
+  getDailyLogsBetween: jest.fn().mockResolvedValue([]),
   getWeightHistory: jest.fn().mockResolvedValue([]),
   getStartDate: jest.fn().mockResolvedValue('2020-01-01'),
   getConsumedMacrosByDay: jest.fn().mockResolvedValue([]),
