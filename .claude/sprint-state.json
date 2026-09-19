@@ -66,7 +66,7 @@
     "A": {
       "branch": "sprint/lane-a-db",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "cleanup",
+      "status": "merging",
       "order": [
         300,
         301,
@@ -103,7 +103,8 @@
       ],
       "parked": [
         316
-      ]
+      ],
+      "cleanup": "f3c774a comment-only (2 fixes)"
     },
     "B": {
       "branch": "sprint/lane-b-notify",
@@ -1858,6 +1859,10 @@
     {
       "at": "2026-09-19T02:19:39Z",
       "event": "lane A queue complete: 14 ready (#300,#301,#305,#302,#314,#303,#319,#320,#321,#315,#306,#307,#326,#331), 1 parked (#316). Cleanup dispatched."
+    },
+    {
+      "at": "2026-09-19T02:23:42Z",
+      "event": "lane A: status=merging cleanup=f3c774a comment-only (2 fixes)"
     }
   ]
 }
