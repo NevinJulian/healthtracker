@@ -209,7 +209,7 @@
       ],
       "parked": [],
       "cleanup": "no changes needed",
-      "mergeSha": 605533
+      "mergeSha": "0605533"
     },
     "F": {
       "branch": "sprint/lane-f-repo",
@@ -237,14 +237,17 @@
     "G": {
       "branch": "sprint/lane-g-tests",
       "worktree": "C:/git/ht-lanes/lane-g",
-      "status": "in_progress",
+      "status": "merging",
       "order": [
         336
       ],
       "waitsFor": "all other lanes merged",
-      "current": 336,
-      "done": [],
-      "parked": []
+      "current": null,
+      "done": [
+        336
+      ],
+      "parked": [],
+      "notes": "cleanup: no changes (ac5855a). Merging 7e16b78."
     }
   },
   "issues": {
@@ -552,7 +555,7 @@
       "notes": "tester APPROVE r2, security APPROVE (no new trust boundary, no write path, URL encoding intact, errors carry no raw body). PARTIAL: abort-on-navigation + out-of-order search responses need DiscoverScreen/RecipeEditorScreen (unowned) -> PR must say Refs #318 not Closes.",
       "securityReview": "required-src-api",
       "regressionProof": "mealdb tests fail at 1beee5e (settled=false; fetch x2) pass at def1e4f; backoff-abort test fails at def1e4f pass at 8f867a5 (tester reproduced both)",
-      "mergeSha": 605533
+      "mergeSha": "0605533"
     },
     "319": {
       "roundTrips": 0,
@@ -795,6 +798,25 @@
       "branch": "sprint/lane-f-repo",
       "notes": "tester APPROVE r2 at bd598e3 (docs-only; security n/a). All ACs re-verified; 492/43.",
       "securityReview": "skipped-docs-only"
+    },
+    "336": {
+      "roundTrips": 1,
+      "commits": [
+        "09a1e8a",
+        "637f6b7",
+        "d079836",
+        "29fb37a",
+        "f72d701",
+        "2d7eaea",
+        "4d1874f",
+        "9d15089",
+        "7e16b78"
+      ],
+      "lane": "G",
+      "status": "ready",
+      "branch": "sprint/lane-g-tests",
+      "notes": "tester APPROVE r2 at 7e16b78: realistic mutations a/b/c/d caught (steps 43/11/28/23) + finishCooking always-insert mutation caught (non-circular); op counts tick 80 untick 52 assign 20 reassign 20 finishCooking 11, 14 null-pointer ticks; test1 time pinned; CLAUDE.md accurate (15 RNTL files). All #336 ACs met -> Closes.",
+      "securityReview": "skipped-tests-ci-docs-only"
     }
   },
   "foundDuringSprint": [
@@ -2243,6 +2265,49 @@
     {
       "at": "2026-09-19T03:52:11Z",
       "event": "lane G: status=in_progress current=336"
+    },
+    {
+      "at": "2026-09-19T03:53:07Z",
+      "event": "#336: lane=G status=analysing branch=sprint/lane-g-tests roundTrips=0 notes=…"
+    },
+    {
+      "at": "2026-09-19T03:58:27Z",
+      "event": "#336: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-19T03:59:20Z",
+      "event": "closed #359 as duplicate of #360 (sprint double-filing)"
+    },
+    {
+      "at": "2026-09-19T04:18:08Z",
+      "event": "#336: status=in_test commits=[\"09a1e8a\",\"637f6b7\",\"d079836\",\"29fb37a\",\"f72d701\",\"2d7eaea\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T04:27:09Z",
+      "event": "#336: status=in_dev roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-19T04:38:13Z",
+      "event": "#336: status=in_test commits+=4d1874f commits+=9d15089 commits+=7e16b78 notes=…"
+    },
+    {
+      "at": "2026-09-19T04:43:31Z",
+      "event": "#336: status=ready securityReview=skipped-tests-ci-docs-only notes=…"
+    },
+    {
+      "at": "2026-09-19T04:43:31Z",
+      "event": "lane G: done+=336 current=null status=cleanup"
+    },
+    {
+      "at": "2026-09-19T04:45:54Z",
+      "event": "lane G: status=merging notes=…"
+    }
+  ],
+  "duplicatesClosed": [
+    {
+      "issue": 359,
+      "duplicateOf": 360,
+      "note": "sprint filed the #308 react-test-renderer finding twice (22:49Z and 22:53Z); closed #359 as duplicate with comment"
     }
   ]
 }
