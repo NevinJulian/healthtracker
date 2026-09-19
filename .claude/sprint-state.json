@@ -84,16 +84,21 @@
         331,
         326
       ],
-      "current": 319,
+      "current": 315,
       "done": [
         300,
         301,
         305,
         302,
         314,
-        303
+        303,
+        319,
+        320,
+        321
       ],
-      "parked": []
+      "parked": [
+        316
+      ]
     },
     "B": {
       "branch": "sprint/lane-b-notify",
@@ -314,6 +319,22 @@
       "securityReview": "required-src-db",
       "regressionProof": "9/10 dailyLogUpserts tests fail with 382b62a database.ts, 10/10 at 52409f4; refactor proven byte-identical sync output (tester)"
     },
+    "306": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "in_dev",
+      "branch": "sprint/lane-a-db",
+      "notes": "work order: getWaterHistory(since, until = toISODate()) adds AND date <= ?; sole caller Analytics (7-day card) fixed by default param. '7-day' label => average over 7 calendar days (zero days count) - unchanged semantics, #301's 90d backfill never reaches this 7-day query. Held until #315 tester done."
+    },
+    "307": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "in_dev",
+      "branch": "sprint/lane-a-db",
+      "notes": "work order: getMealAdherence adds AND date <= toISODate() (issue's Option 1; today's unconsumed still count). Sole consumer Analytics 'Plan adherence' 30d, no screen change. Will be implemented by same developer session as #306 (separate commits, separate verdicts). Held until #315 tester done."
+    },
     "308": {
       "roundTrips": 0,
       "commits": [
@@ -417,6 +438,32 @@
       "securityReview": "required-migration-runner",
       "regressionProof": "throwing-migration + v35-kill tests fail with ba049bc database.ts, 4/4 pass at a5f9276 (tester reproduced)"
     },
+    "315": {
+      "roundTrips": 0,
+      "commits": [
+        "14b1286",
+        "e9f4983",
+        "8f9eeed",
+        "07b1a24",
+        "89c23ed"
+      ],
+      "lane": "A",
+      "status": "in_security",
+      "branch": "sprint/lane-a-db",
+      "notes": "tester APPROVE r0 (after rate-limit interruption resume). Probed quoted/comma/empty/case/__proto__ keys - all dropped. buildInsertColumns confirmed dead. #303 composition verified. Skipped info not yet shown in SettingsScreen (lane D) - AC partially met.",
+      "securityReview": "required-backup-restore",
+      "regressionProof": "restoreInjection 4/4 fail at 9ef7fb6 with real SQL syntax error from injected key; 12 validatePayload cases fail at 9ef7fb6; all pass at 89c23ed (tester reproduced)"
+    },
+    "316": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "parked",
+      "branch": "sprint/lane-a-db",
+      "notes": "issue comment posted",
+      "stalledAt": "analysis",
+      "parkReason": "Pragma alone makes deleteRecipe throw (no ON DELETE CASCADE declared); cascade needs table rebuild AND restoreFromPayload's alphabetical DELETE+INSERT order would cascade-wipe just-restored cooking_tasks/meal_inventory (silent data loss every restore; defer_foreign_keys doesn't stop cascades). cook_log has no FK and is intentional history. Human decides: destroy/keep/block history on recipe delete; refund consumed portions? Recommended after decision: explicit child deletes in deleteRecipe (option b) in one txn; no pragma until restore restructured."
+    },
     "318": {
       "roundTrips": 1,
       "commits": [
@@ -437,11 +484,43 @@
     },
     "319": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "8d1145e",
+        "37e70a4"
+      ],
       "lane": "A",
-      "status": "in_dev",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "analyst proposed withTransactionAsync + adding a mutex to the test adapter claiming expo-sqlite queues - FALSE (verified source: bare BEGIN/COMMIT, not queued). Orchestrator redesign: strict write-path parse (throw, no clobber) + serialise upsertExerciseCompleted via module-level promise chain (no transaction: single UPDATE is atomic; avoids #369 hazard); adapter unchanged. upsertAdditionalWorkouts same clobber class -> file. Waits for #303 (same worktree)."
+      "notes": "tester + security APPROVE r0. Security notes: exercise toggle on corrupt day silently reverts (no Alert) - UI follow-up; sync backfill not in the queue (pre-existing, #369/#371 territory).",
+      "securityReview": "required-src-db",
+      "regressionProof": "3 regression tests fail with d74da00 database.ts, pass at 37e70a4 (tester reproduced)"
+    },
+    "320": {
+      "roundTrips": 0,
+      "commits": [
+        "a6fc1ca",
+        "0913739",
+        "5c206b2"
+      ],
+      "lane": "A",
+      "status": "ready",
+      "branch": "sprint/lane-a-db",
+      "notes": "tester + security APPROVE r0. Security: all parameterised; no notification-driven DB writes exist -> no realistic #369 overlap on recipe screen.",
+      "securityReview": "required-src-db",
+      "regressionProof": "induced-failure test fails at a6fc1ca (not a function, wrapped); MUTATION: removing txn wrapper at 5c206b2 -> test fails with 2 leftover rows (tester) -> proves atomicity"
+    },
+    "321": {
+      "roundTrips": 0,
+      "commits": [
+        "7e8add7",
+        "9ef7fb6"
+      ],
+      "lane": "A",
+      "status": "ready",
+      "branch": "sprint/lane-a-db",
+      "notes": "tester + security APPROVE r0 (security: swallowed rejection is cleanup-only, write still throws).",
+      "securityReview": "required-src-db",
+      "regressionProof": "3/4 fail with 5c206b2 database.ts (finalize spy 0 calls), 4/4 at 9ef7fb6; mutation: removing .catch -> finalize error masks original, test fails (tester)"
     },
     "322": {
       "roundTrips": 0,
@@ -516,10 +595,10 @@
       "roundTrips": 0,
       "commits": [],
       "lane": "A",
-      "status": "pending",
+      "status": "analysed_waiting",
       "branch": "sprint/lane-a-db",
       "reassignedFrom": "D",
-      "notes": "REASSIGNED D->A by orchestrator (analyst recommended re-scoping to lane A; not parked). Analyst finding: claimed NaN/Infinity cannot occur (waterMl>=goal always true when goal<=0, so division never runs). REAL bug: getHydrationGoal returns 0 for empty stored string (Number('')=0 passes isNaN) -> card shows 'Goal met' at 0 ml. Fix in database.ts getHydrationGoal per issue ACs 2+3; DashboardScreen NaN AC moot."
+      "notes": "lane A work order: getHydrationGoal accepts only finite 250..6000 (mirrors Settings stepper #313), else 2000. Satisfies issue AC2+AC3; AC1 (Dashboard guard) moot (branch unreachable). Sibling Number('') getters (nutrition goals, profile) filed separately. Queued after #306/#307."
     },
     "327": {
       "roundTrips": 1,
@@ -574,6 +653,15 @@
       "securityReview": "skipped-ui-write-unchanged",
       "regressionProof": "4/4 fail with 2c05479 DashboardScreen.tsx, pass at 832cd45; test commit precedes fix (tester verified)"
     },
+    "331": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "analysed_waiting",
+      "branch": "sprint/lane-a-db",
+      "notes": "work order: v36 = idx_workout_set_log_date, idx_workout_set_log_exercise_date(exercise,date), idx_meal_inventory_recipe; EXPLAIN QUERY PLAN proof. Cut issue's weekly_meal_plan(date) (redundant w/ v35 unique leftmost prefix) and cook_log(recipe_id) (no query). Orchestrator: replace 'last version === 36' snapshot with append-safe checks (#317 adds v37). Analyst also-found (getLoggedExercises) rejected: (exercise,date) index already covers it.",
+      "migration": "v36"
+    },
     "332": {
       "roundTrips": 0,
       "commits": [
@@ -609,7 +697,10 @@
     367,
     368,
     369,
-    370
+    370,
+    371,
+    372,
+    373
   ],
   "log": [
     {
@@ -1480,6 +1571,174 @@
     {
       "at": "2026-09-19T01:13:35Z",
       "event": "lane A: done+=303 current=319"
+    },
+    {
+      "at": "2026-09-19T01:13:59Z",
+      "event": "#320: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-19T01:15:10Z",
+      "event": "#320: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-19T01:15:10Z",
+      "event": "orchestrator grant: lane A may edit src/screens/RecipeDetailScreen.tsx handleAddToShoppingList for #320 (unowned file)"
+    },
+    {
+      "at": "2026-09-19T01:15:32Z",
+      "event": "#319: status=in_test commits=[\"8d1145e\",\"37e70a4\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T01:19:29Z",
+      "event": "filed found-during-sprint #371"
+    },
+    {
+      "at": "2026-09-19T01:19:29Z",
+      "event": "#319: status=in_security securityReview=required-src-db regressionProof=3 regression tests fail with d74da00 database.ts, pass at 37e70a4 (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-19T01:19:29Z",
+      "event": "#320: status=in_dev"
+    },
+    {
+      "at": "2026-09-19T01:21:14Z",
+      "event": "#319: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T01:21:14Z",
+      "event": "lane A: done+=319 current=320"
+    },
+    {
+      "at": "2026-09-19T01:23:36Z",
+      "event": "#320: status=in_test commits=[\"a6fc1ca\",\"0913739\",\"5c206b2\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T01:23:36Z",
+      "event": "#321: lane=A status=analysing branch=sprint/lane-a-db"
+    },
+    {
+      "at": "2026-09-19T01:25:00Z",
+      "event": "#321: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-19T01:26:26Z",
+      "event": "#320: status=in_security securityReview=required-src-db regressionProof=induced-failure test fails at a6fc1ca (not a function, wrapped); MUTATION: removing txn wrapper at 5c206b2 -> test fails with 2 leftover rows (tester) -> proves atomicity notes=…"
+    },
+    {
+      "at": "2026-09-19T01:26:26Z",
+      "event": "#321: status=in_dev"
+    },
+    {
+      "at": "2026-09-19T01:27:32Z",
+      "event": "#320: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T01:27:32Z",
+      "event": "lane A: done+=320 current=321"
+    },
+    {
+      "at": "2026-09-19T01:27:54Z",
+      "event": "#315: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-19T01:29:18Z",
+      "event": "#321: status=in_test commits=[\"7e8add7\",\"9ef7fb6\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T01:29:43Z",
+      "event": "#315: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-19T01:31:30Z",
+      "event": "#321: status=in_security securityReview=required-src-db regressionProof=3/4 fail with 5c206b2 database.ts (finalize spy 0 calls), 4/4 at 9ef7fb6; mutation: removing .catch -> finalize error masks original, test fails (tester) notes=…"
+    },
+    {
+      "at": "2026-09-19T01:31:38Z",
+      "event": "#315: status=in_dev"
+    },
+    {
+      "at": "2026-09-19T01:31:53Z",
+      "event": "#321: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T01:31:53Z",
+      "event": "lane A: done+=321 current=315"
+    },
+    {
+      "at": "2026-09-19T01:32:02Z",
+      "event": "state helper: added write retry after 2 transient Windows file-lock errors on sprint-state.json"
+    },
+    {
+      "at": "2026-09-19T01:32:23Z",
+      "event": "#316: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-19T01:35:43Z",
+      "event": "#316: status=parked stalledAt=analysis parkReason=Pragma alone makes deleteRecipe throw (no ON DELETE CASCADE declared); cascade needs table rebuild AND restoreFromPayload's alphabetical DELETE+INSERT order would cascade-wipe just-restored cooking_tasks/meal_inventory (silent data loss every restore; defer_foreign_keys doesn't stop cascades). cook_log has no FK and is intentional history. Human decides: destroy/keep/block history on recipe delete; refund consumed portions? Recommended after decision: explicit child deletes in deleteRecipe (option b) in one txn; no pragma until restore restructured. notes=…"
+    },
+    {
+      "at": "2026-09-19T01:35:43Z",
+      "event": "lane A: parked+=316"
+    },
+    {
+      "at": "2026-09-19T01:36:00Z",
+      "event": "filed found-during-sprint #372"
+    },
+    {
+      "at": "2026-09-19T01:36:00Z",
+      "event": "#306: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-19T01:38:11Z",
+      "event": "#315: status=in_test commits=[\"14b1286\",\"e9f4983\",\"8f9eeed\",\"07b1a24\",\"89c23ed\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T01:51:23Z",
+      "event": "API rate limit hit ~01:45 UTC: #315 tester and #306 analyst terminated; #306 work order had already been delivered. Limit reset ~01:50. Worktrees verified clean (lane-a at 89c23ed = origin). #315 tester resumed."
+    },
+    {
+      "at": "2026-09-19T01:51:23Z",
+      "event": "#306: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-19T01:51:39Z",
+      "event": "#307: lane=A status=analysing branch=sprint/lane-a-db"
+    },
+    {
+      "at": "2026-09-19T01:53:15Z",
+      "event": "#307: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-19T01:53:42Z",
+      "event": "#331: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-19T01:53:42Z",
+      "event": "#326: status=analysing notes=…"
+    },
+    {
+      "at": "2026-09-19T01:55:21Z",
+      "event": "#326: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-19T01:55:32Z",
+      "event": "filed found-during-sprint #373"
+    },
+    {
+      "at": "2026-09-19T01:55:32Z",
+      "event": "#331: status=analysed_waiting migration=v36 notes=…"
+    },
+    {
+      "at": "2026-09-19T01:56:05Z",
+      "event": "#315: status=in_security securityReview=required-backup-restore regressionProof=restoreInjection 4/4 fail at 9ef7fb6 with real SQL syntax error from injected key; 12 validatePayload cases fail at 9ef7fb6; all pass at 89c23ed (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-19T01:56:05Z",
+      "event": "#306: status=in_dev"
+    },
+    {
+      "at": "2026-09-19T01:56:05Z",
+      "event": "#307: status=in_dev"
     }
   ]
 }
