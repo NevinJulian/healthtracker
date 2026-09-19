@@ -291,9 +291,16 @@ describe('migration v34 (#302)', () => {
     expect(rows[0].consumed_from_inventory_id).toBeNull();
   });
 
-  it('v34 is the next integer version after v33', () => {
+  it('v34 exists exactly once', () => {
+    // Was "v34 is the next integer version after v33" (i.e. also asserted
+    // Math.max(...versions) === 34), which is a versioning snapshot that
+    // any later, legitimately-appended migration necessarily invalidates —
+    // #303 appends v35, superseding that specific claim. That "is-latest"
+    // invariant now lives in assignMealToPlanRefund.test.ts's own
+    // "v35 is the next integer version after v34" check. What this test
+    // actually guards against — v34 never being duplicated or silently
+    // dropped from MIGRATIONS — still holds and is unchanged below.
     const versions = MIGRATIONS.map((m) => m.version);
-    expect(Math.max(...versions)).toBe(34);
     expect(versions.filter((v) => v === 34)).toHaveLength(1);
   });
 });
