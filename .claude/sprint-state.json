@@ -84,13 +84,14 @@
         331,
         326
       ],
-      "current": 303,
+      "current": 319,
       "done": [
         300,
         301,
         305,
         302,
-        314
+        314,
+        303
       ],
       "parked": []
     },
@@ -279,7 +280,7 @@
       "regressionProof": "7/8 fail with 04434c3 database.ts+schema.ts, 8/8 at 606cdcb (tester reproduced)"
     },
     "303": {
-      "roundTrips": 1,
+      "roundTrips": 2,
       "commits": [
         "4c8662d",
         "854787f",
@@ -287,15 +288,17 @@
         "fc61361",
         "01e0175",
         "ba049bc",
-        "92ddba3"
+        "92ddba3",
+        "69c2d79",
+        "d74da00"
       ],
       "lane": "A",
-      "status": "in_security",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "tester REJECT r1 (kill double-credit), APPROVE r2 after #314 atomic runner + comment fix 92ddba3. roundTrips=1.",
+      "notes": "roundTrips=2 (tester REJECT r1 kill double-credit -> fixed via #314; security BLOCK r2 legacy backups unrestorable -> restoreFromPayload drops index, restores, re-runs v35 SQL from MIGRATIONS). Tester + security APPROVE r3. HUMAN REVIEW: v35 is a data migration deleting duplicate plan rows (survivor = consumed-if-any else MAX(id), orchestrator rule); same-recipe reassign refunds (un-eats).",
       "migration": "v35",
       "securityReview": "required-data-migration",
-      "regressionProof": "assignMealToPlanRefund fails 8/10 at 606cdcb; kill-safety via #314 runner (tester's own independent repro: 0 after kill, 1 after relaunch)"
+      "regressionProof": "assignMealToPlanRefund fails 8/10 at 606cdcb; v35 kill-safety via #314 runner; restoreLegacyDuplicates fails 2/3 at 92ddba3 with UNIQUE error, 3/3 at d74da00"
     },
     "305": {
       "roundTrips": 0,
@@ -436,9 +439,9 @@
       "roundTrips": 0,
       "commits": [],
       "lane": "A",
-      "status": "analysing",
+      "status": "in_dev",
       "branch": "sprint/lane-a-db",
-      "notes": "analysis pipelined with #303 security (read-only)"
+      "notes": "analyst proposed withTransactionAsync + adding a mutex to the test adapter claiming expo-sqlite queues - FALSE (verified source: bare BEGIN/COMMIT, not queued). Orchestrator redesign: strict write-path parse (throw, no clobber) + serialise upsertExerciseCompleted via module-level promise chain (no transaction: single UPDATE is atomic; avoids #369 hazard); adapter unchanged. upsertAdditionalWorkouts same clobber class -> file. Waits for #303 (same worktree)."
     },
     "322": {
       "roundTrips": 0,
@@ -604,7 +607,9 @@
     365,
     366,
     367,
-    368
+    368,
+    369,
+    370
   ],
   "log": [
     {
@@ -1431,6 +1436,50 @@
     {
       "at": "2026-09-19T01:02:49Z",
       "event": "lane D idle: all independent issues done (#313,#322-D,#323-p1,#324,#325,#329,#330); #317, #323-clear, #304 wait for lane A merge (migration numbering + SPRINT.md ordering)"
+    },
+    {
+      "at": "2026-09-19T01:04:52Z",
+      "event": "filed found-during-sprint #369"
+    },
+    {
+      "at": "2026-09-19T01:04:52Z",
+      "event": "#303: status=in_dev roundTrips=2 notes=…"
+    },
+    {
+      "at": "2026-09-19T01:04:52Z",
+      "event": "#319: status=analysed_waiting notes=…"
+    },
+    {
+      "at": "2026-09-19T01:04:52Z",
+      "event": "found #369: overlapping withTransactionAsync on shared expo-sqlite connection can roll back each other (not queued); 13 call sites; systemic, not fixed in sprint"
+    },
+    {
+      "at": "2026-09-19T01:05:04Z",
+      "event": "filed found-during-sprint #370"
+    },
+    {
+      "at": "2026-09-19T01:05:05Z",
+      "event": "filed found-during-sprint: upsertAdditionalWorkouts clobber (sibling of #319)"
+    },
+    {
+      "at": "2026-09-19T01:08:35Z",
+      "event": "#303: status=in_test commits=[\"4c8662d\",\"854787f\",\"c392949\",\"fc61361\",\"01e0175\",\"ba049bc\",\"92ddba3\",\"69c2d79\",\"d74da00\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T01:11:40Z",
+      "event": "#303: status=in_security notes=…"
+    },
+    {
+      "at": "2026-09-19T01:11:40Z",
+      "event": "#319: status=in_dev"
+    },
+    {
+      "at": "2026-09-19T01:13:35Z",
+      "event": "#303: status=ready regressionProof=assignMealToPlanRefund fails 8/10 at 606cdcb; v35 kill-safety via #314 runner; restoreLegacyDuplicates fails 2/3 at 92ddba3 with UNIQUE error, 3/3 at d74da00 notes=…"
+    },
+    {
+      "at": "2026-09-19T01:13:35Z",
+      "event": "lane A: done+=303 current=319"
     }
   ]
 }
