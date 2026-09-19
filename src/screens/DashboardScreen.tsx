@@ -312,6 +312,20 @@ export default function DashboardScreen() {
 
   const today = toISODate();
 
+  // Forces a re-render with a fresh `today` whenever a focus/AppState
+  // trigger fires, independent of whether the reload that follows below
+  // succeeds or fails (#304 round 2). A failed `loadToday` makes no state
+  // change of its own (`setLoading(false)` is a same-value no-op on a
+  // non-first load), so without this nothing would re-render, and every
+  // handler below would keep closing over yesterday's `today` until some
+  // later trigger happened to succeed -- exactly the silent wrong-day write
+  // #304 exists to kill. `today` itself stays the single per-render
+  // `toISODate()` above; this piece of state is never read, only written,
+  // purely to make React re-render. Because `useState`'s setter bails out
+  // on a same-value update, an ordinary same-day focus/active event costs
+  // no extra render.
+  const [, setDayKeyTick] = useState(() => toISODate());
+
   // Tracks whether the screen has completed its first load. Several handlers
   // below call loadToday() again as an error-recovery reload (e.g.
   // handleToggle's catch). Only the very first load should show the
@@ -341,18 +355,26 @@ export default function DashboardScreen() {
 
   const loadToday = useCallback(async () => {
     const runId = ++runIdRef.current;
+    // Read the date at call time, not the outer per-render `today`
+    // (#304 round 2): a focus/AppState trigger's own reload must land on
+    // whatever day it is the moment it actually runs, without depending on
+    // react-navigation re-invoking `useFocusEffect`'s callback when its
+    // identity changes (it does in the real library, but this screen's own
+    // tests deliberately don't model that, and correctness shouldn't lean
+    // on it either).
+    const date = toISODate();
     if (!hasLoadedOnceRef.current) {
       setLoading(true);
     }
     try {
       await syncRollingSchedule();
       const [data, meals, water, goal, measurements, setsToday] = await Promise.all([
-        getLogByDate(today),
-        getTodaysMealsWithRecipe(today),
-        getWaterForDay(today),
+        getLogByDate(date),
+        getTodaysMealsWithRecipe(date),
+        getWaterForDay(date),
         getHydrationGoal(),
         getLatestMeasurements(),
-        getWorkoutSetsForDay(today),
+        getWorkoutSetsForDay(date),
       ]);
       if (!mountedRef.current || runIdRef.current !== runId) return;
 
@@ -381,7 +403,9 @@ export default function DashboardScreen() {
         setLoading(false);
       }
     }
-  }, [today]);
+    // No `today`/date dependency: the date is read fresh at call time above,
+    // so this callback's identity is stable across renders.
+  }, []);
 
   // Reload on every focus (navigating back to Dashboard) -- this REPLACES
   // the old mount-only `useEffect(() => { loadToday(); }, [loadToday])`
@@ -389,6 +413,9 @@ export default function DashboardScreen() {
   // screen's first focus, so keeping both would double-load on mount (#304).
   useFocusEffect(
     useCallback(() => {
+      // Force a fresh `today` on this render pass regardless of how the
+      // reload below turns out (#304 round 2 -- see setDayKeyTick above).
+      setDayKeyTick(toISODate());
       loadToday();
       return () => {
         runIdRef.current++;
@@ -407,6 +434,9 @@ export default function DashboardScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
+        // Force a fresh `today` regardless of how the reload turns out
+        // (#304 round 2 -- see setDayKeyTick above).
+        setDayKeyTick(toISODate());
         loadToday();
       }
     });
