@@ -211,6 +211,27 @@ function parseExercises(raw: string | null | undefined): Exercise[] {
   }
 }
 
+/**
+ * Strict counterpart to parseExercises(), used ONLY by the write path in
+ * upsertExerciseCompleted() (#319). parseExercises() is the read path and
+ * stays lenient on purpose (returns [] on malformed input — screens rely on
+ * that). But upsertExerciseCompleted() reads, patches, and writes the array
+ * back: if it used the lenient parse, malformed stored JSON would silently
+ * become [] and then get persisted, permanently destroying whatever was
+ * actually stored. This returns a discriminated result instead of throwing
+ * so the caller decides how to fail (console.error + throw, see below).
+ */
+function _tryParseExercisesForWrite(
+  raw: string | null | undefined
+): { ok: true; value: Exercise[] } | { ok: false } {
+  try {
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? { ok: true, value: parsed } : { ok: false };
+  } catch {
+    return { ok: false };
+  }
+}
+
 function parseAdditionalWorkouts(raw: string | null | undefined): AdditionalWorkout[] {
   try {
     const parsed = JSON.parse(raw ?? '[]');
@@ -741,10 +762,47 @@ export async function upsertLogField(
 }
 
 /**
+ * Serialisation queue for upsertExerciseCompleted() (#319). It's a
+ * read-modify-write: read daily_log.exercises, toggle one entry, write the
+ * whole array back. Two overlapping calls for the same date can both read
+ * the pre-toggle array and the second write clobbers the first toggle
+ * (lost update). Chaining every call onto this module-level promise forces
+ * the read-modify-write sequences to run one at a time, so they can't
+ * interleave — each call awaits the previous one's settlement (including a
+ * rejection) before its own body starts.
+ *
+ * Deliberately NOT `withTransactionAsync`: a single UPDATE statement is
+ * already atomic by itself, and the real expo-sqlite withTransactionAsync
+ * is a bare, non-queued BEGIN/COMMIT on the shared connection — overlapping
+ * transactions can roll back each other's work (filed as #369, a systemic
+ * issue out of scope here). Wrapping this in another non-queued transaction
+ * would only widen that exposure; the plain queue below avoids it entirely.
+ */
+let _upsertExerciseCompletedQueue: Promise<void> = Promise.resolve();
+
+/**
  * Toggles the `completed` flag on a single exercise within daily_log.exercises
  * for the given date. Reads the current JSON, patches it, then writes back.
+ *
+ * Malformed stored JSON is refused rather than coerced to [] and persisted
+ * (which would destroy the original) — see _tryParseExercisesForWrite().
+ * Calls are serialised per-process; see _upsertExerciseCompletedQueue above.
  */
-export async function upsertExerciseCompleted(
+export function upsertExerciseCompleted(
+  date: string,
+  exerciseId: string,
+  value: boolean
+): Promise<void> {
+  const run = _upsertExerciseCompletedQueue.then(() =>
+    _upsertExerciseCompletedImpl(date, exerciseId, value)
+  );
+  // Swallow the rejection on the CHAIN link only (not on `run`, which the
+  // caller still sees) so a failed call doesn't wedge later queued calls.
+  _upsertExerciseCompletedQueue = run.catch(() => {});
+  return run;
+}
+
+async function _upsertExerciseCompletedImpl(
   date: string,
   exerciseId: string,
   value: boolean
@@ -755,8 +813,14 @@ export async function upsertExerciseCompleted(
     'SELECT exercises FROM daily_log WHERE date = ?',
     [date]
   );
-  const exercises = parseExercises(row?.exercises);
-  const updated = exercises.map((ex) =>
+  const parsed = _tryParseExercisesForWrite(row?.exercises);
+  if (!parsed.ok) {
+    console.error(
+      `[DB] upsertExerciseCompleted: malformed exercises JSON for date=${date} — refusing to write, stored value left unchanged`
+    );
+    throw new Error(`[DB] upsertExerciseCompleted: malformed exercises JSON for date=${date}`);
+  }
+  const updated = parsed.value.map((ex) =>
     ex.id === exerciseId ? { ...ex, completed: value } : ex
   );
   const result = await db.runAsync(
