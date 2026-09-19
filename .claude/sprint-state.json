@@ -72,22 +72,24 @@
         301,
         305,
         302,
+        314,
         303,
         319,
         320,
         321,
-        314,
         315,
         316,
         306,
         307,
-        331
+        331,
+        326
       ],
-      "current": 305,
+      "current": 314,
       "done": [
         300,
         301,
-        305
+        305,
+        302
       ],
       "parked": []
     },
@@ -144,7 +146,6 @@
         323,
         324,
         325,
-        326,
         329,
         330,
         317,
@@ -156,14 +157,19 @@
         "323-clear",
         304
       ],
-      "current": 325,
+      "current": 330,
       "done": [
         313,
         322,
         323,
-        324
+        324,
+        325,
+        329
       ],
-      "parked": []
+      "parked": [],
+      "reassigned": [
+        326
+      ]
     },
     "E": {
       "branch": "sprint/lane-e-api",
@@ -257,12 +263,34 @@
     },
     "302": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "0bf2fc5",
+        "348c166",
+        "606cdcb"
+      ],
       "lane": "A",
-      "status": "in_dev",
+      "status": "ready",
       "branch": "sprint/lane-a-db",
-      "notes": "NOT a park: issue picks Option 1 (record source batch). Work order: migration v34 ADD COLUMN weekly_meal_plan.consumed_from_inventory_id (nullable); debit records inv.id; credit increments exactly that row (no INSERT fallback), clears pointer; transactional. Orchestrator: legacy rows ticked pre-upgrade (NULL pointer) -> untick gives NO credit (conservative: may under-count once, never creates inventory) - flag for human. deleteRecipe orphans = #316 (in scope later). Developer held until #300 deferred step finishes (same worktree). #303 depends on #302.",
-      "migration": "v34"
+      "notes": "tester APPROVE + security APPROVE r0. Security note: crafted backup can set consumed_from_inventory_id -> +1 to arbitrary meal_inventory row per manual untick; strictly weaker than restore setting portions_available directly (pre-existing #315 territory). Legacy NULL pointer -> no credit (orchestrator decision, flag for human).",
+      "migration": "v34",
+      "securityReview": "required-src-db-migration",
+      "regressionProof": "7/8 fail with 04434c3 database.ts+schema.ts, 8/8 at 606cdcb (tester reproduced)"
+    },
+    "303": {
+      "roundTrips": 1,
+      "commits": [
+        "4c8662d",
+        "854787f",
+        "c392949",
+        "fc61361",
+        "01e0175",
+        "ba049bc"
+      ],
+      "lane": "A",
+      "status": "blocked_on_314",
+      "branch": "sprint/lane-a-db",
+      "notes": "tester REJECT r1: v35 not kill-safe - runner writes schema_version after execAsync; credit UPDATE autocommits; kill before DELETE -> relaunch re-runs v35 -> double credit (repro: 2 instead of 1). Schema comment claiming idempotence is false. ORCHESTRATOR: fix systemically via #314 (atomic runner) moved up; BEGIN inside v35 would brick upgrades once #314 wraps migrations in a txn. Round 2 after #314: correct comment + kill-safety test under new runner. Fallback if #314 parks: temp-trigger atomic DELETE.",
+      "migration": "v35"
     },
     "305": {
       "roundTrips": 0,
@@ -367,6 +395,15 @@
       "securityReview": "required-deferred-write-path",
       "regressionProof": "r1: 5/6 stepper tests fail with f132381 source, pass 490f75a; r2: 4 AppState/rejection tests fail with 490f75a source, pass 846aaef (tester reproduced both)"
     },
+    "314": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "in_dev",
+      "branch": "sprint/lane-a-db",
+      "notes": "work order: wrap each migration's execAsync + schema_version insert in withTransactionAsync (per migration). No v1-v35 statement incompatible with txn. Test includes v35 kill-after-credit -> rollback -> relaunch applies once (unblocks #303). PARTIAL: App.tsx dead-end error screen (unowned, issue defers to Option 3) + recovery of already-bricked devices out of scope -> Refs #314.",
+      "partial": true
+    },
     "318": {
       "roundTrips": 1,
       "commits": [
@@ -442,11 +479,26 @@
     },
     "325": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "c03ab22",
+        "286cce3",
+        "0d44ecf"
+      ],
       "lane": "D",
-      "status": "in_dev",
+      "status": "ready",
       "branch": "sprint/lane-d-screens",
-      "notes": "analyst: WORSE than issue - parseField maps blank AND invalid to null; logBodyMeasurement treats null as clear -> a typo silently ERASES a saved measurement. Fix: mount per open (drop reset effect keyed on latest identity), per-field Number()+comma+ranges, invalid key=undefined (skip) + inline error, blank=null (clear). Orchestrator: keep modal open whenever any field invalid (else error never seen)."
+      "notes": "tester APPROVE r0. Spinner-on-first-load-only also protects extra-workout/set-logger modals. Midnight: stale prior-day content shown briefly during reload (was spinner) -> #304 note. Insert-path NULL for skipped fields pre-existing, not worsened -> filed.",
+      "securityReview": "skipped-no-sql-or-external-input",
+      "regressionProof": "7/7 fail with 29c01c4 DashboardScreen.tsx, pass at 0d44ecf; 286cce3 independently load-bearing (reverting spinner gating alone fails clobber test)"
+    },
+    "326": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "pending",
+      "branch": "sprint/lane-a-db",
+      "reassignedFrom": "D",
+      "notes": "REASSIGNED D->A by orchestrator (analyst recommended re-scoping to lane A; not parked). Analyst finding: claimed NaN/Infinity cannot occur (waterMl>=goal always true when goal<=0, so division never runs). REAL bug: getHydrationGoal returns 0 for empty stored string (Number('')=0 passes isNaN) -> card shows 'Goal met' at 0 ml. Fix in database.ts getHydrationGoal per issue ACs 2+3; DashboardScreen NaN AC moot."
     },
     "327": {
       "roundTrips": 1,
@@ -472,6 +524,28 @@
       "stalledAt": "analysis",
       "parkReason": "Issue premise partly stale: the chart that reads getWorkoutHistory (LiftingSectionCard progression) is ALL-TIME, so bounding it silently truncates visible data (product decision). PRSummaryCard needs lifetime history for correct PRs and no aggregate PR query exists -> needs new query in database.ts (lane A). Human needs: decide all-time vs windowed chart; add getExercisePRs() aggregate. Screen-side change then mechanical.",
       "notes": "issue comment posted"
+    },
+    "329": {
+      "roundTrips": 0,
+      "commits": [
+        "b15b722",
+        "fcbce41",
+        "0c2ed7a",
+        "2c05479"
+      ],
+      "lane": "D",
+      "status": "ready",
+      "branch": "sprint/lane-d-screens",
+      "notes": "tester APPROVE r0. Mutation (a) mountedRef-on-blur caught; (b) runId bump on blur redundant/inert (load's own bump suffices). Post-action refresh beats stale focus load (probe). Error path no worse than pre-fix.",
+      "securityReview": "skipped-ui-load-sequencing",
+      "regressionProof": "3/5 fail with 0d44ecf MealPrepScreen.tsx, 5/5 at 2c05479; each fix commit flips exactly its own test (tester verified per-commit)"
+    },
+    "330": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "D",
+      "status": "analysing",
+      "branch": "sprint/lane-d-screens"
     },
     "332": {
       "roundTrips": 0,
@@ -504,7 +578,9 @@
     363,
     364,
     365,
-    366
+    366,
+    367,
+    368
   ],
   "log": [
     {
@@ -1163,6 +1239,122 @@
     {
       "at": "2026-09-19T00:15:37Z",
       "event": "#302: status=in_dev"
+    },
+    {
+      "at": "2026-09-19T00:22:09Z",
+      "event": "#325: status=in_test commits=[\"c03ab22\",\"286cce3\",\"0d44ecf\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T00:22:51Z",
+      "event": "#302: status=in_test commits=[\"0bf2fc5\",\"348c166\",\"606cdcb\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T00:25:36Z",
+      "event": "#302: status=in_security securityReview=required-src-db-migration regressionProof=7/8 fail with 04434c3 database.ts+schema.ts, 8/8 at 606cdcb (tester reproduced) notes=…"
+    },
+    {
+      "at": "2026-09-19T00:25:36Z",
+      "event": "#303: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-19T00:26:54Z",
+      "event": "#325: status=ready securityReview=skipped-no-sql-or-external-input regressionProof=7/7 fail with 29c01c4 DashboardScreen.tsx, pass at 0d44ecf; 286cce3 independently load-bearing (reverting spinner gating alone fails clobber test) notes=…"
+    },
+    {
+      "at": "2026-09-19T00:26:54Z",
+      "event": "lane D: done+=325 current=326"
+    },
+    {
+      "at": "2026-09-19T00:26:54Z",
+      "event": "#326: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-19T00:27:00Z",
+      "event": "filed found-during-sprint #367"
+    },
+    {
+      "at": "2026-09-19T00:27:00Z",
+      "event": "#302: status=ready notes=…"
+    },
+    {
+      "at": "2026-09-19T00:27:00Z",
+      "event": "lane A: done+=302 current=303"
+    },
+    {
+      "at": "2026-09-19T00:28:04Z",
+      "event": "filed found-during-sprint #368"
+    },
+    {
+      "at": "2026-09-19T00:28:04Z",
+      "event": "#303: status=in_dev migration=v35 notes=…"
+    },
+    {
+      "at": "2026-09-19T00:31:06Z",
+      "event": "#326: lane=A status=pending branch=sprint/lane-a-db reassignedFrom=D notes=…"
+    },
+    {
+      "at": "2026-09-19T00:31:06Z",
+      "event": "lane D: order=[313,322,323,324,325,329,330,317,\"323-clear\",304] reassigned+=326 current=329"
+    },
+    {
+      "at": "2026-09-19T00:31:06Z",
+      "event": "lane A: order=[300,301,305,302,303,319,320,321,314,315,316,306,307,331,326]"
+    },
+    {
+      "at": "2026-09-19T00:31:06Z",
+      "event": "#329: lane=D status=analysing branch=sprint/lane-d-screens"
+    },
+    {
+      "at": "2026-09-19T00:31:06Z",
+      "event": "orchestrator decision: #326 moved from lane D to lane A (real defect is in getHydrationGoal, database.ts); appended to lane A queue"
+    },
+    {
+      "at": "2026-09-19T00:34:58Z",
+      "event": "#329: status=in_dev notes=…"
+    },
+    {
+      "at": "2026-09-19T00:37:39Z",
+      "event": "#303: commits=[\"4c8662d\",\"854787f\",\"c392949\",\"fc61361\",\"01e0175\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T00:38:53Z",
+      "event": "#303: status=in_test commits=[\"4c8662d\",\"854787f\",\"c392949\",\"fc61361\",\"01e0175\",\"ba049bc\"]"
+    },
+    {
+      "at": "2026-09-19T00:42:33Z",
+      "event": "#329: status=in_test commits=[\"b15b722\",\"fcbce41\",\"0c2ed7a\",\"2c05479\"] notes=…"
+    },
+    {
+      "at": "2026-09-19T00:43:31Z",
+      "event": "#303: status=blocked_on_314 roundTrips=1 notes=…"
+    },
+    {
+      "at": "2026-09-19T00:43:31Z",
+      "event": "lane A: order=[300,301,305,302,314,303,319,320,321,315,316,306,307,331,326] current=314"
+    },
+    {
+      "at": "2026-09-19T00:43:31Z",
+      "event": "#314: lane=A status=analysing branch=sprint/lane-a-db notes=…"
+    },
+    {
+      "at": "2026-09-19T00:43:31Z",
+      "event": "orchestrator decision: #314 moved before #303 in lane A; #303 paused at round trip 1 pending atomic migration runner"
+    },
+    {
+      "at": "2026-09-19T00:46:56Z",
+      "event": "#314: status=in_dev partial=true notes=…"
+    },
+    {
+      "at": "2026-09-19T00:48:22Z",
+      "event": "#329: status=ready securityReview=skipped-ui-load-sequencing regressionProof=3/5 fail with 0d44ecf MealPrepScreen.tsx, 5/5 at 2c05479; each fix commit flips exactly its own test (tester verified per-commit) notes=…"
+    },
+    {
+      "at": "2026-09-19T00:48:22Z",
+      "event": "lane D: done+=329 current=330"
+    },
+    {
+      "at": "2026-09-19T00:48:22Z",
+      "event": "#330: lane=D status=analysing branch=sprint/lane-d-screens"
     }
   ]
 }
