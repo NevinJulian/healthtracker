@@ -204,7 +204,7 @@
     "F": {
       "branch": "sprint/lane-f-repo",
       "worktree": "C:/git/ht-lanes/lane-f",
-      "status": "merging",
+      "status": "merged",
       "order": [
         332,
         333,
@@ -221,7 +221,8 @@
       "parked": [
         333
       ],
-      "notes": "cleanup: no changes needed (a1c69f5). Merging bd598e3 into sprint/auto-fixes."
+      "notes": "merged f53ba09; integration gates green: typecheck clean, 492/43.",
+      "mergeSha": "f53ba09"
     },
     "G": {
       "branch": "sprint/lane-g-tests",
@@ -738,7 +739,7 @@
         "a6e5813"
       ],
       "lane": "F",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-f-repo",
       "securityReview": "skipped-no-data-flow",
       "notes": "tester APPROVE round 0; security skipped (no data flow)",
@@ -767,7 +768,7 @@
         "bd598e3"
       ],
       "lane": "F",
-      "status": "ready",
+      "status": "merged",
       "branch": "sprint/lane-f-repo",
       "notes": "tester APPROVE r2 at bd598e3 (docs-only; security n/a). All ACs re-verified; 492/43.",
       "securityReview": "skipped-docs-only"
@@ -2080,6 +2081,23 @@
     {
       "at": "2026-09-19T02:46:31Z",
       "event": "lane F: status=merging notes=…"
+    },
+    {
+      "at": "2026-09-19T02:46:46Z",
+      "event": "lane F: status=merged mergeSha=f53ba09 notes=…"
+    },
+    {
+      "at": "2026-09-19T02:46:46Z",
+      "event": "#332: status=merged"
+    },
+    {
+      "at": "2026-09-19T02:46:46Z",
+      "event": "#335: status=merged"
+    },
+    {
+      "at": "2026-09-19T02:46:46Z",
+      "event": "lane F merged into sprint/auto-fixes; gates typecheck clean, 492 tests / 43 suites",
+      "sha": "f53ba09"
     }
   ]
 }
