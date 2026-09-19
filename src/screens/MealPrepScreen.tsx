@@ -99,9 +99,11 @@ export default function MealPrepScreen() {
       setLoading(true);
     }
     try {
-      const inv = await getMealInventory();
-      const plan = await getWeeklyMealPlan();
-      const allRecipes = await getRecipes();
+      const [inv, plan, allRecipes] = await Promise.all([
+        getMealInventory(),
+        getWeeklyMealPlan(),
+        getRecipes(),
+      ]);
       setInventory(inv);
       setWeeklyPlan(plan);
       setRecipes(allRecipes);
