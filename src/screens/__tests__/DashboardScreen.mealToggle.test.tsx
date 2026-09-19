@@ -100,6 +100,7 @@ function makeMeal(
     meal_type: 'lunch',
     recipe_id: 'r1',
     is_consumed: overrides.is_consumed ?? false,
+    consumed_from_inventory_id: null,
     recipe: {
       id: 'r1',
       title: overrides.title ?? 'Chicken Bowl',
