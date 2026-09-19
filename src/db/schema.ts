@@ -618,4 +618,83 @@ export const MIGRATIONS: Migration[] = [
   // handling of the legacy-NULL case in database.ts), and the pointer must
   // also survive its source batch being deleted without a FK violation.
   { version: 34, sql: `ALTER TABLE weekly_meal_plan ADD COLUMN consumed_from_inventory_id INTEGER;` },
+  // v35 (#303): weekly_meal_plan could accumulate duplicate rows for the
+  // same (date, meal_type) slot — there was never a UNIQUE constraint (v26
+  // DDL only; v34 only added a column), and assignMealToPlan's pre-fix
+  // UPDATE branch never refunded or cleared a consumed slot's inventory
+  // pointer, so a reassignment could leave both an orphaned pointer and,
+  // via other code paths, a duplicate row.
+  //
+  // For each (date, meal_type) group with more than one row, survivor
+  // selection (orchestrator rule) is: the consumed row (is_consumed = 1)
+  // with the highest id if the group has any consumed row, otherwise the
+  // highest id overall — never delete a row the user ticked as eaten while
+  // keeping an unticked one. Every other row in the group is a loser; a
+  // loser that was itself consumed with a recorded
+  // consumed_from_inventory_id credits +1 back to that meal_inventory row
+  // (count-based — two losers pointing at the same batch both credit)
+  // before any row is deleted.
+  //
+  // runMigrations() executes a migration's whole SQL string via a single
+  // execAsync call, not wrapped in a transaction (see runMigrations in
+  // database.ts) — a process kill mid-migration can leave only a prefix of
+  // these statements applied (the #314 problem; not fixed here). So the
+  // three steps below are ordered credit-then-delete-then-index: if killed
+  // after the credit UPDATE but before the DELETE, every batch has already
+  // been made whole and at worst some now-redundant duplicate rows remain
+  // (harmless — re-running this migration finishes the job, and it's
+  // idempotent: on a DB with no duplicates, or one already deduped, both
+  // the credit and delete statements match zero rows). The unique index is
+  // created last, and only IF NOT EXISTS, so it can never be applied
+  // against not-yet-deduped data.
+  { version: 35, sql: `
+  WITH survivors AS (
+    SELECT g.date AS date, g.meal_type AS meal_type,
+      COALESCE(
+        (SELECT w2.id FROM weekly_meal_plan w2
+         WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
+         ORDER BY w2.id DESC LIMIT 1),
+        (SELECT w3.id FROM weekly_meal_plan w3
+         WHERE w3.date = g.date AND w3.meal_type = g.meal_type
+         ORDER BY w3.id DESC LIMIT 1)
+      ) AS survivor_id
+    FROM weekly_meal_plan g
+    GROUP BY g.date, g.meal_type
+  )
+  UPDATE meal_inventory
+  SET portions_available = portions_available + (
+    SELECT COUNT(*)
+    FROM weekly_meal_plan loser
+    JOIN survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
+    WHERE loser.consumed_from_inventory_id = meal_inventory.id
+      AND loser.is_consumed = 1
+      AND loser.id != s.survivor_id
+  )
+  WHERE EXISTS (
+    SELECT 1
+    FROM weekly_meal_plan loser
+    JOIN survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
+    WHERE loser.consumed_from_inventory_id = meal_inventory.id
+      AND loser.is_consumed = 1
+      AND loser.id != s.survivor_id
+  );
+
+  WITH survivors AS (
+    SELECT g.date AS date, g.meal_type AS meal_type,
+      COALESCE(
+        (SELECT w2.id FROM weekly_meal_plan w2
+         WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
+         ORDER BY w2.id DESC LIMIT 1),
+        (SELECT w3.id FROM weekly_meal_plan w3
+         WHERE w3.date = g.date AND w3.meal_type = g.meal_type
+         ORDER BY w3.id DESC LIMIT 1)
+      ) AS survivor_id
+    FROM weekly_meal_plan g
+    GROUP BY g.date, g.meal_type
+  )
+  DELETE FROM weekly_meal_plan
+  WHERE id NOT IN (SELECT survivor_id FROM survivors);
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_meal_plan_date_meal_type ON weekly_meal_plan(date, meal_type);
+` },
 ];
