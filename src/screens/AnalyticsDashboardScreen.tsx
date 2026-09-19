@@ -666,7 +666,7 @@ function HydrationSummaryCard({
           <Text style={styles.cardSectionTrailing}>Last 7 days</Text>
         </View>
 
-        {days.length === 0 ? (
+        {days.length === 0 || days.every((d) => d.water_ml === 0) ? (
           <Text style={styles.emptyText}>No hydration data logged yet.</Text>
         ) : (
           <>
