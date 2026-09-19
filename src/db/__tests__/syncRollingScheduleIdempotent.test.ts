@@ -15,9 +15,10 @@
  *     revisits)
  *   - a gap inside the window that the first call must backfill
  *   - a second gap the first call also backfills, which the user then
- *     edits (simulating an in-app edit) between the two sync calls, so
- *     its exercises differ from what weekly_template would generate by
- *     the time the second call runs
+ *     completes an exercise on (via the real upsertExerciseCompleted()
+ *     writer, #319) between the two sync calls, so its exercises differ
+ *     from what weekly_template would generate by the time the second
+ *     call runs
  * — then asserts the SECOND call changes nothing at all: not the row
  * count, not one column of one row, including the just-edited row.
  *
@@ -82,10 +83,6 @@ async function snapshotDailyLog(db: DatabaseModule): Promise<Record<string, unkn
     'SELECT * FROM daily_log ORDER BY date ASC'
   );
 }
-
-const CUSTOM_EXERCISES_JSON = JSON.stringify([
-  { id: 'custom-1', name: 'User Added Burpees', sets: '3', reps: '15', videoUrl: '', completed: true },
-]);
 
 describe('syncRollingSchedule() is idempotent on a second, back-to-back call (#336)', () => {
   afterEach(() => {
@@ -163,19 +160,33 @@ describe('syncRollingSchedule() is idempotent on a second, back-to-back call (#3
     const editedRowAfterCreation = byDate.get(editedAfterCreationDate);
     expect(editedRowAfterCreation).toBeDefined(); // also backfilled by the first sync
 
-    // Simulate the user editing that freshly-created row's exercises
-    // in-app (e.g. via updateTemplateExercises-style UI, or per-exercise
-    // completion) before the next screen focus re-triggers sync. This must
-    // now differ from whatever weekly_template would generate for that
-    // weekday — exactly the "user-edited, differs from template" case.
-    const rawDb = db.getDatabase();
-    await rawDb.runAsync('UPDATE daily_log SET exercises = ? WHERE date = ?', [
-      CUSTOM_EXERCISES_JSON,
-      editedAfterCreationDate,
-    ]);
+    // Every weekday's weekly_template seed has at least one exercise
+    // (EXERCISES_MON..SUN, schema.ts), so the freshly-backfilled row always
+    // has something to toggle here regardless of which real weekday
+    // editedAfterCreationDate happens to land on.
+    const templateExercisesOnRow = JSON.parse(
+      editedRowAfterCreation!.exercises as string
+    ) as { id: string; completed: boolean }[];
+    expect(templateExercisesOnRow.length).toBeGreaterThan(0);
+    const exerciseIdToComplete = templateExercisesOnRow[0].id;
+    expect(templateExercisesOnRow[0].completed).toBe(false); // sanity: not already completed
+
+    // The user actually completing that exercise in-app, between the two
+    // sync calls — the real writer (upsertExerciseCompleted, #319), not a
+    // fabricated raw UPDATE. This must now differ from whatever
+    // weekly_template would generate for that weekday (completed defaults
+    // to false there) — exactly the "user-edited, differs from template"
+    // case.
+    await db.upsertExerciseCompleted(editedAfterCreationDate, exerciseIdToComplete, true);
 
     const afterUserEdit = await snapshotDailyLog(db);
     const rowCountAfterUserEdit = afterUserEdit.length;
+    const editedRowAfterUserEdit = afterUserEdit.find((r) => r.date === editedAfterCreationDate);
+    const exercisesAfterUserEdit = JSON.parse(editedRowAfterUserEdit!.exercises as string) as {
+      id: string;
+      completed: boolean;
+    }[];
+    expect(exercisesAfterUserEdit.find((e) => e.id === exerciseIdToComplete)?.completed).toBe(true);
 
     // ── Second sync: must be a complete no-op, including on the row the
     // user just edited ───────────────────────────────────────────────────
