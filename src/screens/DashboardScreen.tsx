@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -299,8 +299,19 @@ export default function DashboardScreen() {
 
   const today = toISODate();
 
+  // Tracks whether the screen has completed its first load. Several handlers
+  // below call loadToday() again as an error-recovery reload (e.g.
+  // handleToggle's catch). Only the very first load should show the
+  // full-screen spinner (`if (loading) return <ActivityIndicator />` unmounts
+  // this whole subtree, including any open modal) -- a background reload
+  // must not do that, or it silently wipes out in-progress state in any
+  // mounted child, such as text being typed in the measurements modal (#325).
+  const hasLoadedOnceRef = useRef(false);
+
   const loadToday = useCallback(async () => {
-    setLoading(true);
+    if (!hasLoadedOnceRef.current) {
+      setLoading(true);
+    }
     try {
       await syncRollingSchedule();
       const [data, meals, water, goal, measurements, setsToday] = await Promise.all([
@@ -328,6 +339,7 @@ export default function DashboardScreen() {
         grouped[s.exercise].push(s);
       }
       setWorkoutSets(grouped);
+      hasLoadedOnceRef.current = true;
     } catch (err) {
       console.error('DashboardScreen: loadToday error', err);
     } finally {
@@ -897,12 +909,14 @@ export default function DashboardScreen() {
       />
 
       {/* ── Body Measurements Modal ──────────────────────────────────────── */}
-      <MeasurementsModal
-        visible={measurementsModalVisible}
-        onClose={() => setMeasurementsModalVisible(false)}
-        onSave={handleSaveMeasurements}
-        latest={latestMeasurements}
-      />
+      {measurementsModalVisible && (
+        <MeasurementsModal
+          visible={measurementsModalVisible}
+          onClose={() => setMeasurementsModalVisible(false)}
+          onSave={handleSaveMeasurements}
+          latest={latestMeasurements}
+        />
+      )}
 
       {/* ── Set Logger Modal (#285) ──────────────────────────────────────── */}
       {activeSetLogger !== null && (
