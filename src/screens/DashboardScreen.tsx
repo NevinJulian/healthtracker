@@ -12,7 +12,9 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  AppState,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import {
@@ -319,7 +321,26 @@ export default function DashboardScreen() {
   // mounted child, such as text being typed in the measurements modal (#325).
   const hasLoadedOnceRef = useRef(false);
 
+  // mountedRef reflects the component's real lifetime; it is cleared only on
+  // true unmount below -- NOT on blur, which also runs the focus effect's
+  // cleanup (the #312 lesson: don't conflate the two).
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // runIdRef guards against overlapping loads (the #312/#329 pattern, also
+  // used by MealPrepScreen): bumped at the start of every loadToday() call,
+  // and again when the focus effect's cleanup runs (i.e. on blur). A load
+  // only commits its results if it is still the current run when it
+  // resolves, so a stale in-flight load -- whether superseded by a newer
+  // load or abandoned via blur -- can never clobber newer state.
+  const runIdRef = useRef(0);
+
   const loadToday = useCallback(async () => {
+    const runId = ++runIdRef.current;
     if (!hasLoadedOnceRef.current) {
       setLoading(true);
     }
@@ -333,6 +354,7 @@ export default function DashboardScreen() {
         getLatestMeasurements(),
         getWorkoutSetsForDay(today),
       ]);
+      if (!mountedRef.current || runIdRef.current !== runId) return;
 
       setEntry(data);
       setTodaysMeals(meals);
@@ -352,14 +374,45 @@ export default function DashboardScreen() {
       setWorkoutSets(grouped);
       hasLoadedOnceRef.current = true;
     } catch (err) {
+      if (!mountedRef.current || runIdRef.current !== runId) return;
       console.error('DashboardScreen: loadToday error', err);
     } finally {
-      setLoading(false);
+      if (mountedRef.current && runIdRef.current === runId) {
+        setLoading(false);
+      }
     }
   }, [today]);
 
+  // Reload on every focus (navigating back to Dashboard) -- this REPLACES
+  // the old mount-only `useEffect(() => { loadToday(); }, [loadToday])`
+  // rather than adding a second load: `useFocusEffect` also fires on the
+  // screen's first focus, so keeping both would double-load on mount (#304).
+  useFocusEffect(
+    useCallback(() => {
+      loadToday();
+      return () => {
+        runIdRef.current++;
+      };
+    }, [loadToday])
+  );
+
+  // Reload when the app comes back to the foreground. The drawer keeps this
+  // screen mounted indefinitely, so a focus effect alone misses the
+  // overnight case: leaving the app open (or backgrounded) across local
+  // midnight and returning never re-focuses Dashboard, so `today` and every
+  // writer that closes over it silently stay on yesterday's date (#304).
+  // Note: a screen that stays focused AND foregrounded across midnight still
+  // gets no trigger -- that residual gap is accepted rather than adding a
+  // timer.
   useEffect(() => {
-    loadToday();
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        loadToday();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
   }, [loadToday]);
 
   const handleToggle = async (
