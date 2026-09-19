@@ -2082,22 +2082,31 @@ export async function dumpTable(
  *     in older/newer backups are silently skipped).
  *   - Per-row INSERT uses that row's own column list so new columns added by
  *     later migrations default-fill rather than error.
- *   - A backup made before #303's migration v35 shipped can legitimately
- *     contain duplicate (date, meal_type) rows in weekly_meal_plan (v35's
- *     own unique index didn't exist yet when it was taken, and
- *     validatePayload() accepts any backup at or below the current schema
- *     version). v35's idx_weekly_meal_plan_date_meal_type index always
- *     exists on the live DB by the time restore runs, so the second INSERT
- *     of such a pair would throw — and since restore is one transaction,
- *     that would roll back every table, not just this one. So: drop the
- *     index before restoring, restore every table exactly as before, then
- *     re-run v35's own SQL (looked up at runtime, never copied or
- *     reimplemented, so it can't drift from the migration) against the
- *     just-restored data — crediting any consumed loser's batch in the
- *     just-restored meal_inventory, deleting losers per the same survivor
- *     rule the migration uses, and recreating the index. A clean,
- *     already-deduped (post-v35) backup is unaffected: nothing matches the
- *     credit or delete, and the index is simply recreated.
+ *   - A backup can legitimately contain rows that violate a UNIQUE index
+ *     added by a later migration than the one the backup was taken under
+ *     (validatePayload() accepts any backup at or below the current schema
+ *     version): pre-#303 backups can have duplicate (date, meal_type) rows
+ *     in weekly_meal_plan, and pre-#317 backups (or ones taken before
+ *     v37's renumber ever ran) can have colliding/gapped set_index values
+ *     in workout_set_log. Both unique indexes always exist on the live DB
+ *     by the time restore runs, so the second offending INSERT would throw
+ *     — and since restore is one transaction, that would roll back every
+ *     table, not just the offending one. So: drop both indexes before
+ *     restoring, restore every table exactly as before, then re-run each
+ *     affected migration's own SQL — looked up at runtime via
+ *     POST_RESTORE_MIGRATION_VERSIONS, never copied or reimplemented, so it
+ *     can't drift from the migration — against the just-restored data, in
+ *     order, inside the same transaction. v35 (#303) credits any consumed
+ *     loser's batch in the just-restored meal_inventory, deletes losers per
+ *     its survivor rule, and recreates its index. v37 (#317) renumbers
+ *     workout_set_log densely per (date, exercise) by (created_at, id) and
+ *     recreates its index — the SAME ordering requirement the migration
+ *     itself relies on (the renumber must run before its own index is
+ *     (re)created) holds here for the same reason: it runs after the
+ *     index was dropped above, never while it exists. A clean,
+ *     already-migrated backup is unaffected by either re-run: nothing
+ *     matches v35's credit/delete WHERE clauses, and v37's renumber
+ *     reassigns every row the value it already has.
  *
  * A row's own keys are NOT trusted as column identifiers: unlike values,
  * column names can't be parameterised, so a backup file (user-supplied,
@@ -2115,6 +2124,22 @@ export async function dumpTable(
  * @param payloadTables  The `tables` object from the BackupPayload.
  * @returns A summary of what was restored, plus optionally what was skipped.
  */
+
+/**
+ * Migrations whose own SQL must be re-applied, in this order, against
+ * freshly-restored data every time restoreFromPayload() runs — because each
+ * one is a data-repair step (not just DDL) that a backup taken before it
+ * shipped, or before it happened to run, can legitimately still need. Their
+ * unique indexes are dropped before the restore loop (see the restoreFromPayload
+ * doc comment above) and recreated by re-running the listed migration's SQL
+ * here, looked up from MIGRATIONS at runtime so this can never drift from
+ * the real migration.
+ *
+ *   - v35 (#303): weekly_meal_plan (date, meal_type) dedupe + unique index.
+ *   - v37 (#317): workout_set_log set_index renumber + unique index.
+ */
+const POST_RESTORE_MIGRATION_VERSIONS = [35, 37];
+
 export async function restoreFromPayload(
   payloadTables: Record<string, Record<string, unknown>[]>
 ): Promise<{
@@ -2131,10 +2156,12 @@ export async function restoreFromPayload(
   const skipped: { table: string; columns: string[]; rows: number }[] = [];
 
   await db.withTransactionAsync(async () => {
-    // Drop first so a legacy backup's duplicate weekly_meal_plan rows (see
-    // above) can all be inserted below; recreated by v35's own SQL after
-    // the restore loop.
+    // Drop first so a legacy backup's duplicate weekly_meal_plan rows or
+    // colliding/gapped workout_set_log rows (see above) can all be inserted
+    // below; both are recreated by re-running their migrations' own SQL
+    // (POST_RESTORE_MIGRATION_VERSIONS) after the restore loop.
     await db.execAsync('DROP INDEX IF EXISTS idx_weekly_meal_plan_date_meal_type');
+    await db.execAsync('DROP INDEX IF EXISTS idx_workout_set_log_date_exercise_set_index');
 
     for (const [tableName, rows] of Object.entries(payloadTables)) {
       // Skip tables that don't exist in the current schema
@@ -2194,16 +2221,20 @@ export async function restoreFromPayload(
       tablesRestored += 1;
     }
 
-    // Re-apply v35's dedupe/credit/index-creation SQL against the
-    // just-restored data, as if v35 had run on it. Looked up at runtime
-    // rather than duplicated so this can never drift from the migration.
-    const v35 = MIGRATIONS.find((m) => m.version === 35);
-    if (!v35) {
-      throw new Error(
-        'restoreFromPayload: migration v35 not found in MIGRATIONS — cannot rebuild the weekly_meal_plan unique index after restore.'
-      );
+    // Re-apply each post-restore migration's own SQL against the
+    // just-restored data, in order, as if it had just run on it. Each
+    // migration's index was dropped above, before this loop ran — never
+    // while it existed — matching the ordering both migrations require of
+    // their own renumber/dedupe step.
+    for (const version of POST_RESTORE_MIGRATION_VERSIONS) {
+      const migration = MIGRATIONS.find((m) => m.version === version);
+      if (!migration) {
+        throw new Error(
+          `restoreFromPayload: migration v${version} not found in MIGRATIONS — cannot rebuild its post-restore state.`
+        );
+      }
+      await db.execAsync(migration.sql);
     }
-    await db.execAsync(v35.sql);
   });
 
   return {
