@@ -635,18 +635,27 @@ export const MIGRATIONS: Migration[] = [
   // (count-based — two losers pointing at the same batch both credit)
   // before any row is deleted.
   //
-  // runMigrations() executes a migration's whole SQL string via a single
-  // execAsync call, not wrapped in a transaction (see runMigrations in
-  // database.ts) — a process kill mid-migration can leave only a prefix of
-  // these statements applied (the #314 problem; not fixed here). So the
-  // three steps below are ordered credit-then-delete-then-index: if killed
-  // after the credit UPDATE but before the DELETE, every batch has already
-  // been made whole and at worst some now-redundant duplicate rows remain
-  // (harmless — re-running this migration finishes the job, and it's
-  // idempotent: on a DB with no duplicates, or one already deduped, both
-  // the credit and delete statements match zero rows). The unique index is
-  // created last, and only IF NOT EXISTS, so it can never be applied
-  // against not-yet-deduped data.
+  // Kill-safety relies entirely on runMigrations() (database.ts), not on
+  // anything in this SQL: it runs this migration's whole SQL string AND its
+  // schema_version bookkeeping row inside one withTransactionAsync (#314).
+  // A kill/crash at any point during this migration rolls the whole thing
+  // back — including a partially-applied credit UPDATE — so the next launch
+  // re-runs it from scratch instead of resuming partway through.
+  //
+  // This migration's three statements are NOT individually idempotent: the
+  // credit UPDATE is unconditional on "this loser is consumed and points at
+  // a batch", not on "hasn't been credited yet", so executing it a second
+  // time against already-credited, already-deduped data (e.g. by running
+  // this SQL directly, outside runMigrations()'s transaction, the way
+  // migrationAtomicity.test.ts's "v35 kill-safety" case does to simulate a
+  // kill) would double-credit meal_inventory. Do not wrap this migration's
+  // SQL in its own BEGIN/COMMIT to try to make it self-contained — nested
+  // inside runMigrations()'s transaction, that would throw and brick
+  // upgrades. The three steps are still ordered credit-then-delete-then-index
+  // for readability (so the intended data flow is visible statement by
+  // statement), and the index is CREATE ... IF NOT EXISTS purely so it
+  // can't collide with itself if this SQL is ever re-executed directly
+  // (as tests do) rather than through the version-gated runner.
   { version: 35, sql: `
   WITH survivors AS (
     SELECT g.date AS date, g.meal_type AS meal_type,
