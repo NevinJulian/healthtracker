@@ -15,6 +15,18 @@ const { render, fireEvent, act } = require('@testing-library/react-native');
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
+// DashboardScreen now reloads on focus (#304) via `useFocusEffect`, which
+// needs a real `NavigationContainer` unless mocked. These tests only need
+// the load to run once on mount, so the focus effect is modeled as a plain
+// mount effect (same pattern as MealPrepScreen.test.tsx / SettingsScreen.test.tsx).
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useEffect } = require('react');
+    useEffect(callback, []);
+  },
+}));
+
 const mockToday = '2026-09-19';
 
 const mockEntry = {
