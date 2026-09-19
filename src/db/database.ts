@@ -1883,6 +1883,16 @@ export async function setSetting(key: string, value: string): Promise<void> {
   );
 }
 
+/**
+ * Remove a key from app_state entirely, so getSetting() subsequently
+ * returns null rather than a stored string. Deleting an absent key is a
+ * harmless no-op.
+ */
+export async function deleteSetting(key: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('DELETE FROM app_state WHERE key = ?', [key]);
+}
+
 // ── Typed setting keys ────────────────────────
 
 const SETTING_WORKOUT_REMINDER_ENABLED = 'workoutReminderEnabled';
@@ -2348,6 +2358,16 @@ export async function setProfileHeightCm(cm: number): Promise<void> {
 /** Persist the user's age in years. */
 export async function setProfileAge(years: number): Promise<void> {
   await setSetting(SETTING_PROFILE_AGE, String(years));
+}
+
+/** Clear the user's stored height, so getUserProfile() reads it as null. */
+export async function clearProfileHeightCm(): Promise<void> {
+  await deleteSetting(SETTING_PROFILE_HEIGHT_CM);
+}
+
+/** Clear the user's stored age, so getUserProfile() reads it as null. */
+export async function clearProfileAge(): Promise<void> {
+  await deleteSetting(SETTING_PROFILE_AGE);
 }
 
 /** Persist the user's biological sex. */
