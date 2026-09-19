@@ -367,4 +367,121 @@ describe('DashboardScreen reload on focus and app foreground (#304)', () => {
     await flushMicrotasks();
     expect(queryByText('Syncing schedule…')).toBeNull();
   });
+
+  // ── Round 2 (tester rejection): a failed reload must still refresh
+  // `today`, and reads must converge to the new day without depending on
+  // react-navigation re-invoking `useFocusEffect`'s callback (something this
+  // file's capture-only mock deliberately never does). ─────────────────────
+
+  it('a failed reload after midnight still refreshes today, so a subsequent handleSaveWeight writes the new date (error-path convergence)', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { getByPlaceholderText, getByLabelText } = render(<DashboardScreen />);
+    await triggerFocus(); // load for DAY_BEFORE, succeeds
+    expect(mockGetLogByDate).toHaveBeenCalledWith(DAY_BEFORE);
+
+    // Type the weight BEFORE crossing midnight. `TextInput.onChangeText`
+    // sets `weightInput` state on this same screen, which itself forces a
+    // re-render -- doing that *before* the date crosses (and settling it
+    // with a flush) keeps that unrelated re-render from masking the thing
+    // under test: whether the AppState trigger's OWN refresh (independent
+    // of the reload it kicks off) is what gives `handleSaveWeight` a fresh
+    // `today` below.
+    fireEvent.changeText(getByPlaceholderText('0.0'), '78.4');
+    await flushMicrotasks();
+
+    // Cross local midnight while the screen stays mounted.
+    await act(async () => {
+      jest.setSystemTime(AFTER_MIDNIGHT);
+    });
+
+    // The next read transiently fails (e.g. a DB hiccup). The trigger's own
+    // "refresh today" step must not depend on this reload succeeding --
+    // otherwise every handler keeps writing to yesterday until some later
+    // trigger happens to succeed, which is the exact silent wrong-day write
+    // #304 exists to kill.
+    mockGetLogByDate.mockRejectedValueOnce(new Error('transient DB error'));
+
+    expect(mockAddEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    const handler = getAppStateHandler()!;
+    await act(async () => {
+      handler('active');
+    });
+    await flushMicrotasks();
+
+    // No further `changeText` here -- press "Log" using whatever closure is
+    // currently attached to the button, so the only thing that can have
+    // refreshed `today` since the midnight crossing is the trigger itself.
+    await act(async () => {
+      fireEvent.press(getByLabelText('Log body weight'));
+    });
+
+    expect(mockUpsertBodyWeight).toHaveBeenCalledWith(DAY_AFTER, 78.4);
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('reads converge to the new day on an AppState active event alone, without a react-navigation re-invoke', async () => {
+    const { getByText } = render(<DashboardScreen />);
+    await triggerFocus(); // DAY_BEFORE
+    expect(mockGetLogByDate).toHaveBeenCalledWith(DAY_BEFORE);
+
+    await act(async () => {
+      jest.setSystemTime(AFTER_MIDNIGHT);
+    });
+    mockGetLogByDate.mockResolvedValueOnce(
+      makeEntry({ date: DAY_AFTER, walking_task: 'NEW DAY TASK (ACTIVE)' })
+    );
+
+    // Fire the SAME captured AppState handler -- nothing re-registers it
+    // with a fresh closure first. The capture-only mock never re-invokes
+    // anything on its own; convergence must come from `loadToday` reading
+    // the date itself at call time, not from any identity-change re-invoke.
+    expect(mockAddEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    const handler = getAppStateHandler()!;
+    await act(async () => {
+      handler('active');
+    });
+    await flushMicrotasks();
+
+    expect(mockGetLogByDate).toHaveBeenCalledWith(DAY_AFTER);
+    expect(getByText('NEW DAY TASK (ACTIVE)')).toBeTruthy();
+  });
+
+  it('reads converge to the new day on a focus event alone, without a react-navigation re-invoke', async () => {
+    const { getByText } = render(<DashboardScreen />);
+    await triggerFocus(); // DAY_BEFORE
+
+    await act(async () => {
+      jest.setSystemTime(AFTER_MIDNIGHT);
+    });
+    mockGetLogByDate.mockResolvedValueOnce(
+      makeEntry({ date: DAY_AFTER, walking_task: 'NEW DAY TASK (FOCUS)' })
+    );
+
+    // Re-invokes the SAME captured `useFocusEffect` callback (blur +
+    // refocus). This mock never re-invokes it on identity change -- the
+    // real `@react-navigation/core` does, but this fix must not depend on
+    // that, per the tester's defect 2.
+    await triggerFocus();
+
+    expect(mockGetLogByDate).toHaveBeenCalledWith(DAY_AFTER);
+    expect(getByText('NEW DAY TASK (FOCUS)')).toBeTruthy();
+  });
+
+  it('a same-day focus or AppState active event produces exactly one additional loadToday round each', async () => {
+    render(<DashboardScreen />);
+    await triggerFocus(); // mount focus, DAY_BEFORE
+    expect(mockGetLogByDate).toHaveBeenCalledTimes(1);
+
+    await triggerFocus(); // same day, blur + refocus
+    expect(mockGetLogByDate).toHaveBeenCalledTimes(2);
+
+    expect(mockAddEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    const handler = getAppStateHandler()!;
+    await act(async () => {
+      handler('active');
+    });
+    await flushMicrotasks();
+    expect(mockGetLogByDate).toHaveBeenCalledTimes(3);
+  });
 });
