@@ -672,8 +672,35 @@ export function getDatabase(): SQLite.SQLiteDatabase {
 // Rolling Schedule Sync (public API)
 // ─────────────────────────────────────────────
 
+/**
+ * Set for the whole of restoreFromPayload(), cleared in its finally.
+ *
+ * Why this exists (#369): expo-sqlite's withTransactionAsync is a bare,
+ * non-queued BEGIN/COMMIT on one shared connection, so two overlapping
+ * transactions can roll back each other's work. Restore is the worst thing
+ * to overlap with — it DROPs both unique indexes, runs DELETE FROM on every
+ * table, and re-applies migration SQL, all in one transaction — and
+ * syncRollingSchedule() is the most likely thing to overlap with it,
+ * because it runs on every screen focus and on AppState 'active', both of
+ * which fire while the document picker and restore alerts are on screen.
+ *
+ * A sync that lands mid-restore would INSERT daily_log rows into a
+ * half-wiped table; whichever transaction commits second decides what
+ * survives. Skipping the sync entirely is safe: it is idempotent and runs
+ * again on the next focus, which the restore alert guarantees.
+ *
+ * This is a narrow guard for one pair, not a fix for #369 in general.
+ */
+let _restoreInProgress = false;
+
 export async function syncRollingSchedule(): Promise<void> {
+  if (_restoreInProgress) return;
   return _syncRollingSchedule(getDatabase());
+}
+
+/** Test seam: whether a restore is currently holding off the sync (#369). */
+export function isRestoreInProgress(): boolean {
+  return _restoreInProgress;
 }
 
 // ─────────────────────────────────────────────
@@ -2150,14 +2177,31 @@ export async function dumpTable(
  */
 const POST_RESTORE_MIGRATION_VERSIONS = [35, 37];
 
-export async function restoreFromPayload(
-  payloadTables: Record<string, Record<string, unknown>[]>
-): Promise<{
+type RestoreFromPayloadResult = {
   tablesRestored: number;
   rowsRestored: number;
   skipped?: { table: string; columns: string[]; rows: number }[];
   consumedMealsWithoutRefund?: number;
-}> {
+};
+
+export async function restoreFromPayload(
+  payloadTables: Record<string, Record<string, unknown>[]>
+): Promise<RestoreFromPayloadResult> {
+  // Hold off syncRollingSchedule() for the whole restore (#369) — see the
+  // _restoreInProgress doc comment. Set before anything touches the DB, so
+  // a sync firing while the transaction is still opening is skipped too,
+  // and cleared in finally so a thrown restore can't wedge the sync off.
+  _restoreInProgress = true;
+  try {
+    return await _restoreFromPayload(payloadTables);
+  } finally {
+    _restoreInProgress = false;
+  }
+}
+
+async function _restoreFromPayload(
+  payloadTables: Record<string, Record<string, unknown>[]>
+): Promise<RestoreFromPayloadResult> {
   const db = getDatabase();
   const liveTableNames = await listUserTables();
   const liveTableSet = new Set(liveTableNames);
