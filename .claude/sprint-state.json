@@ -237,7 +237,7 @@
     "G": {
       "branch": "sprint/lane-g-tests",
       "worktree": "C:/git/ht-lanes/lane-g",
-      "status": "merged",
+      "status": "reopened-ci-fix",
       "order": [
         336
       ],
@@ -2319,6 +2319,14 @@
     {
       "at": "2026-09-19T04:47:51Z",
       "event": "opened PR #376 sprint/auto-fixes -> main (NOT merged); SPRINT_REPORT.md written"
+    },
+    {
+      "at": "2026-09-19T04:54:23Z",
+      "event": "CI RED on PR #376 (both test runs conclusion=failure, Run Tests step). Reproduced in WSL Ubuntu clone of ff71147: intermittent jest worker crashes SIGSEGV/SIGTRAP under default parallelism (1 of 2 runs; different suites each time incl. pure parseMeasure), runInBand and maxWorkers=2 passed once each, db suites alone pass. Local Windows gates never showed it (except one earlier exit-139 watch item). Orchestrator did not check real CI per merge - own miss. Treating as sprint-caused regression; lane G (test infra owner) to fix."
+    },
+    {
+      "at": "2026-09-19T08:17:04Z",
+      "event": "session restart: CI-fix developer had no commits; resumed with same brief"
     }
   ],
   "duplicatesClosed": [
@@ -2333,10 +2341,19 @@
     "typecheck": "pass",
     "tests": 584,
     "testSuites": 55,
-    "step": "4-report",
+    "step": "4-ci-regression",
     "pr": 376,
     "prUrl": "https://github.com/NevinJulian/healthtracker/pull/376",
     "prMerged": false,
-    "report": "SPRINT_REPORT.md"
+    "report": "SPRINT_REPORT.md",
+    "ciRed": {
+      "pr": 376,
+      "runs": [
+        35422256672,
+        35422259137
+      ],
+      "cause": "intermittent jest worker SIGSEGV/SIGTRAP on Linux under parallel workers",
+      "status": "fixing"
+    }
   }
 }
