@@ -410,9 +410,30 @@ export const SEED_EXERCISES_SUN = `
 
 // ─── Versioned Migration List ─────────────────────────────────────────────────
 
+/**
+ * The little the migration runner needs of a live DB handle to check a
+ * precondition. Declared structurally so schema.ts stays free of
+ * expo-sqlite imports; both the real SQLiteDatabase and the sql.js test
+ * adapter satisfy it.
+ */
+export interface MigrationPreconditionDb {
+  getFirstAsync<T>(sql: string): Promise<T | null>;
+}
+
 export interface Migration {
   version: number;
   sql: string;
+  /**
+   * Optional invariant this migration's SQL depends on, checked against the
+   * live DB immediately before the SQL runs, inside the same transaction.
+   * Throw with an explicit message naming the invariant; the runner lets it
+   * propagate, so the migration and its schema_version row both roll back.
+   *
+   * Every caller that executes a migration's `sql` must run its
+   * `precondition` first — runMigrations() and restoreFromPayload()'s
+   * post-restore replay both do.
+   */
+  precondition?: (db: MigrationPreconditionDb) => Promise<void>;
 }
 
 export const MIGRATIONS: Migration[] = [
@@ -760,8 +781,12 @@ export const MIGRATIONS: Migration[] = [
   // does NOT exist. Run row-by-row with the index already present, a table
   // with real gaps could have an intermediate row transiently collide with
   // another row's not-yet-updated value, even though the fully-applied
-  // result never has a real duplicate. Two call sites run this SQL, and
-  // both uphold that invariant structurally, not by convention:
+  // result never has a real duplicate. That is enforced by this migration's
+  // `precondition` below, which fails with an explicit message naming the
+  // invariant — rather than surfacing as a bare UNIQUE constraint error
+  // from inside the migration transaction, which on a real device means
+  // App.tsx's dead-end screen and no clue why. Two call sites run this SQL,
+  // and both uphold the invariant structurally as well:
   //   - A fresh install or upgrade (runMigrations, database.ts): this
   //     migration's own SQL creates the index itself, AFTER the UPDATE, in
   //     the same string — no device has the index until this migration
@@ -772,7 +797,22 @@ export const MIGRATIONS: Migration[] = [
   //     migration's SQL — looked up at runtime via
   //     POST_RESTORE_MIGRATION_VERSIONS, never copied or reimplemented,
   //     same pattern as v35/#303 — after every table has been restored.
-  { version: 37, sql: `
+  {
+    version: 37,
+    precondition: async (db) => {
+      const existingIndex = await db.getFirstAsync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_workout_set_log_date_exercise_set_index'"
+      );
+      if (existingIndex) {
+        throw new Error(
+          'Migration v37 precondition failed: idx_workout_set_log_date_exercise_set_index already exists. ' +
+            "v37's renumber UPDATE must only run while that unique index does NOT exist, because a row-by-row " +
+            'renumber over gapped data can transiently collide even though the finished result is unique. ' +
+            'Drop the index before running v37 (restoreFromPayload does exactly that), or skip v37 if it has already been applied.'
+        );
+      }
+    },
+    sql: `
   WITH ranked AS (
     SELECT id, ROW_NUMBER() OVER (PARTITION BY date, exercise ORDER BY created_at ASC, id ASC) - 1 AS new_index
     FROM workout_set_log

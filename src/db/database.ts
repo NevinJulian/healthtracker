@@ -264,6 +264,11 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     // double-apply a data migration like v35), while migrations that already
     // committed on an earlier run stay committed.
     await db.withTransactionAsync(async () => {
+      // Invariants this migration's SQL depends on are checked here, inside
+      // its transaction: a throw rolls back both the SQL and the version row
+      // and surfaces a message naming the invariant, instead of a bare
+      // constraint error from the middle of the statement (#317).
+      if (migration.precondition) await migration.precondition(db);
       await db.execAsync(migration.sql);
       await db.runAsync('INSERT INTO schema_version (version) VALUES (?)', [migration.version]);
     });
@@ -2323,6 +2328,10 @@ async function _restoreFromPayload(
           `restoreFromPayload: migration v${version} not found in MIGRATIONS — cannot rebuild its post-restore state.`
         );
       }
+      // Same contract as runMigrations: a migration's precondition runs
+      // immediately before its SQL, in the same transaction. Here it is
+      // also a live check that the DROP INDEX above really happened (#317).
+      if (migration.precondition) await migration.precondition(db);
       await db.execAsync(migration.sql);
     }
   });
