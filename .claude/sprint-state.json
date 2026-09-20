@@ -237,7 +237,7 @@
     "G": {
       "branch": "sprint/lane-g-tests",
       "worktree": "C:/git/ht-lanes/lane-g",
-      "status": "reopened-ci-fix",
+      "status": "merged",
       "order": [
         336
       ],
@@ -836,7 +836,8 @@
     372,
     373,
     374,
-    375
+    375,
+    377
   ],
   "log": [
     {
@@ -2327,6 +2328,19 @@
     {
       "at": "2026-09-19T08:17:04Z",
       "event": "session restart: CI-fix developer had no commits; resumed with same brief"
+    },
+    {
+      "at": "2026-09-20T19:31:21Z",
+      "event": "filed found-during-sprint #377"
+    },
+    {
+      "at": "2026-09-20T19:31:21Z",
+      "event": "user directive: stop repeated-run verification, cap CI jest workers at 2 (9666888), file #377, update PR+report, finish",
+      "sha": "9666888"
+    },
+    {
+      "at": "2026-09-20T19:35:07Z",
+      "event": "CI green on 9666888 (runs 35532540488, 35532542713); PR #376 body and SPRINT_REPORT.md updated with the CI resolution and #377; sprint finished, PR left unmerged"
     }
   ],
   "duplicatesClosed": [
@@ -2337,23 +2351,28 @@
     }
   ],
   "final": {
-    "integrationSha": "71cfcea",
+    "integrationSha": "9666888",
     "typecheck": "pass",
     "tests": 584,
     "testSuites": 55,
-    "step": "4-ci-regression",
+    "step": "done",
     "pr": 376,
     "prUrl": "https://github.com/NevinJulian/healthtracker/pull/376",
     "prMerged": false,
     "report": "SPRINT_REPORT.md",
     "ciRed": {
       "pr": 376,
-      "runs": [
+      "failedRuns": [
         35422256672,
         35422259137
       ],
-      "cause": "intermittent jest worker SIGSEGV/SIGTRAP on Linux under parallel workers",
-      "status": "fixing"
+      "greenRuns": [
+        35532540488,
+        35532542713
+      ],
+      "cause": "jest worker SIGSEGV/SIGTRAP on Linux under parallel workers (sql.js WASM suites)",
+      "resolution": "CI capped at --maxWorkers=2 in test.yml (9666888); root cause unresolved, filed #377",
+      "status": "mitigated"
     }
   }
 }
