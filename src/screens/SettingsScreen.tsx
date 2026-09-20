@@ -902,11 +902,23 @@ export default function SettingsScreen() {
                 // User cancelled the picker — no action needed
                 return;
               }
+              // A pre-v34 backup's already-eaten meals restore without a
+              // pointer back to the batch they came from (#302), so
+              // unticking one returns nothing to inventory. Say so rather
+              // than let the user find out a portion at a time (#310).
+              const refundWarning =
+                result.consumedMealsWithoutRefund
+                  ? `\n\nThis backup predates portion tracking, so ${result.consumedMealsWithoutRefund} meal${
+                      result.consumedMealsWithoutRefund === 1 ? '' : 's'
+                    } already marked as eaten can't be traced back to a cooked batch. Unticking ${
+                      result.consumedMealsWithoutRefund === 1 ? 'it' : 'them'
+                    } will NOT add a portion back to your inventory — add it by hand if you need to.`
+                  : '';
               // Offer to share the safety snapshot if one was written
               if (result.safetySnapshotUri) {
                 Alert.alert(
                   'Restore complete',
-                  `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows.\n\nA safety copy of your previous data was saved. Would you like to share it?`,
+                  `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows.${refundWarning}\n\nA safety copy of your previous data was saved. Would you like to share it?`,
                   [
                     { text: 'Dismiss', style: 'cancel' },
                     {
@@ -918,7 +930,7 @@ export default function SettingsScreen() {
               } else {
                 Alert.alert(
                   'Restore complete',
-                  `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows. Revisit each screen to see the updated data.`
+                  `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows. Revisit each screen to see the updated data.${refundWarning}`
                 );
               }
             } catch (err) {

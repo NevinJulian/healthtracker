@@ -2156,6 +2156,7 @@ export async function restoreFromPayload(
   tablesRestored: number;
   rowsRestored: number;
   skipped?: { table: string; columns: string[]; rows: number }[];
+  consumedMealsWithoutRefund?: number;
 }> {
   const db = getDatabase();
   const liveTableNames = await listUserTables();
@@ -2164,6 +2165,13 @@ export async function restoreFromPayload(
   let tablesRestored = 0;
   let rowsRestored = 0;
   const skipped: { table: string; columns: string[]; rows: number }[] = [];
+  // Consumed weekly_meal_plan rows restored from a pre-v34 backup, i.e. one
+  // whose rows predate the consumed_from_inventory_id column (#302). They
+  // restore fine — the column just lands NULL — but _creditPortion() only
+  // credits a batch it can point at, so unticking one of these meals will
+  // silently return nothing to inventory. Counted here so the caller can
+  // say so instead of the user discovering it a portion at a time (#310).
+  let consumedMealsWithoutRefund = 0;
 
   await db.withTransactionAsync(async () => {
     // Drop first so a legacy backup's duplicate weekly_meal_plan rows or
@@ -2176,6 +2184,22 @@ export async function restoreFromPayload(
     for (const [tableName, rows] of Object.entries(payloadTables)) {
       // Skip tables that don't exist in the current schema
       if (!liveTableSet.has(tableName)) continue;
+
+      // A pre-v34 backup's weekly_meal_plan rows carry no
+      // consumed_from_inventory_id key at all. Detect that on the payload
+      // (not on the restored rows, where the column exists and is simply
+      // NULL) and count the consumed ones, which are the rows that can
+      // never refund.
+      if (tableName === 'weekly_meal_plan' && rows.length > 0) {
+        const payloadHasRefundPointer = rows.some(
+          (row) => 'consumed_from_inventory_id' in row
+        );
+        if (!payloadHasRefundPointer) {
+          consumedMealsWithoutRefund = rows.filter(
+            (row) => row.is_consumed === 1 || row.is_consumed === true
+          ).length;
+        }
+      }
 
       // Wipe existing rows
       await db.runAsync(`DELETE FROM ${tableName}`);
@@ -2251,6 +2275,7 @@ export async function restoreFromPayload(
     tablesRestored,
     rowsRestored,
     ...(skipped.length > 0 ? { skipped } : {}),
+    ...(consumedMealsWithoutRefund > 0 ? { consumedMealsWithoutRefund } : {}),
   };
 }
 

@@ -70,6 +70,13 @@ export interface RestoreResult {
    * all. Present only when something was actually skipped.
    */
   skipped?: { table: string; columns: string[]; rows: number }[];
+  /**
+   * Consumed weekly_meal_plan rows restored from a backup taken before the
+   * consumed_from_inventory_id column existed (pre-v34, #302). They restore
+   * with a NULL pointer, so unticking one returns no portion to inventory.
+   * Present only when such rows were actually restored (#310).
+   */
+  consumedMealsWithoutRefund?: number;
 }
 
 // ─── Pure helpers (exported for unit tests) ──────────────────────────────────
@@ -348,7 +355,8 @@ export async function importBackup(
     // Caller chose to proceed despite failed snapshot — continue without URI.
   }
 
-  const { tablesRestored, rowsRestored, skipped } = await restoreFromPayload(payload.tables);
+  const { tablesRestored, rowsRestored, skipped, consumedMealsWithoutRefund } =
+    await restoreFromPayload(payload.tables);
 
   // ── Resync scheduled notifications to the restored settings (#310) ──────
   // Runs only after a successful restore; nothing above this point touches
@@ -367,6 +375,7 @@ export async function importBackup(
     rowsRestored,
     safetySnapshotUri,
     ...(skipped ? { skipped } : {}),
+    ...(consumedMealsWithoutRefund ? { consumedMealsWithoutRefund } : {}),
   };
 }
 
