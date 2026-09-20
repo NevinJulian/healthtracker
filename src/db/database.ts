@@ -1496,11 +1496,23 @@ export async function insertCookingTask(
  *
  * Note on #369: the real expo-sqlite withTransactionAsync is a bare,
  * non-queued BEGIN/COMMIT on the shared connection, so two overlapping
- * transactions can roll back each other's work. The overlap risk here is
- * low in practice: RecipeDetailScreen's success/failure Alert blocks
- * navigation before the screen loses focus, and syncRollingSchedule only
- * runs on initial load and on focus — so nothing else starts a second
- * transaction while this one is in flight.
+ * transactions can roll back each other's work. An earlier version of this
+ * comment claimed nothing else could start a second transaction here,
+ * because syncRollingSchedule "only runs on initial load and on focus".
+ * That is no longer true, and was never the whole story:
+ *
+ *   - #304 added an AppState 'active' listener that calls loadToday(), and
+ *     syncRollingSchedule() runs on every screen focus across the app, so a
+ *     backgrounded-then-foregrounded app can fire a sync at any moment —
+ *     including while this transaction is in flight.
+ *   - RecipeDetailScreen's Alert blocks *its own* navigation, not the rest
+ *     of the app, and not an OS-driven foreground event.
+ *
+ * So the overlap is possible, just unlikely and small in blast radius: the
+ * sync's own writes are INSERT OR IGNORE plus an exercises backfill, and
+ * both sides re-run on the next focus. It is NOT defended against here.
+ * restoreFromPayload() is the one pair that is explicitly guarded, via
+ * _restoreInProgress. The general fix belongs in #369.
  */
 export async function addRecipeToShoppingList(
   items: { name: string; quantity: number; unit: string }[],
