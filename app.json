@@ -2,7 +2,7 @@
   "expo": {
     "name": "90-Day Tracker",
     "slug": "healthtracker",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F3EFE7"
     },
     "ios": {
       "supportsTablet": true
@@ -19,7 +19,7 @@
       "package": "com.sgnaegi.healthtracker",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#4E6B58"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -33,7 +33,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/notification-icon.png",
           "color": "#7C9A85",
           "defaultChannel": "reminders",
           "androidMode": "default",
