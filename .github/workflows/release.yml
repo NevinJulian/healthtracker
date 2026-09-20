@@ -37,7 +37,9 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
+        with:
+          packages: 'platform-tools'
+          
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8
         with:
