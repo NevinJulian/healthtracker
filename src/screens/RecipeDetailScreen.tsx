@@ -12,8 +12,7 @@ import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
   getRecipeById,
   Recipe,
-  addShoppingListItem,
-  insertCookingTask,
+  addRecipeToShoppingList,
   deleteRecipe,
   isSeededRecipe,
 } from '../db/database';
@@ -98,11 +97,12 @@ export default function RecipeDetailScreen() {
   const handleAddToShoppingList = async () => {
     if (!recipe) return;
     try {
-      for (const ing of recipe.ingredients) {
-        const qty = getCalculatedQuantity(ing.baseQuantity);
-        await addShoppingListItem(ing.name, qty, ing.unit);
-      }
-      await insertCookingTask(recipe.id, servings);
+      const items = recipe.ingredients.map((ing) => ({
+        name: ing.name,
+        quantity: getCalculatedQuantity(ing.baseQuantity),
+        unit: ing.unit,
+      }));
+      await addRecipeToShoppingList(items, recipe.id, servings);
       Alert.alert(
         'Added!',
         `Ingredients added to Shopping List & ${servings} serving(s) added to Cooking Queue!`,

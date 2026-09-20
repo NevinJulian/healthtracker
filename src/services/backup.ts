@@ -17,10 +17,22 @@
  *   - Restore is all-or-nothing via db.withTransactionAsync().
  *   - Before any restore, a safety snapshot of the current data is written
  *     to cacheDirectory so an accidental restore is always recoverable (#293).
+ *   - After a successful restore, scheduled OS notifications are resynced to
+ *     the restored settings (#310): cancelAllScheduledNotificationsAsync()
+ *     runs first, then reconcileScheduledNotifications(). cancelAll (rather
+ *     than reconcile alone) is required because a restored reminder that is
+ *     disabled can carry an empty/stale *_ID_KEY in app_state — the cancel*
+ *     helpers in notifications.ts still cancel by that stored id, not by the
+ *     #309 stable identifier, so reconcile alone could leave a
+ *     currently-scheduled-but-now-disabled reminder firing forever. This
+ *     resync is best-effort: it only runs once restoreFromPayload has
+ *     resolved successfully, and a failure in it is logged, never thrown —
+ *     the data restore itself already succeeded by that point.
  */
 
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
+import * as Notifications from 'expo-notifications';
 import {
   cacheDirectory,
   writeAsStringAsync,
@@ -32,6 +44,7 @@ import {
   dumpTable,
   restoreFromPayload,
 } from '../db/database';
+import { reconcileScheduledNotifications } from './notifications';
 import { localDateKey } from '../utils/dates';
 
 // ─── Public types ────────────────────────────────────────────────────────────
@@ -50,26 +63,23 @@ export interface RestoreResult {
   rowsRestored: number;
   /** URI of the pre-restore safety snapshot written to cache. */
   safetySnapshotUri: string;
+  /**
+   * Per-table report of rows/columns dropped by restoreFromPayload's column
+   * whitelist (#315) — unknown columns in a row are silently ignored rather
+   * than inserted, and a row left with no known columns isn't inserted at
+   * all. Present only when something was actually skipped.
+   */
+  skipped?: { table: string; columns: string[]; rows: number }[];
+  /**
+   * Consumed weekly_meal_plan rows restored from a backup taken before the
+   * consumed_from_inventory_id column existed (pre-v34, #302). They restore
+   * with a NULL pointer, so unticking one returns no portion to inventory.
+   * Present only when such rows were actually restored (#310).
+   */
+  consumedMealsWithoutRefund?: number;
 }
 
 // ─── Pure helpers (exported for unit tests) ──────────────────────────────────
-
-/**
- * Build the (col1, col2, ...) list and VALUES (?, ?, ...) placeholders for a
- * single row's keys. This is a pure function with no side-effects.
- */
-export function buildInsertColumns(row: Record<string, unknown>): {
-  columns: string;
-  placeholders: string;
-  values: unknown[];
-} {
-  const keys = Object.keys(row);
-  return {
-    columns: keys.join(', '),
-    placeholders: keys.map(() => '?').join(', '),
-    values: keys.map((k) => row[k]),
-  };
-}
 
 /**
  * Validate a parsed object as a BackupPayload. Returns the typed payload or
@@ -99,14 +109,47 @@ export function validatePayload(
     );
   }
 
+  if (obj['version'] !== 1) {
+    throw new Error(
+      'Invalid backup file: unsupported backup format version.'
+    );
+  }
+
   if (typeof obj['tables'] !== 'object' || obj['tables'] === null) {
     throw new Error('Invalid backup file: missing tables data.');
   }
 
-  const payloadSchema = Number(obj['schemaVersion']);
-  if (isNaN(payloadSchema)) {
+  if (Array.isArray(obj['tables'])) {
+    throw new Error(
+      'Invalid backup file: tables must be an object, not a list.'
+    );
+  }
+
+  const tables = obj['tables'] as Record<string, unknown>;
+  for (const [tableName, body] of Object.entries(tables)) {
+    if (!Array.isArray(body)) {
+      throw new Error(
+        `Invalid backup file: table "${tableName}" data must be a list of rows.`
+      );
+    }
+    for (const row of body) {
+      if (typeof row !== 'object' || row === null || Array.isArray(row)) {
+        throw new Error(
+          `Invalid backup file: table "${tableName}" contains a row that is not an object.`
+        );
+      }
+    }
+  }
+
+  const rawSchemaVersion = obj['schemaVersion'];
+  if (
+    typeof rawSchemaVersion !== 'number' ||
+    !Number.isFinite(rawSchemaVersion) ||
+    !Number.isInteger(rawSchemaVersion)
+  ) {
     throw new Error('Invalid backup file: missing schema version.');
   }
+  const payloadSchema = rawSchemaVersion;
 
   if (payloadSchema > currentSchemaVersion) {
     throw new Error(
@@ -245,6 +288,12 @@ export async function writeSafetySnapshot(): Promise<string> {
  *   - The returned RestoreResult includes the snapshot URI so the caller can
  *     offer to share it.
  *
+ * On a successful restore, scheduled OS notifications are also resynced to
+ * the restored settings (#310) — see the module docblock above for why that
+ * needs a full cancelAllScheduledNotificationsAsync() rather than just
+ * reconcileScheduledNotifications(). This resync is best-effort and never
+ * turns a successful restore into a reported failure.
+ *
  * @returns A RestoreResult summary (including safetySnapshotUri), or null
  *          when the user cancelled.
  * @throws  When the file is invalid, the schema is incompatible, or the
@@ -306,8 +355,28 @@ export async function importBackup(
     // Caller chose to proceed despite failed snapshot — continue without URI.
   }
 
-  const { tablesRestored, rowsRestored } = await restoreFromPayload(payload.tables);
-  return { tablesRestored, rowsRestored, safetySnapshotUri };
+  const { tablesRestored, rowsRestored, skipped, consumedMealsWithoutRefund } =
+    await restoreFromPayload(payload.tables);
+
+  // ── Resync scheduled notifications to the restored settings (#310) ──────
+  // Runs only after a successful restore; nothing above this point touches
+  // notifications, so a restore that throws leaves existing reminders
+  // untouched. Best-effort: a failure here must not turn a successful data
+  // restore into a reported failure.
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    await reconcileScheduledNotifications();
+  } catch (err) {
+    console.warn('[Backup] Failed to resync notifications after restore:', err);
+  }
+
+  return {
+    tablesRestored,
+    rowsRestored,
+    safetySnapshotUri,
+    ...(skipped ? { skipped } : {}),
+    ...(consumedMealsWithoutRefund ? { consumedMealsWithoutRefund } : {}),
+  };
 }
 
 /**

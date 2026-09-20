@@ -34,7 +34,7 @@ Migrations are `{ version: number, sql: string }` objects in `MIGRATIONS` (schem
 To change the schema: **append a new entry with the next integer `version`.** Never edit, reorder, or renumber existing entries — they have already run on users' devices and are skipped via `schema_version`. Seeds are themselves migrations and must be idempotent (`INSERT OR IGNORE`, or `UPDATE ... WHERE ... AND exercises = '[]'`). Bulk library seeds (`bio_force_library`, `recipe_library`) are seeded separately by `seedBioForceLibrary` / `seedRecipeLibrary`, which are guarded by a row-count check rather than the migration list.
 
 ### The 7-day rolling window (the core domain model)
-`weekly_template` has exactly 7 rows (one per `day_of_week`, 0=Sun). `daily_log` is date-keyed (`YYYY-MM-DD`). `syncRollingSchedule()` runs at startup **and on every screen focus** (via `useFocusEffect`); it generates missing `daily_log` rows for the window (today ± 7 days), backfills empty `exercises`, and prunes rows older than the cutoff. Existing rows with completion data are never regenerated. Gym weight auto-progresses on a 21-day cycle (`buildHammerTask`, `CYCLE_DAYS`/`KG_PER_CYCLE`). Per-day mutable state that isn't a column (`exercises`, `additional_workouts`) is stored as JSON text and parsed defensively (`parseExercises` returns `[]` on any malformed input — preserve that).
+`weekly_template` has exactly 7 rows (one per `day_of_week`, 0=Sun). `daily_log` is date-keyed (`YYYY-MM-DD`). `syncRollingSchedule()` runs at startup **and on every screen focus** (via `useFocusEffect`); it inserts missing `daily_log` rows from today − up to 90 days back (capped at the app's start date) through today + 7 days, and backfills empty `exercises` on existing rows only within today − 7 through today + 7 (the pre-#301 window; older rows are never retro-filled). History is retained indefinitely — old rows are never deleted (#300). Existing rows with completion data are never regenerated. Gym weight auto-progresses on a 21-day cycle (`buildHammerTask`, `CYCLE_DAYS`/`KG_PER_CYCLE`). Per-day mutable state that isn't a column (`exercises`, `additional_workouts`) is stored as JSON text and parsed defensively (`parseExercises` returns `[]` on any malformed input — preserve that).
 
 ### Meal-prep pipeline (data flow)
 `src/data/recipes.ts` (static seed) → `recipe_library` → user adds a recipe → `shopping_list` + `cooking_tasks` → `finishCooking()` → `meal_inventory` → `assignMealToPlan()` → `weekly_meal_plan`; `toggleMealConsumed()` decrements inventory. Cross-table inventory mutations use `db.withTransactionAsync` — keep new multi-step inventory changes transactional.
@@ -46,17 +46,17 @@ To change the schema: **append a new entry with the next integer `version`.** Ne
 
 `jest.config.js` and `__mocks__/` are a **deliberate workaround**, not boilerplate. `testEnvironment` is forced to `node` and `moduleNameMapper` stubs `expo/src/winter`, `expo-sqlite`, and `expo-asset` to dodge a Jest 30 + jest-expo "winter runtime" incompatibility (it uses dynamic `import()`, which Jest 30 blocks). The native-module mocks live in `__mocks__/` (`expo-sqlite.js`, `expo-asset.js`, `expo-winter.js`). Don't "simplify" the jest config or these mocks without understanding why they exist — several recent commits exist solely to fix this.
 
-Note: `src/test/setup.ts` is **not** wired into `jest.config.js` (there is no `setupFiles`); the active mocks are the `__mocks__/` ones referenced by `moduleNameMapper`. Existing tests are smoke-level (e.g. "the screen export is a function") — they do not render DB-backed screens.
+Note: there is no `setupFiles` entry in `jest.config.js`; the active mocks are the `__mocks__/` ones referenced by `moduleNameMapper`. (A dead, unwired `src/test/setup.ts` used to sit alongside this — deleted in #336, not fixed, since nothing imported it.) `src/db/__tests__/` suites drive a real sql.js SQLite engine through `src/db/testHelpers/sqljsExpoAdapter.ts`; the `DashboardScreen*`, `AnalyticsDashboardScreen*`, `SettingsScreen*` and `MealPrepScreen*` suites render the real screens with `@testing-library/react-native` (loaded with `RNTL_SKIP_DEPS_CHECK=1`, see #360) against a mocked `../../db/database`; the Discover, Onboarding and RecipeEditor screen tests are still smoke-level.
 
 ## Gotchas
 
 - **`react-native-reanimated` is pinned to 3.16.7 and worklets were removed** to fix a TurboModule crash under the New Architecture (#219–221). Be very cautious upgrading reanimated or reintroducing worklets.
-- **The per-folder `README.md` files under `src/` are partially stale.** `src/db/README.md` and `schema.ts`'s header describe an `openDb()` function, a `user_version` PRAGMA migration scheme, `migrateV<N>()` functions, and a `weight_log` table — **none of these exist**. The real code uses `initDatabase()`, a `schema_version` table + `MIGRATIONS` array, and stores weight as a `body_weight` column on `daily_log`. Trust the code over those READMEs.
 - `npm install` / `npm ci` require `--legacy-peer-deps`.
 
 ## CI & releases
 
-- `.github/workflows/test.yml` — runs `npm test` on PRs to `main` and on pushes to non-`main` branches.
+- `.github/workflows/test.yml` — runs `npm run typecheck` then `npm test` on PRs to `main` and on pushes to non-`main` branches.
+- `.github/workflows/build-check.yml` — verifies the Android APK actually compiles (the JS-only merge gate can't catch native/Gradle breakage). Runs on PRs to `main` that touch `package.json`, `package-lock.json`, `app.json`, `eas.json`, `babel.config.js`, or the workflow file itself, plus on-demand via `workflow_dispatch`; builds the APK locally through EAS (`eas build -p android --profile preview --local`) without publishing a release.
 - `.github/workflows/release.yml` — on push to `main`, builds the APK locally via EAS and publishes a GitHub Release tagged `v<run_number>` with a download link + QR code.
 
 ## Contribution conventions

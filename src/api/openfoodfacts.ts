@@ -8,10 +8,12 @@
  * (migration v29) so the network is only hit once per unique ingredient name.
  *
  * License: Open Food Facts data is available under ODbL.
- * No API key required. No new npm dependencies — uses built-in fetch.
+ * No API key required. No new npm dependencies — uses built-in fetch,
+ * wrapped by `fetchJson` for a timeout, one retry, and a readable error.
  */
 
 import { getDatabase } from '../db/database';
+import { fetchJson } from './fetchJson';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -103,10 +105,7 @@ const OFF_SEARCH_URL =
 async function fetchFromOFF(term: string): Promise<OFFNutrition | null> {
   try {
     const url = `${OFF_SEARCH_URL}&search_terms=${encodeURIComponent(term)}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-
-    const data: OFFResponse = await res.json();
+    const data = await fetchJson<OFFResponse>(url);
     if (!data.products || data.products.length === 0) return null;
 
     // Pick the first product that has all four macro fields

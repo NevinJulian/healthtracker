@@ -8,7 +8,7 @@ This folder contains the single file that defines the entire navigation structur
 
 ### `AppNavigator.tsx`
 
-The root navigator component. It wires together a **Drawer Navigator** (right-side menu) with a **Stack Navigator** nested inside the Recipes route.
+The root navigator component. It wires together a **Drawer Navigator** (right-side menu) with a **Stack Navigator** nested inside both the Recipes and Discover routes.
 
 ---
 
@@ -21,11 +21,16 @@ AppNavigator (Drawer.Navigator)
 ├── Analytics      → AnalyticsDashboardScreen
 ├── Meal Prep      → MealPrepScreen
 ├── Recipes        → RecipesStackScreen
-│     ├── RecipesMain → RecipesScreen
-│     └── RecipeDetail → RecipeDetailScreen
+│     ├── RecipesMain   → RecipesScreen
+│     ├── RecipeDetail  → RecipeDetailScreen
+│     └── RecipeEditor  → RecipeEditorScreen
+├── Discover       → DiscoverStackScreen
+│     ├── DiscoverMain   → DiscoverScreen
+│     └── DiscoverDetail → DiscoverDetailScreen
 ├── Shopping       → ShoppingListScreen
 ├── Cooking Tasks  → CookingTasksScreen
-└── Template       → TemplateEditorScreen
+├── Template       → TemplateEditorScreen
+└── Settings       → SettingsScreen
 ```
 
 ---
@@ -39,29 +44,31 @@ The default React Navigation drawer puts the hamburger icon on the **left** (whe
 - `drawerPosition: 'right'` — the drawer slides in from the **right**, matching the button position
 
 ### Custom Drawer Icons
-Each route has an emoji icon defined in `DRAWER_ICONS`:
+Each route has an `@expo/vector-icons` Ionicons name defined in `DRAWER_ICONS`:
 
 ```typescript
-const DRAWER_ICONS: Record<string, string> = {
-  Today: '🏋️',
-  Schedule: '📅',
-  Analytics: '📊',
-  'Meal Prep': '🥗',
-  Template: '✏️',
-  Recipes: '🍽️',
-  Shopping: '🛒',
-  'Cooking Tasks': '👨‍🍳',
+const DRAWER_ICONS: Record<string, IoniconsName> = {
+  Today: 'barbell-outline',
+  Schedule: 'calendar-outline',
+  Analytics: 'stats-chart-outline',
+  'Meal Prep': 'nutrition-outline',
+  Template: 'create-outline',
+  Recipes: 'restaurant-outline',
+  Discover: 'compass-outline',
+  Shopping: 'cart-outline',
+  'Cooking Tasks': 'flame-outline',
+  Settings: 'settings-outline',
 };
 ```
 
-The `DrawerIcon` component renders the emoji in a fixed-width `View` (28px) to ensure consistent alignment. The `drawerLabelStyle` adds `marginLeft: 12` to prevent the text from touching the icon.
+The `DrawerIcon` component renders the `Ionicons` glyph in a fixed-width `View` (28px) to ensure consistent alignment. The `drawerLabelStyle` adds `marginLeft: Spacing.sm` to prevent the text from touching the icon.
 
-### RecipesStackScreen
-Because the Recipe Detail view requires a push navigation (not a drawer navigation), the Recipes route wraps two screens in a Stack Navigator:
-- `RecipesMain` — the category browse list
-- `RecipeDetail` — the single recipe detail view
+### RecipesStackScreen and DiscoverStackScreen
+Because the Recipe Detail / Recipe Editor and Discover Detail views require push navigation (not drawer navigation), the Recipes and Discover routes each wrap their screens in their own Stack Navigator:
+- `RecipesStackScreen`: `RecipesMain` (category browse list) → `RecipeDetail` (single recipe view) → `RecipeEditor` (create/edit a recipe)
+- `DiscoverStackScreen`: `DiscoverMain` (external recipe search) → `DiscoverDetail` (single discovered recipe view)
 
-Both have `headerShown: false` since the outer Drawer Navigator already provides the header.
+All of these have `headerShown: false` since the outer Drawer Navigator already provides the header.
 
 ---
 
@@ -74,8 +81,8 @@ All navigation chrome uses the centralized `Colors`, `Typography`, and `Spacing`
 | `headerStyle.backgroundColor` | `Colors.surface` |
 | `headerTintColor` | `Colors.textPrimary` |
 | `drawerStyle.backgroundColor` | `Colors.background` |
-| `drawerActiveTintColor` | `Colors.accent` |
-| `drawerActiveBackgroundColor` | `Colors.surface` |
+| `drawerActiveTintColor` | `Colors.sageDeep` |
+| `drawerActiveBackgroundColor` | `Colors.sageTint` |
 
 ---
 
