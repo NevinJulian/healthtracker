@@ -40,12 +40,6 @@ import ts from 'typescript';
 const DATABASE_TS = path.join(__dirname, '..', 'database.ts');
 const WRITE_METHODS = new Set(['runAsync', 'execAsync', 'withTransactionAsync', 'prepareAsync']);
 
-// Exported writers still serialised by something other than the write queue.
-// Must shrink to empty; each entry needs a reason.
-const R3_EXCEPTIONS: Record<string, string> = {
-  upsertExerciseCompleted: "still on #319's own queue; folded into the write queue next",
-};
-
 interface FunctionInfo {
   name: string;
   exported: boolean;
@@ -201,12 +195,8 @@ describe('database.ts write-queue rules (#369)', () => {
     };
 
     const offenders = [...functions.values()]
-      .filter((f) => f.exported && !(f.name in R3_EXCEPTIONS) && reach(f.name, new Set()))
+      .filter((f) => f.exported && reach(f.name, new Set()))
       .map((f) => `${f.name}() writes outside the write queue`);
     expect(offenders).toEqual([]);
-
-    // Exceptions must stay real: an entry that no longer needs it is removed.
-    const stale = Object.keys(R3_EXCEPTIONS).filter((name) => !reach(name, new Set()));
-    expect(stale).toEqual([]);
   });
 });

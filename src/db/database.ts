@@ -996,44 +996,27 @@ async function _upsertLogFieldImpl(
 }
 
 /**
- * Serialisation queue for upsertExerciseCompleted() (#319). It's a
- * read-modify-write: read daily_log.exercises, toggle one entry, write the
- * whole array back. Two overlapping calls for the same date can both read
- * the pre-toggle array and the second write clobbers the first toggle
- * (lost update). Chaining every call onto this module-level promise forces
- * the read-modify-write sequences to run one at a time, so they can't
- * interleave — each call awaits the previous one's settlement (including a
- * rejection) before its own body starts.
- *
- * Deliberately NOT `withTransactionAsync`: a single UPDATE statement is
- * already atomic by itself, and the real expo-sqlite withTransactionAsync
- * is a bare, non-queued BEGIN/COMMIT on the shared connection — overlapping
- * transactions can roll back each other's work (filed as #369, a systemic
- * issue out of scope here). Wrapping this in another non-queued transaction
- * would only widen that exposure; the plain queue below avoids it entirely.
- */
-let _upsertExerciseCompletedQueue: Promise<void> = Promise.resolve();
-
-/**
  * Toggles the `completed` flag on a single exercise within daily_log.exercises
  * for the given date. Reads the current JSON, patches it, then writes back.
  *
  * Malformed stored JSON is refused rather than coerced to [] and persisted
  * (which would destroy the original) — see _tryParseExercisesForWrite().
- * Calls are serialised per-process; see _upsertExerciseCompletedQueue above.
+ *
+ * It's a read-modify-write, so two overlapping calls for the same date could
+ * both read the pre-toggle array, and the second write would clobber the
+ * first toggle (#319). The whole read-modify-write is one unit on the write
+ * queue, so calls can't interleave with each other or with any other writer
+ * (#369). This call used to have its own promise queue, which serialised it
+ * only against itself; the write queue replaced it.
  */
 export function upsertExerciseCompleted(
   date: string,
   exerciseId: string,
   value: boolean
 ): Promise<void> {
-  const run = _upsertExerciseCompletedQueue.then(() =>
+  return _enqueueWrite('upsertExerciseCompleted', () =>
     _upsertExerciseCompletedImpl(date, exerciseId, value)
   );
-  // Swallow the rejection on the CHAIN link only (not on `run`, which the
-  // caller still sees) so a failed call doesn't wedge later queued calls.
-  _upsertExerciseCompletedQueue = run.catch(() => {});
-  return run;
 }
 
 async function _upsertExerciseCompletedImpl(
