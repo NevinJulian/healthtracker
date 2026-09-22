@@ -165,9 +165,18 @@ export async function createSqljsDb(): Promise<SqljsExpoDb> {
       };
     },
 
+    // Mirrors expo-sqlite's withTransactionAsync statement for statement
+    // (#369), pinned by expoSqliteTransactionCanary.test.ts. BEGIN sits
+    // INSIDE the try on purpose: when a second transaction's BEGIN fails
+    // because one is already open, its catch runs ROLLBACK — which rolls
+    // back the OTHER, still-running transaction. That is the real #369
+    // mechanism. An earlier version had BEGIN outside the try, so a failed
+    // BEGIN never rolled anything back and the harness could not reproduce
+    // the bug at all. Don't "fix" this with a mutex: the adapter must not
+    // queue, because production doesn't.
     async withTransactionAsync(fn: () => Promise<void>): Promise<void> {
-      db.run('BEGIN');
       try {
+        db.run('BEGIN');
         await fn();
         db.run('COMMIT');
       } catch (err) {
