@@ -19,6 +19,7 @@ import {
   PlusJakartaSans_700Bold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from './src/db/database';
+import { installStress369 } from './src/db/devStress369';
 import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import { Colors, Typography } from './src/theme/tokens';
@@ -49,6 +50,9 @@ export default function App() {
     (async () => {
       try {
         await initDatabase();
+        // Dev builds only: exposes globalThis.stress369() for the #369
+        // device stress run. A no-op in release (see src/db/devStress369.ts).
+        installStress369();
         // Ensure the Android notification channel exists and reconcile any
         // persisted reminder settings with the OS scheduler. Both are
         // fire-and-forget: failures are logged but must not block startup.
