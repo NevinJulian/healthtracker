@@ -280,9 +280,95 @@ let _writeQueue: Promise<void> = Promise.resolve();
 /** Name of the unit currently running on the write queue, or null when idle. */
 let _writeQueueHolder: string | null = null;
 
+/**
+ * Reentrancy detection, __DEV__ only.
+ *
+ * A queued unit that calls another queued function waits for itself
+ * forever, and every write in the app queues up behind it. The primary
+ * guard is static: writeQueueRules.test.ts fails if anything in this module
+ * calls a queued export. This is the runtime backstop, for whatever gets
+ * past that (a helper passed in from outside, say).
+ *
+ * It can't simply check "is the caller inside the unit holding the queue?".
+ * Hermes has no async context, so after the holder's first await a nested
+ * call and an ordinary concurrent call from another screen look identical.
+ * What does tell them apart is DB activity. A holder that is deadlocked on a
+ * nested call is awaiting that call, so it has no DB statement in flight
+ * and issues no new ones. A long but healthy unit, such as a restore, always
+ * has one in flight or has just finished one. So when a call is waiting and
+ * the holder has had no DB call in flight for WRITE_QUEUE_STALL_MS, the
+ * WAITING call is rejected with an error naming both functions. That breaks
+ * the cycle: the holder's await rejects, its transaction rolls back, and the
+ * queue moves on. The failure surfaces at the call site instead of the app
+ * silently freezing.
+ *
+ * Activity is counted on the connection's statement methods (see
+ * _trackDbActivity). A unit that awaits something other than the DB for
+ * that long breaks the "DB work only" rule above, so it is reported too.
+ * Statements run through prepareAsync()'s executeAsync aren't counted.
+ * Only the init-time library seeds use those, and nothing can be waiting
+ * behind them.
+ */
+const WRITE_QUEUE_STALL_MS = 2000;
+let _dbCallsInFlight = 0;
+let _lastDbActivityAt = 0;
+
+function _isDev(): boolean {
+  return typeof __DEV__ !== 'undefined' && __DEV__;
+}
+
+const _TRACKED_DB_METHODS = ['execAsync', 'runAsync', 'getFirstAsync', 'getAllAsync', 'prepareAsync'] as const;
+
+/**
+ * Wraps the connection's statement methods (as own properties, so identity
+ * is unchanged) to keep _dbCallsInFlight / _lastDbActivityAt current.
+ * withTransactionAsync is deliberately NOT wrapped. It stays "in flight"
+ * for the whole task, including while a deadlocked task awaits a nested
+ * call, which would hide exactly the stall this detects. Its own BEGIN,
+ * COMMIT and ROLLBACK go through execAsync and are counted there.
+ */
+function _trackDbActivity(db: SQLite.SQLiteDatabase): void {
+  const target = db as unknown as Record<string, unknown>;
+  for (const method of _TRACKED_DB_METHODS) {
+    const original = target[method];
+    if (typeof original !== 'function') continue;
+    target[method] = function (this: unknown, ...args: unknown[]) {
+      _dbCallsInFlight++;
+      _lastDbActivityAt = Date.now();
+      const settle = () => {
+        _dbCallsInFlight--;
+        _lastDbActivityAt = Date.now();
+      };
+      let result: unknown;
+      try {
+        result = original.apply(this, args);
+      } catch (err) {
+        settle();
+        throw err;
+      }
+      const thenable = result as { then?: unknown } | null | undefined;
+      if (thenable && typeof thenable.then === 'function') {
+        (result as Promise<unknown>).then(settle, settle);
+      } else {
+        settle();
+      }
+      return result;
+    };
+  }
+}
+
 function _enqueueWrite<T>(name: string, unit: () => Promise<T>): Promise<T> {
+  let started = false;
+  let abandoned = false;
   const run = _writeQueue.then(async () => {
+    if (abandoned) {
+      // Rejected by the stall detector below; the caller already has that
+      // error and must not have this unit run behind its back afterwards.
+      throw new Error(`[DB] ${name}: abandoned after a write-queue stall`);
+    }
+    started = true;
     _writeQueueHolder = name;
+    _lastDbActivityAt = Date.now();
     try {
       return await unit();
     } finally {
@@ -295,7 +381,47 @@ function _enqueueWrite<T>(name: string, unit: () => Promise<T>): Promise<T> {
     () => undefined,
     () => undefined
   );
-  return run;
+
+  if (!_isDev() || _writeQueueHolder === null) return run;
+
+  // Something holds the queue, so this call waits. Watch for the holder
+  // stalling (see WRITE_QUEUE_STALL_MS above).
+  return new Promise<T>((resolve, reject) => {
+    const timer = setInterval(() => {
+      if (started) {
+        clearInterval(timer);
+        return;
+      }
+      const holder = _writeQueueHolder;
+      if (
+        holder !== null &&
+        _dbCallsInFlight === 0 &&
+        Date.now() - _lastDbActivityAt >= WRITE_QUEUE_STALL_MS
+      ) {
+        clearInterval(timer);
+        abandoned = true;
+        reject(
+          new Error(
+            `[DB] Write-queue reentrancy (#369): ${name}() is waiting behind ${holder}(), ` +
+              `which has made no DB call for ${WRITE_QUEUE_STALL_MS}ms. Almost certainly ` +
+              `${holder}() (or a helper it calls) calls ${name}() from inside its own queued ` +
+              `unit, which would wait for itself forever. Call the internal _…Impl function ` +
+              `instead of the queued export.`
+          )
+        );
+      }
+    }, WRITE_QUEUE_STALL_MS / 4);
+    run.then(
+      (value) => {
+        clearInterval(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearInterval(timer);
+        reject(err);
+      }
+    );
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -697,6 +823,7 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
     await db.execAsync('PRAGMA journal_mode = WAL;');
 
     db = await resetIfIncompatibleSchema(db);
+    if (_isDev()) _trackDbActivity(db);
 
     // Nothing else can reach the DB yet (App.tsx blocks render on this, and
     // getDatabase() throws until _db is set below), so these can't really

@@ -387,3 +387,71 @@ describe('toggleMealConsumed() racing a sync transaction (#369)', () => {
     expect(syncResult.status).toBe('fulfilled');
   });
 });
+
+/**
+ * #369 reentrancy backstop. A queued unit that awaits another queued
+ * function would wait for itself forever and wedge every write in the app.
+ * writeQueueRules.test.ts stops that statically inside database.ts. This
+ * drives the __DEV__ runtime detector with a real nested call: the hook runs
+ * INSIDE toggleMealConsumed's queued unit and awaits syncRollingSchedule().
+ * Without the detector this test hangs until jest's timeout.
+ */
+describe('write-queue reentrancy detection (#369, __DEV__)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('rejects the nested call naming both functions, rolls the holder back, and leaves the queue usable', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const raw = db.getDatabase();
+
+    await raw.runAsync(
+      'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, ?, ?)',
+      [RECIPE_ID, 1, '2024-01-01']
+    );
+    await db.assignMealToPlan('2024-06-01', 'dinner', RECIPE_ID);
+    const id = await planRowId(db, '2024-06-01', 'dinner');
+
+    const originalRun = raw.runAsync;
+    let nestedError: unknown = null;
+    let nested = false;
+    (raw as unknown as { runAsync: typeof originalRun }).runAsync = (async (
+      ...args: Parameters<typeof originalRun>
+    ) => {
+      const result = await originalRun.apply(raw, args);
+      if (!nested && typeof args[0] === 'string' && args[0].includes('portions_available - 1')) {
+        nested = true;
+        try {
+          await db.syncRollingSchedule(); // reentrant: we are inside toggleMealConsumed's unit
+        } catch (err) {
+          nestedError = err;
+          throw err;
+        }
+      }
+      return result;
+    }) as typeof originalRun;
+
+    const started = Date.now();
+    await expect(db.toggleMealConsumed(id, true)).rejects.toThrow(/reentrancy/);
+    const elapsed = Date.now() - started;
+    (raw as unknown as { runAsync: typeof originalRun }).runAsync = originalRun;
+
+    expect(String(nestedError)).toMatch(/syncRollingSchedule\(\) is waiting behind toggleMealConsumed\(\)/);
+    expect(elapsed).toBeLessThan(5000);
+
+    // The holder's transaction rolled back as a whole: nothing debited,
+    // nothing marked consumed.
+    expect(await inventoryTotal(db, RECIPE_ID)).toBe(1);
+    const row = await raw.getFirstAsync<{ is_consumed: number }>(
+      'SELECT is_consumed FROM weekly_meal_plan WHERE id = ?',
+      [id]
+    );
+    expect(row?.is_consumed).toBe(0);
+
+    // And the queue is not wedged: the next writes run normally.
+    await db.toggleMealConsumed(id, true);
+    await db.syncRollingSchedule();
+    expect(await inventoryTotal(db, RECIPE_ID)).toBe(0);
+  }, 15000);
+});
