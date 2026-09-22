@@ -455,3 +455,29 @@ describe('write-queue reentrancy detection (#369, __DEV__)', () => {
     expect(await inventoryTotal(db, RECIPE_ID)).toBe(0);
   }, 15000);
 });
+
+/**
+ * #369 test-only tripwire. database.ts installs a check on the sql.js
+ * adapter, so any withTransactionAsync opened outside the write queue throws
+ * in every sql.js suite. This pins the tripwire itself; the rest of the
+ * suites then exercise it on every transactional writer they call.
+ */
+describe('write-queue transaction tripwire (#369, tests only)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('throws for a transaction opened outside the write queue, before touching the DB', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const raw = db.getDatabase();
+    const body = jest.fn(async () => {});
+
+    await expect(raw.withTransactionAsync(body)).rejects.toThrow(/write queue is not held/);
+    expect(body).not.toHaveBeenCalled();
+
+    // Queued writers still open their transactions normally.
+    await expect(db.logCookedMeal(RECIPE_ID, 2)).resolves.toBeUndefined();
+    expect(await inventoryTotal(db, RECIPE_ID)).toBe(2);
+  });
+});

@@ -824,6 +824,14 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
 
     db = await resetIfIncompatibleSchema(db);
     if (_isDev()) _trackDbActivity(db);
+    // Test-only tripwire (#369): the sql.js test adapter exposes this hook
+    // and then throws if withTransactionAsync is ever called while the
+    // write queue isn't held. expo-sqlite's real connection has no such
+    // method, so in the app this line does nothing.
+    const tripwireHost = db as unknown as {
+      __installTransactionTripwire?: (isHeld: () => boolean) => void;
+    };
+    tripwireHost.__installTransactionTripwire?.(() => _writeQueueHolder !== null);
 
     // Nothing else can reach the DB yet (App.tsx blocks render on this, and
     // getDatabase() throws until _db is set below), so these can't really

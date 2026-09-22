@@ -80,6 +80,8 @@ export interface SqljsExpoDb {
   prepareAsync(sql: string): Promise<SqljsPreparedStatement>;
   withTransactionAsync(fn: () => Promise<void>): Promise<void>;
   closeAsync(): Promise<void>;
+  /** Test-only (#369): see the implementation in createSqljsDb(). */
+  __installTransactionTripwire(isHeld: () => boolean): void;
 }
 
 function readLastInsertRowId(db: Database): number {
@@ -98,6 +100,8 @@ function readLastInsertRowId(db: Database): number {
 export async function createSqljsDb(): Promise<SqljsExpoDb> {
   const SQL = await loadSqlJs();
   const db = new SQL.Database();
+  // Set via __installTransactionTripwire; null until database.ts installs it.
+  let isWriteQueueHeld: (() => boolean) | null = null;
 
   return {
     async execAsync(sql: string): Promise<void> {
@@ -165,6 +169,13 @@ export async function createSqljsDb(): Promise<SqljsExpoDb> {
       };
     },
 
+    // Test-only tripwire (#369). database.ts's initDatabase() installs a
+    // check that says whether its write queue is currently held. Real
+    // expo-sqlite has no such method, so there it's a no-op.
+    __installTransactionTripwire(isHeld: () => boolean): void {
+      isWriteQueueHeld = isHeld;
+    },
+
     // Mirrors expo-sqlite's withTransactionAsync statement for statement
     // (#369), pinned by expoSqliteTransactionCanary.test.ts. BEGIN sits
     // INSIDE the try on purpose: when a second transaction's BEGIN fails
@@ -175,6 +186,16 @@ export async function createSqljsDb(): Promise<SqljsExpoDb> {
     // the bug at all. Don't "fix" this with a mutex: the adapter must not
     // queue, because production doesn't.
     async withTransactionAsync(fn: () => Promise<void>): Promise<void> {
+      // The tripwire check is NOT part of the mirrored body. It throws
+      // before BEGIN, so it never changes what a transaction does; it only
+      // makes every sql.js suite fail loudly if a transaction is ever
+      // opened outside the write queue.
+      if (isWriteQueueHeld && !isWriteQueueHeld()) {
+        throw new Error(
+          '[sqljs adapter] withTransactionAsync called while database.ts\'s write queue is not ' +
+            'held (#369). Every transaction must run inside an _enqueueWrite unit.'
+        );
+      }
       try {
         db.run('BEGIN');
         await fn();
