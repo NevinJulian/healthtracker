@@ -242,6 +242,63 @@ function parseAdditionalWorkouts(raw: string | null | undefined): AdditionalWork
 }
 
 // ─────────────────────────────────────────────
+// Write serialisation (#369)
+// ─────────────────────────────────────────────
+
+/**
+ * One app-wide queue that every unit of work that writes runs through.
+ *
+ * Why (#369): the app has one expo-sqlite connection, and expo-sqlite's
+ * withTransactionAsync is a bare BEGIN / task / COMMIT with ROLLBACK in the
+ * catch, and nothing queues. If transaction B's BEGIN lands while A's is
+ * open, the BEGIN fails and B's catch runs ROLLBACK, which rolls back A.
+ * A then carries on autocommitting whatever statements it has left, so it
+ * ends up TORN: half undone, half persisted. Separately, any plain statement
+ * issued while a transaction is open joins that transaction and shares its
+ * fate.
+ *
+ * The queue is a promise chain (the same idiom #319 used for one writer).
+ * Each unit starts only after the previous one has settled, so no two units
+ * ever overlap on the connection.
+ *
+ * The boundary is the whole unit of work (read, compute, BEGIN…COMMIT), not
+ * just the transaction. _syncRollingSchedule() deliberately reads outside
+ * its transaction (#37). If only the transaction were queued, a sync that
+ * pre-read mid-restore would run its exercises backfill afterwards from a
+ * stale snapshot, overwriting restored rows.
+ *
+ * Rules:
+ *   - Queue at the public entry point only. A queued unit must never call
+ *     another queued function: it would wait for itself and wedge every
+ *     write in the app. Internal helpers (_…Impl, _creditPortion, …) are
+ *     never queued, and a queued unit calls those instead of the exports.
+ *   - A unit is DB work only. Never await user input or the network inside
+ *     one, or every write in the app waits for it.
+ */
+let _writeQueue: Promise<void> = Promise.resolve();
+
+/** Name of the unit currently running on the write queue, or null when idle. */
+let _writeQueueHolder: string | null = null;
+
+function _enqueueWrite<T>(name: string, unit: () => Promise<T>): Promise<T> {
+  const run = _writeQueue.then(async () => {
+    _writeQueueHolder = name;
+    try {
+      return await unit();
+    } finally {
+      _writeQueueHolder = null;
+    }
+  });
+  // Swallow the rejection on the CHAIN link only (not on `run`, which the
+  // caller still sees) so a failed unit doesn't wedge the ones behind it.
+  _writeQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
+// ─────────────────────────────────────────────
 // Versioned migration runner
 // ─────────────────────────────────────────────
 
@@ -641,9 +698,13 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
 
     db = await resetIfIncompatibleSchema(db);
 
-    await runMigrations(db);
-    await seedBioForceLibrary(db);
-    await seedRecipeLibrary(db);
+    // Nothing else can reach the DB yet (App.tsx blocks render on this, and
+    // getDatabase() throws until _db is set below), so these can't really
+    // overlap. They still go through the write queue so that EVERY
+    // transaction in the app does, with no exceptions to remember (#369).
+    await _enqueueWrite('runMigrations', () => runMigrations(db));
+    await _enqueueWrite('seedBioForceLibrary', () => seedBioForceLibrary(db));
+    await _enqueueWrite('seedRecipeLibrary', () => seedRecipeLibrary(db));
 
     const existing = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_state WHERE key = ?',
@@ -655,7 +716,7 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
       await db.runAsync('INSERT INTO app_state (key, value) VALUES (?, ?)', [START_DATE_KEY, today]);
     }
 
-    await _syncRollingSchedule(db);
+    await _enqueueWrite('syncRollingSchedule', () => _syncRollingSchedule(db));
 
     _db = db;
     console.log('[DB] Initialisation complete ✓');
@@ -700,7 +761,9 @@ let _restoreInProgress = false;
 
 export async function syncRollingSchedule(): Promise<void> {
   if (_restoreInProgress) return;
-  return _syncRollingSchedule(getDatabase());
+  // The whole sync, including its pre-read, is one queued unit (#369). See
+  // _enqueueWrite for why the boundary is not just the transaction.
+  return _enqueueWrite('syncRollingSchedule', () => _syncRollingSchedule(getDatabase()));
 }
 
 /** Test seam: whether a restore is currently holding off the sync (#369). */
@@ -1274,7 +1337,11 @@ export async function getMealInventory(): Promise<MealInventoryWithRecipe[]> {
   }));
 }
 
-export async function logCookedMeal(recipe_id: string, portions: number): Promise<void> {
+export function logCookedMeal(recipe_id: string, portions: number): Promise<void> {
+  return _enqueueWrite('logCookedMeal', () => _logCookedMealImpl(recipe_id, portions));
+}
+
+async function _logCookedMealImpl(recipe_id: string, portions: number): Promise<void> {
   const db = getDatabase();
   const date_cooked = toISODate();
 
@@ -1347,7 +1414,11 @@ export async function getTodaysMealsWithRecipe(date: string): Promise<MealPlanWi
  * transaction: select, optional credit, and the insert/update must all
  * succeed or none of them do.
  */
-export async function assignMealToPlan(date: string, meal_type: string, recipe_id: string): Promise<void> {
+export function assignMealToPlan(date: string, meal_type: string, recipe_id: string): Promise<void> {
+  return _enqueueWrite('assignMealToPlan', () => _assignMealToPlanImpl(date, meal_type, recipe_id));
+}
+
+async function _assignMealToPlanImpl(date: string, meal_type: string, recipe_id: string): Promise<void> {
   const db = getDatabase();
   await db.withTransactionAsync(async () => {
     const existing = await db.getFirstAsync<any>(
@@ -1400,7 +1471,11 @@ async function _creditPortion(
   }
 }
 
-export async function toggleMealConsumed(id: number, is_consumed: boolean): Promise<void> {
+export function toggleMealConsumed(id: number, is_consumed: boolean): Promise<void> {
+  return _enqueueWrite('toggleMealConsumed', () => _toggleMealConsumedImpl(id, is_consumed));
+}
+
+async function _toggleMealConsumedImpl(id: number, is_consumed: boolean): Promise<void> {
   const db = getDatabase();
   await db.withTransactionAsync(async () => {
     const meal = await db.getFirstAsync<any>('SELECT * FROM weekly_meal_plan WHERE id = ?', [id]);
@@ -1499,27 +1574,21 @@ export async function insertCookingTask(
  * transaction — each is just one runAsync — so they're safe to call from
  * inside this one.
  *
- * Note on #369: the real expo-sqlite withTransactionAsync is a bare,
- * non-queued BEGIN/COMMIT on the shared connection, so two overlapping
- * transactions can roll back each other's work. An earlier version of this
- * comment claimed nothing else could start a second transaction here,
- * because syncRollingSchedule "only runs on initial load and on focus".
- * That is no longer true, and was never the whole story:
- *
- *   - #304 added an AppState 'active' listener that calls loadToday(), and
- *     syncRollingSchedule() runs on every screen focus across the app, so a
- *     backgrounded-then-foregrounded app can fire a sync at any moment —
- *     including while this transaction is in flight.
- *   - RecipeDetailScreen's Alert blocks *its own* navigation, not the rest
- *     of the app, and not an OS-driven foreground event.
- *
- * So the overlap is possible, just unlikely and small in blast radius: the
- * sync's own writes are INSERT OR IGNORE plus an exercises backfill, and
- * both sides re-run on the next focus. It is NOT defended against here.
- * restoreFromPayload() is the one pair that is explicitly guarded, via
- * _restoreInProgress. The general fix belongs in #369.
+ * Overlap with another transaction (a focus or foreground sync, say) used to
+ * be possible here and could tear this one (#369). It now runs as one unit
+ * on the write queue, so it can't. See _enqueueWrite.
  */
-export async function addRecipeToShoppingList(
+export function addRecipeToShoppingList(
+  items: { name: string; quantity: number; unit: string }[],
+  recipeId: string,
+  servings: number
+): Promise<void> {
+  return _enqueueWrite('addRecipeToShoppingList', () =>
+    _addRecipeToShoppingListImpl(items, recipeId, servings)
+  );
+}
+
+async function _addRecipeToShoppingListImpl(
   items: { name: string; quantity: number; unit: string }[],
   recipeId: string,
   servings: number
@@ -1591,7 +1660,17 @@ export async function getCookingTasks(): Promise<CookingTaskWithRecipe[]> {
  *
  * Called when the user presses "Finished Cooking" on the CookingTasksScreen.
  */
-export async function finishCooking(
+export function finishCooking(
+  taskId: number,
+  recipe_id: string,
+  servings_to_cook: number
+): Promise<void> {
+  return _enqueueWrite('finishCooking', () =>
+    _finishCookingImpl(taskId, recipe_id, servings_to_cook)
+  );
+}
+
+async function _finishCookingImpl(
   taskId: number,
   recipe_id: string,
   servings_to_cook: number
@@ -2210,7 +2289,9 @@ export async function restoreFromPayload(
   // and cleared in finally so a thrown restore can't wedge the sync off.
   _restoreInProgress = true;
   try {
-    return await _restoreFromPayload(payloadTables);
+    // The whole restore, including listUserTables() before its transaction,
+    // is one unit on the write queue (#369).
+    return await _enqueueWrite('restoreFromPayload', () => _restoreFromPayload(payloadTables));
   } finally {
     _restoreInProgress = false;
   }

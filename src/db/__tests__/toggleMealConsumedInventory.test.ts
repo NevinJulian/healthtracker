@@ -304,3 +304,86 @@ describe('migration v34 (#302)', () => {
     expect(versions.filter((v) => v === 34)).toHaveLength(1);
   });
 });
+
+/**
+ * #369: a transaction that starts while toggleMealConsumed()'s transaction
+ * is open must not be able to tear it.
+ *
+ * expo-sqlite's withTransactionAsync (mirrored by the sql.js adapter, pinned
+ * by expoSqliteTransactionCanary.test.ts) is a bare BEGIN/COMMIT on the one
+ * shared connection. If B's BEGIN lands while A's transaction is open, it
+ * fails, and B's catch runs ROLLBACK, which rolls back A. A then carries on
+ * autocommitting. Here A is a meal tick and B is the focus/foreground sync.
+ * B lands right after A's inventory debit, so the rollback undoes the debit
+ * but A's plan-row UPDATE (is_consumed = 1, pointer to the batch) still
+ * autocommits. The meal ends up "consumed from" a batch that was never
+ * debited, and unticking it credits back a portion nobody took: a phantom
+ * portion.
+ *
+ * The interleave is forced deterministically: the hook pauses A right after
+ * its debit, starts B, and yields enough macrotasks for B to reach its BEGIN
+ * if nothing stops it. The hook never awaits B itself, so once B is queued
+ * behind A (the fix) the test can't deadlock.
+ */
+describe('toggleMealConsumed() racing a sync transaction (#369)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('a sync that starts mid-tick cannot roll back the debit and leave a phantom portion', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const raw = db.getDatabase();
+
+    // Exactly one portion ever cooked.
+    await raw.runAsync(
+      'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, ?, ?)',
+      [RECIPE_ID, 1, '2024-01-01']
+    );
+    await db.assignMealToPlan('2024-06-01', 'dinner', RECIPE_ID);
+    const id = await planRowId(db, '2024-06-01', 'dinner');
+
+    const originalRun = raw.runAsync;
+    let syncCall: Promise<void> | null = null;
+    (raw as unknown as { runAsync: typeof originalRun }).runAsync = (async (
+      ...args: Parameters<typeof originalRun>
+    ) => {
+      const result = await originalRun.apply(raw, args);
+      if (
+        syncCall === null &&
+        typeof args[0] === 'string' &&
+        args[0].includes('portions_available = portions_available - 1')
+      ) {
+        syncCall = db.syncRollingSchedule();
+        syncCall.catch(() => {}); // settled and inspected below
+        for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+      }
+      return result;
+    }) as typeof originalRun;
+
+    const tick = db.toggleMealConsumed(id, true);
+    const [tickResult] = await Promise.allSettled([tick]);
+    expect(syncCall).not.toBeNull();
+    const [syncResult] = await Promise.allSettled([syncCall!]);
+    (raw as unknown as { runAsync: typeof originalRun }).runAsync = originalRun;
+
+    // The OUTCOME first: portions in stock + portions attributed to consumed
+    // meals must equal portions ever cooked (1).
+    const stock = await inventoryTotal(db, RECIPE_ID);
+    const attributed = await raw.getFirstAsync<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM weekly_meal_plan WHERE is_consumed = 1 AND consumed_from_inventory_id IS NOT NULL'
+    );
+    expect({ stock, attributedToConsumedMeals: attributed?.n ?? 0 }).toEqual({
+      stock: 0,
+      attributedToConsumedMeals: 1,
+    });
+
+    // And the untick that follows gives back exactly the one real portion.
+    await db.toggleMealConsumed(id, false);
+    expect(await inventoryTotal(db, RECIPE_ID)).toBe(1);
+
+    // Neither side saw an error.
+    expect(tickResult.status).toBe('fulfilled');
+    expect(syncResult.status).toBe('fulfilled');
+  });
+});
