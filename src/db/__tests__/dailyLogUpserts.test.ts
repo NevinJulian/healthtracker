@@ -384,3 +384,59 @@ describe('a rejected upsertExerciseCompleted call does not wedge the serialisati
     consoleErrorSpy.mockRestore();
   });
 });
+
+/**
+ * #369, the plain-writer half. A single-statement writer isn't a
+ * transaction, but any statement issued while ANOTHER unit's transaction is
+ * open joins that transaction. If that transaction then rolls back, the
+ * write is silently undone after its caller was told it succeeded.
+ *
+ * Here the other unit is a restore that fails partway through (a NOT NULL
+ * violation) and rolls back. The user ticks today's walk while the restore
+ * is mid-transaction, right after its DELETE FROM daily_log. Every exported
+ * writer now goes through the write queue, so the tick waits for the restore
+ * to finish and then applies. Before that, it ran inside the restore's
+ * transaction and was rolled back with it.
+ */
+describe('a plain daily_log write cannot be swallowed by another unit\'s rollback (#369)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('a walk tick fired mid-restore survives the restore failing and rolling back', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const today = todayKey();
+    expect((await db.getLogByDate(today))?.walk_completed).toBe(false);
+
+    const raw = db.getDatabase();
+    const originalGetAll = raw.getAllAsync;
+    let tick: Promise<void> | null = null;
+    (raw as unknown as { getAllAsync: typeof originalGetAll }).getAllAsync = (async (
+      ...args: Parameters<typeof originalGetAll>
+    ) => {
+      const result = await originalGetAll.apply(raw, args);
+      // First PRAGMA table_info = inside the restore transaction, right
+      // after DELETE FROM daily_log.
+      if (tick === null && typeof args[0] === 'string' && args[0].startsWith('PRAGMA table_info')) {
+        tick = db.upsertLogField(today, 'walk_completed', true);
+        tick.catch(() => {}); // awaited below
+        // Give an unqueued write every chance to run to completion here.
+        for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+      }
+      return result;
+    }) as typeof originalGetAll;
+
+    await expect(
+      db.restoreFromPayload({
+        daily_log: [{ date: null, walking_task: 'Walk' }], // NOT NULL date -> throws
+      })
+    ).rejects.toBeDefined();
+    (raw as unknown as { getAllAsync: typeof originalGetAll }).getAllAsync = originalGetAll;
+
+    expect(tick).not.toBeNull();
+    await expect(tick!).resolves.toBeUndefined();
+    // The caller was told the tick succeeded, so it must actually be there.
+    expect((await db.getLogByDate(today))?.walk_completed).toBe(true);
+  });
+});
