@@ -7,6 +7,11 @@ module.exports = {
   testPathIgnorePatterns: ['/node_modules/', '<rootDir>/.claude/'],
   modulePathIgnorePatterns: ['<rootDir>/.claude/'],
   testEnvironment: 'node',
+  // The first screen render in a cold run transforms most of react-native's
+  // lazily required modules inside the test's own timeout. Since RN 0.86 that
+  // can take longer than jest's 5 s default on a 2-core runner with
+  // --maxWorkers=2, which fails whichever render suite happens to run first.
+  testTimeout: 15000,
   moduleNameMapper: {
     // expo/src/winter installs __ExpoImportMetaRegistry via a getter that
     // lazily requires runtime.native, which uses dynamic import() — blocked
