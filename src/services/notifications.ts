@@ -41,7 +41,7 @@
  *     notifications scheduled under the old random-UUID scheme.
  */
 
-import * as Notifications from 'expo-notifications';
+import Notifications from './expoNotifications';
 import { Platform } from 'react-native';
 import {
   getSetting,
