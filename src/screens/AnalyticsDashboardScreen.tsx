@@ -1764,7 +1764,7 @@ const styles = StyleSheet.create({
   },
   /** Full-width sage-tint background — represents the area fill under the line */
   areaBackground: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: Colors.sageTint,
     borderRadius: Radius.sm,
     opacity: 0.55,
@@ -1965,7 +1965,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   macroChartBg: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: Radius.sm,
   },
   /** Hairline reference at the top of the chart = 100% of goal */

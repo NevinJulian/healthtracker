@@ -32,7 +32,7 @@
 
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
-import * as Notifications from 'expo-notifications';
+import Notifications from './expoNotifications';
 import {
   cacheDirectory,
   writeAsStringAsync,
