@@ -7,11 +7,11 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getBioForceLibrary, BioForceExercise } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import Button from './Button';
@@ -149,13 +149,13 @@ export default function BioForceModal({ isVisible, onClose, onAddWorkout }: BioF
   if (selectedEx) {
     return (
       <Modal visible={isVisible} animationType="slide" transparent={true}>
-        <SafeAreaView style={styles.safeArea}>
+        <View style={styles.flex}>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.flex}
           >
             <View style={styles.overlay}>
-              <View style={styles.sheet}>
+              <SafeAreaView edges={['bottom']} style={styles.sheet}>
                 {/* Drag handle */}
                 <View style={styles.dragHandle} />
 
@@ -267,10 +267,10 @@ export default function BioForceModal({ isVisible, onClose, onAddWorkout }: BioF
                     onPress={handleAdd}
                   />
                 </View>
-              </View>
+              </SafeAreaView>
             </View>
           </KeyboardAvoidingView>
-        </SafeAreaView>
+        </View>
       </Modal>
     );
   }
@@ -279,9 +279,9 @@ export default function BioForceModal({ isVisible, onClose, onAddWorkout }: BioF
 
   return (
     <Modal visible={isVisible} animationType="slide" transparent={true}>
-      <SafeAreaView style={styles.safeArea}>
+      <View style={styles.flex}>
         <View style={styles.overlay}>
-          <View style={styles.sheet}>
+          <SafeAreaView edges={['bottom']} style={styles.sheet}>
             {/* Drag handle */}
             <View style={styles.dragHandle} />
 
@@ -401,9 +401,9 @@ export default function BioForceModal({ isVisible, onClose, onAddWorkout }: BioF
                 </View>
               )}
             </ScrollView>
-          </View>
+          </SafeAreaView>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
@@ -419,9 +419,6 @@ function difficultyAccent(diff: string): 'sage' | 'gold' | 'clay' {
 
 const styles = StyleSheet.create({
   // Layout scaffolding
-  safeArea: {
-    flex: 1,
-  },
   flex: {
     flex: 1,
   },
