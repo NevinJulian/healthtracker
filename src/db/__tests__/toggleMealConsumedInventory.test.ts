@@ -304,3 +304,180 @@ describe('migration v34 (#302)', () => {
     expect(versions.filter((v) => v === 34)).toHaveLength(1);
   });
 });
+
+/**
+ * #369: a transaction that starts while toggleMealConsumed()'s transaction
+ * is open must not be able to tear it.
+ *
+ * expo-sqlite's withTransactionAsync (mirrored by the sql.js adapter, pinned
+ * by expoSqliteTransactionCanary.test.ts) is a bare BEGIN/COMMIT on the one
+ * shared connection. If B's BEGIN lands while A's transaction is open, it
+ * fails, and B's catch runs ROLLBACK, which rolls back A. A then carries on
+ * autocommitting. Here A is a meal tick and B is the focus/foreground sync.
+ * B lands right after A's inventory debit, so the rollback undoes the debit
+ * but A's plan-row UPDATE (is_consumed = 1, pointer to the batch) still
+ * autocommits. The meal ends up "consumed from" a batch that was never
+ * debited, and unticking it credits back a portion nobody took: a phantom
+ * portion.
+ *
+ * The interleave is forced deterministically: the hook pauses A right after
+ * its debit, starts B, and yields enough macrotasks for B to reach its BEGIN
+ * if nothing stops it. The hook never awaits B itself, so once B is queued
+ * behind A (the fix) the test can't deadlock.
+ */
+describe('toggleMealConsumed() racing a sync transaction (#369)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('a sync that starts mid-tick cannot roll back the debit and leave a phantom portion', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const raw = db.getDatabase();
+
+    // Exactly one portion ever cooked.
+    await raw.runAsync(
+      'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, ?, ?)',
+      [RECIPE_ID, 1, '2024-01-01']
+    );
+    await db.assignMealToPlan('2024-06-01', 'dinner', RECIPE_ID);
+    const id = await planRowId(db, '2024-06-01', 'dinner');
+
+    const originalRun = raw.runAsync;
+    let syncCall: Promise<void> | null = null;
+    (raw as unknown as { runAsync: typeof originalRun }).runAsync = (async (
+      ...args: Parameters<typeof originalRun>
+    ) => {
+      const result = await originalRun.apply(raw, args);
+      if (
+        syncCall === null &&
+        typeof args[0] === 'string' &&
+        args[0].includes('portions_available = portions_available - 1')
+      ) {
+        syncCall = db.syncRollingSchedule();
+        syncCall.catch(() => {}); // settled and inspected below
+        for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+      }
+      return result;
+    }) as typeof originalRun;
+
+    const tick = db.toggleMealConsumed(id, true);
+    const [tickResult] = await Promise.allSettled([tick]);
+    expect(syncCall).not.toBeNull();
+    const [syncResult] = await Promise.allSettled([syncCall!]);
+    (raw as unknown as { runAsync: typeof originalRun }).runAsync = originalRun;
+
+    // The OUTCOME first: portions in stock + portions attributed to consumed
+    // meals must equal portions ever cooked (1).
+    const stock = await inventoryTotal(db, RECIPE_ID);
+    const attributed = await raw.getFirstAsync<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM weekly_meal_plan WHERE is_consumed = 1 AND consumed_from_inventory_id IS NOT NULL'
+    );
+    expect({ stock, attributedToConsumedMeals: attributed?.n ?? 0 }).toEqual({
+      stock: 0,
+      attributedToConsumedMeals: 1,
+    });
+
+    // And the untick that follows gives back exactly the one real portion.
+    await db.toggleMealConsumed(id, false);
+    expect(await inventoryTotal(db, RECIPE_ID)).toBe(1);
+
+    // Neither side saw an error.
+    expect(tickResult.status).toBe('fulfilled');
+    expect(syncResult.status).toBe('fulfilled');
+  });
+});
+
+/**
+ * #369 reentrancy backstop. A queued unit that awaits another queued
+ * function would wait for itself forever and wedge every write in the app.
+ * writeQueueRules.test.ts stops that statically inside database.ts. This
+ * drives the __DEV__ runtime detector with a real nested call: the hook runs
+ * INSIDE toggleMealConsumed's queued unit and awaits syncRollingSchedule().
+ * Without the detector this test hangs until jest's timeout.
+ */
+describe('write-queue reentrancy detection (#369, __DEV__)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('rejects the nested call naming both functions, rolls the holder back, and leaves the queue usable', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const raw = db.getDatabase();
+
+    await raw.runAsync(
+      'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, ?, ?)',
+      [RECIPE_ID, 1, '2024-01-01']
+    );
+    await db.assignMealToPlan('2024-06-01', 'dinner', RECIPE_ID);
+    const id = await planRowId(db, '2024-06-01', 'dinner');
+
+    const originalRun = raw.runAsync;
+    let nestedError: unknown = null;
+    let nested = false;
+    (raw as unknown as { runAsync: typeof originalRun }).runAsync = (async (
+      ...args: Parameters<typeof originalRun>
+    ) => {
+      const result = await originalRun.apply(raw, args);
+      if (!nested && typeof args[0] === 'string' && args[0].includes('portions_available - 1')) {
+        nested = true;
+        try {
+          await db.syncRollingSchedule(); // reentrant: we are inside toggleMealConsumed's unit
+        } catch (err) {
+          nestedError = err;
+          throw err;
+        }
+      }
+      return result;
+    }) as typeof originalRun;
+
+    const started = Date.now();
+    await expect(db.toggleMealConsumed(id, true)).rejects.toThrow(/reentrancy/);
+    const elapsed = Date.now() - started;
+    (raw as unknown as { runAsync: typeof originalRun }).runAsync = originalRun;
+
+    expect(String(nestedError)).toMatch(/syncRollingSchedule\(\) is waiting behind toggleMealConsumed\(\)/);
+    expect(elapsed).toBeLessThan(5000);
+
+    // The holder's transaction rolled back as a whole: nothing debited,
+    // nothing marked consumed.
+    expect(await inventoryTotal(db, RECIPE_ID)).toBe(1);
+    const row = await raw.getFirstAsync<{ is_consumed: number }>(
+      'SELECT is_consumed FROM weekly_meal_plan WHERE id = ?',
+      [id]
+    );
+    expect(row?.is_consumed).toBe(0);
+
+    // And the queue is not wedged: the next writes run normally.
+    await db.toggleMealConsumed(id, true);
+    await db.syncRollingSchedule();
+    expect(await inventoryTotal(db, RECIPE_ID)).toBe(0);
+  }, 15000);
+});
+
+/**
+ * #369 test-only tripwire. database.ts installs a check on the sql.js
+ * adapter, so any withTransactionAsync opened outside the write queue throws
+ * in every sql.js suite. This pins the tripwire itself; the rest of the
+ * suites then exercise it on every transactional writer they call.
+ */
+describe('write-queue transaction tripwire (#369, tests only)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('throws for a transaction opened outside the write queue, before touching the DB', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const raw = db.getDatabase();
+    const body = jest.fn(async () => {});
+
+    await expect(raw.withTransactionAsync(body)).rejects.toThrow(/write queue is not held/);
+    expect(body).not.toHaveBeenCalled();
+
+    // Queued writers still open their transactions normally.
+    await expect(db.logCookedMeal(RECIPE_ID, 2)).resolves.toBeUndefined();
+    expect(await inventoryTotal(db, RECIPE_ID)).toBe(2);
+  });
+});
