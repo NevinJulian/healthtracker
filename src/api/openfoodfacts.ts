@@ -12,7 +12,7 @@
  * wrapped by `fetchJson` for a timeout, one retry, and a readable error.
  */
 
-import { getDatabase } from '../db/database';
+import { getDatabase, putOFFCache } from '../db/database';
 import { fetchJson } from './fetchJson';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -69,24 +69,12 @@ async function getCached(name: string): Promise<OFFNutrition | null> {
 /**
  * Store an OFF result in the cache. Silently ignores write errors and
  * DB-not-ready errors so the import is never blocked by cache failures.
+ * Writes through database.ts's queued putOFFCache (#369), never a raw
+ * statement on the shared connection.
  */
 async function putCache(name: string, nutrition: OFFNutrition): Promise<void> {
   try {
-    const db = getDatabase(); // may throw if DB not yet initialised
-    const fetchedAt = new Date().toISOString();
-    await db.runAsync(
-      `INSERT OR REPLACE INTO off_cache
-         (ingredient_name, kcal, protein, carbs, fat, fetched_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        name.toLowerCase(),
-        nutrition.kcal,
-        nutrition.protein,
-        nutrition.carbs,
-        nutrition.fat,
-        fetchedAt,
-      ],
-    );
+    await putOFFCache(name, nutrition.kcal, nutrition.protein, nutrition.carbs, nutrition.fat);
   } catch {
     // Cache write failure is non-fatal — import proceeds without caching
   }
