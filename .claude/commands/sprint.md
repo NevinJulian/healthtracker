@@ -28,6 +28,7 @@ Do not skip any of this. Starting a sprint from a dirty or broken base wastes th
 
 ```bash
 git status --porcelain          # must be clean — if not, STOP and report
+git config user.email           # must be GitHub-verified (SPRINT.md §8) — if not, STOP and report
 git checkout main && git pull
 npm run typecheck               # must pass on main
 npm test -- --maxWorkers=2      # must pass on main — record the test count
@@ -93,10 +94,10 @@ When every lane is merged, blocked, or out of work:
 
 1. Final `npm run typecheck` and `npm test -- --maxWorkers=2` on `sprint/auto-fixes`
 2. Push it
-3. Open a PR from `sprint/auto-fixes` to `main` via the GitHub MCP — body lists every issue with
-   `Closes #NNN`, and states plainly that it needs human review
-4. Write `SPRINT_REPORT.md` per `.claude/SPRINT.md` §6 and commit it
-5. **Do not merge that PR.** Under no circumstances.
+3. Write `SPRINT_REPORT.md` per `.claude/SPRINT.md` §6 and commit it. Section 5 holds the exact
+   command to open the PR, with a body that lists every issue as `Closes #NNN`
+4. **Do not open the PR.** The cold review and the device checks (`.claude/SPRINT.md` §2) come first,
+   and both belong to the human. Report that the branch is ready for them, and stop.
 
 ---
 

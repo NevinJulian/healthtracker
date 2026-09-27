@@ -57,6 +57,17 @@ records the decision in state.
 
 The `cleanup` agent runs **once at the end of each lane**, not per issue.
 
+**After the run, two stages gate the PR to `main`.** Both are formal stages, and neither can be skipped:
+
+- **Cold review.** A fresh Claude Code session, with none of the sprint's context, reviews the whole
+  `main...sprint/auto-fixes` diff (`/code-review` on the branch). The orchestrator and its agents
+  have seen every rationale. A cold reader only has the code, and that is the point.
+- **Device test.** A human runs every issue's **Device check** from its work order on the phone,
+  from the integration branch, **before the PR is opened**. Jest and CI cannot see a native crash.
+  The SDK 57 expo-notifications crash was invisible to both.
+
+The orchestrator does neither. It lists both as outstanding in the report.
+
 ---
 
 ## 3. Lanes — this is how conflicts are prevented, not resolved
@@ -116,7 +127,8 @@ up exactly where the last one stopped.
   "issues": {
     "302": {
       "lane": "A", "status": "in_test", "roundTrips": 1, "branch": "sprint/lane-a-db",
-      "commits": ["a1b2c3d"], "notes": "tester rejected: credit path still asymmetric for exhausted batch"
+      "commits": ["a1b2c3d"], "deviceCheck": "none",
+      "notes": "tester rejected: credit path still asymmetric for exhausted batch"
     }
   },
   "foundDuringSprint": [358, 359],
@@ -167,6 +179,8 @@ Required sections:
    and the exact command to open the PR to `main`.
 6. **What I would not merge without reading** — the orchestrator's own judgement on which diffs
    deserve close human attention and why. Do not be diplomatic here.
+7. **Before the PR** — a checklist of the device checks, one per issue that has one, copied from the
+   work orders, plus the cold-review step. Both are unticked. The human ticks them.
 
 ---
 
@@ -183,3 +197,23 @@ Inherited from `CLAUDE.md`, restated because agents will get this wrong otherwis
 - PR bodies end with `Closes #<issue>`
 - Use plain `git` for branches, commits, pushes. Use the **GitHub MCP** for issues, PRs, comments.
   Never the `gh` CLI.
+
+---
+
+## 8. Lessons that are now rules
+
+Each of these cost a sprint or a release once.
+
+- **Commit identity is checked in preflight.** `git config user.email` must be an address verified
+  on the GitHub account, normally `41645782+NevinJulian@users.noreply.github.com`. Anything else
+  lands a night of commits that GitHub does not attribute.
+- **After any Expo SDK or native dependency change, open the app in Expo Go before the PR.** The
+  expo-notifications crash on SDK 57 was invisible to jest and to CI.
+- **A CI fix goes into every workflow with the same step.** `test.yml`, `build-check.yml` and
+  `release.yml` share steps. #385–#387 fixed only `release.yml`, and `build-check.yml` failed on the
+  same `tools` package the next time it ran. After changing one workflow, grep the others.
+- **Run git from Windows against this checkout.** Until #334's `.gitattributes` is on `main`, a
+  Linux or WSL shell sees every CRLF working-tree file as modified. That is where the old "52,000
+  lines of churn" came from. Never commit a "line ending fix".
+- **Run `npx expo install --check` with network.** Offline, it silently skips the version lookups.
+  That is how the Jest 30 / SDK 57 mismatch (#390) got through.
