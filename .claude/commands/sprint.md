@@ -30,7 +30,7 @@ Do not skip any of this. Starting a sprint from a dirty or broken base wastes th
 git status --porcelain          # must be clean — if not, STOP and report
 git checkout main && git pull
 npm run typecheck               # must pass on main
-npm test                        # must pass on main — record the test count
+npm test -- --maxWorkers=2      # must pass on main — record the test count
 git checkout -b sprint/auto-fixes
 git push -u origin sprint/auto-fixes
 ```
@@ -80,7 +80,7 @@ On a merge conflict: call `conflict` **with explicit per-hunk resolution instruc
 without them, correctly. One attempt — if it fails, revert the merge, mark the lane `blocked`, carry on
 with the others.
 
-After every merge into the integration branch, run `npm run typecheck` and `npm test` on it. A red
+After every merge into the integration branch, run `npm run typecheck` and `npm test -- --maxWorkers=2` on it. A red
 integration branch is an abort condition.
 
 **Write state after every single transition.** Not at the end of a lane. Every transition.
@@ -91,7 +91,7 @@ integration branch is an abort condition.
 
 When every lane is merged, blocked, or out of work:
 
-1. Final `npm run typecheck` and `npm test` on `sprint/auto-fixes`
+1. Final `npm run typecheck` and `npm test -- --maxWorkers=2` on `sprint/auto-fixes`
 2. Push it
 3. Open a PR from `sprint/auto-fixes` to `main` via the GitHub MCP — body lists every issue with
    `Closes #NNN`, and states plainly that it needs human review

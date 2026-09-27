@@ -42,7 +42,7 @@ behaviour, it is not cleanup — it is a change, and it is not yours to make.
 
 1. `git diff sprint/auto-fixes...<lane branch>` — read the whole lane's work
 2. Make the cleanups
-3. `npm run typecheck` and `npm test` — both green, and **the same test count as before**
+3. `npm run typecheck` and `npm test -- --maxWorkers=2` — both green, and **the same test count as before**
 4. One commit: `chore(<scope>): tidy up after lane <X> (#NNN, #NNN)`
 5. Report
 

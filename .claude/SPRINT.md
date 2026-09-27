@@ -22,8 +22,10 @@ Read these before anything else. They exist to stop the run going sideways while
    stalled, mark it `parked` in state, move to the next. Never a fourth attempt.
 4. **Nothing merges to `main`.** Everything lands on `sprint/auto-fixes`. The human opens the PR from
    there to `main` after review. No agent is permitted to merge to `main` under any circumstance.
-5. **A red gate is a stop, not a suggestion.** `npm run typecheck` and `npm test` must both exit 0
+5. **A red gate is a stop, not a suggestion.** `npm run typecheck` and `npm test -- --maxWorkers=2` must both exit 0
    before anything merges to the integration branch. No exceptions, no "it was already failing".
+   The worker cap is part of the gate, not a speed tweak: the sql.js WASM suites crash under default
+   jest parallelism on Linux (#377), and CI runs with the same cap. Drop it only when #377 is fixed.
 6. **Never edit an existing migration.** Append-only, integer-versioned. This rule has no exceptions
    and breaking it corrupts live databases.
 7. **Stay in your lane.** Each lane owns its files exclusively (see §3). A developer who needs to

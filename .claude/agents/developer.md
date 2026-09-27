@@ -24,7 +24,7 @@ first. Guessing here is the single most common way this goes wrong.
 2. **Write the regression test first.** From the work order. Run it. **It must fail.** A test that
    passes before your fix is testing nothing — stop and say so rather than continuing.
 3. **Implement the smallest change that makes it pass.**
-4. **Run `npm run typecheck` and `npm test`.** Both must exit 0. Fix anything you broke.
+4. **Run `npm run typecheck` and `npm test -- --maxWorkers=2`.** Both must exit 0. Fix anything you broke.
 5. **Commit in small atomic steps** with Conventional Commits, each referencing the issue:
    ```
    test(db): add failing test for daily_log history retention (#300)
