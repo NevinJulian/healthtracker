@@ -21,14 +21,7 @@
  * Issue #306
  */
 import React from 'react';
-
-// See AnalyticsDashboardScreen.liftingSelection.test.tsx (#308 / #360) for why
-// this escape hatch is needed: the lockfile pins `react` at 19.1.0 while
-// `react-test-renderer` resolved to 19.2.5, and RNTL's module-load side
-// effect throws on that mismatch unless this env var is set first.
-process.env.RNTL_SKIP_DEPS_CHECK = '1';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { render, act } = require('@testing-library/react-native') as typeof import('@testing-library/react-native');
+import { render, act } from '@testing-library/react-native';
 
 // ─── Mock @react-navigation/native's useFocusEffect ─────────────────────────
 let latestFocusEffect: (() => void | (() => void)) | null = null;

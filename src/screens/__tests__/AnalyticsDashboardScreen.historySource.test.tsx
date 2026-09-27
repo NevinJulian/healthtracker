@@ -21,10 +21,7 @@
  * AnalyticsDashboardScreen.cancellationGuard.test.tsx (#312, #360).
  */
 import React from 'react';
-
-process.env.RNTL_SKIP_DEPS_CHECK = '1';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { render, act } = require('@testing-library/react-native') as typeof import('@testing-library/react-native');
+import { render, act } from '@testing-library/react-native';
 
 import { addDays } from '../../utils/dates';
 
