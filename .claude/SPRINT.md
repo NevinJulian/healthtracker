@@ -72,39 +72,55 @@ The orchestrator does neither. It lists both as outstanding in the report.
 
 ## 3. Lanes — this is how conflicts are prevented, not resolved
 
-Most of #300–#336 touch `src/db/database.ts`. Running them as parallel worktrees guarantees
-conflicts on every merge. So issues are grouped into lanes by file ownership, lanes run in parallel,
-and **issues within a lane run serially on one branch**.
+Most of the scope touches `src/db/database.ts`. Running those issues as parallel worktrees
+guarantees conflicts on every merge. So issues are grouped into lanes by file ownership, lanes run in
+parallel, and **issues within a lane run serially on one branch**.
 
-| Lane | Branch | Owns | Issues |
+This table is sprint 2's scope. `/sprint` freezes exactly the issues in the Issues column that are
+still open. Sprint 1 (#300–#336) is done. Its lanes are in git history.
+
+| Lane | Branch | Owns | Issues, in order |
 |---|---|---|---|
-| A — db core | `sprint/lane-a-db` | `src/db/**` | #300, #301, #305, #302, #303, #319, #320, #321, #314, #315, #316, #306, #307, #331 |
-| B — notifications | `sprint/lane-b-notify` | `src/services/notifications.ts`, `src/services/backup.ts` | #309, #310, #311 |
-| C — analytics screen | `sprint/lane-c-analytics` | `src/screens/AnalyticsDashboardScreen.tsx`, `src/screens/analyticsHelpers.ts` | #308, #312, #327, #328 |
-| D — other screens | `sprint/lane-d-screens` | `src/screens/{Settings,MealPrep,Dashboard}Screen.tsx` | #313, #322, #323, #324, #325, #326, #329, #330, #304, #317 |
+| A — db core | `sprint/lane-a-db` | `src/db/**` except `src/db/testHelpers/**`, `src/services/backup.ts` | #314, #316, #315, #363, #378, #380, #368, #370, #371, #381, #379, #382, #383, #372, #373, #367, #362 |
+| B — notifications | `sprint/lane-b-notify` | `src/services/notifications.ts` | #311, #361 |
+| C — analytics screen | `sprint/lane-c-analytics` | `src/screens/AnalyticsDashboardScreen.tsx`, `src/screens/analyticsHelpers.ts` | #328 |
+| D — other screens | `sprint/lane-d-screens` | `src/screens/{Settings,MealPrep,Dashboard,Onboarding}Screen.tsx` | #375, #366, #365, #364 |
 | E — network | `sprint/lane-e-api` | `src/api/**` | #318 |
-| F — repo hygiene | `sprint/lane-f-repo` | root config, docs | #332, #333, #335 |
-| G — tests | `sprint/lane-g-tests` | `src/**/__tests__/**`, `jest.config.js` | #336 |
+| F — repo hygiene | `sprint/lane-f-repo` | root config, docs | #374 |
+| G — tests | `sprint/lane-g-tests` | `src/db/testHelpers/**`, `jest.config.js`, `.github/workflows/test.yml` | #377 |
+
+`backup.ts` moved from lane B to lane A for this sprint, because #315's fix spans
+`restoreFromPayload` (`database.ts`) and `validatePayload` (`backup.ts`).
+
+**Partials.** Sprint 1 landed part of #311, #314, #315 and #318. The analyst reads the issue's latest
+comments and the code on `main`, and scopes the work order to what is still open. It does not redo
+what already landed.
 
 **Ordering constraints inside lanes** — these are real dependencies, not preferences:
 
-- Lane A: #300 and #301 first. Everything else in the lane assumes history survives.
-- Lane A: #305 before #302/#303. Upserts must work before inventory maths is trusted.
-- Lane B: #309 first. It unblocks #310 and #311 and makes both far smaller.
-- Lane D: #304 last. It depends on lane A's writers being correct, so it merges after lane A lands.
-- Lane G: #336 last overall. It writes regression tests for the other lanes' work.
+- Lane A: #314 first. Migrations must be atomic before this sprint appends any new ones, and #316 and
+  #380 may need one each.
+- Lane A: #315 before #363 and #378. Restore validation is where a garbled `app_start_date` gets in,
+  and #363 points there for the sturdier fix. Take #363 and #378 back to back. If #363's fix also
+  closes #378, the tester says so and #378 is closed as done by #363's commit, not re-implemented.
+- Lane G: #377 last overall. It changes the sql.js adapter every db suite runs on. After it lands, the
+  whole suite must pass at default parallelism and at `--maxWorkers=3`.
 
-**Cross-lane dependencies** are the orchestrator's problem. Lane D waits for lane A to merge into
-`sprint/auto-fixes` before starting #304 and #317. Lane G waits for everything.
+**Cross-lane dependencies** are the orchestrator's problem. Lane G waits for everything. If #377
+removes the worker cap, update the gate in §1 rule 5 in the same lane.
+
+**Decisions a human should make before the run**, or the analyst parks the issue:
+
+- #316: when a recipe still has inventory and cook-log rows, is deleting it blocked, confirmed or
+  cascaded?
+- #363: what `app_start_date` falls back to when the stored value is invalid.
 
 ### Excluded from this sprint
 
-- **#334 (`.gitattributes`)** — renormalises 52k lines. Merged alongside anything else it makes every
-  diff unreviewable and conflicts with every open branch. It lands alone, by hand, when nothing is in
-  flight. Do not touch it.
-- **#327 memoisation** — only the measurable parts. Do not speculatively memoise. If the agent cannot
-  demonstrate an improvement, it reports that and the issue is parked rather than churned.
-- Everything #337 and above. Features are out of scope.
+- **#360** — PR #394, landed by hand.
+- **#334 (`.gitattributes`)** — PR #393, landed by hand. Before it's merged, no agent touches line
+  endings.
+- **#392 and every other feature request.** Features run one at a time, outside the sprint.
 
 ---
 

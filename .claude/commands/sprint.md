@@ -45,7 +45,7 @@ Record the baseline test count. You will compare against it all night.
 
 ## Step 2 — freeze scope
 
-Fetch issues #300–#336 via the GitHub MCP. Write `.claude/sprint-state.json` with:
+Fetch every issue in the Issues column of `.claude/SPRINT.md` §3 via the GitHub MCP. Write `.claude/sprint-state.json` with:
 
 - `frozenScope` — exactly those issue numbers that are open. **This list never grows.**
 - `baseSha` — current `main`
@@ -58,8 +58,8 @@ Commit this file. It is your memory across context resets.
 
 ## Step 3 — run the lanes
 
-Lanes A, B, C, E, F, G start in parallel. **Lane D waits for lane A to merge** — it depends on the db
-writers being correct. **Lane G runs last** — it writes regression tests over everyone's work.
+Lanes start in parallel, except where `.claude/SPRINT.md` §3 says a lane waits. In sprint 2,
+**lane G runs last**, because it changes the test adapter under everyone's work.
 
 Each lane runs its issues **serially on one branch**, in the order given in `.claude/SPRINT.md` §3.
 
