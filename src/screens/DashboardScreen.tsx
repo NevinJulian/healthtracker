@@ -1102,6 +1102,14 @@ function MeasurementsModal({
   const [thigh, setThigh] = useState(() => (latest?.thigh_cm != null ? String(latest.thigh_cm) : ''));
   const [arm, setArm] = useState(() => (latest?.arm_cm != null ? String(latest.arm_cm) : ''));
 
+  const [initial] = useState(() => ({
+    waist_cm: waist,
+    chest_cm: chest,
+    hips_cm: hips,
+    thigh_cm: thigh,
+    arm_cm: arm,
+  }));
+
   const waistResult = parseMeasurementField(waist, 'waist_cm');
   const chestResult = parseMeasurementField(chest, 'chest_cm');
   const hipsResult = parseMeasurementField(hips, 'hips_cm');
@@ -1116,26 +1124,32 @@ function MeasurementsModal({
     arm_cm: armResult,
   };
 
-  const handleSave = async () => {
-    const results = Object.values(fieldResults);
-    const hasError = results.some((r) => r.isError);
-    const hasValidField = results.some((r) => !r.isError);
+  const currentText: Record<MeasurementKey, string> = {
+    waist_cm: waist,
+    chest_cm: chest,
+    hips_cm: hips,
+    thigh_cm: thigh,
+    arm_cm: arm,
+  };
+  const isEdited = (key: MeasurementKey) => currentText[key] !== initial[key];
 
-    // Save whatever is valid -- invalid keys are `undefined` (skip), so
-    // logBodyMeasurement leaves those columns untouched rather than erasing
-    // them with a typo (#325).
-    if (hasValidField) {
+  const submitted = (key: MeasurementKey) =>
+    isEdited(key) ? fieldResults[key].value : undefined;
+
+  const handleSave = async () => {
+    const keys = Object.keys(fieldResults) as MeasurementKey[];
+    const hasError = keys.some((k) => fieldResults[k].isError);
+
+    if (keys.some(isEdited)) {
       await onSave({
-        waist_cm: waistResult.value,
-        chest_cm: chestResult.value,
-        hips_cm: hipsResult.value,
-        thigh_cm: thighResult.value,
-        arm_cm: armResult.value,
+        waist_cm: submitted('waist_cm'),
+        chest_cm: submitted('chest_cm'),
+        hips_cm: submitted('hips_cm'),
+        thigh_cm: submitted('thigh_cm'),
+        arm_cm: submitted('arm_cm'),
       });
     }
 
-    // Only close once every field was valid -- otherwise the user would
-    // never see the inline error, and the typo would vanish silently.
     if (!hasError) {
       onClose();
     }
