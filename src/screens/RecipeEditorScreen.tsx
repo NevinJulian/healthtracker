@@ -138,6 +138,9 @@ export default function RecipeEditorScreen() {
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const recomputeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lookupController = useRef<AbortController | null>(null);
+
+  useEffect(() => () => lookupController.current?.abort(), []);
 
   // ── Load existing recipe in edit mode ────────────────────────────────────
 
@@ -223,6 +226,10 @@ export default function RecipeEditorScreen() {
 
     const numServings = Math.max(1, parseInt(servings, 10) || 1);
 
+    const controller = new AbortController();
+    lookupController.current = controller;
+    const { signal } = controller;
+
     setMacroLoading(true);
     try {
       // Build OFF overrides for ingredients not in local table
@@ -233,8 +240,10 @@ export default function RecipeEditorScreen() {
       });
 
       for (const ing of needsOFF) {
+        if (signal.aborted) return;
         try {
-          const nutrition = await lookupNutrition(ing.name);
+          const nutrition = await lookupNutrition(ing.name, signal);
+          if (signal.aborted) return;
           if (nutrition) {
             const key = normaliseIngredientName(ing.name);
             offOverrides[key] = nutrition;
