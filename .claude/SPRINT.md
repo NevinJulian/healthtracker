@@ -211,6 +211,9 @@ Inherited from `CLAUDE.md`, restated because agents will get this wrong otherwis
 - Merge into the integration branch with a **regular merge commit, never squash** — preserving the
   individual commits is the whole point of committing in small steps
 - PR bodies end with `Closes #<issue>`
+- Comments only where the code can't explain itself. No issue numbers, no history of how the code got
+  here, no explanation of why a line exists, that goes in the commit message. In lines you touch
+  anyway, trim existing comments to the same standard.
 - Use plain `git` for branches, commits, pushes. Use the **GitHub MCP** for issues, PRs, comments.
   Never the `gh` CLI.
 
