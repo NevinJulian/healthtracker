@@ -54,7 +54,7 @@ function travelTo(dateKey: string): void {
 }
 
 const FAR_PAST = () => addDays(todayKey(), -400);
-const FAR_FUTURE = () => addDays(todayKey(), 400);
+const WINDOW_EDGE = () => addDays(todayKey(), 7);
 
 describe('daily_log writers create a missing row instead of silently no-op-ing (#305)', () => {
   afterEach(() => {
@@ -76,10 +76,10 @@ describe('daily_log writers create a missing row instead of silently no-op-ing (
     expect(after?.walk_completed).toBe(true);
   });
 
-  it('upsertExerciseCompleted creates the row for a date with no row (far future) without throwing', async () => {
+  it('upsertExerciseCompleted creates the row for a date with no row (far past) without throwing', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
-    const date = FAR_FUTURE();
+    const date = FAR_PAST();
 
     expect(await db.getLogByDate(date)).toBeNull();
 
@@ -104,10 +104,10 @@ describe('daily_log writers create a missing row instead of silently no-op-ing (
     expect(after?.body_weight).toBe(71.4);
   });
 
-  it('upsertAdditionalWorkouts creates the row and persists the value for a date with no row (far future)', async () => {
+  it('upsertAdditionalWorkouts creates the row and persists the value for a date with no row (far past)', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
-    const date = FAR_FUTURE();
+    const date = FAR_PAST();
 
     const workouts = [{ id: 'w1', name: 'Extra Row', completed: false }];
     await db.upsertAdditionalWorkouts(date, workouts);
@@ -130,10 +130,10 @@ describe('daily_log writers create a missing row instead of silently no-op-ing (
     expect(await db.getLogByDate(date)).not.toBeNull();
   });
 
-  it('setWaterForDay creates the row and persists the value for a date with no row (far future)', async () => {
+  it('setWaterForDay creates the row and persists the value for a date with no row (far past)', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
-    const date = FAR_FUTURE();
+    const date = FAR_PAST();
 
     await db.setWaterForDay(date, 1200);
 
@@ -177,12 +177,13 @@ describe('auto-created daily_log rows match what syncRollingSchedule() would hav
   });
 
   it('produces a row identical (aside from the field the writer itself sets) to the one syncRollingSchedule() generates for the same date', async () => {
-    const targetDate = FAR_FUTURE();
+    const targetDate = WINDOW_EDGE();
 
     // "Expected": run sync with the clock moved to targetDate, so sync
     // generates that date's row through its normal (non-ensure-row) path.
     const expectedDb = loadFreshDatabaseModule();
     await expectedDb.initDatabase(); // real time — records app_start_date = today
+    await expectedDb.getDatabase().runAsync('DELETE FROM daily_log WHERE date = ?', [targetDate]);
     travelTo(targetDate);
     await expectedDb.syncRollingSchedule();
     const expected = await expectedDb.getLogByDate(targetDate);
@@ -191,10 +192,11 @@ describe('auto-created daily_log rows match what syncRollingSchedule() would hav
 
     expect(expected).not.toBeNull();
 
-    // "Actual": real today, far outside sync's own window — only reachable
+    // "Actual": real today, row absent — only reachable
     // via a writer's _ensureDailyLogRow() ensure-step.
     const actualDb = loadFreshDatabaseModule();
     await actualDb.initDatabase();
+    await actualDb.getDatabase().runAsync('DELETE FROM daily_log WHERE date = ?', [targetDate]);
     await actualDb.upsertBodyWeight(targetDate, 70); // body_weight isn't part of the builder — excluded below
     const actual = await actualDb.getLogByDate(targetDate);
 
@@ -503,7 +505,8 @@ describe('upsertAdditionalWorkouts refuses to overwrite malformed stored JSON (#
     await db.upsertAdditionalWorkouts(date, []);
     expect(await readRaw(db, date)).toBe('[]');
 
-    const future = FAR_FUTURE();
+    const future = WINDOW_EDGE();
+    await db.getDatabase().runAsync('DELETE FROM daily_log WHERE date = ?', [future]);
     await db.upsertAdditionalWorkouts(future, workouts);
     expect(JSON.parse((await readRaw(db, future)) as string)).toEqual(workouts);
   });
@@ -512,7 +515,7 @@ describe('upsertAdditionalWorkouts refuses to overwrite malformed stored JSON (#
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
     const bad = todayKey();
-    const good = FAR_FUTURE();
+    const good = FAR_PAST();
     await seedRaw(db, bad, '{not json');
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
