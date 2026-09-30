@@ -2667,6 +2667,12 @@ async function _restoreFromPayload(
 
 // ── Nutrition goal settings (#274) ────────────────────────────────────────────
 
+function parseNumericSetting(raw: string | null, min: number, max: number): number | null {
+  if (raw === null || raw.trim() === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= min && n <= max ? n : null;
+}
+
 const SETTING_NUTRITION_GOAL_CALORIES = 'nutritionGoalCalories';
 const SETTING_NUTRITION_GOAL_PROTEIN = 'nutritionGoalProtein';
 
@@ -2683,15 +2689,8 @@ export async function getNutritionGoals(): Promise<NutritionGoals> {
     getSetting(SETTING_NUTRITION_GOAL_PROTEIN),
   ]);
 
-  const calories =
-    calRaw !== null && !isNaN(Number(calRaw))
-      ? Number(calRaw)
-      : NUTRITION_GOALS.calories;
-
-  const protein =
-    protRaw !== null && !isNaN(Number(protRaw))
-      ? Number(protRaw)
-      : NUTRITION_GOALS.protein;
+  const calories = parseNumericSetting(calRaw, Number.MIN_VALUE, Infinity) ?? NUTRITION_GOALS.calories;
+  const protein = parseNumericSetting(protRaw, Number.MIN_VALUE, Infinity) ?? NUTRITION_GOALS.protein;
 
   return { calories, protein };
 }
@@ -2740,8 +2739,8 @@ export async function getUserProfile(): Promise<UserProfileData> {
     getSetting(SETTING_PROFILE_GOAL_TYPE),
   ]);
 
-  const heightCm = hRaw !== null && !isNaN(Number(hRaw)) ? Number(hRaw) : null;
-  const age      = aRaw !== null && !isNaN(Number(aRaw)) ? Number(aRaw) : null;
+  const heightCm = parseNumericSetting(hRaw, 50, 250);
+  const age      = parseNumericSetting(aRaw, 10, 120);
 
   const VALID_SEX: Sex[] = ['male', 'female'];
   const sex = sRaw !== null && (VALID_SEX as string[]).includes(sRaw) ? (sRaw as Sex) : null;
