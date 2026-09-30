@@ -398,6 +398,10 @@ export default function SettingsScreen() {
   // down) so it can't read fresh state directly — only a ref's `.current`.
   const profileHeightInvalidRef = useRef(false);
   const profileAgeInvalidRef = useRef(false);
+  const heightWriteSeqRef = useRef(0);
+  const heightPendingWritesRef = useRef(0);
+  const ageWriteSeqRef = useRef(0);
+  const agePendingWritesRef = useRef(0);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [recalcBusy, setRecalcBusy] = useState(false);
 
@@ -517,6 +521,8 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      const heightSeqAtStart = heightWriteSeqRef.current;
+      const ageSeqAtStart = ageWriteSeqRef.current;
       (async () => {
         const [
           workoutEnabled,
@@ -586,15 +592,21 @@ export default function SettingsScreen() {
           setGoalCalories(nutritionGoals.calories);
           setGoalProtein(nutritionGoals.protein);
           setHydrationGoalMl(hydrationGoal);
-          setProfile(userProfile);
-          // Don't clobber text the user is actively correcting after an
-          // invalid blur (#323) — skip re-hydrating a field from storage
-          // while it has an unsaved invalid edit, so the error text and the
-          // field text never end up describing different values.
-          if (!profileHeightInvalidRef.current) {
+          const heightEditedSince =
+            heightWriteSeqRef.current !== heightSeqAtStart || heightPendingWritesRef.current > 0;
+          const ageEditedSince =
+            ageWriteSeqRef.current !== ageSeqAtStart || agePendingWritesRef.current > 0;
+          setProfile((prev) => ({
+            ...userProfile,
+            heightCm: heightEditedSince ? prev.heightCm : userProfile.heightCm,
+            age: ageEditedSince ? prev.age : userProfile.age,
+          }));
+          // A field with an unsaved invalid edit, or a write that landed
+          // after this load began, keeps its local text.
+          if (!profileHeightInvalidRef.current && !heightEditedSince) {
             setProfileHeightStr(userProfile.heightCm != null ? String(userProfile.heightCm) : '');
           }
-          if (!profileAgeInvalidRef.current) {
+          if (!profileAgeInvalidRef.current && !ageEditedSince) {
             setProfileAgeStr(userProfile.age != null ? String(userProfile.age) : '');
           }
           setLatestWeight(weight);
@@ -756,17 +768,29 @@ export default function SettingsScreen() {
 
   // ── Profile: field save helpers (#281) ────────────────────────────────
 
+  async function trackProfileWrite(
+    seqRef: React.MutableRefObject<number>,
+    pendingRef: React.MutableRefObject<number>,
+    write: () => Promise<void>,
+  ) {
+    seqRef.current += 1;
+    pendingRef.current += 1;
+    try {
+      await write();
+    } finally {
+      pendingRef.current -= 1;
+    }
+    seqRef.current += 1;
+  }
+
   async function handleProfileHeightBlur() {
     const trimmed = profileHeightStr.trim();
     if (trimmed === '') {
-      // Blank + blur persists the clear (#323 part 2): a previously-saved
-      // height is removed via deleteSetting, not left in place. Local
-      // state only goes null once the delete resolves — same "await then
-      // update state" shape as the valid-save path below, so a rejected
-      // write leaves the saved value (and displayed state) untouched.
+      // Local state only goes null once the delete resolves, so a rejected
+      // write leaves the saved value untouched.
       profileHeightInvalidRef.current = false;
       setProfileHeightError(null);
-      await clearProfileHeightCm();
+      await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, clearProfileHeightCm);
       setProfile((prev) => ({ ...prev, heightCm: null }));
       return;
     }
@@ -781,17 +805,16 @@ export default function SettingsScreen() {
     }
     profileHeightInvalidRef.current = false;
     setProfileHeightError(null);
-    await setProfileHeightCm(val);
+    await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, () => setProfileHeightCm(val));
     setProfile((prev) => ({ ...prev, heightCm: val }));
   }
 
   async function handleProfileAgeBlur() {
     const trimmed = profileAgeStr.trim();
     if (trimmed === '') {
-      // Same clear-and-persist shape as the height handler above (#323 part 2).
       profileAgeInvalidRef.current = false;
       setProfileAgeError(null);
-      await clearProfileAge();
+      await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, clearProfileAge);
       setProfile((prev) => ({ ...prev, age: null }));
       return;
     }
@@ -803,7 +826,7 @@ export default function SettingsScreen() {
     }
     profileAgeInvalidRef.current = false;
     setProfileAgeError(null);
-    await setProfileAge(val);
+    await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, () => setProfileAge(val));
     setProfile((prev) => ({ ...prev, age: val }));
   }
 
