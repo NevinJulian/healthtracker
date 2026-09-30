@@ -50,7 +50,7 @@ Note: there is no `setupFiles` entry in `jest.config.js`; the active mocks are t
 
 ## Gotchas
 
-- **`react-native-reanimated` is pinned to 3.16.7 and worklets were removed** to fix a TurboModule crash under the New Architecture (#219–221). Be very cautious upgrading reanimated or reintroducing worklets.
+- **`react-native-reanimated` 4.x must stay paired with `react-native-worklets`.** Keep both at the versions Expo SDK 57 / RN 0.86 supports. The worklets Babel plugin comes through `babel-preset-expo`, so keep it a dependency and keep it as the preset in `babel.config.js`. Do not restore reanimated 3.16.7 (it does not compile on current RN) or remove worklets. Native breakage is caught only by `build-check.yml` / the EAS build, not by `npm test` or `npm run typecheck`.
 - `npm install` / `npm ci` require `--legacy-peer-deps`.
 
 ## CI & releases
