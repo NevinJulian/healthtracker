@@ -61,9 +61,11 @@ describe('syncRollingSchedule() backfill with malformed stored exercises', () =>
     for (const d of dates) {
       expect(await readExercises(db, d)).toBe(bad);
     }
-    expect(warn).toHaveBeenCalledTimes(dates.length);
-    expect(warn.mock.calls[0][0]).toContain(dates[0]);
-    expect(warn.mock.calls[0][0]).not.toContain(bad || '\u0000');
+    // today-7 precedes the start date, so the sync never visits it
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0][0]).toContain(dates[1]);
+    expect(warn.mock.calls[1][0]).toContain(dates[2]);
+    if (bad) expect(warn.mock.calls[0][0]).not.toContain(bad);
   });
 
   it('backfills a [] row with template exercises, all not completed', async () => {
