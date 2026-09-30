@@ -606,12 +606,7 @@ interface DailyLogRowValues {
  * _syncRollingSchedule() and _ensureDailyLogRow() share exactly one
  * implementation and can never drift apart.
  *
- * Takes exactly the inputs _syncRollingSchedule() has always used —
- * `startDateISO` is the RAW value read from app_state (not the
- * sanitised/clamped variant _syncRollingSchedule() computes for its own
- * insert-range floor) — so the gym-weight progression's semantics are
- * unchanged by this refactor. (#363 tracks any actual change to that
- * formula separately.)
+ * `startDateISO` must come from _readEffectiveStartDate().
  *
  * Returns null when weekly_template has no row for `targetISO`'s weekday —
  * shouldn't happen given the 7-row invariant (CLAUDE.md), but
@@ -650,11 +645,7 @@ function _buildDailyLogRowValues(
 }
 
 async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
-  const startRow = await db.getFirstAsync<{ value: string }>(
-    'SELECT value FROM app_state WHERE key = ?',
-    [START_DATE_KEY]
-  );
-  const startDateISO = startRow?.value ?? toISODate();
+  const { date: startDateISO, garbled: startDateGarbled } = await _readEffectiveStartDate(db);
 
   const templateRows = await db.getAllAsync<WeeklyTemplateRow>('SELECT * FROM weekly_template');
 
@@ -664,27 +655,12 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   }
 
   const todayISO = toISODate();
-  // cutoffISO gates the *existing-row* exercises backfill further below —
-  // kept at its pre-#301 range (today - DAYS_HISTORY) on purpose. Widening
-  // the INSERT range (below) must not also widen this: retroactively handing
-  // an old row today's template exercises would invent history the user
-  // never had (#301, orchestrator amendment).
+  // Gates the existing-row exercises backfill. Deliberately narrower than the
+  // insert range: retro-filling old rows would invent history.
   const cutoffISO = _addDaysKey(todayISO, -DAYS_HISTORY);
-  // floorISO gates how far back MISSING rows get inserted: up to
-  // BACKFILL_CAP_DAYS in the past, but never before the app's own start date
-  // — there's no schedule to backfill before the user started using the app.
+  // MISSING rows are inserted up to BACKFILL_CAP_DAYS back, never before the start date.
   const backfillFloorISO = _addDaysKey(todayISO, -BACKFILL_CAP_DAYS);
-  // A garbled/legacy startDateISO (e.g. restored from a corrupted backup)
-  // must not poison the range with NaN arithmetic — fall back to the
-  // 90-day cap instead (#301).
-  const safeStartDateISO = isValidDateKey(startDateISO) ? startDateISO : backfillFloorISO;
-  const lowerBoundISO =
-    safeStartDateISO > backfillFloorISO ? safeStartDateISO : backfillFloorISO;
-  // A startDateISO in the future (e.g. restored from a device whose clock
-  // ran fast, or that crossed a timezone) must not push the floor past
-  // today — today..today+DAYS_AHEAD always has to generate regardless of
-  // what startDateISO claims (#301).
-  const floorISO = lowerBoundISO < todayISO ? lowerBoundISO : todayISO;
+  const floorISO = startDateISO > backfillFloorISO ? startDateISO : backfillFloorISO;
 
   // Pre-fetch existing rows with their exercises OUTSIDE the transaction (#37)
   const existingRows = await db.getAllAsync<{ date: string; exercises: string }>(
@@ -733,6 +709,12 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
   }
 
   await db.withTransactionAsync(async () => {
+    if (startDateGarbled) {
+      await db.runAsync('UPDATE app_state SET value = ? WHERE key = ?', [
+        startDateISO,
+        START_DATE_KEY,
+      ]);
+    }
     for (const params of inserts) {
       await db.runAsync(
         `INSERT OR IGNORE INTO daily_log
