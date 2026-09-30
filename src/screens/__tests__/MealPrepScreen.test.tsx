@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -34,15 +35,23 @@ import {
   getMealInventory,
   getWeeklyMealPlan,
   logCookedMeal,
+  assignMealToPlan,
+  toggleMealConsumed,
   resetCookEmptyNotified,
   Recipe,
+  MealInventoryWithRecipe,
+  WeeklyMealPlanItem,
 } from '../../db/database';
+import { checkAndNotifyEmptyInventory } from '../../services/notifications';
 
 const mockGetRecipes = jest.mocked(getRecipes);
 const mockGetMealInventory = jest.mocked(getMealInventory);
 const mockGetWeeklyMealPlan = jest.mocked(getWeeklyMealPlan);
 const mockLogCookedMeal = jest.mocked(logCookedMeal);
 const mockResetCookEmptyNotified = jest.mocked(resetCookEmptyNotified);
+const mockAssignMealToPlan = jest.mocked(assignMealToPlan);
+const mockToggleMealConsumed = jest.mocked(toggleMealConsumed);
+const mockCheckAndNotifyEmptyInventory = jest.mocked(checkAndNotifyEmptyInventory);
 
 function makeRecipe(overrides: Partial<Recipe> = {}): Recipe {
   return {
@@ -201,5 +210,136 @@ describe('MealPrepScreen log meal modal (#324)', () => {
 
     expect(getByDisplayValue('4')).toBeTruthy();
     expect(getByLabelText('Save').props.accessibilityState.disabled).toBe(true);
+  });
+});
+
+/** Press a control inside act and let the resulting promise chain settle. */
+async function pressAndFlush(element: Parameters<typeof fireEvent.press>[0]) {
+  await act(async () => {
+    fireEvent.press(element);
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+  });
+}
+
+describe('MealPrepScreen write failure feedback', () => {
+  let alertSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockGetRecipes.mockResolvedValue(mockRecipes);
+    mockGetMealInventory.mockResolvedValue([]);
+    mockGetWeeklyMealPlan.mockResolvedValue([]);
+    mockLogCookedMeal.mockResolvedValue(undefined);
+    mockAssignMealToPlan.mockResolvedValue(undefined);
+    mockToggleMealConsumed.mockResolvedValue(undefined);
+    mockResetCookEmptyNotified.mockResolvedValue(undefined);
+    mockCheckAndNotifyEmptyInventory.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('alerts once and keeps the modal and its inputs when logCookedMeal rejects', async () => {
+    mockLogCookedMeal.mockRejectedValue(new Error('x'));
+    const { getByText, getByLabelText, getByDisplayValue } = await renderWithModalOpen();
+
+    fireEvent.press(getByText('Chicken Bowl'));
+    fireEvent.changeText(getByLabelText('Portions cooked'), '6');
+    await pressAndFlush(getByLabelText('Save'));
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][0]).toBe('Error');
+    expect(getByText('Log Cooked Meal')).toBeTruthy();
+    expect(getByDisplayValue('6')).toBeTruthy();
+    expect(getByLabelText('Save').props.accessibilityState.disabled).toBe(false);
+
+    await pressAndFlush(getByLabelText('Save'));
+
+    expect(mockLogCookedMeal).toHaveBeenCalledTimes(2);
+    expect(mockLogCookedMeal).toHaveBeenLastCalledWith('r1', 6);
+  });
+
+  const inventoryItem: MealInventoryWithRecipe = {
+    id: 1,
+    recipe_id: 'r1',
+    portions_available: 3,
+    date_cooked: '2026-09-18',
+    recipe: mockRecipes[0],
+  };
+
+  const todaysLunch: WeeklyMealPlanItem = {
+    id: 7,
+    date: '2026-09-19',
+    meal_type: 'Lunch',
+    recipe_id: 'r1',
+    is_consumed: false,
+    consumed_from_inventory_id: null,
+  };
+
+  it('alerts and keeps the assign modal open when assignMealToPlan rejects', async () => {
+    mockGetMealInventory.mockResolvedValue([inventoryItem]);
+    mockAssignMealToPlan.mockRejectedValue(new Error('x'));
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(utils.getAllByLabelText('Assign recipe to Lunch')[0]);
+    await pressAndFlush(utils.getByText('Chicken Bowl'));
+
+    expect(mockAssignMealToPlan).toHaveBeenCalledTimes(1);
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][0]).toBe('Error');
+    expect(utils.getByText('Assign from Inventory')).toBeTruthy();
+  });
+
+  it('alerts when toggleMealConsumed rejects', async () => {
+    mockGetWeeklyMealPlan.mockResolvedValue([todaysLunch]);
+    mockToggleMealConsumed.mockRejectedValue(new Error('x'));
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+    mockGetWeeklyMealPlan.mockClear();
+
+    await pressAndFlush(utils.getByLabelText('Mark Chicken Bowl consumed'));
+
+    expect(mockToggleMealConsumed).toHaveBeenCalledWith(7, true);
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][0]).toBe('Error');
+    expect(mockCheckAndNotifyEmptyInventory).toHaveBeenCalledTimes(1);
+    expect(mockGetWeeklyMealPlan).not.toHaveBeenCalled();
+  });
+
+  it('closes the log modal without alerting when resetCookEmptyNotified rejects after a saved log', async () => {
+    mockResetCookEmptyNotified.mockRejectedValue(new Error('x'));
+    const { getByText, getByLabelText, queryByLabelText } = await renderWithModalOpen();
+
+    fireEvent.press(getByText('Chicken Bowl'));
+    await pressAndFlush(getByLabelText('Save'));
+
+    expect(mockLogCookedMeal).toHaveBeenCalledTimes(1);
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalled();
+    expect(queryByLabelText('Portions cooked')).toBeNull();
+  });
+
+  it('still reloads without alerting when checkAndNotifyEmptyInventory rejects after a saved toggle', async () => {
+    mockGetWeeklyMealPlan.mockResolvedValue([todaysLunch]);
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+    mockCheckAndNotifyEmptyInventory.mockRejectedValue(new Error('x'));
+    mockGetWeeklyMealPlan.mockClear();
+
+    await pressAndFlush(utils.getByLabelText('Mark Chicken Bowl consumed'));
+
+    expect(mockToggleMealConsumed).toHaveBeenCalledWith(7, true);
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalled();
+    expect(mockGetWeeklyMealPlan).toHaveBeenCalledTimes(1);
   });
 });
