@@ -413,6 +413,22 @@ describe('importBackup — notification resync (#310)', () => {
     expect(reconcileSpy).not.toHaveBeenCalled();
   });
 
+  it('when restoreFromPayload rejects, importBackup rejects with a Restore failed message that keeps the original text and cause', async () => {
+    const original = new Error('SQLITE_CONSTRAINT: UNIQUE constraint failed: daily_log.date');
+    jest.mocked(db.restoreFromPayload).mockRejectedValue(original);
+
+    const rejection = await importBackup().catch((e: unknown) => e);
+
+    expect(rejection).toBeInstanceOf(Error);
+    const error = rejection as Error;
+    expect(error.message).toMatch(/^Restore failed/);
+    expect(error.message).toContain('your existing data was not changed');
+    expect(error.message).toContain(
+      'Details: SQLITE_CONSTRAINT: UNIQUE constraint failed: daily_log.date'
+    );
+    expect(error.cause).toBe(original);
+  });
+
   it('two successive successful imports trigger exactly one cancelAll+reconcile pair each (no accumulation)', async () => {
     await importBackup();
     await importBackup();

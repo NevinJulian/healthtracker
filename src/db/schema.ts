@@ -820,4 +820,77 @@ export const MIGRATIONS: Migration[] = [
   UPDATE workout_set_log SET set_index = (SELECT new_index FROM ranked WHERE ranked.id = workout_set_log.id);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_set_log_date_exercise_set_index ON workout_set_log(date, exercise, set_index);
 ` },
+  { version: 38, sql: `
+  ALTER TABLE recipe_library ADD COLUMN archived_at TEXT;
+  DELETE FROM meal_inventory WHERE recipe_id NOT IN (SELECT id FROM recipe_library);
+  DELETE FROM cooking_tasks WHERE recipe_id NOT IN (SELECT id FROM recipe_library);
+  DELETE FROM weekly_meal_plan WHERE recipe_id NOT IN (SELECT id FROM recipe_library);
+  DELETE FROM cook_log WHERE recipe_id NOT IN (SELECT id FROM recipe_library);
+` },
 ];
+
+/**
+ * Restore-only replacement for v35's dedupe. Not a migration: it runs only
+ * inside restoreFromPayload's transaction, after the unique index is dropped.
+ * Survivor per (date, meal_type): consumed row with a live inventory pointer,
+ * else highest-id consumed row, else highest-id row. Only consumed losers with
+ * a live pointer credit their batch.
+ */
+export const RESTORE_SLOT_DEDUPE_SQL = `
+  WITH survivors AS (
+    SELECT g.date AS date, g.meal_type AS meal_type,
+      COALESCE(
+        (SELECT w1.id FROM weekly_meal_plan w1
+         WHERE w1.date = g.date AND w1.meal_type = g.meal_type AND w1.is_consumed = 1
+           AND w1.consumed_from_inventory_id IN (SELECT id FROM meal_inventory)
+         ORDER BY w1.id DESC LIMIT 1),
+        (SELECT w2.id FROM weekly_meal_plan w2
+         WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
+         ORDER BY w2.id DESC LIMIT 1),
+        (SELECT w3.id FROM weekly_meal_plan w3
+         WHERE w3.date = g.date AND w3.meal_type = g.meal_type
+         ORDER BY w3.id DESC LIMIT 1)
+      ) AS survivor_id
+    FROM weekly_meal_plan g
+    GROUP BY g.date, g.meal_type
+  )
+  UPDATE meal_inventory
+  SET portions_available = portions_available + (
+    SELECT COUNT(*)
+    FROM weekly_meal_plan loser
+    JOIN survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
+    WHERE loser.consumed_from_inventory_id = meal_inventory.id
+      AND loser.is_consumed = 1
+      AND loser.id != s.survivor_id
+  )
+  WHERE EXISTS (
+    SELECT 1
+    FROM weekly_meal_plan loser
+    JOIN survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
+    WHERE loser.consumed_from_inventory_id = meal_inventory.id
+      AND loser.is_consumed = 1
+      AND loser.id != s.survivor_id
+  );
+
+  WITH survivors AS (
+    SELECT g.date AS date, g.meal_type AS meal_type,
+      COALESCE(
+        (SELECT w1.id FROM weekly_meal_plan w1
+         WHERE w1.date = g.date AND w1.meal_type = g.meal_type AND w1.is_consumed = 1
+           AND w1.consumed_from_inventory_id IN (SELECT id FROM meal_inventory)
+         ORDER BY w1.id DESC LIMIT 1),
+        (SELECT w2.id FROM weekly_meal_plan w2
+         WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
+         ORDER BY w2.id DESC LIMIT 1),
+        (SELECT w3.id FROM weekly_meal_plan w3
+         WHERE w3.date = g.date AND w3.meal_type = g.meal_type
+         ORDER BY w3.id DESC LIMIT 1)
+      ) AS survivor_id
+    FROM weekly_meal_plan g
+    GROUP BY g.date, g.meal_type
+  )
+  DELETE FROM weekly_meal_plan
+  WHERE id NOT IN (SELECT survivor_id FROM survivors);
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_meal_plan_date_meal_type ON weekly_meal_plan(date, meal_type);
+`;
