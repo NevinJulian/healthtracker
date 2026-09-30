@@ -266,4 +266,50 @@ describe('MealPrepScreen write failure feedback', () => {
     expect(mockLogCookedMeal).toHaveBeenCalledTimes(2);
     expect(mockLogCookedMeal).toHaveBeenLastCalledWith('r1', 6);
   });
+
+  const inventoryItem: MealInventoryWithRecipe = {
+    id: 1,
+    recipe_id: 'r1',
+    portions_available: 3,
+    date_cooked: '2026-09-18',
+    recipe: mockRecipes[0],
+  };
+
+  const todaysLunch: WeeklyMealPlanItem = {
+    id: 7,
+    date: '2026-09-19',
+    meal_type: 'Lunch',
+    recipe_id: 'r1',
+    is_consumed: false,
+    consumed_from_inventory_id: null,
+  };
+
+  it('alerts and keeps the assign modal open when assignMealToPlan rejects', async () => {
+    mockGetMealInventory.mockResolvedValue([inventoryItem]);
+    mockAssignMealToPlan.mockRejectedValue(new Error('x'));
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(utils.getAllByLabelText('Assign recipe to Lunch')[0]);
+    await pressAndFlush(utils.getByText('Chicken Bowl'));
+
+    expect(mockAssignMealToPlan).toHaveBeenCalledTimes(1);
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][0]).toBe('Error');
+    expect(utils.getByText('Assign from Inventory')).toBeTruthy();
+  });
+
+  it('alerts when toggleMealConsumed rejects', async () => {
+    mockGetWeeklyMealPlan.mockResolvedValue([todaysLunch]);
+    mockToggleMealConsumed.mockRejectedValue(new Error('x'));
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    await pressAndFlush(utils.getByLabelText('Mark Chicken Bowl consumed'));
+
+    expect(mockToggleMealConsumed).toHaveBeenCalledWith(7, true);
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][0]).toBe('Error');
+    expect(mockCheckAndNotifyEmptyInventory).toHaveBeenCalledTimes(1);
+  });
 });
