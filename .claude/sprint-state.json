@@ -60,7 +60,8 @@
     "#318: grant extended to a new file src/screens/__tests__/RecipeEditorScreen.abort.test.tsx (unowned) so the editor-unmount AC gets a test.",
     "#315 split: lane A does the importBackup error wrapping (backup.ts); lane D gets a queued item 315-display (SettingsScreen restore alert lists result.skipped; skipped already returned on main so independent). app_start_date restore validation belongs to #363.",
     "After each integration push, read the real GitHub test check via the public REST check-runs endpoint (curl, read-only; gh CLI forbidden).",
-    "#380: overrode analyst design (append v39). Restore-only dedupe SQL constant outside MIGRATIONS replaces v35 in the restore replay; no migration runs on user devices for a restore-only bug. #380 lands partial -> Refs."
+    "#380: overrode analyst design (append v39). Restore-only dedupe SQL constant outside MIGRATIONS replaces v35 in the restore replay; no migration runs on user devices for a restore-only bug. #380 lands partial -> Refs.",
+    "#380: authorized editing the existing restoreLegacyDuplicates test that pinned the v35 NULL-pointer survivor (it encodes the #380 bug). Own commit, flagged for human review."
   ],
   "lanes": {
     "A": {
@@ -86,12 +87,13 @@
         367,
         362
       ],
-      "current": 380,
+      "current": 368,
       "done": [
         316,
         315,
         363,
-        378
+        378,
+        380
       ],
       "parked": [
         314
@@ -130,7 +132,7 @@
     "D": {
       "branch": "sprint/lane-d-screens",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "in_progress",
+      "status": "merged",
       "order": [
         375,
         366,
@@ -138,13 +140,17 @@
         364,
         "315-display"
       ],
-      "current": 364,
+      "current": null,
       "done": [
         375,
         366,
-        365
+        365,
+        364,
+        "315-display"
       ],
-      "parked": []
+      "parked": [],
+      "cleanup": "a6be28e comment-only (2 moved why-comments)",
+      "mergeSha": "34a3bf2"
     },
     "E": {
       "branch": "sprint/lane-e-api",
@@ -314,10 +320,12 @@
         "cb69eed"
       ],
       "lane": "D",
-      "status": "in_test",
+      "status": "merged",
       "securityReview": "skipped-device-owner-input-validation",
       "deviceCheck": "Comma-decimal keyboard (fr-CH): log a set with 78,4 -> row reads @ 78.4 kg; reps 12abc -> alert, text stays.",
-      "notes": "Bounds reps 1-100, weight 0.5-500 kg are ANALYST PICKS - flag for human. Weight 0 (bodyweight sets) still rejected as before."
+      "notes": "tester APPROVE r0. HUMAN: bounds reps 1-100 / weight 0.5-500 are analyst picks; 1.000 (German thousands) accepted as 1; 1e2/0x10 accepted as numeric literals (judged not a defect). Test selects inputs via UNSAFE_getAllByType(TextInput).slice(-2) (brittle).",
+      "regressionProof": "11/13 fail with 49abc78 DashboardScreen.tsx (78,4 saved as 78), pass at cb69eed (tester)",
+      "mergeSha": "34a3bf2"
     },
     "365": {
       "roundTrips": 1,
@@ -327,11 +335,12 @@
         "49abc78"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "securityReview": "skipped-ui-error-surfacing",
       "deviceCheck": "First-run onboarding on the phone still completes and lands on the dashboard (startup path).",
       "notes": "tester REJECT r1 (file-level mock hollowed 9 smoke tests), APPROVE r2 (tests moved to OnboardingScreen.confirm.test.tsx, original file restored).",
-      "regressionProof": "confirm.test fails with b8a70f8 OnboardingScreen.tsx, passes HEAD; disabled-mid-save assertion proven by probe removing saving gate (tester)"
+      "regressionProof": "confirm.test fails with b8a70f8 OnboardingScreen.tsx, passes HEAD; disabled-mid-save assertion proven by probe removing saving gate (tester)",
+      "mergeSha": "34a3bf2"
     },
     "366": {
       "roundTrips": 1,
@@ -347,11 +356,20 @@
         "1b929ed"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "securityReview": "skipped: diff only surfaces previously swallowed errors via Alert; the two follow-ups now warn-only were already silent; tester audited all write paths",
       "deviceCheck": "none (optional: happy path still closes the Log Cooked Meal modal)",
       "notes": "tester REJECT r1 (fix commit too coarse), APPROVE r2 after revert + 3 per-handler commits (no history rewrite).",
-      "regressionProof": "5 tests fail with 07dc001 MealPrepScreen.tsx, pass at HEAD; final file byte-identical to dd873c3 (tester verified)"
+      "regressionProof": "5 tests fail with 07dc001 MealPrepScreen.tsx, pass at HEAD; final file byte-identical to dd873c3 (tester verified)",
+      "mergeSha": "34a3bf2"
+    },
+    "368": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "in_dev",
+      "securityReview": "required-src-db",
+      "deviceCheck": "none (removeMealFromPlan has no UI caller)"
     },
     "374": {
       "roundTrips": 1,
@@ -376,11 +394,12 @@
         "07dc001"
       ],
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "securityReview": "skipped-ui-state-only",
       "deviceCheck": "none (optional: save height, leave Settings, return, value persists)",
       "regressionProof": "6/6 fail with 50bb9aa SettingsScreen.tsx, pass at 07dc001 (tester reproduced)",
-      "notes": "tester APPROVE r0. Committed tests assert input text, not profile state; tester verified profile freshness via throwaway probe (recalc used fresh height). Failed write keeps local text until next focus (same as before)."
+      "notes": "tester APPROVE r0. Committed tests assert input text, not profile state; tester verified profile freshness via throwaway probe (recalc used fresh height). Failed write keeps local text until next focus (same as before).",
+      "mergeSha": "34a3bf2"
     },
     "378": {
       "roundTrips": 0,
@@ -399,22 +418,33 @@
     },
     "380": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "bf0e784",
+        "a424cb9",
+        "453d985"
+      ],
       "lane": "A",
-      "status": "in_dev",
+      "status": "ready",
       "partial": true,
-      "securityReview": "required-restore-data-path",
+      "securityReview": "APPROVE: static SQL, delete only non-survivors per (date,meal_type) group matching the index, credit bounded by backup rows, single txn",
       "deviceCheck": "none",
-      "notes": "Fixable part = restore replay only. Unfixable (record on issue): devices where v35 already ran (valid row deleted); fresh upgrades from pre-v35 DBs (v35 runs first); re-pointing survivors needs product decision."
+      "notes": "tester APPROVE r0. MIGRATIONS byte-identical. Stale comments (schema.ts:798 inside MIGRATIONS - frozen; test-file comments + database.ts doc ~2425 -> cleanup).",
+      "regressionProof": "2 tests fail with aefd465 database.ts+schema.ts, 4/4 pass at 453d985; probe vs v35 SQL identical except intended dangling/3+dup cases (tester)"
     },
     "315-display": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "d866f2a",
+        "69ec2c8"
+      ],
       "lane": "D",
-      "status": "pending",
+      "status": "merged",
       "parentIssue": 315,
       "deviceCheck": "Restore a hand-edited backup with an extra column; alert names the dropped table/column.",
-      "notes": "Also fix the duplicated title: SettingsScreen Alert(\"Restore failed\", err.message) now that importBackup message starts with \"Restore failed —\"."
+      "notes": "Also fix the duplicated title: SettingsScreen Alert(\"Restore failed\", err.message) now that importBackup message starts with \"Restore failed —\".",
+      "securityReview": "skipped: only renders device-owner backup text in a plain Alert (judged non-issue by #315 security review)",
+      "regressionProof": "4/5 fail with cb69eed SettingsScreen.tsx, 5/5 at 69ec2c8 (tester)",
+      "mergeSha": "34a3bf2"
     }
   },
   "foundDuringSprint": [
@@ -427,7 +457,8 @@
     403,
     404,
     405,
-    406
+    406,
+    407
   ],
   "log": [
     {
@@ -626,6 +657,38 @@
     {
       "at": "2026-09-30T22:54:07Z",
       "event": "filed #405 (Onboarding parseFloat) and #406 (restore refund count before dedupe)"
+    },
+    {
+      "at": "2026-09-30T22:54:37Z",
+      "event": "#380 dev stopped on contradicting existing test; orchestrator authorized updating it (own commit)"
+    },
+    {
+      "at": "2026-09-30T22:54:56Z",
+      "event": "#364 ready; lane D -> 315-display in_dev (work order from #315 analyst)"
+    },
+    {
+      "at": "2026-09-30T22:56:08Z",
+      "event": "#380 in_test (630 per dev)"
+    },
+    {
+      "at": "2026-09-30T22:56:52Z",
+      "event": "315-display in_test (641 per dev); d866f2a alone does not typecheck (disclosed)"
+    },
+    {
+      "at": "2026-09-30T22:58:07Z",
+      "event": "#380 tester APPROVE -> security"
+    },
+    {
+      "at": "2026-09-30T22:58:27Z",
+      "event": "315-display ready; lane D cleanup running; filed #407 (skipped-summary column cap)"
+    },
+    {
+      "at": "2026-09-30T22:59:00Z",
+      "event": "#380 ready (security APPROVE), partial comment posted; lane A -> #368 analysing"
+    },
+    {
+      "at": "2026-09-30T22:59:40Z",
+      "event": "merged lane D 34a3bf2 (gates green 698/68); #368 in_dev"
     }
   ]
 }
