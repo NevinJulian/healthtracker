@@ -761,6 +761,9 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
  * unconditionally before every daily_log UPDATE: a no-op when the row is
  * already there.
  *
+ * Throws for a malformed date key or one beyond today + DAYS_AHEAD. There is
+ * no lower bound: history is permanent.
+ *
  * Every column outside the builder's set (walk_completed, hammer_completed,
  * fasting_completed, body_weight, water_ml, additional_workouts) takes its
  * schema DEFAULT — identical to a row _syncRollingSchedule() itself inserts.
@@ -772,6 +775,13 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
  * that loudly instead of the previous silent no-op.
  */
 async function _ensureDailyLogRow(db: SQLite.SQLiteDatabase, date: string): Promise<void> {
+  if (!isValidDateKey(date)) {
+    throw new Error(`Invalid date key: "${date}"`);
+  }
+  if (date > _addDaysKey(toISODate(), DAYS_AHEAD)) {
+    throw new Error(`Date ${date} is out of range: more than ${DAYS_AHEAD} days ahead`);
+  }
+
   const { date: startDateISO } = await _readEffectiveStartDate(db);
 
   const templateRows = await db.getAllAsync<WeeklyTemplateRow>('SELECT * FROM weekly_template');
