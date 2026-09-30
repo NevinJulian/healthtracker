@@ -1621,7 +1621,14 @@ export function removeMealFromPlan(id: number): Promise<void> {
 
 async function _removeMealFromPlanImpl(id: number): Promise<void> {
   const db = getDatabase();
-  await db.runAsync('DELETE FROM weekly_meal_plan WHERE id = ?', [id]);
+  await db.withTransactionAsync(async () => {
+    const row = await db.getFirstAsync<any>('SELECT * FROM weekly_meal_plan WHERE id = ?', [id]);
+    if (!row) return;
+    if (row.is_consumed === 1) {
+      await _creditPortion(db, row);
+    }
+    await db.runAsync('DELETE FROM weekly_meal_plan WHERE id = ?', [id]);
+  });
 }
 
 /**
