@@ -28,9 +28,10 @@ Do not skip any of this. Starting a sprint from a dirty or broken base wastes th
 
 ```bash
 git status --porcelain          # must be clean — if not, STOP and report
+git config user.email           # must be GitHub-verified (SPRINT.md §8) — if not, STOP and report
 git checkout main && git pull
 npm run typecheck               # must pass on main
-npm test                        # must pass on main — record the test count
+npm test -- --maxWorkers=2      # must pass on main — record the test count
 git checkout -b sprint/auto-fixes
 git push -u origin sprint/auto-fixes
 ```
@@ -44,7 +45,7 @@ Record the baseline test count. You will compare against it all night.
 
 ## Step 2 — freeze scope
 
-Fetch issues #300–#336 via the GitHub MCP. Write `.claude/sprint-state.json` with:
+Fetch every issue in the Issues column of `.claude/SPRINT.md` §3 via the GitHub MCP. Write `.claude/sprint-state.json` with:
 
 - `frozenScope` — exactly those issue numbers that are open. **This list never grows.**
 - `baseSha` — current `main`
@@ -57,8 +58,8 @@ Commit this file. It is your memory across context resets.
 
 ## Step 3 — run the lanes
 
-Lanes A, B, C, E, F, G start in parallel. **Lane D waits for lane A to merge** — it depends on the db
-writers being correct. **Lane G runs last** — it writes regression tests over everyone's work.
+Lanes start in parallel, except where `.claude/SPRINT.md` §3 says a lane waits. In sprint 2,
+**lane G runs last**, because it changes the test adapter under everyone's work.
 
 Each lane runs its issues **serially on one branch**, in the order given in `.claude/SPRINT.md` §3.
 
@@ -80,7 +81,7 @@ On a merge conflict: call `conflict` **with explicit per-hunk resolution instruc
 without them, correctly. One attempt — if it fails, revert the merge, mark the lane `blocked`, carry on
 with the others.
 
-After every merge into the integration branch, run `npm run typecheck` and `npm test` on it. A red
+After every merge into the integration branch, run `npm run typecheck` and `npm test -- --maxWorkers=2` on it. A red
 integration branch is an abort condition.
 
 **Write state after every single transition.** Not at the end of a lane. Every transition.
@@ -91,12 +92,12 @@ integration branch is an abort condition.
 
 When every lane is merged, blocked, or out of work:
 
-1. Final `npm run typecheck` and `npm test` on `sprint/auto-fixes`
+1. Final `npm run typecheck` and `npm test -- --maxWorkers=2` on `sprint/auto-fixes`
 2. Push it
-3. Open a PR from `sprint/auto-fixes` to `main` via the GitHub MCP — body lists every issue with
-   `Closes #NNN`, and states plainly that it needs human review
-4. Write `SPRINT_REPORT.md` per `.claude/SPRINT.md` §6 and commit it
-5. **Do not merge that PR.** Under no circumstances.
+3. Write `SPRINT_REPORT.md` per `.claude/SPRINT.md` §6 and commit it. Section 5 holds the exact
+   command to open the PR, with a body that lists every issue as `Closes #NNN`
+4. **Do not open the PR.** The cold review and the device checks (`.claude/SPRINT.md` §2) come first,
+   and both belong to the human. Report that the branch is ready for them, and stop.
 
 ---
 

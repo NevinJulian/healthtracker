@@ -62,3 +62,5 @@ Note: there is no `setupFiles` entry in `jest.config.js`; the active mocks are t
 ## Contribution conventions
 
 Atomic commits referencing a GitHub issue number, e.g. `fix: resolve drawer overlap (#105)`. Branch from `main`, open a PR, and **merge with a regular merge commit — never squash**, so each branch's individual commits are preserved on `main` (keeping that granular history is the whole point of committing in small steps). (`CLAUDE_CODE_SETUP.md` documents the GitHub-MCP-driven workflow and the in-progress "Verdure" redesign under `design/`.)
+
+Comments only where the code can't explain itself. No issue numbers, no history of how the code got here, no explanation of why a line exists, that goes in the commit message. In lines you touch anyway, trim existing comments to the same standard.

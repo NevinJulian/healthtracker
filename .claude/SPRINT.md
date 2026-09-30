@@ -22,8 +22,10 @@ Read these before anything else. They exist to stop the run going sideways while
    stalled, mark it `parked` in state, move to the next. Never a fourth attempt.
 4. **Nothing merges to `main`.** Everything lands on `sprint/auto-fixes`. The human opens the PR from
    there to `main` after review. No agent is permitted to merge to `main` under any circumstance.
-5. **A red gate is a stop, not a suggestion.** `npm run typecheck` and `npm test` must both exit 0
+5. **A red gate is a stop, not a suggestion.** `npm run typecheck` and `npm test -- --maxWorkers=2` must both exit 0
    before anything merges to the integration branch. No exceptions, no "it was already failing".
+   The worker cap is part of the gate, not a speed tweak: the sql.js WASM suites crash under default
+   jest parallelism on Linux (#377), and CI runs with the same cap. Drop it only when #377 is fixed.
 6. **Never edit an existing migration.** Append-only, integer-versioned. This rule has no exceptions
    and breaking it corrupts live databases.
 7. **Stay in your lane.** Each lane owns its files exclusively (see §3). A developer who needs to
@@ -55,43 +57,70 @@ records the decision in state.
 
 The `cleanup` agent runs **once at the end of each lane**, not per issue.
 
+**After the run, two stages gate the PR to `main`.** Both are formal stages, and neither can be skipped:
+
+- **Cold review.** A fresh Claude Code session, with none of the sprint's context, reviews the whole
+  `main...sprint/auto-fixes` diff (`/code-review` on the branch). The orchestrator and its agents
+  have seen every rationale. A cold reader only has the code, and that is the point.
+- **Device test.** A human runs every issue's **Device check** from its work order on the phone,
+  from the integration branch, **before the PR is opened**. Jest and CI cannot see a native crash.
+  The SDK 57 expo-notifications crash was invisible to both.
+
+The orchestrator does neither. It lists both as outstanding in the report.
+
 ---
 
 ## 3. Lanes — this is how conflicts are prevented, not resolved
 
-Most of #300–#336 touch `src/db/database.ts`. Running them as parallel worktrees guarantees
-conflicts on every merge. So issues are grouped into lanes by file ownership, lanes run in parallel,
-and **issues within a lane run serially on one branch**.
+Most of the scope touches `src/db/database.ts`. Running those issues as parallel worktrees
+guarantees conflicts on every merge. So issues are grouped into lanes by file ownership, lanes run in
+parallel, and **issues within a lane run serially on one branch**.
 
-| Lane | Branch | Owns | Issues |
+This table is sprint 2's scope. `/sprint` freezes exactly the issues in the Issues column that are
+still open. Sprint 1 (#300–#336) is done. Its lanes are in git history.
+
+| Lane | Branch | Owns | Issues, in order |
 |---|---|---|---|
-| A — db core | `sprint/lane-a-db` | `src/db/**` | #300, #301, #305, #302, #303, #319, #320, #321, #314, #315, #316, #306, #307, #331 |
-| B — notifications | `sprint/lane-b-notify` | `src/services/notifications.ts`, `src/services/backup.ts` | #309, #310, #311 |
-| C — analytics screen | `sprint/lane-c-analytics` | `src/screens/AnalyticsDashboardScreen.tsx`, `src/screens/analyticsHelpers.ts` | #308, #312, #327, #328 |
-| D — other screens | `sprint/lane-d-screens` | `src/screens/{Settings,MealPrep,Dashboard}Screen.tsx` | #313, #322, #323, #324, #325, #326, #329, #330, #304, #317 |
+| A — db core | `sprint/lane-a-db` | `src/db/**` except `src/db/testHelpers/**`, `src/services/backup.ts` | #314, #316, #315, #363, #378, #380, #368, #370, #371, #381, #379, #382, #383, #372, #373, #367, #362 |
+| B — notifications | `sprint/lane-b-notify` | `src/services/notifications.ts` | #311, #361 |
+| C — analytics screen | `sprint/lane-c-analytics` | `src/screens/AnalyticsDashboardScreen.tsx`, `src/screens/analyticsHelpers.ts` | #328 |
+| D — other screens | `sprint/lane-d-screens` | `src/screens/{Settings,MealPrep,Dashboard,Onboarding}Screen.tsx` | #375, #366, #365, #364 |
 | E — network | `sprint/lane-e-api` | `src/api/**` | #318 |
-| F — repo hygiene | `sprint/lane-f-repo` | root config, docs | #332, #333, #335 |
-| G — tests | `sprint/lane-g-tests` | `src/**/__tests__/**`, `jest.config.js` | #336 |
+| F — repo hygiene | `sprint/lane-f-repo` | root config, docs | #374 |
+| G — tests | `sprint/lane-g-tests` | `src/db/testHelpers/**`, `jest.config.js`, `.github/workflows/test.yml` | #377 |
+
+`backup.ts` moved from lane B to lane A for this sprint, because #315's fix spans
+`restoreFromPayload` (`database.ts`) and `validatePayload` (`backup.ts`).
+
+**Partials.** Sprint 1 landed part of #311, #314, #315 and #318. The analyst reads the issue's latest
+comments and the code on `main`, and scopes the work order to what is still open. It does not redo
+what already landed.
 
 **Ordering constraints inside lanes** — these are real dependencies, not preferences:
 
-- Lane A: #300 and #301 first. Everything else in the lane assumes history survives.
-- Lane A: #305 before #302/#303. Upserts must work before inventory maths is trusted.
-- Lane B: #309 first. It unblocks #310 and #311 and makes both far smaller.
-- Lane D: #304 last. It depends on lane A's writers being correct, so it merges after lane A lands.
-- Lane G: #336 last overall. It writes regression tests for the other lanes' work.
+- Lane A: #314 first. Migrations must be atomic before this sprint appends any new ones, and #316 and
+  #380 may need one each.
+- Lane A: #315 before #363 and #378. Restore validation is where a garbled `app_start_date` gets in,
+  and #363 points there for the sturdier fix. Take #363 and #378 back to back. If #363's fix also
+  closes #378, the tester says so and #378 is closed as done by #363's commit, not re-implemented.
+- Lane G: #377 last overall. It changes the sql.js adapter every db suite runs on. After it lands, the
+  whole suite must pass at default parallelism and at `--maxWorkers=3`.
 
-**Cross-lane dependencies** are the orchestrator's problem. Lane D waits for lane A to merge into
-`sprint/auto-fixes` before starting #304 and #317. Lane G waits for everything.
+**Cross-lane dependencies** are the orchestrator's problem. Lane G waits for everything. If #377
+removes the worker cap, update the gate in §1 rule 5 in the same lane.
+
+**Decisions a human should make before the run**, or the analyst parks the issue:
+
+- #316: when a recipe still has inventory and cook-log rows, is deleting it blocked, confirmed or
+  cascaded?
+- #363: what `app_start_date` falls back to when the stored value is invalid.
 
 ### Excluded from this sprint
 
-- **#334 (`.gitattributes`)** — renormalises 52k lines. Merged alongside anything else it makes every
-  diff unreviewable and conflicts with every open branch. It lands alone, by hand, when nothing is in
-  flight. Do not touch it.
-- **#327 memoisation** — only the measurable parts. Do not speculatively memoise. If the agent cannot
-  demonstrate an improvement, it reports that and the issue is parked rather than churned.
-- Everything #337 and above. Features are out of scope.
+- **#360** — PR #394, landed by hand.
+- **#334 (`.gitattributes`)** — PR #393, landed by hand. Before it's merged, no agent touches line
+  endings.
+- **#392 and every other feature request.** Features run one at a time, outside the sprint.
 
 ---
 
@@ -114,7 +143,8 @@ up exactly where the last one stopped.
   "issues": {
     "302": {
       "lane": "A", "status": "in_test", "roundTrips": 1, "branch": "sprint/lane-a-db",
-      "commits": ["a1b2c3d"], "notes": "tester rejected: credit path still asymmetric for exhausted batch"
+      "commits": ["a1b2c3d"], "deviceCheck": "none",
+      "notes": "tester rejected: credit path still asymmetric for exhausted batch"
     }
   },
   "foundDuringSprint": [358, 359],
@@ -165,6 +195,8 @@ Required sections:
    and the exact command to open the PR to `main`.
 6. **What I would not merge without reading** — the orchestrator's own judgement on which diffs
    deserve close human attention and why. Do not be diplomatic here.
+7. **Before the PR** — a checklist of the device checks, one per issue that has one, copied from the
+   work orders, plus the cold-review step. Both are unticked. The human ticks them.
 
 ---
 
@@ -179,5 +211,28 @@ Inherited from `CLAUDE.md`, restated because agents will get this wrong otherwis
 - Merge into the integration branch with a **regular merge commit, never squash** — preserving the
   individual commits is the whole point of committing in small steps
 - PR bodies end with `Closes #<issue>`
+- Comments only where the code can't explain itself. No issue numbers, no history of how the code got
+  here, no explanation of why a line exists, that goes in the commit message. In lines you touch
+  anyway, trim existing comments to the same standard.
 - Use plain `git` for branches, commits, pushes. Use the **GitHub MCP** for issues, PRs, comments.
   Never the `gh` CLI.
+
+---
+
+## 8. Lessons that are now rules
+
+Each of these cost a sprint or a release once.
+
+- **Commit identity is checked in preflight.** `git config user.email` must be an address verified
+  on the GitHub account, normally `41645782+NevinJulian@users.noreply.github.com`. Anything else
+  lands a night of commits that GitHub does not attribute.
+- **After any Expo SDK or native dependency change, open the app in Expo Go before the PR.** The
+  expo-notifications crash on SDK 57 was invisible to jest and to CI.
+- **A CI fix goes into every workflow with the same step.** `test.yml`, `build-check.yml` and
+  `release.yml` share steps. #385–#387 fixed only `release.yml`, and `build-check.yml` failed on the
+  same `tools` package the next time it ran. After changing one workflow, grep the others.
+- **Run git from Windows against this checkout.** Until #334's `.gitattributes` is on `main`, a
+  Linux or WSL shell sees every CRLF working-tree file as modified. That is where the old "52,000
+  lines of churn" came from. Never commit a "line ending fix".
+- **Run `npx expo install --check` with network.** Offline, it silently skips the version lookups.
+  That is how the Jest 30 / SDK 57 mismatch (#390) got through.

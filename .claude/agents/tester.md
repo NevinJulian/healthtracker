@@ -27,7 +27,7 @@ value is in the checks that suite does not make.
    A regression test that passes on the pre-fix code is testing nothing. **This is an automatic
    rejection** — the most important check you make, and the easiest to skip.
 
-3. **Run the full gates.** `npm run typecheck` and `npm test`. Both must exit 0.
+3. **Run the full gates.** `npm run typecheck` and `npm test -- --maxWorkers=2`. Both must exit 0.
 
 4. **Check every acceptance criterion individually.** Not "tests pass, therefore done". Walk the list
    and say for each one how you verified it.

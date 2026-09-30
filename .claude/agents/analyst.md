@@ -41,6 +41,10 @@ belongs in and what it asserts. This is the developer's proof, so be exact.>
 
 **Migration needed:** yes / no — <if yes, which table, what change, next version number>
 
+**Device check:** none / <the exact steps on the phone and what must be seen> — required for anything
+the user sees, any native call (notifications, file system, share sheet), and anything on the startup
+or migration path. The human runs these before the integration PR is opened.
+
 **Risk**
 <What could this break? Which other code reads the thing being changed?>
 
@@ -58,7 +62,8 @@ Say so plainly, at the top of your output, if:
 - The fix requires a product decision nobody has made — for example #302 and #303 both need a
   decision on whether a portion returns to its original batch or the newest one, and that is a
   semantics call, not an implementation detail
-- The change cannot be verified without a physical device
+- The change can *only* be verified on a physical device — no regression test is possible at all.
+  If a test can prove the logic and the device only confirms it, don't park: fill in **Device check**
 - Correct implementation requires touching files another lane owns
 
 Parking an issue at this stage costs five minutes. Discovering the same problem after two developer

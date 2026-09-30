@@ -29,7 +29,7 @@ in a data layer is how both fixes end up half-applied and neither works.
 4. **Verify the resolution preserves both intents.** Run the regression tests from *both* conflicting
    issues. Both must pass. This is the check that matters — a syntactically clean merge that drops one
    side's fix is the failure mode here, and it is silent.
-5. `npm run typecheck` and `npm test` — both green
+5. `npm run typecheck` and `npm test -- --maxWorkers=2` — both green
 6. Commit the merge with a message naming both sides:
    `merge: resolve database.ts conflict between #300 and #302 — kept both guards`
 
