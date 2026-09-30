@@ -40,7 +40,7 @@ To change the schema: **append a new entry with the next integer `version`.** Ne
 `src/data/recipes.ts` (static seed) → `recipe_library` → user adds a recipe → `shopping_list` + `cooking_tasks` → `finishCooking()` → `meal_inventory` → `assignMealToPlan()` → `weekly_meal_plan`; `toggleMealConsumed()` decrements inventory. Cross-table inventory mutations use `db.withTransactionAsync` — keep new multi-step inventory changes transactional.
 
 ### Navigation & theme
-`src/navigation/AppNavigator.tsx` is a **right-side** drawer; the hamburger is rendered as `headerRight` (default left icon suppressed). "Recipes" is a nested stack (`RecipesMain` → `RecipeDetail`) inside the drawer. `src/theme/tokens.ts` (the "Verdure" palette) is the single source of truth for `Colors`/`Spacing`/`Typography`/`Radius` — use these tokens, never raw hex or magic numbers. Screens should not add top padding; the navigation header owns it.
+`src/navigation/AppNavigator.tsx` is a **right-side** drawer; the hamburger is rendered as `headerRight` (default left icon suppressed). Two nested stacks sit inside the drawer: "Recipes" (`RecipesMain` → `RecipeDetail`, `RecipeEditor`) and "Discover" (`DiscoverMain` → `DiscoverDetail`). `src/theme/tokens.ts` (the "Verdure" palette) is the single source of truth for `Colors`/`Spacing`/`Typography`/`Radius` — use these tokens, never raw hex or magic numbers. Screens should not add top padding; the navigation header owns it.
 
 ## Testing setup — read before touching jest config
 
