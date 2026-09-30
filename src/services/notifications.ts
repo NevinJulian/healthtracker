@@ -219,22 +219,37 @@ export async function scheduleWorkoutReminder(time: string): Promise<void> {
   }
 }
 
+async function cancelReminder(identifier: string, idKey: string, label: string): Promise<void> {
+  lastScheduledSignature.delete(identifier);
+  try {
+    await Notifications.cancelScheduledNotificationAsync(identifier);
+  } catch (err) {
+    console.warn(`[Notifications] cancel ${label} failed:`, err);
+  }
+  try {
+    const legacyId = await getSetting(idKey);
+    if (legacyId) {
+      if (legacyId !== identifier) {
+        try {
+          await Notifications.cancelScheduledNotificationAsync(legacyId);
+        } catch (err) {
+          console.warn(`[Notifications] cancel legacy ${label} id failed:`, err);
+        }
+      }
+      await setSetting(idKey, '');
+    }
+    console.log(`[Notifications] ${label} cancelled`);
+  } catch (err) {
+    console.warn(`[Notifications] cancel ${label} failed:`, err);
+  }
+}
+
 /**
  * Cancel the previously scheduled workout reminder (if any).
  * Silently succeeds when no reminder was previously scheduled.
  */
 export async function cancelWorkoutReminder(): Promise<void> {
-  try {
-    lastScheduledSignature.delete(WORKOUT_REMINDER_IDENTIFIER);
-    const id = await getSetting(WORKOUT_REMINDER_ID_KEY);
-    if (id) {
-      await Notifications.cancelScheduledNotificationAsync(id);
-      await setSetting(WORKOUT_REMINDER_ID_KEY, '');
-      console.log(`[Notifications] Workout reminder cancelled (id: ${id})`);
-    }
-  } catch (err) {
-    console.warn('[Notifications] cancelWorkoutReminder failed:', err);
-  }
+  await cancelReminder(WORKOUT_REMINDER_IDENTIFIER, WORKOUT_REMINDER_ID_KEY, 'workout reminder');
 }
 
 // ─── Weekly cook-day reminder ────────────────────────────────────────────────
@@ -290,17 +305,7 @@ export async function scheduleWeeklyCookDay(day: number, time: string): Promise<
  * Cancel the previously scheduled weekly cook-day reminder (if any).
  */
 export async function cancelWeeklyCookDay(): Promise<void> {
-  try {
-    lastScheduledSignature.delete(COOKDAY_REMINDER_IDENTIFIER);
-    const id = await getSetting(WEEKLY_COOK_DAY_ID_KEY);
-    if (id) {
-      await Notifications.cancelScheduledNotificationAsync(id);
-      await setSetting(WEEKLY_COOK_DAY_ID_KEY, '');
-      console.log(`[Notifications] Weekly cook-day reminder cancelled (id: ${id})`);
-    }
-  } catch (err) {
-    console.warn('[Notifications] cancelWeeklyCookDay failed:', err);
-  }
+  await cancelReminder(COOKDAY_REMINDER_IDENTIFIER, WEEKLY_COOK_DAY_ID_KEY, 'weekly cook-day reminder');
 }
 
 // ─── Meal-time reminders (#287) ─────────────────────────────────────────────
@@ -364,17 +369,7 @@ export async function scheduleMealReminder(meal: MealType, hour: number, minute:
  * Silently succeeds when no reminder was previously scheduled.
  */
 export async function cancelMealReminder(meal: MealType): Promise<void> {
-  try {
-    lastScheduledSignature.delete(getMealReminderIdentifier(meal));
-    const id = await getSetting(MEAL_REMINDER_ID_KEYS[meal]);
-    if (id) {
-      await Notifications.cancelScheduledNotificationAsync(id);
-      await setSetting(MEAL_REMINDER_ID_KEYS[meal], '');
-      console.log(`[Notifications] Meal reminder (${meal}) cancelled (id: ${id})`);
-    }
-  } catch (err) {
-    console.warn(`[Notifications] cancelMealReminder(${meal}) failed:`, err);
-  }
+  await cancelReminder(getMealReminderIdentifier(meal), MEAL_REMINDER_ID_KEYS[meal], `meal reminder (${meal})`);
 }
 
 /**
@@ -504,17 +499,7 @@ export async function scheduleBackupReminder(day: number, time: string): Promise
  * Silently succeeds when no reminder was previously scheduled.
  */
 export async function cancelBackupReminder(): Promise<void> {
-  try {
-    lastScheduledSignature.delete(BACKUP_REMINDER_IDENTIFIER);
-    const id = await getSetting(BACKUP_REMINDER_ID_KEY);
-    if (id) {
-      await Notifications.cancelScheduledNotificationAsync(id);
-      await setSetting(BACKUP_REMINDER_ID_KEY, '');
-      console.log(`[Notifications] Backup reminder cancelled (id: ${id})`);
-    }
-  } catch (err) {
-    console.warn('[Notifications] cancelBackupReminder failed:', err);
-  }
+  await cancelReminder(BACKUP_REMINDER_IDENTIFIER, BACKUP_REMINDER_ID_KEY, 'backup reminder');
 }
 
 // ─── Reconcile ───────────────────────────────────────────────────────────────
