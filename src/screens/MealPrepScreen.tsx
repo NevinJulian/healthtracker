@@ -193,13 +193,19 @@ export default function MealPrepScreen() {
   const handleToggleConsumed = async (planId: number, currentVal: boolean) => {
     try {
       await toggleMealConsumed(planId, !currentVal);
-      // After consuming a meal, check whether inventory is now empty
-      // and nudge the user to cook if so (debounced per empty episode).
-      await checkAndNotifyEmptyInventory();
-      loadData();
     } catch (err) {
       logDbError(err);
+      Alert.alert('Error', 'Failed to update the meal. Please try again.');
+      return;
     }
+    // After consuming a meal, check whether inventory is now empty
+    // and nudge the user to cook if so (debounced per empty episode).
+    try {
+      await checkAndNotifyEmptyInventory();
+    } catch (err) {
+      console.warn('[MealPrepScreen] checkAndNotifyEmptyInventory failed:', err);
+    }
+    loadData();
   };
 
   // ─── Tab Switcher ─────────────────────────────────────────────
