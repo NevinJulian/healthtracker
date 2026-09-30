@@ -44,6 +44,9 @@ describe('syncRollingSchedule() backfill with malformed stored exercises', () =>
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
     await seedTemplateExercises(db);
+    await db.getDatabase().runAsync("UPDATE app_state SET value = ? WHERE key = 'app_start_date'", [
+      addDays(todayKey(), -30),
+    ]);
     await db.syncRollingSchedule();
 
     const dates = [addDays(todayKey(), -7), todayKey(), addDays(todayKey(), 7)];
@@ -61,10 +64,8 @@ describe('syncRollingSchedule() backfill with malformed stored exercises', () =>
     for (const d of dates) {
       expect(await readExercises(db, d)).toBe(bad);
     }
-    // today-7 precedes the start date, so the sync never visits it
-    expect(warn).toHaveBeenCalledTimes(2);
-    expect(warn.mock.calls[0][0]).toContain(dates[1]);
-    expect(warn.mock.calls[1][0]).toContain(dates[2]);
+    expect(warn).toHaveBeenCalledTimes(3);
+    dates.forEach((d, i) => expect(warn.mock.calls[i][0]).toContain(d));
     if (bad) expect(warn.mock.calls[0][0]).not.toContain(bad);
   });
 
