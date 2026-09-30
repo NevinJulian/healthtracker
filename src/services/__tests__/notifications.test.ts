@@ -23,6 +23,9 @@ import {
   getBackupReminderIdentifier,
   scheduleBackupReminder,
   cancelBackupReminder,
+  cancelWorkoutReminder,
+  cancelWeeklyCookDay,
+  cancelMealReminder,
   scheduleWorkoutReminder,
   scheduleWeeklyCookDay,
   scheduleMealReminder,
@@ -766,5 +769,105 @@ describe('reconcile skips unchanged reminders', () => {
     jest.mocked(db.getMealReminderEnabled).mockResolvedValue(true);
     await reconcileScheduledNotifications();
     expect(entries.has('meal-reminder-lunch')).toBe(true);
+  });
+});
+
+describe('cancel functions cancel the stable identifier', () => {
+  const cases: { name: string; identifier: string; key: string; schedule: () => Promise<void>; cancel: () => Promise<void> }[] = [
+    {
+      name: 'workout reminder',
+      identifier: 'workout-reminder',
+      key: 'workoutReminderNotificationId',
+      schedule: () => scheduleWorkoutReminder('07:00'),
+      cancel: () => cancelWorkoutReminder(),
+    },
+    {
+      name: 'cook-day reminder',
+      identifier: 'cookday-reminder',
+      key: 'weeklyCookDayNotificationId',
+      schedule: () => scheduleWeeklyCookDay(0, '10:00'),
+      cancel: () => cancelWeeklyCookDay(),
+    },
+    {
+      name: 'backup reminder',
+      identifier: 'backup-reminder',
+      key: 'backupReminderNotificationId',
+      schedule: () => scheduleBackupReminder(0, '18:00'),
+      cancel: () => cancelBackupReminder(),
+    },
+    ...(['breakfast', 'lunch', 'dinner'] as MealType[]).map((meal) => ({
+      name: `${meal} meal reminder`,
+      identifier: `meal-reminder-${meal}`,
+      key: `mealReminder${meal[0].toUpperCase()}${meal.slice(1)}NotificationId`,
+      schedule: () => scheduleMealReminder(meal, 12, 0),
+      cancel: () => cancelMealReminder(meal),
+    })),
+  ];
+
+  describe.each(cases)('$name', ({ identifier, key, schedule, cancel }) => {
+    it.each([null, ''])('removes the scheduled entry when the stored id is %p', async (stored) => {
+      const entries = mockOsSchedule();
+      await schedule();
+      expect(entries.has(identifier)).toBe(true);
+
+      jest.mocked(db.getSetting).mockResolvedValue(stored);
+      await cancel();
+
+      expect(entries.has(identifier)).toBe(false);
+    });
+
+    it('cancels both the legacy id and the stable id and clears the key', async () => {
+      jest.mocked(db.getSetting).mockImplementation(async (k: string) => (k === key ? 'legacy-uuid' : null));
+
+      await cancel();
+
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith('legacy-uuid');
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith(identifier);
+      expect(db.setSetting).toHaveBeenCalledWith(key, '');
+    });
+
+    it('cancels once when the stored id equals the stable id', async () => {
+      jest.mocked(db.getSetting).mockImplementation(async (k: string) => (k === key ? identifier : null));
+
+      await cancel();
+
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledTimes(1);
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith(identifier);
+    });
+
+    it('still cancels the stable id when the legacy cancel rejects', async () => {
+      jest.mocked(db.getSetting).mockImplementation(async (k: string) => (k === key ? 'legacy-uuid' : null));
+      jest.mocked(Notifications.cancelScheduledNotificationAsync).mockImplementation(async (id: string) => {
+        if (id === 'legacy-uuid') throw new Error('gone');
+      });
+
+      await cancel();
+
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith(identifier);
+    });
+
+    it('does not throw when the stable cancel rejects', async () => {
+      jest.mocked(Notifications.cancelScheduledNotificationAsync).mockRejectedValue(new Error('boom'));
+      jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      await expect(cancel()).resolves.toBeUndefined();
+    });
+  });
+
+  it('reconcile reschedules a reminder after it was cancelled', async () => {
+    const entries = mockOsSchedule();
+    jest.mocked(Notifications.getAllScheduledNotificationsAsync).mockImplementation(async () =>
+      [...entries.keys()].map((identifier) => ({ identifier })) as any
+    );
+    jest.mocked(db.getWorkoutReminderEnabled).mockResolvedValue(true);
+    jest.mocked(db.getWorkoutReminderTime).mockResolvedValue('07:00');
+    await reconcileScheduledNotifications();
+    expect(entries.has('workout-reminder')).toBe(true);
+
+    await cancelWorkoutReminder();
+    expect(entries.has('workout-reminder')).toBe(false);
+
+    await reconcileScheduledNotifications();
+    expect(entries.has('workout-reminder')).toBe(true);
   });
 });
