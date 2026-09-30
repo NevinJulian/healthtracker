@@ -101,7 +101,7 @@ describe('SettingsScreen restore result alert', () => {
     jest.restoreAllMocks();
   });
 
-  const base = { tablesRestored: 3, rowsRestored: 10 };
+  const base = { tablesRestored: 3, rowsRestored: 10, safetySnapshotUri: '' };
   const skipped = [{ table: 'daily_log', columns: ['foo'], rows: 0 }];
 
   it('names skipped tables and columns when a snapshot was saved', async () => {

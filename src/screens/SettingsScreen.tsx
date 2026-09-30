@@ -345,6 +345,26 @@ const stepperStyles = StyleSheet.create({
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
+const MAX_SKIPPED_TABLES_SHOWN = 5;
+
+function formatSkippedSummary(
+  skipped: { table: string; columns: string[]; rows: number }[] | undefined
+): string {
+  if (!skipped?.length) return '';
+  const parts = skipped.slice(0, MAX_SKIPPED_TABLES_SHOWN).map(({ table, columns, rows }) => {
+    const detail = [
+      columns.join(', '),
+      rows > 0 ? `${rows} row${rows === 1 ? '' : 's'}` : '',
+    ].filter(Boolean);
+    return detail.length ? `${table} (${detail.join('; ')})` : table;
+  });
+  const extra = skipped.length - MAX_SKIPPED_TABLES_SHOWN;
+  const more = extra > 0 ? ` and ${extra} more` : '';
+  return `
+
+Skipped data this app version doesn't recognise: ${parts.join(', ')}${more}`;
+}
+
 export default function SettingsScreen() {
   const [reminder, setReminder] = useState<ReminderState>({
     enabled: false,
@@ -937,11 +957,12 @@ export default function SettingsScreen() {
                       result.consumedMealsWithoutRefund === 1 ? 'it' : 'them'
                     } will NOT add a portion back to your inventory — add it by hand if you need to.`
                   : '';
+              const skippedNote = formatSkippedSummary(result.skipped);
               // Offer to share the safety snapshot if one was written
               if (result.safetySnapshotUri) {
                 Alert.alert(
                   'Restore complete',
-                  `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows.${refundWarning}\n\nA safety copy of your previous data was saved. Would you like to share it?`,
+                  `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows.${refundWarning}${skippedNote}\n\nA safety copy of your previous data was saved. Would you like to share it?`,
                   [
                     { text: 'Dismiss', style: 'cancel' },
                     {
@@ -953,7 +974,7 @@ export default function SettingsScreen() {
               } else {
                 Alert.alert(
                   'Restore complete',
-                  `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows. Revisit each screen to see the updated data.${refundWarning}`
+                  `Restored ${result.tablesRestored} tables and ${result.rowsRestored} rows. Revisit each screen to see the updated data.${refundWarning}${skippedNote}`
                 );
               }
             } catch (err) {
