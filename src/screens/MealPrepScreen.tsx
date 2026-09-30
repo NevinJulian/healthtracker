@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -161,14 +162,20 @@ export default function MealPrepScreen() {
     if (!Number.isInteger(portions) || portions < 1 || portions > 50) return;
     try {
       await logCookedMeal(recipe_id, portions);
-      // Inventory just grew — clear the empty-episode debounce flag so the
-      // next time it empties again the user gets a fresh notification.
-      await resetCookEmptyNotified();
-      setLogModalVisible(false);
-      loadData();
     } catch (err) {
       logDbError(err);
+      Alert.alert('Error', 'Failed to record your cooked meal. Please try again.');
+      return;
     }
+    // Inventory just grew — clear the empty-episode debounce flag so the
+    // next time it empties again the user gets a fresh notification.
+    try {
+      await resetCookEmptyNotified();
+    } catch (err) {
+      console.warn('[MealPrepScreen] resetCookEmptyNotified failed:', err);
+    }
+    setLogModalVisible(false);
+    loadData();
   };
 
   const handleAssignMeal = async (recipe_id: string) => {
