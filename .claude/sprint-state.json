@@ -1,6 +1,6 @@
 {
   "sprint": 2,
-  "startedAt": "2026-10-01T00:00:00Z",
+  "startedAt": "2026-09-30T22:30:33Z",
   "integrationBranch": "sprint/auto-fixes",
   "baseSha": "fdf5c68",
   "baseline": {
@@ -9,37 +9,353 @@
     "tests": 610,
     "note": "green at --maxWorkers=2 in Europe/Zurich and TZ=UTC"
   },
-  "frozenScope": [314, 316, 315, 363, 378, 380, 368, 370, 371, 381, 379, 382, 383, 372, 373, 367, 362, 311, 361, 328, 375, 366, 365, 364, 318, 374, 377],
+  "frozenScope": [
+    314,
+    316,
+    315,
+    363,
+    378,
+    380,
+    368,
+    370,
+    371,
+    381,
+    379,
+    382,
+    383,
+    372,
+    373,
+    367,
+    362,
+    311,
+    361,
+    328,
+    375,
+    366,
+    365,
+    364,
+    318,
+    374,
+    377
+  ],
   "excluded": {
-    "360": "PR #394, landed by hand",
     "334": "PR #393, landed by hand",
+    "360": "PR #394, landed by hand",
     "392": "feature, runs outside the sprint",
     "396": "not in SPRINT.md §3 (follow-up to #316)"
   },
-  "budget": { "maxRoundTripsPerIssue": 3, "maxParkedBeforeAbort": 8 },
+  "budget": {
+    "maxRoundTripsPerIssue": 3,
+    "maxParkedBeforeAbort": 8
+  },
   "worktreeRoot": "C:/git/ht-lanes",
   "orchestratorDecisions": [
     "Each lane runs in its own git worktree at C:/git/ht-lanes/lane-<x>, branched from sprint/auto-fixes at fdf5c68.",
     "Agents must not use git stash: the stash stack is shared across all worktrees.",
     "Test-file ownership: A = src/db/__tests__/** + src/services/__tests__/backup.test.ts; B = src/services/__tests__/notifications*; C = src/screens/__tests__/analyticsHelpers* + AnalyticsDashboardScreen*; D = src/screens/__tests__/{Settings,MealPrep,Dashboard,Onboarding}Screen* (and SetLoggerModal tests if #364 lands in a component, pending analyst); E = src/api/__tests__/**; G = src/db/testHelpers/**, jest.config.js, .github/workflows/test.yml.",
     "Lane G (#377) starts only after every other lane has merged into sprint/auto-fixes.",
-    "Security review is required for every lane A issue, lane E, and any other issue whose diff reaches src/db, backup.ts, src/api or external input; skip decisions are recorded per issue."
+    "Security review is required for every lane A issue, lane E, and any other issue whose diff reaches src/db, backup.ts, src/api or external input; skip decisions are recorded per issue.",
+    "#318: lane E granted DiscoverScreen.tsx, RecipeEditorScreen.tsx and DiscoverScreen.test.tsx (no sprint-2 owner). DiscoverDetailScreen.tsx and src/nutrition/importRecipe.ts NOT granted; the cancel affordance is excluded (product call). #318 stays partial -> Refs.",
+    "#311: analyst chose an in-lane variant of option 3 (signature map + OS identifier check inside _reconcile) instead of passing reminder kind from SettingsScreen; accepted.",
+    "#318: grant extended to a new file src/screens/__tests__/RecipeEditorScreen.abort.test.tsx (unowned) so the editor-unmount AC gets a test."
   ],
   "lanes": {
-    "A": { "branch": "sprint/lane-a-db", "worktree": "C:/git/ht-lanes/lane-a", "status": "pending", "order": [314, 316, 315, 363, 378, 380, 368, 370, 371, 381, 379, 382, 383, 372, 373, 367, 362], "current": null, "done": [], "parked": [] },
-    "B": { "branch": "sprint/lane-b-notify", "worktree": "C:/git/ht-lanes/lane-b", "status": "pending", "order": [311, 361], "current": null, "done": [], "parked": [] },
-    "C": { "branch": "sprint/lane-c-analytics", "worktree": "C:/git/ht-lanes/lane-c", "status": "pending", "order": [328], "current": null, "done": [], "parked": [] },
-    "D": { "branch": "sprint/lane-d-screens", "worktree": "C:/git/ht-lanes/lane-d", "status": "pending", "order": [375, 366, 365, 364], "current": null, "done": [], "parked": [] },
-    "E": { "branch": "sprint/lane-e-api", "worktree": "C:/git/ht-lanes/lane-e", "status": "pending", "order": [318], "current": null, "done": [], "parked": [] },
-    "F": { "branch": "sprint/lane-f-repo", "worktree": "C:/git/ht-lanes/lane-f", "status": "pending", "order": [374], "current": null, "done": [], "parked": [] },
-    "G": { "branch": "sprint/lane-g-tests", "worktree": "C:/git/ht-lanes/lane-g", "status": "pending", "order": [377], "waitsFor": "all other lanes merged", "current": null, "done": [], "parked": [] }
+    "A": {
+      "branch": "sprint/lane-a-db",
+      "worktree": "C:/git/ht-lanes/lane-a",
+      "status": "in_progress",
+      "order": [
+        314,
+        316,
+        315,
+        363,
+        378,
+        380,
+        368,
+        370,
+        371,
+        381,
+        379,
+        382,
+        383,
+        372,
+        373,
+        367,
+        362
+      ],
+      "current": 316,
+      "done": [],
+      "parked": [
+        314
+      ]
+    },
+    "B": {
+      "branch": "sprint/lane-b-notify",
+      "worktree": "C:/git/ht-lanes/lane-b",
+      "status": "in_progress",
+      "order": [
+        311,
+        361
+      ],
+      "current": 361,
+      "done": [
+        311
+      ],
+      "parked": []
+    },
+    "C": {
+      "branch": "sprint/lane-c-analytics",
+      "worktree": "C:/git/ht-lanes/lane-c",
+      "status": "out_of_work",
+      "order": [
+        328
+      ],
+      "current": null,
+      "done": [],
+      "parked": [
+        328
+      ]
+    },
+    "D": {
+      "branch": "sprint/lane-d-screens",
+      "worktree": "C:/git/ht-lanes/lane-d",
+      "status": "in_progress",
+      "order": [
+        375,
+        366,
+        365,
+        364
+      ],
+      "current": 366,
+      "done": [
+        375
+      ],
+      "parked": []
+    },
+    "E": {
+      "branch": "sprint/lane-e-api",
+      "worktree": "C:/git/ht-lanes/lane-e",
+      "status": "in_progress",
+      "order": [
+        318
+      ],
+      "current": 318,
+      "done": [],
+      "parked": []
+    },
+    "F": {
+      "branch": "sprint/lane-f-repo",
+      "worktree": "C:/git/ht-lanes/lane-f",
+      "status": "merged",
+      "order": [
+        374
+      ],
+      "current": null,
+      "done": [
+        374
+      ],
+      "parked": [],
+      "cleanup": "no changes needed",
+      "mergeSha": "c3c9dbd"
+    },
+    "G": {
+      "branch": "sprint/lane-g-tests",
+      "worktree": "C:/git/ht-lanes/lane-g",
+      "status": "pending",
+      "order": [
+        377
+      ],
+      "waitsFor": "all other lanes merged",
+      "current": null,
+      "done": [],
+      "parked": []
+    }
   },
-  "issues": {},
-  "foundDuringSprint": [],
+  "issues": {
+    "311": {
+      "roundTrips": 0,
+      "commits": [
+        "f7f9796",
+        "08177d8"
+      ],
+      "lane": "B",
+      "status": "ready",
+      "partial": true,
+      "securityReview": "skipped-notifications-only",
+      "deviceCheck": "Enable workout/cook-day/backup reminders 2 min ahead; change only cook-day time; each fires exactly once at the right time; toggle one meal reminder off/on and confirm it fires; restore a backup and confirm reminders still fire.",
+      "regressionProof": "3/5 new tests fail with f7f9796 notifications.ts (stub), all pass at 08177d8 (tester reproduced); 2 guards pass pre-fix by design",
+      "notes": "tester APPROVE r0. Content is static so signature w/o content is safe (breaks if content becomes dynamic). resetReconcileStateForTests exported test-only helper (small API smell). PARTIAL-> now all ACs covered? AC4 done; earlier ACs landed sprint 1 -> Closes #311."
+    },
+    "314": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "parked",
+      "stalledAt": "analysis",
+      "parkReason": "Lane-A part already landed in sprint 1 (runner transactional per migration, database.ts:449-457; migrationAtomicity.test.ts covers throw/rollback, idempotent rerun, multi-statement). Only open AC is the App.tsx failure screen (dead end at App.tsx:86): not lane A, and a reset/recovery action destroys all health data -> owner decides retry vs reset vs export-first."
+    },
+    "316": {
+      "roundTrips": 0,
+      "commits": [
+        "7728404",
+        "67bb382",
+        "b4b8732",
+        "3054a18",
+        "8fea2a6"
+      ],
+      "lane": "A",
+      "status": "in_test",
+      "migration": "v38",
+      "securityReview": "required-src-db-data-migration",
+      "decisionSource": "owner comment on #316 2026-09-30 (archive, not delete; v38 orphan sweep approved)",
+      "deviceCheck": "Install over an existing build; delete a custom recipe; it leaves library and picker; cooked portions still show in inventory; re-import from Discover brings it back (migration on startup path)."
+    },
+    "318": {
+      "roundTrips": 0,
+      "commits": [
+        "0083100",
+        "111f8fb",
+        "134efad",
+        "985ce33",
+        "aa3da5c",
+        "0e37408"
+      ],
+      "lane": "E",
+      "status": "in_test",
+      "partial": true,
+      "securityReview": "required-src-api",
+      "grant": "DiscoverScreen.tsx, RecipeEditorScreen.tsx, src/screens/__tests__/DiscoverScreen.test.tsx (unowned in sprint 2)",
+      "excludedRemainder": "DiscoverDetailScreen/importRecipe signals + import-spinner cancel affordance -> PR says Refs #318",
+      "deviceCheck": "Discover: search chicken, immediately change to beef and search - only beef results show. Search then navigate away - no red-box/warning in Metro.",
+      "notes": "dev round 1 done but editor-unmount AC untested (file not granted). Orchestrator extended grant to NEW src/screens/__tests__/RecipeEditorScreen.abort.test.tsx; dev continuing (not a round trip)."
+    },
+    "328": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "C",
+      "status": "parked",
+      "stalledAt": "analysis",
+      "parkReason": "Unchanged since sprint-1 park; no human answer. (1) LiftingSectionCard progression chart is all-time; bounding truncates visible data - all-time vs windowed? (2) PRSummaryCard needs lifetime PRs; needs new getExercisePRs(): Promise<Record<string,PRRecord>> GROUP BY exercise in database.ts (lane A). Analyst-recommended design if all-time: aggregate PRs + lazy full history for active exercise only."
+    },
+    "361": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "B",
+      "status": "in_dev",
+      "securityReview": "skipped-notifications-only",
+      "deviceCheck": "none (optional: toggle workout reminder off/on in Settings, exactly one notification fires)"
+    },
+    "366": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "D",
+      "status": "analysing"
+    },
+    "374": {
+      "roundTrips": 1,
+      "commits": [
+        "b8a6b8d",
+        "97e92c6",
+        "a40aad3",
+        "157da1c"
+      ],
+      "lane": "F",
+      "status": "merged",
+      "securityReview": "skipped-docs-only",
+      "deviceCheck": "none",
+      "notes": "tester REJECT r1 (false app.json newArchEnabled pointer), APPROVE r2. r2 also corrected false no-remote-API claim on line 7.",
+      "regressionProof": "grep assertions fail on fdf5c68, pass at 157da1c (tester ran, incl. gates 610/62)",
+      "mergeSha": "c3c9dbd"
+    },
+    "375": {
+      "roundTrips": 0,
+      "commits": [
+        "50bb9aa",
+        "07dc001"
+      ],
+      "lane": "D",
+      "status": "ready",
+      "securityReview": "skipped-ui-state-only",
+      "deviceCheck": "none (optional: save height, leave Settings, return, value persists)",
+      "regressionProof": "6/6 fail with 50bb9aa SettingsScreen.tsx, pass at 07dc001 (tester reproduced)",
+      "notes": "tester APPROVE r0. Committed tests assert input text, not profile state; tester verified profile freshness via throwaway probe (recalc used fresh height). Failed write keeps local text until next focus (same as before)."
+    }
+  },
+  "foundDuringSprint": [
+    397,
+    398,
+    399,
+    400
+  ],
   "log": [
-    { "at": "2026-10-01T00:00:00Z", "event": "preflight green on main fdf5c68: typecheck pass, 610 tests / 62 suites (Zurich and UTC)" },
-    { "at": "2026-10-01T00:00:00Z", "event": "created and pushed sprint/auto-fixes from main", "sha": "fdf5c68" },
-    { "at": "2026-10-01T00:00:00Z", "event": "scope frozen: 27 open issues from SPRINT.md §3" },
-    { "at": "2026-10-01T00:00:00Z", "event": "worktrees created at C:/git/ht-lanes/lane-{a..g}, lane branches pushed, npm ci running" }
+    {
+      "at": "2026-09-30T22:30:33Z",
+      "event": "preflight green on main fdf5c68: typecheck pass, 610 tests / 62 suites (Zurich and UTC)"
+    },
+    {
+      "at": "2026-09-30T22:30:33Z",
+      "event": "created and pushed sprint/auto-fixes from main",
+      "sha": "fdf5c68"
+    },
+    {
+      "at": "2026-09-30T22:30:33Z",
+      "event": "scope frozen: 27 open issues from SPRINT.md §3"
+    },
+    {
+      "at": "2026-09-30T22:30:33Z",
+      "event": "worktrees created at C:/git/ht-lanes/lane-{a..g}, lane branches pushed, npm ci running"
+    },
+    {
+      "at": "2026-09-30T22:30:33Z",
+      "event": "#314 parked at analysis; #328 parked at analysis (lane C out of work); #318 in_dev with screen grant; lane A -> #316"
+    },
+    {
+      "at": "2026-09-30T22:31:53Z",
+      "event": "#311/#375/#374/#318 in_dev; #316 analysing"
+    },
+    {
+      "at": "2026-09-30T22:32:57Z",
+      "event": "#316 decision verified in owner comment; in_dev (v38). #374 in_test. Filed #397 (settings stale reload sex/activity/goal), #398 (unused bottom-tabs), #399 (sequential import lookups). Commented #396 re createRecipe resetting archived_at."
+    },
+    {
+      "at": "2026-09-30T22:34:00Z",
+      "event": "#311 in_test (615 tests per dev)"
+    },
+    {
+      "at": "2026-09-30T22:34:24Z",
+      "event": "#374 REJECT r1 -> back to dev; #375 in_test (616 tests per dev)"
+    },
+    {
+      "at": "2026-09-30T22:34:36Z",
+      "event": "filed #400 (stale babel.config.js comment)"
+    },
+    {
+      "at": "2026-09-30T22:34:48Z",
+      "event": "#318 dev continuing for editor abort test"
+    },
+    {
+      "at": "2026-09-30T22:34:58Z",
+      "event": "#374 round 2 (157da1c) in_test"
+    },
+    {
+      "at": "2026-09-30T22:35:24Z",
+      "event": "#311 ready (tester APPROVE r0, security skipped notifications-only); lane B -> #361 analysing"
+    },
+    {
+      "at": "2026-09-30T22:35:50Z",
+      "event": "#374 ready (APPROVE r2); lane F cleanup running"
+    },
+    {
+      "at": "2026-09-30T22:36:13Z",
+      "event": "#316 in_test (615 per dev)"
+    },
+    {
+      "at": "2026-09-30T22:36:52Z",
+      "event": "#375 ready (security skipped: UI state gating only, write calls unchanged); lane D -> #366 analysing; #318 in_test; #361 in_dev; lane F cleanup no-op, merging"
+    },
+    {
+      "at": "2026-09-30T22:37:21Z",
+      "event": "merged lane F into integration c3c9dbd; gates green: typecheck clean, 610/62"
+    }
   ]
 }
