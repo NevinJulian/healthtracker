@@ -238,7 +238,7 @@ async function cancelReminder(identifier: string, idKey: string, label: string):
       }
       await setSetting(idKey, '');
     }
-    console.log(`[Notifications] ${label} cancelled`);
+    console.log(`[Notifications] cancel ${label} completed`);
   } catch (err) {
     console.warn(`[Notifications] cancel ${label} failed:`, err);
   }
