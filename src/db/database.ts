@@ -179,7 +179,7 @@ export function toISODate(date: Date = new Date()): string {
 
 function buildHammerTask(base: string, isRestDay: boolean, daysDiff: number): string {
   if (isRestDay) return `${base} @ Light Weight`;
-  const cycle = Math.floor(daysDiff / CYCLE_DAYS);
+  const cycle = Math.max(0, Math.floor(daysDiff / CYCLE_DAYS));
   if (cycle === 0) return `${base} @ Baseline`;
   return `${base} @ Baseline + ${cycle * KG_PER_CYCLE}kg`;
 }
