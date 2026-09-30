@@ -101,8 +101,8 @@ function toDetail(meal: MealDbMeal): MealDetail {
  * Search meals by name.
  *
  * Returns an empty array when no results match (`meals: null` from the API).
- * Throws (`FetchJsonError`) on a non-2xx response, a timeout, or a network
- * error so callers can show a retry state.
+ * Throws (`FetchJsonError`) on a non-2xx response, a timeout, an abort, or a
+ * network error so callers can show a retry state.
  */
 export async function searchMeals(query: string, signal?: AbortSignal): Promise<MealSummary[]> {
   const encoded = encodeURIComponent(query.trim());
@@ -124,8 +124,8 @@ const mealByIdCache = new Map<string, MealDetail | null>();
  * Fetch full meal detail by TheMealDB id.
  *
  * Returns `null` when the id is not found.
- * Throws (`FetchJsonError`) on a non-2xx response, a timeout, or a network
- * error.
+ * Throws (`FetchJsonError`) on a non-2xx response, a timeout, an abort, or a
+ * network error. An aborted call is never cached.
  *
  * Repeated calls for the same id are served from an in-memory cache after
  * the first successful lookup — no second network call.

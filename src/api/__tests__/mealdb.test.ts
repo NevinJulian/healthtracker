@@ -82,6 +82,7 @@ describe('mealdb — fetch timeout + retry + cache (#318)', () => {
     expect(second?.name).toBe('Teriyaki Chicken Casserole');
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
   });
+
   it('searchMeals rejects and never fetches when given an already-aborted signal', async () => {
     global.fetch = jest.fn() as unknown as typeof fetch;
     const { searchMeals } = require('../mealdb');
