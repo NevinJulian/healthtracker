@@ -1221,9 +1221,12 @@ export async function getRecipes(category?: string): Promise<Recipe[]> {
   const db = getDatabase();
   let rows: any[];
   if (category && category !== 'All') {
-    rows = await db.getAllAsync('SELECT * FROM recipe_library WHERE category = ?', [category]);
+    rows = await db.getAllAsync(
+      'SELECT * FROM recipe_library WHERE archived_at IS NULL AND category = ?',
+      [category],
+    );
   } else {
-    rows = await db.getAllAsync('SELECT * FROM recipe_library');
+    rows = await db.getAllAsync('SELECT * FROM recipe_library WHERE archived_at IS NULL');
   }
 
   return rows.map((r) => ({
@@ -1234,7 +1237,10 @@ export async function getRecipes(category?: string): Promise<Recipe[]> {
 
 export async function getRecipeById(id: string): Promise<Recipe | null> {
   const db = getDatabase();
-  const row = await db.getFirstAsync<any>('SELECT * FROM recipe_library WHERE id = ?', [id]);
+  const row = await db.getFirstAsync<any>(
+    'SELECT * FROM recipe_library WHERE id = ? AND archived_at IS NULL',
+    [id],
+  );
   if (!row) return null;
   return {
     ...row,
@@ -1381,7 +1387,7 @@ async function _deleteRecipeImpl(id: string): Promise<void> {
 export async function getRecipeCategories(): Promise<string[]> {
   const db = getDatabase();
   const rows = await db.getAllAsync<{ category: string }>(
-    'SELECT DISTINCT category FROM recipe_library ORDER BY category ASC',
+    'SELECT DISTINCT category FROM recipe_library WHERE archived_at IS NULL ORDER BY category ASC',
   );
   return rows.map((r) => r.category);
 }
