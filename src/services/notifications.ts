@@ -84,6 +84,20 @@ const BACKUP_REMINDER_ID_KEY = 'backupReminderNotificationId';
  */
 const NOTIFICATION_ID_SWEEP_V1_KEY = 'notificationIdSweepV1Done';
 
+const lastScheduledSignature = new Map<string, string>();
+
+function dailySignature(hour: number, minute: number): string {
+  return `daily|${hour}|${minute}`;
+}
+
+function weeklySignature(weekday: number, hour: number, minute: number): string {
+  return `weekly|${weekday}|${hour}|${minute}`;
+}
+
+export function resetReconcileStateForTests(): void {
+  lastScheduledSignature.clear();
+}
+
 // ─── Foreground display handler ────────────────────────────────────────────
 
 /**
@@ -198,9 +212,35 @@ export async function scheduleWorkoutReminder(time: string): Promise<void> {
     });
 
     await setSetting(WORKOUT_REMINDER_ID_KEY, id);
+    lastScheduledSignature.set(WORKOUT_REMINDER_IDENTIFIER, dailySignature(hour, minute));
     console.log(`[Notifications] Workout reminder scheduled at ${time} (id: ${id})`);
   } catch (err) {
     console.warn('[Notifications] scheduleWorkoutReminder failed:', err);
+  }
+}
+
+async function cancelReminder(identifier: string, idKey: string, label: string): Promise<void> {
+  lastScheduledSignature.delete(identifier);
+  try {
+    await Notifications.cancelScheduledNotificationAsync(identifier);
+  } catch (err) {
+    console.warn(`[Notifications] cancel ${label} failed:`, err);
+  }
+  try {
+    const legacyId = await getSetting(idKey);
+    if (legacyId) {
+      if (legacyId !== identifier) {
+        try {
+          await Notifications.cancelScheduledNotificationAsync(legacyId);
+        } catch (err) {
+          console.warn(`[Notifications] cancel legacy ${label} id failed:`, err);
+        }
+      }
+      await setSetting(idKey, '');
+    }
+    console.log(`[Notifications] cancel ${label} completed`);
+  } catch (err) {
+    console.warn(`[Notifications] cancel ${label} failed:`, err);
   }
 }
 
@@ -209,16 +249,7 @@ export async function scheduleWorkoutReminder(time: string): Promise<void> {
  * Silently succeeds when no reminder was previously scheduled.
  */
 export async function cancelWorkoutReminder(): Promise<void> {
-  try {
-    const id = await getSetting(WORKOUT_REMINDER_ID_KEY);
-    if (id) {
-      await Notifications.cancelScheduledNotificationAsync(id);
-      await setSetting(WORKOUT_REMINDER_ID_KEY, '');
-      console.log(`[Notifications] Workout reminder cancelled (id: ${id})`);
-    }
-  } catch (err) {
-    console.warn('[Notifications] cancelWorkoutReminder failed:', err);
-  }
+  await cancelReminder(WORKOUT_REMINDER_IDENTIFIER, WORKOUT_REMINDER_ID_KEY, 'workout reminder');
 }
 
 // ─── Weekly cook-day reminder ────────────────────────────────────────────────
@@ -263,6 +294,7 @@ export async function scheduleWeeklyCookDay(day: number, time: string): Promise<
     });
 
     await setSetting(WEEKLY_COOK_DAY_ID_KEY, id);
+    lastScheduledSignature.set(COOKDAY_REMINDER_IDENTIFIER, weeklySignature(weekday, hour, minute));
     console.log(`[Notifications] Weekly cook-day scheduled (weekday ${weekday}, ${time}, id: ${id})`);
   } catch (err) {
     console.warn('[Notifications] scheduleWeeklyCookDay failed:', err);
@@ -273,16 +305,7 @@ export async function scheduleWeeklyCookDay(day: number, time: string): Promise<
  * Cancel the previously scheduled weekly cook-day reminder (if any).
  */
 export async function cancelWeeklyCookDay(): Promise<void> {
-  try {
-    const id = await getSetting(WEEKLY_COOK_DAY_ID_KEY);
-    if (id) {
-      await Notifications.cancelScheduledNotificationAsync(id);
-      await setSetting(WEEKLY_COOK_DAY_ID_KEY, '');
-      console.log(`[Notifications] Weekly cook-day reminder cancelled (id: ${id})`);
-    }
-  } catch (err) {
-    console.warn('[Notifications] cancelWeeklyCookDay failed:', err);
-  }
+  await cancelReminder(COOKDAY_REMINDER_IDENTIFIER, WEEKLY_COOK_DAY_ID_KEY, 'weekly cook-day reminder');
 }
 
 // ─── Meal-time reminders (#287) ─────────────────────────────────────────────
@@ -334,6 +357,7 @@ export async function scheduleMealReminder(meal: MealType, hour: number, minute:
     });
 
     await setSetting(MEAL_REMINDER_ID_KEYS[meal], id);
+    lastScheduledSignature.set(getMealReminderIdentifier(meal), dailySignature(hour, minute));
     console.log(`[Notifications] Meal reminder (${meal}) scheduled at ${formatTimeString(hour, minute)} (id: ${id})`);
   } catch (err) {
     console.warn(`[Notifications] scheduleMealReminder(${meal}) failed:`, err);
@@ -345,16 +369,7 @@ export async function scheduleMealReminder(meal: MealType, hour: number, minute:
  * Silently succeeds when no reminder was previously scheduled.
  */
 export async function cancelMealReminder(meal: MealType): Promise<void> {
-  try {
-    const id = await getSetting(MEAL_REMINDER_ID_KEYS[meal]);
-    if (id) {
-      await Notifications.cancelScheduledNotificationAsync(id);
-      await setSetting(MEAL_REMINDER_ID_KEYS[meal], '');
-      console.log(`[Notifications] Meal reminder (${meal}) cancelled (id: ${id})`);
-    }
-  } catch (err) {
-    console.warn(`[Notifications] cancelMealReminder(${meal}) failed:`, err);
-  }
+  await cancelReminder(getMealReminderIdentifier(meal), MEAL_REMINDER_ID_KEYS[meal], `meal reminder (${meal})`);
 }
 
 /**
@@ -472,6 +487,7 @@ export async function scheduleBackupReminder(day: number, time: string): Promise
     });
 
     await setSetting(BACKUP_REMINDER_ID_KEY, id);
+    lastScheduledSignature.set(BACKUP_REMINDER_IDENTIFIER, weeklySignature(weekday, hour, minute));
     console.log(`[Notifications] Backup reminder scheduled (weekday ${weekday}, ${time}, id: ${id})`);
   } catch (err) {
     console.warn('[Notifications] scheduleBackupReminder failed:', err);
@@ -483,16 +499,7 @@ export async function scheduleBackupReminder(day: number, time: string): Promise
  * Silently succeeds when no reminder was previously scheduled.
  */
 export async function cancelBackupReminder(): Promise<void> {
-  try {
-    const id = await getSetting(BACKUP_REMINDER_ID_KEY);
-    if (id) {
-      await Notifications.cancelScheduledNotificationAsync(id);
-      await setSetting(BACKUP_REMINDER_ID_KEY, '');
-      console.log(`[Notifications] Backup reminder cancelled (id: ${id})`);
-    }
-  } catch (err) {
-    console.warn('[Notifications] cancelBackupReminder failed:', err);
-  }
+  await cancelReminder(BACKUP_REMINDER_IDENTIFIER, BACKUP_REMINDER_ID_KEY, 'backup reminder');
 }
 
 // ─── Reconcile ───────────────────────────────────────────────────────────────
@@ -595,13 +602,28 @@ async function _reconcile(): Promise<void> {
     console.warn('[Notifications] reconcile: notification-id sweep failed:', err);
   }
 
+  let osIdentifiers: Set<string> | null = null;
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    osIdentifiers = new Set(scheduled.map((n) => n.identifier));
+  } catch (err) {
+    console.warn('[Notifications] reconcile: listing scheduled notifications failed:', err);
+  }
+  const isCurrent = (identifier: string, signature: string): boolean =>
+    osIdentifiers !== null &&
+    osIdentifiers.has(identifier) &&
+    lastScheduledSignature.get(identifier) === signature;
+
   // Workout reminder
   try {
     const workoutEnabled = await getWorkoutReminderEnabled();
     const workoutTime = await getWorkoutReminderTime();
 
+    const { hour: workoutHour, minute: workoutMinute } = parseTimeString(workoutTime);
     if (workoutEnabled) {
-      await scheduleWorkoutReminder(workoutTime);
+      if (!isCurrent(WORKOUT_REMINDER_IDENTIFIER, dailySignature(workoutHour, workoutMinute))) {
+        await scheduleWorkoutReminder(workoutTime);
+      }
     } else {
       await cancelWorkoutReminder();
     }
@@ -615,8 +637,12 @@ async function _reconcile(): Promise<void> {
     const cookDay = await getWeeklyCookDay();
     const cookDayTime = await getWeeklyCookDayTime();
 
+    const { hour: cookHour, minute: cookMinute } = parseTimeString(cookDayTime);
     if (cookDayEnabled) {
-      await scheduleWeeklyCookDay(cookDay, cookDayTime);
+      const signature = weeklySignature(mapWeekdayToExpo(cookDay), cookHour, cookMinute);
+      if (!isCurrent(COOKDAY_REMINDER_IDENTIFIER, signature)) {
+        await scheduleWeeklyCookDay(cookDay, cookDayTime);
+      }
     } else {
       await cancelWeeklyCookDay();
     }
@@ -633,7 +659,9 @@ async function _reconcile(): Promise<void> {
       const time = await getMealReminderTime(meal);
       const { hour, minute } = parseTimeString(time);
       if (enabled) {
-        await scheduleMealReminder(meal, hour, minute);
+        if (!isCurrent(getMealReminderIdentifier(meal), dailySignature(hour, minute))) {
+          await scheduleMealReminder(meal, hour, minute);
+        }
       } else {
         await cancelMealReminder(meal);
       }
@@ -648,8 +676,12 @@ async function _reconcile(): Promise<void> {
     const backupDay = await getBackupReminderDay();
     const backupTime = await getBackupReminderTime();
 
+    const { hour: backupHour, minute: backupMinute } = parseTimeString(backupTime);
     if (backupEnabled) {
-      await scheduleBackupReminder(backupDay, backupTime);
+      const signature = weeklySignature(mapWeekdayToExpo(backupDay), backupHour, backupMinute);
+      if (!isCurrent(BACKUP_REMINDER_IDENTIFIER, signature)) {
+        await scheduleBackupReminder(backupDay, backupTime);
+      }
     } else {
       await cancelBackupReminder();
     }
