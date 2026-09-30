@@ -355,8 +355,17 @@ export async function importBackup(
     // Caller chose to proceed despite failed snapshot — continue without URI.
   }
 
-  const { tablesRestored, rowsRestored, skipped, consumedMealsWithoutRefund } =
-    await restoreFromPayload(payload.tables);
+  let restored: Awaited<ReturnType<typeof restoreFromPayload>>;
+  try {
+    restored = await restoreFromPayload(payload.tables);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Restore failed — your existing data was not changed. Details: ${detail}`,
+      { cause: err }
+    );
+  }
+  const { tablesRestored, rowsRestored, skipped, consumedMealsWithoutRefund } = restored;
 
   // ── Resync scheduled notifications to the restored settings (#310) ──────
   // Runs only after a successful restore; nothing above this point touches
