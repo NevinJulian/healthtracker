@@ -245,6 +245,14 @@ function _tryParseExercisesForWrite(
   }
 }
 
+function _isStoredJsonArray(raw: string | null | undefined): boolean {
+  try {
+    return Array.isArray(JSON.parse(raw ?? '[]'));
+  } catch {
+    return false;
+  }
+}
+
 function parseAdditionalWorkouts(raw: string | null | undefined): AdditionalWorkout[] {
   try {
     const parsed = JSON.parse(raw ?? '[]');
@@ -1056,6 +1064,16 @@ async function _upsertAdditionalWorkoutsImpl(
 ): Promise<void> {
   const db = getDatabase();
   await _ensureDailyLogRow(db, date);
+  const row = await db.getFirstAsync<{ additional_workouts: string }>(
+    'SELECT additional_workouts FROM daily_log WHERE date = ?',
+    [date]
+  );
+  if (!_isStoredJsonArray(row?.additional_workouts)) {
+    console.error(
+      `[DB] upsertAdditionalWorkouts: malformed additional_workouts JSON for date=${date} — refusing to write, stored value left unchanged`
+    );
+    throw new Error(`[DB] upsertAdditionalWorkouts: malformed additional_workouts JSON for date=${date}`);
+  }
   const result = await db.runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [
     JSON.stringify(workouts),
     date,
