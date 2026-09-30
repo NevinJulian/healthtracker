@@ -186,6 +186,7 @@ export default function MealPrepScreen() {
       loadData();
     } catch (err) {
       logDbError(err);
+      Alert.alert('Error', 'Failed to assign the meal. Please try again.');
     }
   };
 
