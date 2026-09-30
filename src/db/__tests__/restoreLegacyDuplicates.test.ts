@@ -110,7 +110,7 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
     expect(await uniqueIndexExists(db)).toBe(true);
   });
 
-  it('restores a legacy backup with two CONSUMED duplicate rows: the loser is deleted and its batch is credited +1, matching v35', async () => {
+  it('restores a legacy backup with two CONSUMED duplicate rows: the row with a live pointer survives, the pointerless loser is deleted, and the survivor stays refundable', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
 
@@ -119,9 +119,9 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
         { id: 2, recipe_id: RECIPE_ID, portions_available: 2, date_cooked: '2024-01-01' },
       ],
       weekly_meal_plan: [
-        // Loser: consumed, lower id, points at the batch.
+        // Survivor: consumed, lower id, live pointer to the batch.
         { id: 20, date: '2024-06-03', meal_type: 'breakfast', recipe_id: RECIPE_ID, is_consumed: 1, consumed_from_inventory_id: 2 },
-        // Survivor: consumed, higher id, no pointer of its own.
+        // Loser: consumed, higher id, no pointer — crediting it is impossible.
         { id: 21, date: '2024-06-03', meal_type: 'breakfast', recipe_id: RECIPE_ID, is_consumed: 1, consumed_from_inventory_id: null },
       ],
     };
@@ -134,13 +134,20 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
       "SELECT * FROM weekly_meal_plan WHERE date = '2024-06-03' AND meal_type = 'breakfast'"
     );
     expect(planRows).toHaveLength(1);
-    expect(planRows[0].id).toBe(21);
+    expect(planRows[0].id).toBe(20);
     expect(planRows[0].is_consumed).toBe(1);
+    expect(planRows[0].consumed_from_inventory_id).toBe(2);
 
     const inv = await raw.getFirstAsync<{ portions_available: number }>(
       'SELECT portions_available FROM meal_inventory WHERE id = 2'
     );
-    expect(inv?.portions_available).toBe(3); // 2 + 1 credited back from the deleted loser
+    expect(inv?.portions_available).toBe(2); // the loser had no pointer, nothing to credit
+
+    await db.toggleMealConsumed(20, false);
+    const after = await raw.getFirstAsync<{ portions_available: number }>(
+      'SELECT portions_available FROM meal_inventory WHERE id = 2'
+    );
+    expect(after?.portions_available).toBe(3); // the survivor refunds its batch
 
     expect(await uniqueIndexExists(db)).toBe(true);
   });
