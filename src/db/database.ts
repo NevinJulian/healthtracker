@@ -720,6 +720,8 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
     ]);
   }
 
+  if (!startDateGarbled && inserts.length === 0 && backfills.length === 0) return;
+
   await db.withTransactionAsync(async () => {
     if (startDateGarbled) {
       await db.runAsync('UPDATE app_state SET value = ? WHERE key = ?', [
