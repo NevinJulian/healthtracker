@@ -740,8 +740,8 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
 /**
  * Ensure a daily_log row exists for `date`. If missing, inserts one using
  * exactly the column values _syncRollingSchedule() would generate for that
- * date — same weekly_template lookup, same (raw, unsanitised) startDateISO
- * handling, same exercises reset — via the shared _buildDailyLogRowValues()
+ * date — same weekly_template lookup, same effective start date, same
+ * exercises reset — via the shared _buildDailyLogRowValues()
  * builder, so an on-demand row can never drift from what the next sync
  * would have produced for it. `INSERT OR IGNORE` makes this safe to call
  * unconditionally before every daily_log UPDATE: a no-op when the row is
@@ -758,11 +758,7 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
  * that loudly instead of the previous silent no-op.
  */
 async function _ensureDailyLogRow(db: SQLite.SQLiteDatabase, date: string): Promise<void> {
-  const startRow = await db.getFirstAsync<{ value: string }>(
-    'SELECT value FROM app_state WHERE key = ?',
-    [START_DATE_KEY]
-  );
-  const startDateISO = startRow?.value ?? toISODate();
+  const { date: startDateISO } = await _readEffectiveStartDate(db);
 
   const templateRows = await db.getAllAsync<WeeklyTemplateRow>('SELECT * FROM weekly_template');
   const templateMap = new Map<number, WeeklyTemplateRow>();
