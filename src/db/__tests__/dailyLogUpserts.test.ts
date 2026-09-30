@@ -440,3 +440,88 @@ describe('a plain daily_log write cannot be swallowed by another unit\'s rollbac
     expect((await db.getLogByDate(today))?.walk_completed).toBe(true);
   });
 });
+
+describe('upsertAdditionalWorkouts refuses to overwrite malformed stored JSON (#370)', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const workouts = [{ id: 'w1', name: 'Run', completed: false }] as never;
+
+  async function readRaw(db: DatabaseModule, date: string): Promise<string | undefined> {
+    const row = await db.getDatabase().getFirstAsync<{ additional_workouts: string }>(
+      'SELECT additional_workouts FROM daily_log WHERE date = ?',
+      [date]
+    );
+    return row?.additional_workouts;
+  }
+
+  async function seedRaw(db: DatabaseModule, date: string, raw: string): Promise<void> {
+    await db
+      .getDatabase()
+      .runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [raw, date]);
+  }
+
+  it('rejects malformed text, leaves it byte-identical, and the read path still returns []', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    const corrupted = '{not json';
+    await seedRaw(db, date, corrupted);
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(db.upsertAdditionalWorkouts(date, workouts)).rejects.toThrow(date);
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(await readRaw(db, date)).toBe(corrupted);
+    expect((await db.getLogByDate(date))?.additional_workouts).toEqual([]);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it.each(['{}', '"x"'])('refuses valid JSON that is not an array (%s)', async (raw) => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await seedRaw(db, date, raw);
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(db.upsertAdditionalWorkouts(date, workouts)).rejects.toThrow();
+
+    expect(await readRaw(db, date)).toBe(raw);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('still writes over the valid [] default, an existing array, and a missing row', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+
+    await db.upsertAdditionalWorkouts(date, workouts);
+    expect(JSON.parse((await readRaw(db, date)) as string)).toEqual(workouts);
+
+    await db.upsertAdditionalWorkouts(date, []);
+    expect(await readRaw(db, date)).toBe('[]');
+
+    const future = FAR_FUTURE();
+    await db.upsertAdditionalWorkouts(future, workouts);
+    expect(JSON.parse((await readRaw(db, future)) as string)).toEqual(workouts);
+  });
+
+  it('a rejected call does not wedge the queue', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const bad = todayKey();
+    const good = FAR_FUTURE();
+    await seedRaw(db, bad, '{not json');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const first = db.upsertAdditionalWorkouts(bad, workouts);
+    const second = db.upsertAdditionalWorkouts(good, workouts);
+    await expect(first).rejects.toThrow();
+    await expect(second).resolves.toBeUndefined();
+
+    expect(JSON.parse((await readRaw(db, good)) as string)).toEqual(workouts);
+    consoleErrorSpy.mockRestore();
+  });
+});
