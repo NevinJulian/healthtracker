@@ -61,7 +61,8 @@
     "#315 split: lane A does the importBackup error wrapping (backup.ts); lane D gets a queued item 315-display (SettingsScreen restore alert lists result.skipped; skipped already returned on main so independent). app_start_date restore validation belongs to #363.",
     "After each integration push, read the real GitHub test check via the public REST check-runs endpoint (curl, read-only; gh CLI forbidden).",
     "#380: overrode analyst design (append v39). Restore-only dedupe SQL constant outside MIGRATIONS replaces v35 in the restore replay; no migration runs on user devices for a restore-only bug. #380 lands partial -> Refs.",
-    "#380: authorized editing the existing restoreLegacyDuplicates test that pinned the v35 NULL-pointer survivor (it encodes the #380 bug). Own commit, flagged for human review."
+    "#380: authorized editing the existing restoreLegacyDuplicates test that pinned the v35 NULL-pointer survivor (it encodes the #380 bug). Own commit, flagged for human review.",
+    "#381: authorized editing workoutSetIndexCollision.test.ts read-order test that pinned #317 created_at order (the behaviour #381 reverses). Own commit, flagged for human review."
   ],
   "lanes": {
     "A": {
@@ -87,7 +88,7 @@
         367,
         362
       ],
-      "current": 381,
+      "current": 372,
       "done": [
         316,
         315,
@@ -96,7 +97,10 @@
         380,
         368,
         370,
-        371
+        371,
+        381,
+        382,
+        383
       ],
       "parked": [
         314,
@@ -429,7 +433,7 @@
       "roundTrips": 0,
       "commits": [],
       "lane": "A",
-      "status": "work_order_ready",
+      "status": "in_dev",
       "securityReview": "skipped-read-shape-only (decide after diff)",
       "deviceCheck": "none"
     },
@@ -513,28 +517,44 @@
     },
     "381": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "d507942",
+        "be8bf91",
+        "7cf7260"
+      ],
       "lane": "A",
-      "status": "in_dev",
-      "securityReview": "skipped-read-order-only (decide after diff)",
-      "deviceCheck": "none"
+      "status": "ready",
+      "securityReview": "skipped: read ORDER BY only, no write path",
+      "deviceCheck": "none",
+      "notes": "tester APPROVE r0. Stale v37 comment in schema.ts ~766 is inside MIGRATIONS array - left untouched deliberately. idx_workout_set_log_date now redundant (optional future migration).",
+      "regressionProof": "ordering + collision tests fail with b4c86dd database.ts, pass HEAD; 300-row probe shows set_index order == (created_at,id) order after v37 (tester)"
     },
     "382": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "7f0d915",
+        "a09da59"
+      ],
       "lane": "A",
-      "status": "work_order_ready",
-      "securityReview": "required-src-db",
-      "deviceCheck": "none (optional launch smoke)"
+      "status": "ready",
+      "securityReview": "APPROVE: predicate covers all three write groups; note future write groups must extend it",
+      "deviceCheck": "none (optional launch smoke)",
+      "regressionProof": "2/6 fail with 7cf7260 database.ts, 6/6 at a09da59; mutation removing !startDateGarbled fails garbled test (tester)",
+      "notes": "tester APPROVE r0"
     },
     "383": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "d6b9f44",
+        "1a33cb0",
+        "c24ba55"
+      ],
       "lane": "A",
-      "status": "work_order_ready",
-      "securityReview": "required-src-db",
+      "status": "ready",
+      "securityReview": "APPROVE: throws before any DB access; all real callers pass toISODate(); no live trigger",
       "deviceCheck": "none",
-      "notes": "requires moving 6 existing dailyLogUpserts tests off arbitrary FAR_FUTURE (+400d) to FAR_PAST/today+7"
+      "notes": "tester APPROVE r0. d6b9f44 also adds 3 DELETEs (needed: today+7 has a startup row) - commit message understates. Sync-parity test now in-window (inherent).",
+      "regressionProof": "30/74 fail with a09da59 database.ts (6 writers x 5 bad dates), 74/74 at c24ba55; d6b9f44 date-move green pre-fix (tester)"
     },
     "315-display": {
       "roundTrips": 0,
@@ -568,7 +588,9 @@
     409,
     410,
     411,
-    412
+    412,
+    413,
+    414
   ],
   "log": [
     {
@@ -907,6 +929,46 @@
     {
       "at": "2026-09-30T23:11:13Z",
       "event": "#371 ready (security APPROVE); WOs ready for #372 #373 #362 (+#367 #382 #383 earlier)"
+    },
+    {
+      "at": "2026-09-30T23:11:20Z",
+      "event": "filed #413 (restore orphan sweep), #414 (reminder settings validation)"
+    },
+    {
+      "at": "2026-09-30T23:11:54Z",
+      "event": "#381: existing collision test pins old order; authorized update"
+    },
+    {
+      "at": "2026-09-30T23:12:50Z",
+      "event": "#381 in_test (650/650 per dev)"
+    },
+    {
+      "at": "2026-09-30T23:14:21Z",
+      "event": "#381 ready (security skipped: read order only); #382 in_dev"
+    },
+    {
+      "at": "2026-09-30T23:16:03Z",
+      "event": "#382 in_test (656 per dev)"
+    },
+    {
+      "at": "2026-09-30T23:17:36Z",
+      "event": "#382 APPROVE -> security (parallel); #383 in_dev"
+    },
+    {
+      "at": "2026-09-30T23:17:53Z",
+      "event": "#382 ready (security APPROVE)"
+    },
+    {
+      "at": "2026-09-30T23:20:07Z",
+      "event": "#383 in_test (710 per dev)"
+    },
+    {
+      "at": "2026-09-30T23:21:51Z",
+      "event": "#383 APPROVE -> security (parallel); #372 in_dev"
+    },
+    {
+      "at": "2026-09-30T23:22:17Z",
+      "event": "#383 ready (security APPROVE)"
     }
   ]
 }
