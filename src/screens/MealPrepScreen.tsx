@@ -167,8 +167,6 @@ export default function MealPrepScreen() {
       Alert.alert('Error', 'Failed to record your cooked meal. Please try again.');
       return;
     }
-    // Inventory just grew — clear the empty-episode debounce flag so the
-    // next time it empties again the user gets a fresh notification.
     try {
       await resetCookEmptyNotified();
     } catch (err) {
@@ -198,8 +196,6 @@ export default function MealPrepScreen() {
       Alert.alert('Error', 'Failed to update the meal. Please try again.');
       return;
     }
-    // After consuming a meal, check whether inventory is now empty
-    // and nudge the user to cook if so (debounced per empty episode).
     try {
       await checkAndNotifyEmptyInventory();
     } catch (err) {
