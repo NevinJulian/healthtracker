@@ -1285,7 +1285,7 @@ async function _insertRecipe(
  * Import a recipe into the library.  Uses INSERT OR IGNORE so calling it
  * twice with the same id is safe (duplicate guard returns false).
  *
- * @returns true when the recipe was newly inserted, false when it already existed.
+ * @returns true when the recipe was newly inserted or restored from the archive, false when it was already active.
  */
 export function importRecipe(recipe: Recipe): Promise<boolean> {
   return _enqueueWrite('importRecipe', () => _importRecipeImpl(recipe));
@@ -1293,8 +1293,12 @@ export function importRecipe(recipe: Recipe): Promise<boolean> {
 
 async function _importRecipeImpl(recipe: Recipe): Promise<boolean> {
   const db = getDatabase();
+  const restored = await db.runAsync(
+    'UPDATE recipe_library SET archived_at = NULL WHERE id = ? AND archived_at IS NOT NULL',
+    [recipe.id],
+  );
+  if ((restored.changes ?? 0) > 0) return true;
   const result = await _insertRecipe(db, recipe, 'IGNORE');
-  // lastInsertRowId > 0 means a row was actually inserted
   return (result.changes ?? 0) > 0;
 }
 
