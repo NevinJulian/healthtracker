@@ -1590,17 +1590,17 @@ export interface MealPlanWithRecipe extends WeeklyMealPlanItem {
 export async function getTodaysMealsWithRecipe(date: string): Promise<MealPlanWithRecipe[]> {
   const db = getDatabase();
   const rows = await db.getAllAsync<any>(`
-    SELECT p.*, r.title, r.calories, r.protein, r.carbs, r.fat 
+    SELECT p.*, r.id AS recipe_join_id, r.title, r.calories, r.protein, r.carbs, r.fat
     FROM weekly_meal_plan p
     LEFT JOIN recipe_library r ON p.recipe_id = r.id
     WHERE p.date = ?
     ORDER BY p.meal_type DESC
   `, [date]);
   
-  return rows.map(r => ({
+  return rows.map(({ recipe_join_id, ...r }) => ({
     ...r,
     is_consumed: Boolean(r.is_consumed),
-    recipe: r.recipe_id ? {
+    recipe: recipe_join_id != null ? {
       id: r.recipe_id,
       title: r.title,
       calories: r.calories,
