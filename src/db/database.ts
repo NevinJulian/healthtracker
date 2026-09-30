@@ -697,9 +697,13 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
       // insert range below, and must stay untouched (see cutoffISO comment).
       if (targetISO >= cutoffISO) {
         const existing = existingRows.find((r) => r.date === targetISO);
-        const currentExercises = parseExercises(existing?.exercises);
+        const current = _tryParseExercisesForWrite(existing?.exercises);
+        if (!current.ok) {
+          console.warn(`[DB] syncRollingSchedule: skipping backfill, malformed exercises for ${targetISO}`);
+          continue;
+        }
         const templateExerciseCount = parseExercises(rowValues.exercises).length;
-        if (currentExercises.length === 0 && templateExerciseCount > 0) {
+        if (current.value.length === 0 && templateExerciseCount > 0) {
           backfills.push([rowValues.exercises, targetISO]);
         }
       }
