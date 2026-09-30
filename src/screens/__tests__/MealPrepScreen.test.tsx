@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -34,15 +35,23 @@ import {
   getMealInventory,
   getWeeklyMealPlan,
   logCookedMeal,
+  assignMealToPlan,
+  toggleMealConsumed,
   resetCookEmptyNotified,
   Recipe,
+  MealInventoryWithRecipe,
+  WeeklyMealPlanItem,
 } from '../../db/database';
+import { checkAndNotifyEmptyInventory } from '../../services/notifications';
 
 const mockGetRecipes = jest.mocked(getRecipes);
 const mockGetMealInventory = jest.mocked(getMealInventory);
 const mockGetWeeklyMealPlan = jest.mocked(getWeeklyMealPlan);
 const mockLogCookedMeal = jest.mocked(logCookedMeal);
 const mockResetCookEmptyNotified = jest.mocked(resetCookEmptyNotified);
+const mockAssignMealToPlan = jest.mocked(assignMealToPlan);
+const mockToggleMealConsumed = jest.mocked(toggleMealConsumed);
+const mockCheckAndNotifyEmptyInventory = jest.mocked(checkAndNotifyEmptyInventory);
 
 function makeRecipe(overrides: Partial<Recipe> = {}): Recipe {
   return {
@@ -201,5 +210,60 @@ describe('MealPrepScreen log meal modal (#324)', () => {
 
     expect(getByDisplayValue('4')).toBeTruthy();
     expect(getByLabelText('Save').props.accessibilityState.disabled).toBe(true);
+  });
+});
+
+/** Press a control inside act and let the resulting promise chain settle. */
+async function pressAndFlush(element: Parameters<typeof fireEvent.press>[0]) {
+  await act(async () => {
+    fireEvent.press(element);
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+  });
+}
+
+describe('MealPrepScreen write failure feedback', () => {
+  let alertSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockGetRecipes.mockResolvedValue(mockRecipes);
+    mockGetMealInventory.mockResolvedValue([]);
+    mockGetWeeklyMealPlan.mockResolvedValue([]);
+    mockLogCookedMeal.mockResolvedValue(undefined);
+    mockAssignMealToPlan.mockResolvedValue(undefined);
+    mockToggleMealConsumed.mockResolvedValue(undefined);
+    mockResetCookEmptyNotified.mockResolvedValue(undefined);
+    mockCheckAndNotifyEmptyInventory.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('alerts once and keeps the modal and its inputs when logCookedMeal rejects', async () => {
+    mockLogCookedMeal.mockRejectedValue(new Error('x'));
+    const { getByText, getByLabelText, getByDisplayValue } = await renderWithModalOpen();
+
+    fireEvent.press(getByText('Chicken Bowl'));
+    fireEvent.changeText(getByLabelText('Portions cooked'), '6');
+    await pressAndFlush(getByLabelText('Save'));
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][0]).toBe('Error');
+    expect(getByText('Log Cooked Meal')).toBeTruthy();
+    expect(getByDisplayValue('6')).toBeTruthy();
+    expect(getByLabelText('Save').props.accessibilityState.disabled).toBe(false);
+
+    await pressAndFlush(getByLabelText('Save'));
+
+    expect(mockLogCookedMeal).toHaveBeenCalledTimes(2);
+    expect(mockLogCookedMeal).toHaveBeenLastCalledWith('r1', 6);
   });
 });
