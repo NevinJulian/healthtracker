@@ -1158,12 +1158,8 @@ async function _updateTemplateExercisesImpl(
 // ─────────────────────────────────────────────
 
 export async function getStartDate(): Promise<string> {
-  const db = getDatabase();
-  const row = await db.getFirstAsync<{ value: string }>(
-    'SELECT value FROM app_state WHERE key = ?',
-    [START_DATE_KEY]
-  );
-  return row?.value ?? toISODate();
+  const { date } = await _readEffectiveStartDate(getDatabase());
+  return date;
 }
 
 export async function getCycleForDate(dateISO: string): Promise<number> {
