@@ -304,6 +304,7 @@ describe('MealPrepScreen write failure feedback', () => {
     mockToggleMealConsumed.mockRejectedValue(new Error('x'));
     const utils = render(<MealPrepScreen />);
     await flushMicrotasks();
+    mockGetWeeklyMealPlan.mockClear();
 
     await pressAndFlush(utils.getByLabelText('Mark Chicken Bowl consumed'));
 
@@ -311,6 +312,7 @@ describe('MealPrepScreen write failure feedback', () => {
     expect(alertSpy).toHaveBeenCalledTimes(1);
     expect(alertSpy.mock.calls[0][0]).toBe('Error');
     expect(mockCheckAndNotifyEmptyInventory).toHaveBeenCalledTimes(1);
+    expect(mockGetWeeklyMealPlan).not.toHaveBeenCalled();
   });
 
   it('closes the log modal without alerting when resetCookEmptyNotified rejects after a saved log', async () => {
