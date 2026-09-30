@@ -657,3 +657,5 @@ async function _reconcile(): Promise<void> {
     console.warn('[Notifications] reconcile: backup reminder failed:', err);
   }
 }
+
+export function resetReconcileStateForTests(): void {}
