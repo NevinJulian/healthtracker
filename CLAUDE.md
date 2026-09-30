@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-HealthTracker — an Expo / React Native (SDK 57, RN 0.86, React 19, TypeScript strict) fitness + meal-prep app. All data is on-device in SQLite via `expo-sqlite`. No backend, no remote API. New Architecture is enabled (`app.json` → `newArchEnabled: true`).
+HealthTracker — an Expo / React Native (SDK 57, RN 0.86, React 19, TypeScript strict) fitness + meal-prep app. All data is on-device in SQLite via `expo-sqlite`. No backend; the only network calls are keyless recipe lookups in `src/api` (TheMealDB, Open Food Facts). New Architecture is on.
 
 ## Commands
 
