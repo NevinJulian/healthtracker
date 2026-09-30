@@ -12,19 +12,14 @@
  *   log a new set                -> setIndex = existingSets.length === 2
  *                                    -> COLLIDES with the surviving set_index=2 row
  *
- * `getWorkoutSetsForDay`/`getWorkoutHistory` also ordered by `set_index ASC`
- * (a value with no uniqueness guarantee), so read order wasn't even stable
- * across collisions.
- *
  * Fix:
  *   - `logWorkoutSet(date, exercise, { reps, weightKg })` no longer takes a
  *     caller-supplied `setIndex`. It assigns one atomically via a single
  *     INSERT…SELECT that computes `COALESCE(MAX(set_index), -1) + 1` for the
  *     (date, exercise) pair inside the same statement — no separate
  *     read-then-write that a delete could race.
- *   - `getWorkoutSetsForDay`/`getWorkoutHistory` now order by
- *     `created_at ASC, id ASC` (after the grouping column) — `set_index`
- *     becomes a uniqueness key, not an ordering key.
+ *   - `getWorkoutSetsForDay`/`getWorkoutHistory` order by `set_index ASC`
+ *     (after the grouping column), which is the display order.
  *   - v37 (schema.ts) renumbers every existing row densely per
  *     (date, exercise), ordered by (created_at, id), then adds
  *     `UNIQUE(date, exercise, set_index)` so the database itself rejects any
@@ -198,8 +193,8 @@ describe('logWorkoutSet() atomic set_index assignment (#317)', () => {
   });
 });
 
-describe('getWorkoutSetsForDay() read ordering (#317)', () => {
-  it('returns rows in logged (created_at, id) order even when set_index disagrees with it, identically on repeated reads', async () => {
+describe('getWorkoutSetsForDay() read ordering', () => {
+  it('returns rows in set_index order even when created_at disagrees with it, identically on repeated reads', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
 
@@ -207,12 +202,9 @@ describe('getWorkoutSetsForDay() read ordering (#317)', () => {
     const date = '2024-07-03';
     const exercise = 'Overhead Press';
 
-    // Seeded directly via raw SQL — never through logWorkoutSet — so this
-    // test is independent of logWorkoutSet's signature entirely. Rows are
-    // listed here in LOGGED order (created_at ascending, matching insertion
-    // order), but their set_index values deliberately DISAGREE with that
-    // order — a legacy collision/out-of-order-caller pattern, the exact
-    // kind of data set_index was never safe to sort by.
+    // Seeded directly via raw SQL, independent of logWorkoutSet. Rows are
+    // listed in created_at order, but set_index deliberately runs the
+    // opposite way.
     const loggedOrder = [
       { weight_kg: 40, set_index: 2, created_at: '2024-07-03T10:00:00.000Z' }, // logged 1st, set_index says "3rd"
       { weight_kg: 42, set_index: 1, created_at: '2024-07-03T10:05:00.000Z' }, // logged 2nd, set_index says "2nd"
@@ -226,10 +218,7 @@ describe('getWorkoutSetsForDay() read ordering (#317)', () => {
     }
 
     const first = await db.getWorkoutSetsForDay(date);
-    // Pre-fix (ORDER BY set_index ASC) returns weight_kg as [44, 42, 40] —
-    // exactly reversed from logged order. Post-fix (ORDER BY created_at
-    // ASC, id ASC) returns logged order: [40, 42, 44].
-    expect(first.map((s) => s.weight_kg)).toEqual([40, 42, 44]);
+    expect(first.map((s) => s.weight_kg)).toEqual([44, 42, 40]);
 
     const second = await db.getWorkoutSetsForDay(date);
     expect(second).toEqual(first);
