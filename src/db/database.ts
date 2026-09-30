@@ -1358,7 +1358,7 @@ async function _updateRecipeImpl(recipe: Recipe): Promise<void> {
 }
 
 /**
- * Delete a recipe from recipe_library by id.
+ * Archive a recipe by id. The row stays so joins keep resolving its history.
  * Callers should check isSeededRecipe(id) before calling this and refuse
  * to delete protected seed recipes (r001–r100).
  */
@@ -1368,7 +1368,10 @@ export function deleteRecipe(id: string): Promise<void> {
 
 async function _deleteRecipeImpl(id: string): Promise<void> {
   const db = getDatabase();
-  await db.runAsync('DELETE FROM recipe_library WHERE id = ?', [id]);
+  await db.runAsync('UPDATE recipe_library SET archived_at = ? WHERE id = ?', [
+    new Date().toISOString(),
+    id,
+  ]);
 }
 
 /**
