@@ -156,28 +156,23 @@ describe('deleteSetting (#323 part 2)', () => {
   });
 });
 
-describe('documentation: why setSetting(key, "") could not be the fix (#323)', () => {
+describe('blank stored profile values', () => {
   afterEach(() => {
     jest.dontMock('expo-sqlite');
   });
 
-  it('setSetting(key, "") makes getUserProfile() read height/age as 0, not null', async () => {
+  it('setSetting(key, "") reads as unset (null)', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
 
     await db.setProfileHeightCm(180);
     await db.setProfileAge(30);
 
-    // The workaround part 1 explicitly avoided: writing an empty string
-    // instead of deleting the row.
     await db.setSetting(PROFILE_HEIGHT_KEY, '');
     await db.setSetting(PROFILE_AGE_KEY, '');
 
     const profile = await db.getUserProfile();
-    // Number('') === 0 and !isNaN(0) === true, so this is 0 — not the null
-    // a "cleared" field should read back as. This is the bug that makes a
-    // real DELETE (deleteSetting) necessary instead.
-    expect(profile.heightCm).toBe(0);
-    expect(profile.age).toBe(0);
+    expect(profile.heightCm).toBeNull();
+    expect(profile.age).toBeNull();
   });
 });
