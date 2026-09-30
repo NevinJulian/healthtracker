@@ -1225,14 +1225,16 @@ function SetLoggerModal({
   const [saving, setSaving] = useState(false);
 
   const handleAdd = async () => {
-    const reps = parseInt(repsInput, 10);
-    const weight = parseFloat(weightInput);
-    if (isNaN(reps) || reps < 1) {
-      Alert.alert('Invalid reps', 'Enter a whole number of reps (minimum 1).');
+    const repsText = repsInput.trim();
+    const weightText = weightInput.trim();
+    const reps = repsText === '' ? NaN : Number(repsText.replace(',', '.'));
+    const weight = weightText === '' ? NaN : Number(weightText.replace(',', '.'));
+    if (!Number.isInteger(reps) || reps < 1 || reps > 100) {
+      Alert.alert('Invalid reps', 'Enter a whole number of reps between 1 and 100.');
       return;
     }
-    if (isNaN(weight) || weight <= 0) {
-      Alert.alert('Invalid weight', 'Enter a weight in kg (must be > 0).');
+    if (!Number.isFinite(weight) || weight < 0.5 || weight > 500) {
+      Alert.alert('Invalid weight', 'Enter a weight between 0.5 and 500 kg.');
       return;
     }
     setSaving(true);
