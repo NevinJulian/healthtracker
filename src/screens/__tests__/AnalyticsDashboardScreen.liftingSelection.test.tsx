@@ -16,17 +16,7 @@ import React from 'react';
 import { LiftingSectionCard } from '../AnalyticsDashboardScreen';
 import type { WorkoutSetSlice } from '../analyticsHelpers';
 
-// This repo's lockfile pins `react` at 19.1.0 while `react-test-renderer`
-// (a devDependency owned outside Lane C's scope) resolved to 19.2.5.
-// @testing-library/react-native's own module-load side effect does a strict
-// equality check between the two and throws on import if they differ, even
-// though both are React 19 and RNTL itself works fine across this gap.
-// RNTL_SKIP_DEPS_CHECK is the library's own documented escape hatch for
-// exactly this situation — set it before requiring the module (using
-// `require` rather than a hoisted `import` so ordering is preserved).
-process.env.RNTL_SKIP_DEPS_CHECK = '1';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { render } = require('@testing-library/react-native') as typeof import('@testing-library/react-native');
+import { render } from '@testing-library/react-native';
 
 const squatHistory: WorkoutSetSlice[] = [
   { id: 1, date: '2024-01-01', exercise: 'squat', reps: 5, weight_kg: 80 },

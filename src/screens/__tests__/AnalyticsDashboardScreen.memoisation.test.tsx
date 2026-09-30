@@ -20,16 +20,8 @@ import React from 'react';
 import * as analyticsHelpers from '../analyticsHelpers';
 import type { WorkoutSetSlice } from '../analyticsHelpers';
 
-// See AnalyticsDashboardScreen.liftingSelection.test.tsx (#308) for why this
-// escape hatch is needed: the lockfile pins `react` at 19.1.0 while
-// `react-test-renderer` resolved to 19.2.5, and RNTL's module-load side
-// effect throws on that mismatch unless this env var is set first.
-process.env.RNTL_SKIP_DEPS_CHECK = '1';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { render } = require('@testing-library/react-native') as typeof import('@testing-library/react-native');
+import { render } from '@testing-library/react-native';
 
-// Imported after the RNTL_SKIP_DEPS_CHECK env var is set, same as the
-// liftingSelection test.
 import { StrengthProgressionCard, LiftingSectionCard } from '../AnalyticsDashboardScreen';
 
 const squatHistory: WorkoutSetSlice[] = [

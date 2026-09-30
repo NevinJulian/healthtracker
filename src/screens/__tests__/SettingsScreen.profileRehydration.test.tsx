@@ -1,17 +1,5 @@
-// @testing-library/react-native 13.3.3 refuses to import unless the
-// installed react-test-renderer version matches its expected peer exactly.
-// This repo currently has react@19.1.0 / react-test-renderer@19.2.5 (a
-// pre-existing devDependency mismatch, out of this lane's scope to fix).
-// Setting this env var before RNTL's own module body runs skips that check;
-// RNTL's actual rendering works fine with this combination. It must be set
-// before the (non-hoisted) `require` below, so it cannot be a hoisted
-// `import`.
-process.env.RNTL_SKIP_DEPS_CHECK = '1';
-
 import React from 'react';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { render, fireEvent, act } = require('@testing-library/react-native');
+import { render, fireEvent, act } from '@testing-library/react-native';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 //
