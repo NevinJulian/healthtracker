@@ -61,6 +61,14 @@ function loadSqlJs(): Promise<SqlJsStatic> {
   return sqlJsPromise;
 }
 
+const openDatabases = new Set<() => void>();
+
+if (typeof afterEach === 'function') {
+  afterEach(() => {
+    for (const close of [...openDatabases]) close();
+  });
+}
+
 export interface SqljsRunResult {
   lastInsertRowId: number;
   changes: number;
@@ -100,17 +108,30 @@ function readLastInsertRowId(db: Database): number {
 export async function createSqljsDb(): Promise<SqljsExpoDb> {
   const SQL = await loadSqlJs();
   const db = new SQL.Database();
+  let closed = false;
+  const close = (): void => {
+    if (closed) return;
+    closed = true;
+    openDatabases.delete(close);
+    db.close();
+  };
+  openDatabases.add(close);
+  const assertOpen = (): void => {
+    if (closed) throw new Error('Database closed');
+  };
   // Set via __installTransactionTripwire; null until database.ts installs it.
   let isWriteQueueHeld: (() => boolean) | null = null;
 
   return {
     async execAsync(sql: string): Promise<void> {
+      assertOpen();
       // No params — safe to run a multi-statement string in one call, same
       // as migrations.integration.test.ts does for full migration SQL blocks.
       db.run(sql);
     },
 
     async runAsync(sql: string, params?: BindParams): Promise<SqljsRunResult> {
+      assertOpen();
       const stmt = db.prepare(sql);
       try {
         stmt.bind(params ?? []);
@@ -122,6 +143,7 @@ export async function createSqljsDb(): Promise<SqljsExpoDb> {
     },
 
     async getFirstAsync<T>(sql: string, params?: BindParams): Promise<T | null> {
+      assertOpen();
       const stmt = db.prepare(sql);
       try {
         stmt.bind(params ?? []);
@@ -134,6 +156,7 @@ export async function createSqljsDb(): Promise<SqljsExpoDb> {
     },
 
     async getAllAsync<T>(sql: string, params?: BindParams): Promise<T[]> {
+      assertOpen();
       const stmt = db.prepare(sql);
       const rows: T[] = [];
       try {
@@ -148,6 +171,7 @@ export async function createSqljsDb(): Promise<SqljsExpoDb> {
     },
 
     async prepareAsync(sql: string): Promise<SqljsPreparedStatement> {
+      assertOpen();
       const stmt = db.prepare(sql);
       return {
         async executeAsync(params?: BindParams): Promise<SqljsRunResult> {
@@ -207,7 +231,7 @@ export async function createSqljsDb(): Promise<SqljsExpoDb> {
     },
 
     async closeAsync(): Promise<void> {
-      db.close();
+      close();
     },
   };
 }
