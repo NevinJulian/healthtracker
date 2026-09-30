@@ -188,17 +188,30 @@ function buildHammerTask(base: string, isRestDay: boolean, daysDiff: number): st
  * True when `value` is a syntactically valid YYYY-MM-DD date key that
  * round-trips through the Date constructor to the same calendar day
  * (rejects both the wrong shape and overflow like "2026-13-40").
- *
- * Guards `_syncRollingSchedule()`'s rolling-window floor against a garbled
- * `app_start_date` — e.g. restored verbatim from a corrupted backup — which
- * would otherwise turn `_daysBetweenKey()` into NaN arithmetic and silently
- * generate zero rows (#301).
  */
 function isValidDateKey(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [y, m, d] = value.split('-').map(Number);
   const date = new Date(y, m - 1, d);
   return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
+/**
+ * The start date the schedule should use: the stored `app_start_date` when it
+ * is a valid date not after today, otherwise today. `garbled` is true only
+ * when the stored value is present but not a valid date key.
+ */
+async function _readEffectiveStartDate(
+  db: SQLite.SQLiteDatabase
+): Promise<{ date: string; garbled: boolean }> {
+  const row = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM app_state WHERE key = ?',
+    [START_DATE_KEY]
+  );
+  const todayISO = toISODate();
+  if (!row) return { date: todayISO, garbled: false };
+  if (!isValidDateKey(row.value)) return { date: todayISO, garbled: true };
+  return { date: row.value > todayISO ? todayISO : row.value, garbled: false };
 }
 
 /** Safely parse a JSON string as Exercise[]; returns [] on any error. */
