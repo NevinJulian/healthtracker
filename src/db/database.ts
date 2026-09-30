@@ -772,7 +772,7 @@ async function _syncRollingSchedule(db: SQLite.SQLiteDatabase): Promise<void> {
  * weekday — shouldn't happen given the 7-row invariant (CLAUDE.md), but
  * this helper must not throw over user-editable template data. The caller's
  * own UPDATE then simply won't find the row, and _assertWrote() surfaces
- * that loudly instead of the previous silent no-op.
+ * that loudly.
  */
 async function _ensureDailyLogRow(db: SQLite.SQLiteDatabase, date: string): Promise<void> {
   if (!isValidDateKey(date)) {
@@ -2465,19 +2465,19 @@ export async function dumpTable(
  *     — and since restore is one transaction, that would roll back every
  *     table, not just the offending one. So: drop both indexes before
  *     restoring, restore every table exactly as before, then re-run each
- *     affected migration's own SQL — looked up at runtime via
- *     POST_RESTORE_STEPS, never copied or reimplemented, so it
- *     can't drift from the migration — against the just-restored data, in
- *     order, inside the same transaction. v35 (#303) credits any consumed
- *     loser's batch in the just-restored meal_inventory, deletes losers per
- *     its survivor rule, and recreates its index. v37 (#317) renumbers
+ *     affected repair step — POST_RESTORE_STEPS, never copied or
+ *     reimplemented, so it can't drift from the schema — against the
+ *     just-restored data, in order, inside the same transaction.
+ *     RESTORE_SLOT_DEDUPE_SQL credits any consumed loser's batch, dedupes
+ *     weekly_meal_plan per (date, meal_type), preferring a consumed row whose
+ *     inventory pointer is live, and recreates its index. v37 renumbers
  *     workout_set_log densely per (date, exercise) by (created_at, id) and
  *     recreates its index — the SAME ordering requirement the migration
  *     itself relies on (the renumber must run before its own index is
  *     (re)created) holds here for the same reason: it runs after the
  *     index was dropped above, never while it exists. A clean,
  *     already-migrated backup is unaffected by either re-run: nothing
- *     matches v35's credit/delete WHERE clauses, and v37's renumber
+ *     matches the dedupe's credit/delete WHERE clauses, and v37's renumber
  *     reassigns every row the value it already has.
  *
  * A row's own keys are NOT trusted as column identifiers: unlike values,
@@ -2498,19 +2498,17 @@ export async function dumpTable(
  */
 
 /**
- * Migrations whose own SQL must be re-applied, in this order, against
- * freshly-restored data every time restoreFromPayload() runs — because each
- * one is a data-repair step (not just DDL) that a backup taken before it
- * shipped, or before it happened to run, can legitimately still need. Their
- * unique indexes are dropped before the restore loop (see the restoreFromPayload
- * doc comment above) and recreated by re-running the listed migration's SQL
- * here, looked up from MIGRATIONS at runtime so this can never drift from
- * the real migration.
+ * Data-repair steps re-applied, in this order, against freshly-restored data
+ * every time restoreFromPayload() runs — because a backup taken before a
+ * step shipped, or before it happened to run, can legitimately still need it.
+ * Their unique indexes are dropped before the restore loop (see the
+ * restoreFromPayload doc comment above) and recreated here. A `version` step
+ * is looked up from MIGRATIONS at runtime so it can never drift from the
+ * real migration.
  *
- *   - RESTORE_SLOT_DEDUPE_SQL (in place of v35): weekly_meal_plan (date,
- *     meal_type) dedupe + unique index, preferring a consumed row whose
- *     inventory pointer is live.
- *   - v37 (#317): workout_set_log set_index renumber + unique index.
+ *   - RESTORE_SLOT_DEDUPE_SQL: weekly_meal_plan (date, meal_type) dedupe +
+ *     unique index, preferring a consumed row whose inventory pointer is live.
+ *   - v37: workout_set_log set_index renumber + unique index.
  */
 const POST_RESTORE_STEPS: readonly ({ sql: string } | { version: number })[] = [
   { sql: RESTORE_SLOT_DEDUPE_SQL },
@@ -2633,11 +2631,9 @@ async function _restoreFromPayload(
       tablesRestored += 1;
     }
 
-    // Re-apply each post-restore migration's own SQL against the
-    // just-restored data, in order, as if it had just run on it. Each
-    // migration's index was dropped above, before this loop ran — never
-    // while it existed — matching the ordering both migrations require of
-    // their own renumber/dedupe step.
+    // Each step's index was dropped above, before this loop ran — never
+    // while it existed — matching the ordering both the dedupe and the
+    // renumber require.
     for (const step of POST_RESTORE_STEPS) {
       if ('sql' in step) {
         await db.execAsync(step.sql);

@@ -20,12 +20,10 @@
  *
  * Fix: restoreFromPayload() now (1) drops the unique index before the
  * restore loop, (2) restores every table exactly as before, then (3) —
- * still inside the same transaction — re-runs v35's own SQL (looked up at
- * runtime via `MIGRATIONS.find(m => m.version === 35)!.sql`, never copied
- * or reimplemented) against the just-restored data. That credits any
- * consumed loser's batch in the just-restored meal_inventory, deletes the
- * losers per the exact same survivor rule the migration uses, and recreates
- * the unique index. A clean, already-deduped (post-v35) backup is
+ * still inside the same transaction — runs RESTORE_SLOT_DEDUPE_SQL against
+ * the just-restored data. That credits any consumed loser's batch, deletes
+ * the losers (preferring a consumed row whose inventory pointer is live),
+ * and recreates the unique index. A clean, already-deduped backup is
  * unaffected: nothing matches the credit or delete WHERE clauses, and the
  * index is simply recreated.
  *
