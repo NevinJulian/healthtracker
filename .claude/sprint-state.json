@@ -87,16 +87,20 @@
         367,
         362
       ],
-      "current": 368,
+      "current": 381,
       "done": [
         316,
         315,
         363,
         378,
-        380
+        380,
+        368,
+        370,
+        371
       ],
       "parked": [
-        314
+        314,
+        379
       ]
     },
     "B": {
@@ -294,6 +298,14 @@
       "notes": "tester APPROVE r0. Tester claimed committed blobs are CRLF - FALSE, orchestrator verified git ls-files --eol all i/lf and 0 CR in fdf5c68 blob (tester misread working copy); nothing filed.",
       "mergeSha": "23e1838"
     },
+    "362": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "work_order_ready",
+      "securityReview": "skipped-read-parse-only (decide after diff)",
+      "deviceCheck": "none"
+    },
     "363": {
       "roundTrips": 0,
       "commits": [
@@ -363,13 +375,72 @@
       "regressionProof": "5 tests fail with 07dc001 MealPrepScreen.tsx, pass at HEAD; final file byte-identical to dd873c3 (tester verified)",
       "mergeSha": "34a3bf2"
     },
-    "368": {
+    "367": {
       "roundTrips": 0,
       "commits": [],
       "lane": "A",
-      "status": "in_dev",
-      "securityReview": "required-src-db",
-      "deviceCheck": "none (removeMealFromPlan has no UI caller)"
+      "status": "work_order_ready",
+      "securityReview": "skipped-read-query-only (decide after diff)",
+      "deviceCheck": "Log waist only one day, chest only the next: pills show both; open modal and save without edits - check whether waist gets written onto today (copy-forward risk)",
+      "notes": "RISK: modal prefill reads latest; if save submits unchanged prefilled fields, becomes copy-forward via UI. Tester must check DashboardScreen modal submit semantics (read-only)."
+    },
+    "368": {
+      "roundTrips": 0,
+      "commits": [
+        "0805cf0",
+        "5b5c068"
+      ],
+      "lane": "A",
+      "status": "ready",
+      "securityReview": "APPROVE: +1 only with non-NULL pointer set by a matching debit; same txn; errors propagate. Note: _creditPortion has no recipe_id check (restore-crafted pointer only)",
+      "deviceCheck": "none (removeMealFromPlan has no UI caller)",
+      "regressionProof": "2/6 fail with 453d985 database.ts, 6/6 at 5b5c068; atomicity proven by mutation removing txn wrapper (tester)",
+      "notes": "tester APPROVE r0; latent fix (no UI caller, #408)"
+    },
+    "370": {
+      "roundTrips": 0,
+      "commits": [
+        "a78575d",
+        "a81b7b6"
+      ],
+      "lane": "A",
+      "status": "ready",
+      "securityReview": "APPROVE: no row content in error; raw text preserved; revert-without-explanation accepted as #319 parity (follow-up filed)",
+      "deviceCheck": "none",
+      "regressionProof": "4 fail with 5b5c068 database.ts, 20/20 at a81b7b6 (tester)",
+      "notes": "tester APPROVE r0"
+    },
+    "371": {
+      "roundTrips": 1,
+      "commits": [
+        "e7f71f9",
+        "b1a1b85",
+        "1d75da9",
+        "b4c86dd"
+      ],
+      "lane": "A",
+      "status": "ready",
+      "securityReview": "APPROVE: no malformed row reaches the UPDATE; no new throw path; warn has date only",
+      "deviceCheck": "Startup path: cold-start, Dashboard lists today exercises; navigate away/back, no crash, nothing changed.",
+      "notes": "tester REJECT r1 (today-7 never visited), APPROVE r2",
+      "regressionProof": "6/7 fail with a81b7b6 database.ts, 7/7 at b4c86dd; today-7 row isolated by probe (tester)"
+    },
+    "372": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "work_order_ready",
+      "securityReview": "skipped-read-shape-only (decide after diff)",
+      "deviceCheck": "none"
+    },
+    "373": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "work_order_ready",
+      "securityReview": "skipped-read-parse-only (decide after diff)",
+      "deviceCheck": "none",
+      "notes": "ranges height 50-250, age 10-120, goals >0 no upper bound = analyst picks"
     },
     "374": {
       "roundTrips": 1,
@@ -416,6 +487,15 @@
       "notes": "tester confirmed #363 commits fully cover #378 criteria 1-3; close as done by #363 commit, not re-implemented",
       "closedBy": 363
     },
+    "379": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "parked",
+      "stalledAt": "analysis",
+      "parkReason": "Product decision needed (issue says so, no owner comment): (1) upgrade marker in app_state capping the insert floor [recommended, db-only] vs (2) generated column v39 + analytics exclusion (lane C) vs (3) accept + note. Sub-decisions for (1): marker value on already-backfilled devices; delete already-invented rows?",
+      "notes": "issue comment posted"
+    },
     "380": {
       "roundTrips": 0,
       "commits": [
@@ -430,6 +510,31 @@
       "deviceCheck": "none",
       "notes": "tester APPROVE r0. MIGRATIONS byte-identical. Stale comments (schema.ts:798 inside MIGRATIONS - frozen; test-file comments + database.ts doc ~2425 -> cleanup).",
       "regressionProof": "2 tests fail with aefd465 database.ts+schema.ts, 4/4 pass at 453d985; probe vs v35 SQL identical except intended dangling/3+dup cases (tester)"
+    },
+    "381": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "in_dev",
+      "securityReview": "skipped-read-order-only (decide after diff)",
+      "deviceCheck": "none"
+    },
+    "382": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "work_order_ready",
+      "securityReview": "required-src-db",
+      "deviceCheck": "none (optional launch smoke)"
+    },
+    "383": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "A",
+      "status": "work_order_ready",
+      "securityReview": "required-src-db",
+      "deviceCheck": "none",
+      "notes": "requires moving 6 existing dailyLogUpserts tests off arbitrary FAR_FUTURE (+400d) to FAR_PAST/today+7"
     },
     "315-display": {
       "roundTrips": 0,
@@ -458,7 +563,12 @@
     404,
     405,
     406,
-    407
+    407,
+    408,
+    409,
+    410,
+    411,
+    412
   ],
   "log": [
     {
@@ -689,6 +799,114 @@
     {
       "at": "2026-09-30T22:59:40Z",
       "event": "merged lane D 34a3bf2 (gates green 698/68); #368 in_dev"
+    },
+    {
+      "at": "2026-09-30T22:59:58Z",
+      "event": "filed #408 (removeMealFromPlan no caller), #409 (inert eslint-disable comments)"
+    },
+    {
+      "at": "2026-09-30T23:01:06Z",
+      "event": "#368 in_test; #370 analysis in parallel (read-only)"
+    },
+    {
+      "at": "2026-09-30T23:01:16Z",
+      "event": "GitHub CI test check on integration eec9ed9 (lanes B,D,E,F): completed success"
+    },
+    {
+      "at": "2026-09-30T23:01:47Z",
+      "event": "#370 work order ready (waits for #368); filed #410 (additional-workouts stale-state race)"
+    },
+    {
+      "at": "2026-09-30T23:02:22Z",
+      "event": "#368 tester APPROVE -> security (parallel with #370 dev, low risk); #370 in_dev"
+    },
+    {
+      "at": "2026-09-30T23:02:47Z",
+      "event": "#368 ready (security APPROVE); lane A current #370 in_dev"
+    },
+    {
+      "at": "2026-09-30T23:02:59Z",
+      "event": "#371 analysis in parallel with #370 dev"
+    },
+    {
+      "at": "2026-09-30T23:03:26Z",
+      "event": "#370 in_test (641 per dev)"
+    },
+    {
+      "at": "2026-09-30T23:03:36Z",
+      "event": "#371 work order ready (skip-not-throw); waits for #370"
+    },
+    {
+      "at": "2026-09-30T23:04:42Z",
+      "event": "#370 tester APPROVE -> security (parallel); #371 in_dev"
+    },
+    {
+      "at": "2026-09-30T23:04:53Z",
+      "event": "#381 analysis in parallel"
+    },
+    {
+      "at": "2026-09-30T23:05:09Z",
+      "event": "#370 ready (security APPROVE); filed #411 (corrupt row blocks edits, no repair path)"
+    },
+    {
+      "at": "2026-09-30T23:05:41Z",
+      "event": "#381 work order ready (set_index display order); waits for #371"
+    },
+    {
+      "at": "2026-09-30T23:05:45Z",
+      "event": "filed #412 (restore v37 renumber discards set order)"
+    },
+    {
+      "at": "2026-09-30T23:07:01Z",
+      "event": "#371 in_test (648 per dev); today-7 case trivially true flagged to tester"
+    },
+    {
+      "at": "2026-09-30T23:07:13Z",
+      "event": "#379 analysis in parallel"
+    },
+    {
+      "at": "2026-09-30T23:07:55Z",
+      "event": "#379 parked at analysis (3 parked total)"
+    },
+    {
+      "at": "2026-09-30T23:08:06Z",
+      "event": "#382 analysis in parallel"
+    },
+    {
+      "at": "2026-09-30T23:08:29Z",
+      "event": "#371 REJECT r1 (test coverage gap) -> dev"
+    },
+    {
+      "at": "2026-09-30T23:08:43Z",
+      "event": "#382 work order ready (skip txn unless inserts/backfills/garbled write-back); queued after #371, #381"
+    },
+    {
+      "at": "2026-09-30T23:08:53Z",
+      "event": "#383 analysis in parallel"
+    },
+    {
+      "at": "2026-09-30T23:09:19Z",
+      "event": "#371 round 2 (b4c86dd) in_test"
+    },
+    {
+      "at": "2026-09-30T23:09:44Z",
+      "event": "#383 work order ready (throw on invalid or > today+7)"
+    },
+    {
+      "at": "2026-09-30T23:10:10Z",
+      "event": "analyses for #372 #373 #367 #362 dispatched in parallel (read-only)"
+    },
+    {
+      "at": "2026-09-30T23:10:30Z",
+      "event": "#371 APPROVE r2 -> security; #381 in_dev"
+    },
+    {
+      "at": "2026-09-30T23:10:54Z",
+      "event": "#367 work order ready (read-side per-column latest non-null); prefill copy-forward risk flagged"
+    },
+    {
+      "at": "2026-09-30T23:11:13Z",
+      "event": "#371 ready (security APPROVE); WOs ready for #372 #373 #362 (+#367 #382 #383 earlier)"
     }
   ]
 }
