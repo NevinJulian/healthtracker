@@ -3096,29 +3096,31 @@ async function _logWorkoutSetImpl(
   );
 }
 
+// set_index is the display order: dense and unique per (date, exercise), and immune to clock changes.
+export const WORKOUT_SETS_FOR_DAY_SQL = `SELECT * FROM workout_set_log WHERE date = ?
+     ORDER BY exercise ASC, set_index ASC`;
+
+export const WORKOUT_HISTORY_SINCE_SQL = `SELECT * FROM workout_set_log WHERE exercise = ? AND date >= ?
+       ORDER BY date ASC, set_index ASC`;
+
+export const WORKOUT_HISTORY_SQL = `SELECT * FROM workout_set_log WHERE exercise = ?
+     ORDER BY date ASC, set_index ASC`;
+
 /**
- * Return all sets logged for `date`, ordered by exercise name then by
- * logging order (created_at, then id to break exact-timestamp ties).
- * set_index (#317) is a uniqueness key, not an ordering key — it isn't used
- * here. Used on the Dashboard to display already-logged sets for today's
- * session.
+ * Return all sets logged for `date`, ordered by exercise name then set_index.
+ * Used on the Dashboard to display already-logged sets for today's session.
  *
  * @param date - YYYY-MM-DD date key.
  */
 export async function getWorkoutSetsForDay(date: string): Promise<WorkoutSet[]> {
   const db = getDatabase();
-  return db.getAllAsync<WorkoutSet>(
-    `SELECT * FROM workout_set_log WHERE date = ?
-     ORDER BY exercise ASC, created_at ASC, id ASC`,
-    [date]
-  );
+  return db.getAllAsync<WorkoutSet>(WORKOUT_SETS_FOR_DAY_SQL, [date]);
 }
 
 /**
  * Return all sets logged for `exercise` since `sinceDateKey` (inclusive),
- * ordered chronologically (date ASC, created_at ASC, id ASC — #317: set_index
- * is a uniqueness key, not an ordering key). Used to build progression charts
- * and compute PRs.
+ * ordered by date then set_index. Used to build progression charts and
+ * compute PRs.
  *
  * @param exercise      - Exercise name.
  * @param sinceDateKey  - Optional earliest date (YYYY-MM-DD). Defaults to all history.
@@ -3129,17 +3131,9 @@ export async function getWorkoutHistory(
 ): Promise<WorkoutSet[]> {
   const db = getDatabase();
   if (sinceDateKey) {
-    return db.getAllAsync<WorkoutSet>(
-      `SELECT * FROM workout_set_log WHERE exercise = ? AND date >= ?
-       ORDER BY date ASC, created_at ASC, id ASC`,
-      [exercise, sinceDateKey]
-    );
+    return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SINCE_SQL, [exercise, sinceDateKey]);
   }
-  return db.getAllAsync<WorkoutSet>(
-    `SELECT * FROM workout_set_log WHERE exercise = ?
-     ORDER BY date ASC, created_at ASC, id ASC`,
-    [exercise]
-  );
+  return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SQL, [exercise]);
 }
 
 /**
