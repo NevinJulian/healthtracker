@@ -3044,13 +3044,20 @@ export async function getBodyMeasurements(
 }
 
 /**
- * Return the single most-recent body-measurement row, or null when no
- * measurements have been logged yet.
+ * Return the current body measurements: `id` and `date` come from the newest
+ * row, and each `*_cm` is that column's newest non-NULL value across all rows
+ * (null if never logged). Returns null when no rows exist.
  */
 export async function getLatestMeasurements(): Promise<BodyMeasurement | null> {
   const db = getDatabase();
   const row = await db.getFirstAsync<BodyMeasurement>(
-    'SELECT * FROM body_measurements ORDER BY date DESC LIMIT 1'
+    `SELECT id, date,
+       (SELECT waist_cm FROM body_measurements WHERE waist_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS waist_cm,
+       (SELECT chest_cm FROM body_measurements WHERE chest_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS chest_cm,
+       (SELECT hips_cm FROM body_measurements WHERE hips_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS hips_cm,
+       (SELECT thigh_cm FROM body_measurements WHERE thigh_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS thigh_cm,
+       (SELECT arm_cm FROM body_measurements WHERE arm_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS arm_cm
+     FROM body_measurements ORDER BY date DESC LIMIT 1`
   );
   return row ?? null;
 }
