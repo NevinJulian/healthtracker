@@ -528,3 +528,76 @@ describe('upsertAdditionalWorkouts refuses to overwrite malformed stored JSON (#
     consoleErrorSpy.mockRestore();
   });
 });
+
+describe('daily_log writers reject dates outside the valid range', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const workouts = [{ id: 'w1', name: 'Run', completed: false }] as never;
+
+  const writers: [string, (db: DatabaseModule, date: string) => Promise<void>][] = [
+    ['upsertLogField', (db, d) => db.upsertLogField(d, 'walk_completed', true)],
+    ['upsertExerciseCompleted', (db, d) => db.upsertExerciseCompleted(d, 'some-exercise-id', true)],
+    ['upsertBodyWeight', (db, d) => db.upsertBodyWeight(d, 70)],
+    ['upsertAdditionalWorkouts', (db, d) => db.upsertAdditionalWorkouts(d, workouts)],
+    ['addWater', (db, d) => db.addWater(d, 250)],
+    ['setWaterForDay', (db, d) => db.setWaterForDay(d, 1000)],
+  ];
+
+  async function rowCount(db: DatabaseModule, date: string): Promise<number> {
+    const row = await db
+      .getDatabase()
+      .getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM daily_log WHERE date = ?', [date]);
+    return row?.n ?? 0;
+  }
+
+  const rejected: [string, () => string][] = [
+    ['an impossible calendar date', () => '2026-13-40'],
+    ['garbage', () => 'garbage'],
+    ['an empty string', () => ''],
+    ['today + 8', () => addDays(todayKey(), 8)],
+    ['a far-future year', () => '2087-01-01'],
+  ];
+
+  describe.each(writers)('%s', (_name, write) => {
+    it.each(rejected)('rejects %s and creates no row', async (_label, getDate) => {
+      const db = loadFreshDatabaseModule();
+      await db.initDatabase();
+      const date = getDate();
+
+      await expect(write(db, date)).rejects.toThrow(/invalid|out of range/i);
+
+      expect(await rowCount(db, date)).toBe(0);
+    });
+
+    it.each([
+      ['today + 7', () => addDays(todayKey(), 7)],
+      ['today', () => todayKey()],
+      ['400 days back', () => addDays(todayKey(), -400)],
+    ])('accepts %s and creates the missing row', async (_label, getDate) => {
+      const db = loadFreshDatabaseModule();
+      await db.initDatabase();
+      const date = getDate();
+      await db.getDatabase().runAsync('DELETE FROM daily_log WHERE date = ?', [date]);
+
+      await write(db, date);
+
+      expect(await rowCount(db, date)).toBe(1);
+    });
+
+    it('does not block the next queued write after a rejection', async () => {
+      const db = loadFreshDatabaseModule();
+      await db.initDatabase();
+      const good = addDays(todayKey(), -400);
+
+      const first = write(db, 'garbage');
+      const second = write(db, good);
+      await expect(first).rejects.toThrow();
+      await expect(second).resolves.toBeUndefined();
+
+      expect(await rowCount(db, good)).toBe(1);
+    });
+  });
+});
