@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  Alert,
   View,
   Text,
   StyleSheet,
@@ -162,20 +161,14 @@ export default function MealPrepScreen() {
     if (!Number.isInteger(portions) || portions < 1 || portions > 50) return;
     try {
       await logCookedMeal(recipe_id, portions);
+      // Inventory just grew — clear the empty-episode debounce flag so the
+      // next time it empties again the user gets a fresh notification.
+      await resetCookEmptyNotified();
+      setLogModalVisible(false);
+      loadData();
     } catch (err) {
       logDbError(err);
-      Alert.alert('Error', 'Failed to record your cooked meal. Please try again.');
-      return;
     }
-    // Inventory just grew — clear the empty-episode debounce flag so the
-    // next time it empties again the user gets a fresh notification.
-    try {
-      await resetCookEmptyNotified();
-    } catch (err) {
-      console.warn('[MealPrepScreen] resetCookEmptyNotified failed:', err);
-    }
-    setLogModalVisible(false);
-    loadData();
   };
 
   const handleAssignMeal = async (recipe_id: string) => {
@@ -186,26 +179,19 @@ export default function MealPrepScreen() {
       loadData();
     } catch (err) {
       logDbError(err);
-      Alert.alert('Error', 'Failed to assign the meal. Please try again.');
     }
   };
 
   const handleToggleConsumed = async (planId: number, currentVal: boolean) => {
     try {
       await toggleMealConsumed(planId, !currentVal);
+      // After consuming a meal, check whether inventory is now empty
+      // and nudge the user to cook if so (debounced per empty episode).
+      await checkAndNotifyEmptyInventory();
+      loadData();
     } catch (err) {
       logDbError(err);
-      Alert.alert('Error', 'Failed to update the meal. Please try again.');
-      return;
     }
-    // After consuming a meal, check whether inventory is now empty
-    // and nudge the user to cook if so (debounced per empty episode).
-    try {
-      await checkAndNotifyEmptyInventory();
-    } catch (err) {
-      console.warn('[MealPrepScreen] checkAndNotifyEmptyInventory failed:', err);
-    }
-    loadData();
   };
 
   // ─── Tab Switcher ─────────────────────────────────────────────
