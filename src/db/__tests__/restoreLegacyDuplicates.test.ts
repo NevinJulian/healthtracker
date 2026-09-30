@@ -152,6 +152,40 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
     expect(await uniqueIndexExists(db)).toBe(true);
   });
 
+  it('keeps the consumed row with a live pointer over a higher-id consumed row with a NULL pointer, conserving portions and leaving it refundable', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.restoreFromPayload({
+      meal_inventory: [
+        { id: 4, recipe_id: RECIPE_ID, portions_available: 3, date_cooked: '2024-01-01' },
+      ],
+      weekly_meal_plan: [
+        { id: 10, date: '2024-06-07', meal_type: 'dinner', recipe_id: RECIPE_ID, is_consumed: 1, consumed_from_inventory_id: 4 },
+        { id: 11, date: '2024-06-07', meal_type: 'dinner', recipe_id: RECIPE_ID, is_consumed: 1, consumed_from_inventory_id: null },
+      ],
+    });
+
+    const raw = db.getDatabase();
+    const ids = await raw.getAllAsync<{ id: number }>(
+      "SELECT id FROM weekly_meal_plan WHERE date = '2024-06-07' AND meal_type = 'dinner'"
+    );
+    expect(ids.map((r) => r.id)).toEqual([10]);
+    expect(await uniqueIndexExists(db)).toBe(true);
+
+    const portions = async () =>
+      (await raw.getFirstAsync<{ portions_available: number }>(
+        'SELECT portions_available FROM meal_inventory WHERE id = 4'
+      ))?.portions_available;
+    const liveConsumed = await raw.getFirstAsync<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM weekly_meal_plan WHERE is_consumed = 1 AND consumed_from_inventory_id IN (SELECT id FROM meal_inventory)'
+    );
+    expect((await portions())! + liveConsumed!.n).toBe(4);
+
+    await db.toggleMealConsumed(10, false);
+    expect(await portions()).toBe(4);
+  });
+
   it('restores a clean post-v35 backup (no duplicates) exactly as before, and the index exists afterwards', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
