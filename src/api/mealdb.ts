@@ -8,7 +8,7 @@
  * Docs: https://www.themealdb.com/api.php
  */
 
-import { fetchJson } from './fetchJson';
+import { fetchJson, FetchJsonError } from './fetchJson';
 
 const BASE = 'https://www.themealdb.com/api/json/v1/1';
 
@@ -104,9 +104,9 @@ function toDetail(meal: MealDbMeal): MealDetail {
  * Throws (`FetchJsonError`) on a non-2xx response, a timeout, or a network
  * error so callers can show a retry state.
  */
-export async function searchMeals(query: string): Promise<MealSummary[]> {
+export async function searchMeals(query: string, signal?: AbortSignal): Promise<MealSummary[]> {
   const encoded = encodeURIComponent(query.trim());
-  const data = await fetchJson<MealDbResponse>(`${BASE}/search.php?s=${encoded}`);
+  const data = await fetchJson<MealDbResponse>(`${BASE}/search.php?s=${encoded}`, { signal });
   return data.meals ? data.meals.map(toSummary) : [];
 }
 
@@ -130,12 +130,21 @@ const mealByIdCache = new Map<string, MealDetail | null>();
  * Repeated calls for the same id are served from an in-memory cache after
  * the first successful lookup — no second network call.
  */
-export async function fetchMealById(id: string): Promise<MealDetail | null> {
+export async function fetchMealById(
+  id: string,
+  signal?: AbortSignal,
+): Promise<MealDetail | null> {
   if (mealByIdCache.has(id)) {
     return mealByIdCache.get(id) ?? null;
   }
-  const data = await fetchJson<MealDbResponse>(`${BASE}/lookup.php?i=${encodeURIComponent(id)}`);
+  const data = await fetchJson<MealDbResponse>(
+    `${BASE}/lookup.php?i=${encodeURIComponent(id)}`,
+    { signal },
+  );
   const result = !data.meals || data.meals.length === 0 ? null : toDetail(data.meals[0]);
+  if (signal?.aborted) {
+    throw new FetchJsonError('Request aborted');
+  }
   mealByIdCache.set(id, result);
   return result;
 }

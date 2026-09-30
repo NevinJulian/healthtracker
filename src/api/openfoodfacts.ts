@@ -90,10 +90,10 @@ const OFF_SEARCH_URL =
  * Returns null when: no products found, fields are missing, or network fails.
  * Never throws.
  */
-async function fetchFromOFF(term: string): Promise<OFFNutrition | null> {
+async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutrition | null> {
   try {
     const url = `${OFF_SEARCH_URL}&search_terms=${encodeURIComponent(term)}`;
-    const data = await fetchJson<OFFResponse>(url);
+    const data = await fetchJson<OFFResponse>(url, { signal });
     if (!data.products || data.products.length === 0) return null;
 
     // Pick the first product that has all four macro fields
@@ -127,13 +127,21 @@ async function fetchFromOFF(term: string): Promise<OFFNutrition | null> {
  * Checks the SQLite cache first; falls back to an OFF network call when the
  * cache misses. Returns null when neither source has data (offline, not found).
  *
+ * An aborted lookup resolves null and is never cached.
+ *
  * @param ingredientName - Ingredient name (will be normalised to lowercase for cache key)
+ * @param signal - Optional abort signal
  */
-export async function lookupNutrition(ingredientName: string): Promise<OFFNutrition | null> {
+export async function lookupNutrition(
+  ingredientName: string,
+  signal?: AbortSignal,
+): Promise<OFFNutrition | null> {
+  if (signal?.aborted) return null;
   const cached = await getCached(ingredientName);
   if (cached) return cached;
 
-  const result = await fetchFromOFF(ingredientName);
+  const result = await fetchFromOFF(ingredientName, signal);
+  if (signal?.aborted) return null;
   if (result) {
     await putCache(ingredientName, result);
   }
@@ -149,10 +157,12 @@ export async function lookupNutrition(ingredientName: string): Promise<OFFNutrit
  */
 export async function batchLookupNutrition(
   names: string[],
+  signal?: AbortSignal,
 ): Promise<Record<string, OFFNutrition>> {
   const result: Record<string, OFFNutrition> = {};
   for (const name of names) {
-    const n = await lookupNutrition(name);
+    if (signal?.aborted) break;
+    const n = await lookupNutrition(name, signal);
     if (n) {
       result[name.toLowerCase()] = n;
     }
