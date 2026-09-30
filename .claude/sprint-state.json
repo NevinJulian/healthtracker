@@ -62,13 +62,15 @@
     "After each integration push, read the real GitHub test check via the public REST check-runs endpoint (curl, read-only; gh CLI forbidden).",
     "#380: overrode analyst design (append v39). Restore-only dedupe SQL constant outside MIGRATIONS replaces v35 in the restore replay; no migration runs on user devices for a restore-only bug. #380 lands partial -> Refs.",
     "#380: authorized editing the existing restoreLegacyDuplicates test that pinned the v35 NULL-pointer survivor (it encodes the #380 bug). Own commit, flagged for human review.",
-    "#381: authorized editing workoutSetIndexCollision.test.ts read-order test that pinned #317 created_at order (the behaviour #381 reverses). Own commit, flagged for human review."
+    "#381: authorized editing workoutSetIndexCollision.test.ts read-order test that pinned #317 created_at order (the behaviour #381 reverses). Own commit, flagged for human review.",
+    "#373: authorized updating clearProfileFields.test.ts documentation test that asserted blank setting reads as 0 (the #373 bug). Own commit, flagged for human review.",
+    "#367: granted lane A DashboardScreen MeasurementsModal save path + a new test file to fix the copy-forward the read-side fix would widen (sprint-caused regression rule). Lane D is merged and idle."
   ],
   "lanes": {
     "A": {
       "branch": "sprint/lane-a-db",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "in_progress",
+      "status": "merged",
       "order": [
         314,
         316,
@@ -88,7 +90,7 @@
         367,
         362
       ],
-      "current": 372,
+      "current": null,
       "done": [
         316,
         315,
@@ -100,12 +102,18 @@
         371,
         381,
         382,
-        383
+        383,
+        372,
+        373,
+        367,
+        362
       ],
       "parked": [
         314,
         379
-      ]
+      ],
+      "cleanup": "f01c39b comment-only (5 files)",
+      "mergeSha": "6898c98"
     },
     "B": {
       "branch": "sprint/lane-b-notify",
@@ -234,12 +242,13 @@
         "bbea6ef"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "partial": true,
       "securityReview": "APPROVE: data-not-changed promise holds; error may echo own-file schema names into plain Alert (not a finding); optional: truncate detail",
       "deviceCheck": "none (lane A part)",
       "notes": "tester APPROVE r0; data-not-changed claim verified against single restore transaction",
-      "regressionProof": "new test fails with 74e874d backup.ts, passes bbea6ef (tester reproduced)"
+      "regressionProof": "new test fails with 74e874d backup.ts, passes bbea6ef (tester reproduced)",
+      "mergeSha": "6898c98"
     },
     "316": {
       "roundTrips": 0,
@@ -251,13 +260,14 @@
         "8fea2a6"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "migration": "v38",
       "securityReview": "APPROVE: TEXT/TEXT affinity, seed runs after migrations but upgrading devices already seeded, fresh install has empty children; restore never runs v38; v38 atomic via runner",
       "decisionSource": "owner comment on #316 2026-09-30 (archive, not delete; v38 orphan sweep approved)",
       "deviceCheck": "Install over an existing build; delete a custom recipe; it leaves library and picker; cooked portions still show in inventory; re-import from Discover brings it back (migration on startup path).",
       "regressionProof": "2 core tests fail with 7728404~1 database.ts+schema.ts, 5/5 pass at 8fea2a6 (tester reproduced). importRecipe-archived test is a guard (passes pre-fix since hard delete + reinsert).",
-      "notes": "tester APPROVE r0. Probe: pre/post-v38 backups restore correctly; v38 not replayed on restore -> orphans in old backups come back (hidden by inner joins). updateRecipe on archived id silently stays archived. deleteRecipe has no seeded guard (callers check)."
+      "notes": "tester APPROVE r0. Probe: pre/post-v38 backups restore correctly; v38 not replayed on restore -> orphans in old backups come back (hidden by inner joins). updateRecipe on archived id silently stays archived. deleteRecipe has no seeded guard (callers check).",
+      "mergeSha": "6898c98"
     },
     "318": {
       "roundTrips": 0,
@@ -304,11 +314,17 @@
     },
     "362": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "445b6b4",
+        "25cc481"
+      ],
       "lane": "A",
-      "status": "work_order_ready",
-      "securityReview": "skipped-read-parse-only (decide after diff)",
-      "deviceCheck": "none"
+      "status": "merged",
+      "securityReview": "skipped: read-side parsing only",
+      "deviceCheck": "none",
+      "regressionProof": "5/12 fail with 6666af2 database.ts, 12/12 at 25cc481 (tester)",
+      "notes": "tester APPROVE r0",
+      "mergeSha": "6898c98"
     },
     "363": {
       "roundTrips": 0,
@@ -321,13 +337,14 @@
         "aefd465"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "decisionSource": "owner comment on #363 2026-09-30 (verified by orchestrator): garbled->today+write-back in sync txn; future->today, stored untouched; existing rows untouched; one helper for sync/_ensureDailyLogRow/getStartDate/getCycleForDate",
       "coversIssue": 378,
       "securityReview": "APPROVE: every historic writer of app_start_date emits YYYY-MM-DD so a real value cannot be misclassified; write-back parameterised, in-txn, errors propagate",
       "deviceCheck": "none",
       "notes": "tester APPROVE r0; #378 fully covered (tester explicit). Amend was pre-push only (reflog verified).",
-      "regressionProof": "effectiveStartDate.test 11/13 fail with bbea6ef database.ts, 13/13 at aefd465 (tester reproduced; also Kiritimati/Pago_Pago via npx jest). Weakness: 1-day-future case passes pre-fix on rest days."
+      "regressionProof": "effectiveStartDate.test 11/13 fail with bbea6ef database.ts, 13/13 at aefd465 (tester reproduced; also Kiritimati/Pago_Pago via npx jest). Weakness: 1-day-future case passes pre-fix on rest days.",
+      "mergeSha": "6898c98"
     },
     "364": {
       "roundTrips": 0,
@@ -381,12 +398,20 @@
     },
     "367": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "1096d90",
+        "2a80838",
+        "bd78d4f",
+        "6666af2"
+      ],
       "lane": "A",
-      "status": "work_order_ready",
-      "securityReview": "skipped-read-query-only (decide after diff)",
+      "status": "merged",
+      "securityReview": "skipped: db change is a read query (static SQL); modal change only sends fewer fields",
       "deviceCheck": "Log waist only one day, chest only the next: pills show both; open modal and save without edits - check whether waist gets written onto today (copy-forward risk)",
-      "notes": "RISK: modal prefill reads latest; if save submits unchanged prefilled fields, becomes copy-forward via UI. Tester must check DashboardScreen modal submit semantics (read-only)."
+      "notes": "tester APPROVE r0. HUMAN: blanking a field no longer clears it from latest (filed). Text compare: typing 80.0 over 80 writes 80 (explicit edit, benign).",
+      "grant": "DashboardScreen.tsx MeasurementsModal save path only + new DashboardScreen.measurementsPrefill.test.tsx",
+      "regressionProof": "db 3/4 fail with fe7b82a database.ts; modal 2/4 fail with fe7b82a DashboardScreen.tsx; all pass HEAD (tester). Dry-run merge with integration clean.",
+      "mergeSha": "6898c98"
     },
     "368": {
       "roundTrips": 0,
@@ -395,11 +420,12 @@
         "5b5c068"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "securityReview": "APPROVE: +1 only with non-NULL pointer set by a matching debit; same txn; errors propagate. Note: _creditPortion has no recipe_id check (restore-crafted pointer only)",
       "deviceCheck": "none (removeMealFromPlan has no UI caller)",
       "regressionProof": "2/6 fail with 453d985 database.ts, 6/6 at 5b5c068; atomicity proven by mutation removing txn wrapper (tester)",
-      "notes": "tester APPROVE r0; latent fix (no UI caller, #408)"
+      "notes": "tester APPROVE r0; latent fix (no UI caller, #408)",
+      "mergeSha": "6898c98"
     },
     "370": {
       "roundTrips": 0,
@@ -408,11 +434,12 @@
         "a81b7b6"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "securityReview": "APPROVE: no row content in error; raw text preserved; revert-without-explanation accepted as #319 parity (follow-up filed)",
       "deviceCheck": "none",
       "regressionProof": "4 fail with 5b5c068 database.ts, 20/20 at a81b7b6 (tester)",
-      "notes": "tester APPROVE r0"
+      "notes": "tester APPROVE r0",
+      "mergeSha": "6898c98"
     },
     "371": {
       "roundTrips": 1,
@@ -423,28 +450,41 @@
         "b4c86dd"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "securityReview": "APPROVE: no malformed row reaches the UPDATE; no new throw path; warn has date only",
       "deviceCheck": "Startup path: cold-start, Dashboard lists today exercises; navigate away/back, no crash, nothing changed.",
       "notes": "tester REJECT r1 (today-7 never visited), APPROVE r2",
-      "regressionProof": "6/7 fail with a81b7b6 database.ts, 7/7 at b4c86dd; today-7 row isolated by probe (tester)"
+      "regressionProof": "6/7 fail with a81b7b6 database.ts, 7/7 at b4c86dd; today-7 row isolated by probe (tester)",
+      "mergeSha": "6898c98"
     },
     "372": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "86c59ff",
+        "131aada"
+      ],
       "lane": "A",
-      "status": "in_dev",
-      "securityReview": "skipped-read-shape-only (decide after diff)",
-      "deviceCheck": "none"
+      "status": "merged",
+      "securityReview": "skipped: read-shape change only",
+      "deviceCheck": "none",
+      "regressionProof": "orphan test fails with c24ba55 database.ts (object of nulls), 3/3 at 131aada (tester)",
+      "notes": "tester APPROVE r0",
+      "mergeSha": "6898c98"
     },
     "373": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "5f4a583",
+        "940c60d",
+        "fe7b82a"
+      ],
       "lane": "A",
-      "status": "work_order_ready",
-      "securityReview": "skipped-read-parse-only (decide after diff)",
+      "status": "merged",
+      "securityReview": "skipped: read-side parsing only",
       "deviceCheck": "none",
-      "notes": "ranges height 50-250, age 10-120, goals >0 no upper bound = analyst picks"
+      "notes": "tester APPROVE r0. SPRINT-CAUSED REGRESSION (minor): Onboarding accepts height/age >0, getter now reads outside 50-250/10-120 as null; fix belongs in OnboardingScreen (lane D, merged) -> added to #405. Bounds are analyst picks.",
+      "regressionProof": "21 fail with 131aada database.ts, all pass at fe7b82a (tester)",
+      "mergeSha": "6898c98"
     },
     "374": {
       "roundTrips": 1,
@@ -476,6 +516,15 @@
       "notes": "tester APPROVE r0. Committed tests assert input text, not profile state; tester verified profile freshness via throwaway probe (recalc used fresh height). Failed write keeps local text until next focus (same as before).",
       "mergeSha": "34a3bf2"
     },
+    "377": {
+      "roundTrips": 0,
+      "commits": [],
+      "lane": "G",
+      "status": "work_order_ready",
+      "securityReview": "skipped-test-infra",
+      "deviceCheck": "none",
+      "notes": "root cause unconfirmed; step 1 = WSL repro with evidence; fix = adapter afterEach closes leaked dbs; proof = 10/10 Linux runs default + maxWorkers=3 + real CI check; fallback (keep cap) is a human call"
+    },
     "378": {
       "roundTrips": 0,
       "commits": [
@@ -487,9 +536,10 @@
         "aefd465"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "notes": "tester confirmed #363 commits fully cover #378 criteria 1-3; close as done by #363 commit, not re-implemented",
-      "closedBy": 363
+      "closedBy": 363,
+      "mergeSha": "6898c98"
     },
     "379": {
       "roundTrips": 0,
@@ -508,12 +558,13 @@
         "453d985"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "partial": true,
       "securityReview": "APPROVE: static SQL, delete only non-survivors per (date,meal_type) group matching the index, credit bounded by backup rows, single txn",
       "deviceCheck": "none",
       "notes": "tester APPROVE r0. MIGRATIONS byte-identical. Stale comments (schema.ts:798 inside MIGRATIONS - frozen; test-file comments + database.ts doc ~2425 -> cleanup).",
-      "regressionProof": "2 tests fail with aefd465 database.ts+schema.ts, 4/4 pass at 453d985; probe vs v35 SQL identical except intended dangling/3+dup cases (tester)"
+      "regressionProof": "2 tests fail with aefd465 database.ts+schema.ts, 4/4 pass at 453d985; probe vs v35 SQL identical except intended dangling/3+dup cases (tester)",
+      "mergeSha": "6898c98"
     },
     "381": {
       "roundTrips": 0,
@@ -523,11 +574,12 @@
         "7cf7260"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "securityReview": "skipped: read ORDER BY only, no write path",
       "deviceCheck": "none",
       "notes": "tester APPROVE r0. Stale v37 comment in schema.ts ~766 is inside MIGRATIONS array - left untouched deliberately. idx_workout_set_log_date now redundant (optional future migration).",
-      "regressionProof": "ordering + collision tests fail with b4c86dd database.ts, pass HEAD; 300-row probe shows set_index order == (created_at,id) order after v37 (tester)"
+      "regressionProof": "ordering + collision tests fail with b4c86dd database.ts, pass HEAD; 300-row probe shows set_index order == (created_at,id) order after v37 (tester)",
+      "mergeSha": "6898c98"
     },
     "382": {
       "roundTrips": 0,
@@ -536,11 +588,12 @@
         "a09da59"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "securityReview": "APPROVE: predicate covers all three write groups; note future write groups must extend it",
       "deviceCheck": "none (optional launch smoke)",
       "regressionProof": "2/6 fail with 7cf7260 database.ts, 6/6 at a09da59; mutation removing !startDateGarbled fails garbled test (tester)",
-      "notes": "tester APPROVE r0"
+      "notes": "tester APPROVE r0",
+      "mergeSha": "6898c98"
     },
     "383": {
       "roundTrips": 0,
@@ -550,11 +603,12 @@
         "c24ba55"
       ],
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "securityReview": "APPROVE: throws before any DB access; all real callers pass toISODate(); no live trigger",
       "deviceCheck": "none",
       "notes": "tester APPROVE r0. d6b9f44 also adds 3 DELETEs (needed: today+7 has a startup row) - commit message understates. Sync-parity test now in-window (inherent).",
-      "regressionProof": "30/74 fail with a09da59 database.ts (6 writers x 5 bad dates), 74/74 at c24ba55; d6b9f44 date-move green pre-fix (tester)"
+      "regressionProof": "30/74 fail with a09da59 database.ts (6 writers x 5 bad dates), 74/74 at c24ba55; d6b9f44 date-move green pre-fix (tester)",
+      "mergeSha": "6898c98"
     },
     "315-display": {
       "roundTrips": 0,
@@ -590,7 +644,9 @@
     411,
     412,
     413,
-    414
+    414,
+    415,
+    416
   ],
   "log": [
     {
@@ -969,6 +1025,66 @@
     {
       "at": "2026-09-30T23:22:17Z",
       "event": "#383 ready (security APPROVE)"
+    },
+    {
+      "at": "2026-09-30T23:22:56Z",
+      "event": "#372 in_test (713 per dev)"
+    },
+    {
+      "at": "2026-09-30T23:24:10Z",
+      "event": "#372 ready (security skipped: read shape only); #373 in_dev"
+    },
+    {
+      "at": "2026-09-30T23:25:39Z",
+      "event": "#373: existing doc test pins blank=0; authorized update"
+    },
+    {
+      "at": "2026-09-30T23:26:25Z",
+      "event": "#373 in_test (748 per dev)"
+    },
+    {
+      "at": "2026-09-30T23:27:54Z",
+      "event": "#373 ready; sprint-caused onboarding-bounds regression recorded on #405; #367 in_dev"
+    },
+    {
+      "at": "2026-09-30T23:29:18Z",
+      "event": "#367: modal copy-forward regression confirmed; granted screen fix"
+    },
+    {
+      "at": "2026-09-30T23:29:29Z",
+      "event": "filed #415 (measurement Last-date label)"
+    },
+    {
+      "at": "2026-09-30T23:31:07Z",
+      "event": "#367 in_test (756 per dev)"
+    },
+    {
+      "at": "2026-09-30T23:33:03Z",
+      "event": "#367 ready; filed clearing issue; #362 in_dev (last lane A issue)"
+    },
+    {
+      "at": "2026-09-30T23:33:08Z",
+      "event": "filed #416 (measurement clearing after #367)"
+    },
+    {
+      "at": "2026-09-30T23:33:56Z",
+      "event": "#362 in_test (768 per dev)"
+    },
+    {
+      "at": "2026-09-30T23:35:07Z",
+      "event": "#362 ready; lane A out of issues (15 done, 2 parked) -> cleanup"
+    },
+    {
+      "at": "2026-09-30T23:35:21Z",
+      "event": "#377 analysis started (read-only) while lane A cleanup runs"
+    },
+    {
+      "at": "2026-09-30T23:36:06Z",
+      "event": "#377 work order ready; waits for lane A merge"
+    },
+    {
+      "at": "2026-09-30T23:37:02Z",
+      "event": "verified schema.ts diff vs fdf5c68 is pure append (73+/0-); merged lane A 6898c98; gates green 856/79"
     }
   ]
 }
