@@ -2312,8 +2312,8 @@ export async function setWeeklyCookDayEnabled(enabled: boolean): Promise<void> {
 export async function getWeeklyCookDay(): Promise<number> {
   const raw = await getSetting(SETTING_WEEKLY_COOK_DAY);
   if (raw === null) return DEFAULT_WEEKLY_COOK_DAY;
-  const parsed = parseInt(raw, 10);
-  return isNaN(parsed) ? DEFAULT_WEEKLY_COOK_DAY : parsed;
+  const trimmed = raw.trim();
+  return /^[0-6]$/.test(trimmed) ? Number(trimmed) : DEFAULT_WEEKLY_COOK_DAY;
 }
 
 export async function setWeeklyCookDay(day: number): Promise<void> {
