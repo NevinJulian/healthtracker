@@ -18,7 +18,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, Exercise } from './schema';
+import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, RESTORE_SLOT_DEDUPE_SQL, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
 import { recipes } from '../data/recipes';
 import { NUTRITION_GOALS, NutritionGoals } from '../nutrition/goals';
@@ -2425,7 +2425,7 @@ export async function dumpTable(
  *     table, not just the offending one. So: drop both indexes before
  *     restoring, restore every table exactly as before, then re-run each
  *     affected migration's own SQL — looked up at runtime via
- *     POST_RESTORE_MIGRATION_VERSIONS, never copied or reimplemented, so it
+ *     POST_RESTORE_STEPS, never copied or reimplemented, so it
  *     can't drift from the migration — against the just-restored data, in
  *     order, inside the same transaction. v35 (#303) credits any consumed
  *     loser's batch in the just-restored meal_inventory, deletes losers per
@@ -2466,10 +2466,15 @@ export async function dumpTable(
  * here, looked up from MIGRATIONS at runtime so this can never drift from
  * the real migration.
  *
- *   - v35 (#303): weekly_meal_plan (date, meal_type) dedupe + unique index.
+ *   - RESTORE_SLOT_DEDUPE_SQL (in place of v35): weekly_meal_plan (date,
+ *     meal_type) dedupe + unique index, preferring a consumed row whose
+ *     inventory pointer is live.
  *   - v37 (#317): workout_set_log set_index renumber + unique index.
  */
-const POST_RESTORE_MIGRATION_VERSIONS = [35, 37];
+const POST_RESTORE_STEPS: readonly ({ sql: string } | { version: number })[] = [
+  { sql: RESTORE_SLOT_DEDUPE_SQL },
+  { version: 37 },
+];
 
 type RestoreFromPayloadResult = {
   tablesRestored: number;
@@ -2509,7 +2514,7 @@ async function _restoreFromPayload(
     // Drop first so a legacy backup's duplicate weekly_meal_plan rows or
     // colliding/gapped workout_set_log rows (see above) can all be inserted
     // below; both are recreated by re-running their migrations' own SQL
-    // (POST_RESTORE_MIGRATION_VERSIONS) after the restore loop.
+    // (POST_RESTORE_STEPS) after the restore loop.
     await db.execAsync('DROP INDEX IF EXISTS idx_weekly_meal_plan_date_meal_type');
     await db.execAsync('DROP INDEX IF EXISTS idx_workout_set_log_date_exercise_set_index');
 
@@ -2592,16 +2597,20 @@ async function _restoreFromPayload(
     // migration's index was dropped above, before this loop ran — never
     // while it existed — matching the ordering both migrations require of
     // their own renumber/dedupe step.
-    for (const version of POST_RESTORE_MIGRATION_VERSIONS) {
-      const migration = MIGRATIONS.find((m) => m.version === version);
+    for (const step of POST_RESTORE_STEPS) {
+      if ('sql' in step) {
+        await db.execAsync(step.sql);
+        continue;
+      }
+      const migration = MIGRATIONS.find((m) => m.version === step.version);
       if (!migration) {
         throw new Error(
-          `restoreFromPayload: migration v${version} not found in MIGRATIONS — cannot rebuild its post-restore state.`
+          `restoreFromPayload: migration v${step.version} not found in MIGRATIONS — cannot rebuild its post-restore state.`
         );
       }
       // Same contract as runMigrations: a migration's precondition runs
       // immediately before its SQL, in the same transaction. Here it is
-      // also a live check that the DROP INDEX above really happened (#317).
+      // also a live check that the DROP INDEX above really happened.
       if (migration.precondition) await migration.precondition(db);
       await db.execAsync(migration.sql);
     }
