@@ -201,14 +201,16 @@
     "G": {
       "branch": "sprint/lane-g-tests",
       "worktree": "C:/git/ht-lanes/lane-g",
-      "status": "pending",
+      "status": "not_merged",
       "order": [
         377
       ],
       "waitsFor": "all other lanes merged",
       "current": null,
       "done": [],
-      "parked": []
+      "parked": [
+        377
+      ]
     }
   },
   "issues": {
@@ -518,12 +520,18 @@
     },
     "377": {
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "21c6f26",
+        "47a37fa"
+      ],
       "lane": "G",
-      "status": "work_order_ready",
+      "status": "parked",
       "securityReview": "skipped-test-infra",
       "deviceCheck": "none",
-      "notes": "root cause unconfirmed; step 1 = WSL repro with evidence; fix = adapter afterEach closes leaked dbs; proof = 10/10 Linux runs default + maxWorkers=3 + real CI check; fallback (keep cap) is a human call"
+      "notes": "issue comment posted with evidence table",
+      "grant": "new src/db/__tests__/sqljsAdapterCleanup.test.ts (lane A idle)",
+      "stalledAt": "dev (after Linux repro, roundTrips 0)",
+      "parkReason": "Reproduced on WSL Linux (5/10 crash at ~27 workers, 0/10 at 3). Not sql.js: control run with src/db excluded still crashes; adapter cleanup fix does not cure. Root cause unknown (worker-count related native crash). Work order: if fix does not cure, keeping cap is a human decision. Cap left at 2; lane G NOT merged (hygiene commits untested, not the cure)."
     },
     "378": {
       "roundTrips": 0,
@@ -1085,6 +1093,42 @@
     {
       "at": "2026-09-30T23:37:02Z",
       "event": "verified schema.ts diff vs fdf5c68 is pure append (73+/0-); merged lane A 6898c98; gates green 856/79"
+    },
+    {
+      "at": "2026-09-30T23:37:32Z",
+      "event": "lane G refreshed to 215b228 and pushed; #377 in_dev (Linux repro first)"
+    },
+    {
+      "at": "2026-09-30T23:39:50Z",
+      "event": "GitHub CI test check on 215b228 (all lanes except G merged; integration + lane-g pushes): 2x completed success"
+    },
+    {
+      "at": "2026-10-01T00:38:36Z",
+      "event": "#377 parked after Linux repro (not sql.js; worker-count native crash); lane G not merged"
+    },
+    {
+      "at": "2026-10-01T00:40:57Z",
+      "event": "sprint finished: report written; PR NOT opened (awaits cold review + device checks)"
     }
-  ]
+  ],
+  "status": "finished",
+  "finishedAt": "2026-10-01T00:40:57Z",
+  "final": {
+    "sha": "215b228",
+    "typecheck": "pass",
+    "tests": 856,
+    "suites": 79,
+    "ci": "success on 215b228",
+    "merged": 23,
+    "parked": [
+      314,
+      328,
+      379,
+      377
+    ],
+    "partial": [
+      318,
+      380
+    ]
+  }
 }
