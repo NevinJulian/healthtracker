@@ -2484,8 +2484,7 @@ export async function dumpTable(
  *     — and since restore is one transaction, that would roll back every
  *     table, not just the offending one. So: drop both indexes before
  *     restoring, restore every table exactly as before, then re-run each
- *     affected repair step — POST_RESTORE_STEPS, never copied or
- *     reimplemented, so it can't drift from the schema — against the
+ *     affected repair step (POST_RESTORE_STEPS) against the
  *     just-restored data, in order, inside the same transaction.
  *     RESTORE_SLOT_DEDUPE_SQL credits any consumed loser's batch, dedupes
  *     weekly_meal_plan per (date, meal_type), preferring a consumed row whose
