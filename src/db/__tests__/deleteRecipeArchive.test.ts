@@ -100,15 +100,19 @@ describe('deleteRecipe archives instead of deleting (#316)', () => {
     expect(await snapshot()).toEqual(before);
   });
 
-  it('importRecipe on an archived id restores it and returns true', async () => {
+  it('importRecipe on an archived id restores it with the imported content and returns true', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
     await db.importRecipe(customRecipe());
     await db.deleteRecipe(CUSTOM_ID);
 
-    expect(await db.importRecipe(customRecipe())).toBe(true);
+    const updated = { ...customRecipe(), title: 'Archive Me v2', calories: 650 };
+    expect(await db.importRecipe(updated)).toBe(true);
     expect((await db.getRecipes()).some((r) => r.id === CUSTOM_ID)).toBe(true);
-    expect(await db.getRecipeById(CUSTOM_ID)).not.toBeNull();
+    const restored = await db.getRecipeById(CUSTOM_ID);
+    expect(restored).not.toBeNull();
+    expect(restored!.title).toBe('Archive Me v2');
+    expect(restored!.calories).toBe(650);
   });
 
   it('importRecipe on an active id still returns false', async () => {
