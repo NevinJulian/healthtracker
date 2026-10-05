@@ -822,10 +822,6 @@ export const MIGRATIONS: Migration[] = [
 ` },
   { version: 38, sql: `
   ALTER TABLE recipe_library ADD COLUMN archived_at TEXT;
-  DELETE FROM meal_inventory WHERE recipe_id NOT IN (SELECT id FROM recipe_library);
-  DELETE FROM cooking_tasks WHERE recipe_id NOT IN (SELECT id FROM recipe_library);
-  DELETE FROM weekly_meal_plan WHERE recipe_id NOT IN (SELECT id FROM recipe_library);
-  DELETE FROM cook_log WHERE recipe_id NOT IN (SELECT id FROM recipe_library);
 ` },
 ];
 

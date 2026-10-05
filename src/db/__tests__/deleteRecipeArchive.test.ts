@@ -1,7 +1,7 @@
 /**
  * Deleting a recipe archives it: it disappears from the recipe getters but
  * every join that resolves recipe_id keeps working, and importing it again
- * restores it. The v38 migration sweeps orphans left by earlier hard deletes.
+ * restores it. The v38 migration leaves orphans from earlier hard deletes alone.
  *
  * Issue #316
  */
@@ -125,8 +125,8 @@ describe('deleteRecipe archives instead of deleting (#316)', () => {
   });
 });
 
-describe('v38 orphan sweep (#316)', () => {
-  it('removes orphans in all four tables and keeps rows whose recipe exists', async () => {
+describe('v38 orphaned rows (#316)', () => {
+  it('keeps orphaned rows in all four tables', async () => {
     const raw = await createSqljsDb();
     await raw.execAsync('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY NOT NULL);');
     for (const m of MIGRATIONS.filter((x) => x.version <= 37)) {
@@ -149,8 +149,8 @@ describe('v38 orphan sweep (#316)', () => {
     await raw.execAsync(v38!.sql);
 
     for (const table of ['meal_inventory', 'cooking_tasks', 'weekly_meal_plan', 'cook_log']) {
-      const rows = await raw.getAllAsync<{ recipe_id: string }>(`SELECT recipe_id FROM ${table}`);
-      expect(rows.map((r) => r.recipe_id)).toEqual(['keep']);
+      const rows = await raw.getAllAsync<{ recipe_id: string }>(`SELECT recipe_id FROM ${table} ORDER BY rowid`);
+      expect(rows.map((r) => r.recipe_id)).toEqual(['keep', 'gone']);
     }
   });
 });
