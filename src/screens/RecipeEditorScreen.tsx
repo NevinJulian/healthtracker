@@ -217,10 +217,14 @@ export default function RecipeEditorScreen() {
   }, [ingredients, servings]);
 
   const recomputeMacros = async () => {
+    lookupController.current?.abort();
+    lookupController.current = null;
+
     const validIngredients = rowsToIngredients(ingredients);
     if (validIngredients.length === 0) {
       setMacros(null);
       setEstimatedIngredients([]);
+      setMacroLoading(false);
       return;
     }
 
@@ -271,7 +275,9 @@ export default function RecipeEditorScreen() {
     } catch {
       // Leave previous macros displayed if recompute throws
     } finally {
-      setMacroLoading(false);
+      if (lookupController.current === controller) {
+        setMacroLoading(false);
+      }
     }
   };
 
