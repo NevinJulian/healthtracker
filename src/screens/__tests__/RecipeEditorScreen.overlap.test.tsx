@@ -91,4 +91,87 @@ describe('RecipeEditorScreen overlapping macro recomputes', () => {
     expect(saved.calories).toBe(60);
     expect(signals[0]?.aborted).toBe(true);
   });
+
+  describe('Save before the latest recompute has finished', () => {
+    let resolvers: Array<(v: typeof NUTRITION) => void>;
+    let resolved: number;
+
+    beforeEach(() => {
+      resolvers = [];
+      resolved = 0;
+      mockLookup.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)));
+    });
+
+    const resolvePending = async () => {
+      await act(async () => {
+        while (resolved < resolvers.length) resolvers[resolved++](NUTRITION);
+        await jest.advanceTimersByTimeAsync(0);
+      });
+    };
+
+    const renderWithSettledMacros = async () => {
+      const utils = render(<RecipeEditorScreen />);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(0);
+      });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(700);
+      });
+      await resolvePending();
+      expect(utils.getByText('5g')).toBeTruthy();
+      return utils;
+    };
+
+    const pressSave = async (utils: ReturnType<typeof render>) => {
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Save Changes'));
+        await jest.advanceTimersByTimeAsync(0);
+      });
+      await resolvePending();
+    };
+
+    it('waits for the debounced recompute when Save follows a quantity edit', async () => {
+      const utils = await renderWithSettledMacros();
+
+      fireEvent.changeText(utils.getByDisplayValue('100'), '300');
+      await pressSave(utils);
+
+      expect(mockUpdateRecipe).toHaveBeenCalledTimes(1);
+      const saved = mockUpdateRecipe.mock.calls[0][0];
+      expect(saved.ingredients).toEqual([{ name: 'zzz unknown one', baseQuantity: 300, unit: 'g' }]);
+      expect(saved.protein).toBe(15);
+      expect(saved.calories).toBe(60);
+    });
+
+    it('waits for the running lookup when Save follows a quantity edit', async () => {
+      const utils = await renderWithSettledMacros();
+
+      fireEvent.changeText(utils.getByDisplayValue('100'), '300');
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(700);
+      });
+      expect(resolvers.length).toBe(resolved + 1);
+
+      await pressSave(utils);
+
+      expect(mockUpdateRecipe).toHaveBeenCalledTimes(1);
+      const saved = mockUpdateRecipe.mock.calls[0][0];
+      expect(saved.ingredients).toEqual([{ name: 'zzz unknown one', baseQuantity: 300, unit: 'g' }]);
+      expect(saved.protein).toBe(15);
+      expect(saved.calories).toBe(60);
+    });
+
+    it('waits for the debounced recompute when Save follows a servings edit', async () => {
+      const utils = await renderWithSettledMacros();
+
+      fireEvent.changeText(utils.getByDisplayValue('2'), '1');
+      await pressSave(utils);
+
+      expect(mockUpdateRecipe).toHaveBeenCalledTimes(1);
+      const saved = mockUpdateRecipe.mock.calls[0][0];
+      expect(saved.defaultServings).toBe(1);
+      expect(saved.protein).toBe(10);
+      expect(saved.calories).toBe(40);
+    });
+  });
 });
