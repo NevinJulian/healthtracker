@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-HealthTracker — an Expo / React Native (SDK 54, RN 0.81, React 19, TypeScript strict) fitness + meal-prep app. All data is on-device in SQLite via `expo-sqlite`. No backend, no remote API. New Architecture is enabled (`app.json` → `newArchEnabled: true`).
+HealthTracker — an Expo / React Native (SDK 57, RN 0.86, React 19, TypeScript strict) fitness + meal-prep app. All data is on-device in SQLite via `expo-sqlite`. No backend; the only network calls are keyless recipe lookups in `src/api` (TheMealDB, Open Food Facts). New Architecture is on.
 
 ## Commands
 
@@ -40,7 +40,7 @@ To change the schema: **append a new entry with the next integer `version`.** Ne
 `src/data/recipes.ts` (static seed) → `recipe_library` → user adds a recipe → `shopping_list` + `cooking_tasks` → `finishCooking()` → `meal_inventory` → `assignMealToPlan()` → `weekly_meal_plan`; `toggleMealConsumed()` decrements inventory. Cross-table inventory mutations use `db.withTransactionAsync` — keep new multi-step inventory changes transactional.
 
 ### Navigation & theme
-`src/navigation/AppNavigator.tsx` is a **right-side** drawer; the hamburger is rendered as `headerRight` (default left icon suppressed). "Recipes" is a nested stack (`RecipesMain` → `RecipeDetail`) inside the drawer. `src/theme/tokens.ts` (the "Verdure" palette) is the single source of truth for `Colors`/`Spacing`/`Typography`/`Radius` — use these tokens, never raw hex or magic numbers. Screens should not add top padding; the navigation header owns it.
+`src/navigation/AppNavigator.tsx` is a **right-side** drawer; the hamburger is rendered as `headerRight` (default left icon suppressed). Two nested stacks sit inside the drawer: "Recipes" (`RecipesMain` → `RecipeDetail`, `RecipeEditor`) and "Discover" (`DiscoverMain` → `DiscoverDetail`). `src/theme/tokens.ts` (the "Verdure" palette) is the single source of truth for `Colors`/`Spacing`/`Typography`/`Radius` — use these tokens, never raw hex or magic numbers. Screens should not add top padding; the navigation header owns it.
 
 ## Testing setup — read before touching jest config
 
@@ -50,7 +50,7 @@ Note: there is no `setupFiles` entry in `jest.config.js`; the active mocks are t
 
 ## Gotchas
 
-- **`react-native-reanimated` is pinned to 3.16.7 and worklets were removed** to fix a TurboModule crash under the New Architecture (#219–221). Be very cautious upgrading reanimated or reintroducing worklets.
+- **`react-native-reanimated` 4.x must stay paired with `react-native-worklets`.** Keep both at the versions Expo SDK 57 / RN 0.86 supports. The worklets Babel plugin comes through `babel-preset-expo`, so keep it a dependency and keep it as the preset in `babel.config.js`. Do not restore reanimated 3.16.7 (it does not compile on current RN) or remove worklets. Native breakage is caught only by `build-check.yml` / the EAS build, not by `npm test` or `npm run typecheck`.
 - `npm install` / `npm ci` require `--legacy-peer-deps`.
 
 ## CI & releases

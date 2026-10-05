@@ -1,119 +1,186 @@
-# Sprint report: `sprint/auto-fixes`
+# Sprint report: `sprint/auto-fixes` (sprint 2)
 
-Autonomous overnight sprint, 2026-09-18 to 2026-09-19. Frozen scope: the 36 open issues in #300–#336, excluding #334. The orchestrator dispatched, judged, merged and recorded. Every line of code was written by developer agents and adversarially checked by tester agents. Security agents also reviewed every change touching `src/db`, `backup.ts`, `src/api` or external input.
+Autonomous sprint, started 2026-09-30 22:30 UTC. Frozen scope: the 27 open issues in `.claude/SPRINT.md` §3. The orchestrator only dispatched work, judged it, merged lanes and recorded state. Developer agents wrote every line of code, and tester agents checked every change adversarially. Security agents reviewed every change that touched `src/db`, `backup.ts` or `src/api` and wrote data or read external input; skips are recorded per issue below.
 
-**Nothing has been merged to `main`. The PR needs human review before anything lands.**
+**Nothing has been merged to `main`, and no PR has been opened.** The PR waits for the cold review and the device checks in §7.
+
+---
 
 ## 1. Outcome
 
-**33 of 36 issues landed** on `sprint/auto-fixes` and **3 were parked** (#316, #328, #333). Four of the 33 are **partial** fixes (#311, #314, #315, #318). The PR references them with `Refs` rather than closing them, and the Merged table says what is missing for each. Each landed code fix has a regression test that was shown to fail on the pre-fix code for the real reason, not an import or "not a function" error, and to pass after the fix. #336 is itself tests, so its tests were proven with mutations instead. The two repo and docs issues (#332, #335) were verified mechanically. The tester re-ran each of those proofs rather than taking the developer's word. Four schema migrations were appended (v34–v37). No existing migration was edited: `git diff main -- src/db/schema.ts` removes one header-comment line and nothing inside `MIGRATIONS`. Seven lanes merged into the integration branch with regular merge commits, never squashed. After every merge, typecheck and the full suite ran green. The integration branch is **green: typecheck clean, 584 tests / 55 suites** (baseline on `main`: 331 / 17). No abort condition was hit: 3 parked (limit 8), no migration edited, no push to `main`. The integration branch was, however, **red in GitHub CI** after the final push, for a reason no local gate could see, and I only discovered it after opening the PR; §5 has the details and what I should have done. It is green now, via a worker cap that is a workaround rather than a fix (#377). 17 new issues were filed as `found-during-sprint` (#360–#375 and #377; an accidental duplicate, #359, was closed). **None were worked**, apart from that one-line CI mitigation.
+23 of 27 issues landed on `sprint/auto-fixes`: 21 close fully and 2 are partial (#318, #380). 4 are parked: #314, #328, #379 and #377. Lanes A–F are merged. Lane G (#377) was **not** merged: the Linux reproduction showed the crash is not caused by sql.js, so its fix does not cure the issue.
+
+The integration branch is green:
+- `npm run typecheck` is clean.
+- 856/856 tests pass in 79 suites, up from the baseline of 610 tests in 62 suites.
+- The real GitHub CI `test` check concluded **success** on `215b228`. Two runs were made, one for the integration push and one for the lane-G push, and both were green.
+
+The run did not abort:
+- 4 parked out of a maximum of 8.
+- No red integration gate.
+- No migration edited. `schema.ts` against `main` is 73 lines added and 0 removed, appended after v37.
+- No push to `main`.
+
+Round trips:
+- Five issues needed one tester rejection each before approval: #374, #366, #365, #371 and #315's display half.
+- No issue needed a second round.
+- Three issues had an existing test that encoded the bug being fixed: #380, #381 and #373. In each case the orchestrator authorized changing that test, as its own commit. See §6.
 
 ## 2. Merged
 
-Round trips count tester or security rejections that went back to the developer. The limit was 3; the maximum reached was 2.
-
-| Issue | Title | Lane / branch | Commits | What the regression test asserts |
+| Issue | Title (short) | Lane / branch | Commits | What the regression test asserts |
 |---|---|---|---|---|
-| #300 | P0: syncRollingSchedule deletes daily_log history older than 7 days | A `sprint/lane-a-db` | 266cf76 66d3f58 e46607f 313877b 91e7932 231d644 0aad077 b83a2fe 04434c3 | `syncRollingSchedule.test.ts`: a row far outside the window survives a sync. `getRollingWindow.test.ts`: the window is bounded. `getDailyLogsBetween.test.ts`: the range query. `AnalyticsDashboardScreen.historySource.test.tsx`: analytics now reads 90 days at render level (a −7 mutation is caught). |
-| #301 | P0: an absence longer than 7 days leaves an unfillable gap | A | bfabfdb d9ff8d7 ab6ae5e 263a593 d1890de 382b62a | `backfillGap.test.ts`: a gap is backfilled up to 90 days back, but never before the start date. Completed rows are never touched, and rows older than the ±7 window are never retro-filled with template exercises. `backfillStartDateGuard.test.ts`: a future or garbled start date is guarded, tested across month and year boundaries and 3 time zones. Tester rejected twice. |
-| #302 | P0: toggleMealConsumed creates inventory out of nothing | A | 0bf2fc5 348c166 606cdcb | `toggleMealConsumedInventory.test.ts`: unticking credits exactly the batch that was debited, via the new `consumed_from_inventory_id` column (migration **v34**); total portions are conserved over tick/untick sequences. |
-| #303 | P0: assignMealToPlan never refunds, is non-transactional, and duplicates slots | A | 4c8662d 854787f c392949 fc61361 01e0175 ba049bc 92ddba3 69c2d79 d74da00 | `assignMealToPlanRefund.test.ts`: a reassign refunds atomically. Migration **v35** dedupes slots and adds a unique slot index. `restoreLegacyDuplicates.test.ts`: a legacy backup containing duplicate slots still restores. Rejected twice: a kill-mid-migration double credit, then legacy backups becoming unrestorable. |
-| #304 | P0: Dashboard is stale and writes to the wrong day after midnight | D `sprint/lane-d-screens` | 50feac5 f6091e8 5bb2c10 ac89374 ddb8cf9 | `DashboardScreen.midnight.test.tsx` (12 tests): a reload runs on focus and on AppState `active`. A stale overlapping load can't overwrite a newer one. After midnight, reads **and** the next weight write use the new date, **even when the reload fails**. Convergence doesn't rely on react-navigation re-invoking the effect. A same-day trigger costs exactly one DB round. Rejected once for the failed-reload hole. |
-| #305 | P0: every daily_log writer silently writes nothing when the row is missing | A | 77fc8ae cdc5a90 52409f4 | `dailyLogUpserts.test.ts`: each of the 6 writers creates a missing row and asserts the write landed. |
-| #306 | Hydration stats halved by future rows | A | 97dfdd6 7e4831c 64c24ed bcae28a | `getWaterHistory.test.ts`: history stops at today. `AnalyticsDashboardScreen.hydrationEmptyState.test.tsx`: an all-zero week renders the empty state. |
-| #307 | Meal adherence counts future meals as missed | A | 130cadd 0e1fee3 | `getMealAdherence.test.ts`: meals after today are excluded (3 time zones). |
-| #308 | Strength chart empty until a pill is tapped | C `sprint/lane-c-analytics` | 577e79b 8efa95c | `AnalyticsDashboardScreen.liftingSelection.test.tsx`: the first exercise is selected once data arrives. This is a component re-render test, and it fails when only the behavioural fix is reverted. |
-| #309 | Stable notification identifiers never reach scheduleNotificationAsync | B `sprint/lane-b-notify` | 2c171a8 398f733 | `notifications.test.ts`: asserts `scheduleNotificationAsync` receives `identifier: <stable id>`, not that a getter returns its constant. 12/40 fail before the fix. |
-| #310 | Restore wipes app_state and orphans scheduled notifications | B | 1edd492 186cabf | `backup.test.ts`: a successful restore cancels all and reconciles; a failed restore does neither. |
-| #311 | reconcileScheduledNotifications has no in-flight guard | B | 6f0bb27 457d423 b1aeb91 081f1fa | `notifications.test.ts`: concurrent reconciles coalesce (a third pass sees the latest settings), and one failing reminder doesn't skip the others. **Partial: AC #4 excluded; the PR says `Refs`.** |
-| #312 | Analytics loadData has no cancellation guard | C | 3189d8f bdbf4ea f97b321 | `AnalyticsDashboardScreen.cancellationGuard.test.tsx`: a stale slower run can't overwrite a newer one. |
-| #313 | Settings steppers drop rapid taps | D | 7a9199a 490f75a d68c7f6 846aaef | `SettingsScreen.test.tsx`: rapid taps accumulate; the debounced write flushes on background or unmount; a rejected write surfaces. Security blocked once over the missing AppState flush. |
-| #314 | Migrations not atomic, so a kill bricks the app | A | 778dcbd a5f9276 | `migrationAtomicity.test.ts`: a throwing migration leaves `schema_version` unchanged; a kill mid-v35 re-applies cleanly; a re-run is a no-op. **Partial: already-bricked devices and the App.tsx dead-end screen are not addressed; `Refs`.** |
-| #315 | restoreFromPayload interpolates column names; validatePayload weak | A (+ granted `backup.ts`) | 14b1286 e9f4983 8f9eeed 07b1a24 89c23ed | `restoreInjection.test.ts`: an injected column key can't reach SQL (it failed before the fix with a real SQL syntax error). `backup.test.ts`: 12 malformed-payload cases are rejected. **Partial: skipped columns are reported by the function but not shown in the Settings alert; `Refs`.** |
-| #317 | workout_set_log set_index collides after a delete | D (granted `database.ts`/`schema.ts`) | 905aa98 277fb67 33c4635 878eda5 01e21c2 | `workoutSetIndexCollision.test.ts`: delete-middle-then-relog, calling the way the old Dashboard did, yields no duplicate. Reads come back in logged order. Migration **v37** renumbers densely and adds `UNIQUE(date, exercise, set_index)`; it's kill-safe. A legacy colliding backup restores. Rejected once: the first tests only failed on a signature error. |
-| #318 | No network timeouts, aborts or retries in src/api | E `sprint/lane-e-api` | 1beee5e 1a59e42 def1e4f 1ee6a8a 8f867a5 | `fetchJson.test.ts`, `mealdb.test.ts`, `openfoodfacts.test.ts`: timeouts, bounded retry with abortable backoff, no double fetch. **Partial: abort-on-navigation and out-of-order responses need the Discover and RecipeEditor screens; `Refs`.** |
-| #319 | upsertExerciseCompleted clobbers malformed JSON; non-transactional RMW | A | 8d1145e 37e70a4 | `dailyLogUpserts.test.ts`: malformed exercises JSON is refused, not overwritten with `[]`; toggles are serialised through a promise chain. The original "expo-sqlite queues transactions" design was rejected as false; see #369. |
-| #320 | Add-to-shopping-list not transactional | A (+ granted `RecipeDetailScreen.tsx`) | a6fc1ca 0913739 5c206b2 | `addRecipeToShoppingList.test.ts`: an induced mid-loop failure leaves zero rows. Removing the transaction makes it fail with 2 leftover rows. |
-| #321 | Seeding leaks prepared statements on throw | A | 7e8add7 9ef7fb6 | `seedFinalizeOnThrow.test.ts`: finalize runs on throw, and a finalize error doesn't mask the original. |
-| #322 | Body weight input accepts partial or absurd values | D (input) + C (chart) | ee4fbb0 389c189 · 733de02 4b74b42 c7c8292 1481f7b 4fde986 a55de6b | `DashboardScreen.test.tsx`: invalid or partial input is rejected with feedback and the decimal comma is accepted (10/14 fail before the fix). `analyticsHelpers.test.ts` and `AnalyticsDashboardScreen.weightResilience.test.tsx`: the chart ignores absurd historical values. |
-| #323 | Profile height/age discard invalid input and can't be cleared | D | b06a2d7 9b2445e 5cb4219 · e081ab5 57ceca1 30a7833 2d792bd | `SettingsScreen.test.tsx`: range validation, decimal comma, inline error. `SettingsScreen.profileClear.test.tsx`: blank plus blur calls the new clear, not a save. `clearProfileFields.test.ts`: a cleared value reads back `null`, not 0. |
-| #324 | Portions modal: silent Save no-op, state persists | D | da96911 29c01c4 | `MealPrepScreen.test.tsx`: Save is disabled until the input is valid, and each open gets a fresh form. |
-| #325 | MeasurementsModal clobbers typing; invalid values discarded | D | c03ab22 286cce3 0d44ecf | `DashboardScreen.measurements.test.tsx`: a background reload no longer unmounts the open modal (the spinner shows on the first load only); invalid values give feedback. |
-| #326 | Hydration % divides by an unguarded goal | A (reassigned from D) | b52bd5c 8baa245 | `getHydrationGoal.test.ts`: empty or out-of-range stored goals fall back to the default (`Number('') === 0` is no longer accepted). |
-| #327 | perf: no useMemo in Analytics | C | 1a874bf d9f76cc 31348f5 | `AnalyticsDashboardScreen.memoisation.test.tsx`: heavy derivations are not recomputed on unrelated renders, and each dependency mutation is caught. |
-| #329 | MealPrep blanks on focus, stale closure, sequential queries | D | b15b722 fcbce41 0c2ed7a 2c05479 | `MealPrepScreen.focus.test.tsx`: no blanking on refocus, a stale run can't overwrite, and a post-action refresh beats a stale focus load. |
-| #330 | perf: ticking a meal runs a full sync plus six queries | D | 0c6b989 832cd45 57651c2 | `DashboardScreen.mealToggle.test.tsx`: the toggle is optimistic, with no reload on success, a reload on failure, and double taps safe. |
-| #331 | perf: no indexes | A | 04ab5b1 554a945 | `indexes.test.ts`: the hot queries' `EXPLAIN QUERY PLAN` uses the new indexes from migration **v36** (they did SCAN before). |
-| #332 | cleanup: jest-error.log and temp.txt committed | F `sprint/lane-f-repo` | 19ecb0c a6e5813 | Mechanical: the files are untracked and ignored (`git ls-files`, `git check-ignore`). |
-| #335 | docs: db README and schema header describe APIs that don't exist | F (granted docs + CLAUDE.md) | 4ddcd6e e019e3c 290f9a8 88e5d15 5871f0c 87b764c 2346d16 bd598e3 | Mechanical: zero hits for stale API names, every documented name exists in code, and the CLAUDE.md retention sentence matches `_syncRollingSchedule`. Rejected once for "trailing 7 days". |
-| #336 | test: the suite is green while every P0 is live; close the coverage gap | G `sprint/lane-g-tests` | 09a1e8a 637f6b7 d079836 29fb37a f72d701 2d7eaea 4d1874f 9d15089 7e16b78 | The gap audit found every P0 (#300–#305, #309, #314) already had a fail-before test from this sprint. Three new real-DB tests fill the rest. `syncRollingScheduleIdempotent.test.ts`: a second sync leaves `daily_log` row-for-row identical, including a real `upsertExerciseCompleted` edit. `mealInventoryInvariants.test.ts`: a seeded (0xC0FFEE) 200-step tick/untick/assign/reassign/finishCooking run checks per-recipe conservation **and** that each credit returns to the debited batch. It is mutation-proven to catch `main`'s original #302 and #303 bug shapes (no refund, wrong-batch credit, fabrication, no debit). `backupRoundTrip.test.ts`: the real `buildBackupPayload` → `restoreFromPayload` round trip is exact. Also: dead `src/test/setup.ts` deleted, and CI runs typecheck. Rejected once: a false CLAUDE.md sentence, and the invariant test was blind to wrong-batch credits. |
+| #311 | reconcile does more work than needed (AC4) | B `sprint/lane-b-notify` | f7f9796, 08177d8 (+cleanup 0a1b7a8) | A second reconcile with unchanged settings makes 0 schedule and 0 cancel calls. A cook-day-only change makes exactly 1 schedule call. An identifier missing from the OS list is rescheduled. A list call that rejects causes everything to be scheduled. |
+| #361 | cancel* uses stored ID instead of stable identifier | B | 576115c, f721c8d | Each cancelX removes its stable identifier from a stateful fake OS set when the stored ID is null or `''`. A legacy UUID is cancelled too, and the key is cleared. |
+| #318 *(partial, Refs)* | no aborts / sequencing in src/api | E `sprint/lane-e-api` | 0083100, 111f8fb, 134efad, 985ce33, aa3da5c, 0e37408 (+3aede93) | An aborted signal rejects or resolves null and is never cached. Searching "a" then "b", with "a" resolving last, renders "b". Unmounting Discover or the editor aborts the in-flight signal. |
+| #374 | CLAUDE.md stale reanimated/nav/version | F `sprint/lane-f-repo` | b8a6b8d, 97e92c6, a40aad3, 157da1c | Grep assertions: no 3.16.7 pin, SDK 57 / RN 0.86, all 5 nav screen names present, and no false `app.json`/"no remote API" claims. |
+| #375 | Settings reload overwrites just-saved height/age | D `sprint/lane-d-screens` | 50bb9aa, 07dc001 | A deferred profile reload that resolves after a save or clear (height or age) leaves the typed value on screen. |
+| #366 | MealPrep write failures swallowed | D | 1e87cb6, b7f935e, 0addf31, dd873c3, 8f7573d (revert), 2b774bc, 070c787, f1d1ca2, 1b929ed | Rejected log, assign or toggle shows an Alert, and the modal keeps its inputs. A failure in a post-write follow-up shows no Alert and the modal still closes. |
+| #365 | Onboarding confirm has no catch | D | b8a70f8, 58bf54f, 49abc78 | A rejected `upsertBodyWeight` shows an Alert. Onboarding is not marked complete. The button is disabled while saving and re-enabled after. |
+| #364 | SetLogger parseFloat garbage | D | 5d6c99c, cb69eed | "78,4" saves 78.4. "12abc" and "12.5" reps raise an alert and nothing is saved. Bounds 1–100 reps and 0.5–500 kg. |
+| #315 | restore validation (remainder: readable failure + skipped report) | A + D | 74e874d, bbea6ef; d866f2a, 69ec2c8 | A restore DB failure surfaces as "Restore failed — your existing data was not changed. Details: …" with `cause` kept. The restore alert names skipped tables and columns. |
+| #316 | deleteRecipe orphans four tables | A `sprint/lane-a-db` | 7728404, 67bb382, b4b8732, 3054a18, 8fea2a6 | Deleting a recipe archives it (v38 `archived_at`): it is hidden from the getters, and all 6 joined reads are unchanged. Importing an archived id brings it back. v38 only adds the column: rows orphaned by earlier hard deletes are kept (changed after the cold review). |
+| #363 + #378 | garbled/future app_start_date → NaN / negative weights | A | a3aa9d0, a2ddf35, 6ff8d0a, 75c4fa8, 898e04c, aefd465 | Future and garbled start dates give only "Baseline", never NaN or a negative weight. A garbled date is rewritten to today and a future date is left alone. A valid date at +45 days still gives "+10kg". The tester explicitly confirmed #378 is fully covered. |
+| #380 *(partial, Refs)* | v35 survivor rule keeps dangling-pointer row | A | bf0e784, a424cb9, 453d985 | A legacy restore keeps the live-pointer row over a higher-id NULL-pointer row, the row stays refundable, and portions are conserved. **No new migration**: a restore-only `RESTORE_SLOT_DEDUPE_SQL` replaces v35 in the replay. |
+| #368 | removeMealFromPlan doesn't credit portion | A | 0805cf0, 5b5c068 | Removing a consumed row credits exactly the debited batch, and the credit and delete are atomic (proved by mutation). |
+| #370 | upsertAdditionalWorkouts clobbers malformed JSON | A | a78575d, a81b7b6 | Over malformed stored JSON (or `{}`/`"x"`) the write rejects and the raw text stays byte-identical. The queue is not wedged. |
+| #371 | sync backfill clobbers malformed exercises | A | e7f71f9, b1a1b85, 1d75da9, b4c86dd | For `'{oops'`, `''`, `'null'`, `'{}'` and `'"x"'`, rows at today−7, today and today+7 are byte-identical after sync. `'[]'` still backfills. Sync never throws. |
+| #381 | set-log reads ordered by created_at | A | d507942, be8bf91, 7cf7260 | Sets come back in `set_index` order even when `created_at` disagrees. The day query plan uses the v37 unique index with no temp sort. |
+| #382 | sync opens empty BEGIN/COMMIT | A | 7f0d915, a09da59 | A second sync of a synced DB makes 0 transactions. A garbled start date still makes 1, so the #363 write-back is kept. |
+| #383 | `_ensureDailyLogRow` has no date bounds | A | d6b9f44, 1a33cb0, c24ba55 | All 6 writers reject invalid dates and dates after today+7, creating no row. Today+7, today and today−400 are accepted. |
+| #372 | today's meals: orphan renders recipe of nulls | A | 86c59ff, 131aada | An orphaned plan row returns `recipe: undefined`. Live and archived recipes are unchanged. |
+| #373 | empty setting reads as 0 | A | 5f4a583, 940c60d, fe7b82a | `''`, `'  '`, `'abc'`, `'0'` and out-of-range values read as the default (goals) or null (height/age). |
+| #367 | latest measurement blank for skipped fields | A (+ granted Dashboard modal) | 1096d90, 2a80838, bd78d4f, 6666af2 | Latest takes the newest non-null value per field, and history gaps are preserved. The modal submits only the fields the user edited. |
+| #362 | getWeeklyCookDay no range check | A | 445b6b4, 25cc481 | "999", "-1", "7", "1.5", "3abc" and `""` read as the default 0. "0"–"6" are returned unchanged. |
+
+Lane cleanups: A f01c39b, B 0a1b7a8, D a6be28e, E 3aede93, all comment-only. F made no changes. Lane merge commits on `sprint/auto-fixes`: F c3c9dbd, B 23e1838, E 6c42331, D 34a3bf2, A 6898c98.
 
 ## 3. Parked
 
 | Issue | How far it got | Exactly why it stalled | What a human needs to decide |
 |---|---|---|---|
-| #316: PRAGMA foreign_keys never enabled; deleteRecipe orphans four tables | Analysis only; no code | Turning the pragma on alone makes `deleteRecipe` **throw**, because no FK declares `ON DELETE CASCADE`. Adding cascades needs a table rebuild, **and** `restoreFromPayload` deletes and re-inserts tables in alphabetical order, so with cascades on, every restore would silently cascade-wipe the `cooking_tasks` / `meal_inventory` rows it had just restored. `defer_foreign_keys` doesn't stop cascades. `cook_log` has no FK on purpose (it's history). | When a recipe is deleted, what happens to its history (cook log, consumed plan rows, inventory)? Destroy it, keep it, or block the delete? Should consumed portions be refunded? Recommended once decided: explicit child deletes in `deleteRecipe` inside one transaction, and **no pragma until restore is restructured**. |
-| #328: perf: Analytics loads all lifetime lifting history on every focus | Analysis only; no code | The issue's premise is partly stale. The chart reading `getWorkoutHistory` (LiftingSectionCard progression) is **all-time** by design, so bounding the query would silently truncate visible data. `PRSummaryCard` needs lifetime history for correct PRs, and no aggregate PR query exists, so fixing it properly needs a new `database.ts` query (lane A's file) plus a product decision. | Should the progression chart be all-time or windowed? Then add a `getExercisePRs()` aggregate query. The screen-side change is mechanical after that. |
-| #333: cleanup: 57 merged local branches plus worktree/pr-* leftovers | Analysis only; exact commands posted on the issue | Every acceptance criterion is local git state on your machine or a GitHub repo setting. Nothing in it travels through a reviewable PR, and the sprint doesn't delete branches on your machine unreviewed. Also, `fix-recipe-detail-safe-area` is **not merged** (1 commit, `7d7ba67`), even though the issue lists it as a leftover. | Run the `git branch -d` sweep from the issue comment after this PR is resolved. Turn on "automatically delete head branches". Decide what happens to `fix-recipe-detail-safe-area`. |
+| #314 | Analysis | Lane A's part (atomic migrations) already landed in sprint 1 and is fully tested. The only open criterion is the `App.tsx` "Failed to initialise" dead-end screen. No lane owns that file, and any recovery action there wipes or replaces all health data. | Should the failure screen offer retry, reset, or export-then-reset, and with what wording and confirmation? Or should #314 close for the db layer and the screen be split into its own issue? |
+| #328 | Analysis (second sprint parked here) | Nobody has answered either question since sprint 1. The Lift Progression chart is all-time, so bounding the fetch would silently truncate what users see. Lifetime PRs also need a `getExercisePRs()` aggregate query in `database.ts`. | Is the chart all-time or windowed? Is a lane-A `getExercisePRs(): Record<string, PRRecord>` approved? (The analyst's recommended design is on the issue.) |
+| #379 | Analysis | The issue itself says a product decision is needed, and there is no owner comment. Invented all-zero backfill days count as misses in analytics. | Choose (1) an upgrade marker that caps the insert floor, which is db-only and recommended, (2) a `generated` column plus analytics exclusion, or (3) accept it with a note. For (1), also decide the marker value on already-backfilled devices and whether to delete rows already invented. |
+| #377 | Development, after Linux reproduction | Reproduced on WSL with about 27 workers: the baseline crashed in 5 of 10 runs, and runs at 3 workers passed 10 of 10. **The cause is not sql.js**: a control run with `src/db/` excluded still crashed, with native SIGSEGV/SIGTRAP worker kills. The adapter-cleanup fix doesn't cure it. The root cause is unknown and correlates with worker count. The cap stays at 2, and lane G's two hygiene commits (21c6f26, 47a37fa) were not merged. | Keep the cap at 2, or raise it to 3? Put `maxWorkers` in `jest.config.js` so local many-core runs are protected too? Should the adapter-hygiene commits go in as a separate PR? Next diagnostic: `workerIdleMemoryLimit`. |
 
 ## 4. Found during sprint
 
-Filed with the `found-during-sprint` label. **None of these were worked on in this sprint.** Scope was frozen.
+Filed with the `found-during-sprint` label. **None of these were worked.**
 
-| Issue | Note |
-|---|---|
-| #360 | test: react-test-renderer 19.2.5 mismatches react 19.1.0, so @testing-library/react-native refuses to load |
-| #361 | notifications: cancel* functions still cancel by the app_state-stored ID instead of the stable identifier |
-| #362 | getWeeklyCookDay() does not range-check, so a restored backup with an out-of-range day silently stops the cook-day reminder |
-| #363 | Future or garbled app_start_date gives nonsense hammer-task weights ("Baseline + -5kg", "NaNkg") |
-| #364 | SetLoggerModal weight/reps inputs use parseFloat without range checks — "12abc" and comma decimals save wrong values |
-| #365 | OnboardingScreen.handleConfirm calls upsertBodyWeight inside try/finally with no catch, so a failed write becomes an unhandled rejection |
-| #366 | MealPrep: logCookedMeal failures are swallowed by logDbError, so the user sees success when nothing was saved |
-| #367 | logBodyMeasurement's INSERT path writes skipped fields as NULL, so the "latest measurement" display goes blank for them |
-| #368 | removeMealFromPlan deletes a consumed plan row without crediting its portion back to inventory |
-| #369 | Overlapping withTransactionAsync calls on the shared connection can roll back each other's writes |
-| #370 | upsertAdditionalWorkouts overwrites malformed additional_workouts JSON (same clobber class as #319) |
-| #371 | syncRollingSchedule's exercises backfill overwrites malformed exercises JSON with template data |
-| #372 | getTodaysMealsWithRecipe checks p.recipe_id instead of a joined column, so an orphaned plan row renders a recipe of undefineds |
-| #373 | getNutritionGoals and getUserProfile treat an empty stored setting as 0 (Number('') === 0) |
-| #374 | CLAUDE.md: stale reanimated pin guidance (says 3.16.7, which does not compile on RN 0.81) and incomplete navigation description |
-| #375 | SettingsScreen: an in-flight focus reload overwrites a just-saved or just-cleared profile height/age with the stale value |
-| #377 | test: sql.js WASM suites segfault under parallel jest workers on Linux (the CI failure described in §5; CI is capped at 2 workers as a workaround, root cause unresolved) |
-| ~~#359~~ | Accidental duplicate of #360 filed by this sprint; closed as duplicate. |
+- #397: Settings stale reload also overwrites sex, activity level and goal. Same bug class as #375.
+- #398: `@react-navigation/bottom-tabs` is a dependency but nothing imports it.
+- #399: Recipe import looks up nutrition sequentially, worst case about 16 s per ingredient.
+- #400: The `babel.config.js` comment still says SDK 54.
+- #401: A failed MealPrep `loadData` is silent and shows an empty screen.
+- #402: RecipeEditor recomputes overlap and are never aborted. Security found that a stale run can **save wrong macros**.
+- #403: The MealPrep Log and Assign modals have no in-flight guard, so a double press logs or assigns twice.
+- #404: Onboarding `handleSkip` has no catch.
+- #405: Onboarding parses with `parseFloat`. **It also has a small regression caused by this sprint** (see the comment there): after #373, an Onboarding height or age outside 50–250 or 10–120 reads back as unset.
+- #406: Restore's `consumedMealsWithoutRefund` is counted before the dedupe, so it can over-count.
+- #407: The restore skipped-summary caps the number of tables but not the columns per table.
+- #408: `removeMealFromPlan` has no UI caller.
+- #409: `eslint-disable` comments sit in a repo with no ESLint.
+- #410: Dashboard additional-workout handlers write whole arrays from stale state.
+- #411: A row with corrupt exercises or additional-workouts JSON silently blocks all edits for that date, with no repair path.
+- #412: Restore replays v37 and discards the backup's own set order.
+- #413: Restore has no orphan sweep.
+- #414: Reminder day and time getters and setters don't validate. These are siblings of #362.
+- #415: Measurement pills show values from older dates under a single "Last: {date}" label.
+- #416: After #367, blanking a measurement can't clear a stale value from "latest".
+
+Comments were also added to #396 (`createRecipe`'s `INSERT OR REPLACE` resets `archived_at`) and #405.
 
 ## 5. Integration branch state
 
-- Branch: `sprint/auto-fixes` at **`9666888`** (the last code-bearing lane merge is `71cfcea`; later commits are this report, sprint state, and the CI worker cap)
-- Typecheck: **pass** (`npm run typecheck`, i.e. `tsc --noEmit`, clean)
-- Tests: **584 passed / 55 suites**. Before the sprint (`main`): **331 tests / 17 suites**.
-- The suite is also green with `CI=true TZ=UTC` (what CI runs) and with `TZ=Europe/Zurich` (this dev box). `origin/main` is untouched at `198a5f2`.
-- **GitHub CI: green** on `9666888` (runs 35532540488 and 35532542713, both `success`). It was **red before that**, and this is the part of the run I got wrong: the first two `test` runs on PR #376 (35422256672, 35422259137) failed in the Run Tests step while every local gate was green, and I had merged all seven lanes on local gates alone without once reading the real GitHub check. The failure was not an assertion: jest **worker processes** crash on Linux under parallel workers (`SIGSEGV` / `SIGTRAP`), killing whichever suite they happen to run, including pure ones. Reproduced in WSL Ubuntu on a fresh clone: the default parallel run crashed intermittently, `--runInBand` and `--maxWorkers=2` passed, and the 25 sql.js suites alone passed. The sprint caused it by taking the suite from one sql.js suite to ~24. The Run Tests step is now `npm test -- --maxWorkers=2` (`9666888`), which is a **workaround, not a root-cause fix**, filed as **#377**. A parallel local run on Linux can still crash.
-- Migrations appended: v34 (#302), v35 (#303), v36 (#331), v37 (#317). v1–v33 are byte-identical to `main`.
-- Lane merges, all `--no-ff`: E `0605533`, B `c424709`, C `5de3b4c`, A `c2fe262`, F `f53ba09`, D `42d3e4e`, G `71cfcea`.
-- PR: **#376**, https://github.com/NevinJulian/healthtracker/pull/376, **open and not merged.** It was opened with the GitHub MCP call `create_pull_request(owner: "NevinJulian", repo: "healthtracker", head: "sprint/auto-fixes", base: "main")`. To re-open it by hand if needed: https://github.com/NevinJulian/healthtracker/compare/main...sprint/auto-fixes. Commits after `71cfcea` (the last lane merge) touch only `.claude/sprint-state.json` and this report.
+- **Branch:** `sprint/auto-fixes`. The SHA before the report commit is `215b228`, and the report commit follows it.
+- **typecheck:** pass.
+- **tests:** 856 passed / 856, 79 suites. The baseline on `main` `fdf5c68` was 610 / 62.
+- **GitHub CI `test` check:** success on `215b228`, also on `eec9ed9` and `377a113` after the earlier merges.
+- **Note on timezones:** `npm test` is `cross-env TZ=UTC jest`, so every local run in this sprint was UTC. The sprint did not exercise other zones locally, apart from the #363 tester's direct `npx jest` runs under Kiritimati and Pago Pago.
+
+**Opening the PR.** This uses the GitHub MCP, as the sprint protocol requires; the `gh` CLI is not used. Do this only after §7 is fully ticked. Call `mcp__github__create_pull_request` with:
+
+```
+owner: NevinJulian
+repo:  healthtracker
+base:  main
+head:  sprint/auto-fixes
+title: Sprint 2: db hardening, restore, notifications, screen error handling
+body: |
+  Autonomous sprint 2. See SPRINT_REPORT.md on the branch for per-issue tests, parked issues and the review list.
+  Merge with a regular merge commit, never squash.
+
+  Closes #311
+  Closes #315
+  Closes #316
+  Closes #361
+  Closes #362
+  Closes #363
+  Closes #364
+  Closes #365
+  Closes #366
+  Closes #367
+  Closes #368
+  Closes #370
+  Closes #371
+  Closes #372
+  Closes #373
+  Closes #374
+  Closes #375
+  Closes #378
+  Closes #381
+  Closes #382
+  Closes #383
+  Refs #318
+  Refs #380
+```
 
 ## 6. What I would not merge without reading
 
-These are my judgement calls on where the risk is.
+1. **v38 (`schema.ts`, commit 67bb382) no longer deletes anything.** It originally swept rows in `meal_inventory`, `cooking_tasks`, `weekly_meal_plan` and `cook_log` whose recipe no longer exists. The cold review removed the sweep before v38 ran on any device: since #372 orphaned rows don't break any screen, and deleting them would destroy history that re-importing the recipe brings back. v38 is now only `ALTER TABLE recipe_library ADD COLUMN archived_at TEXT`. Read it anyway to confirm that the migration is that one statement.
+2. **Three existing tests were changed because they encoded the bug being fixed.** In each case the orchestrator authorized the change and it is a separate commit:
+   - bf0e784 (#380): restore survivor rule.
+   - 7cf7260 (#381): set display order.
+   - fe7b82a (#373): blank setting no longer reads as 0.
+   These are exactly the edits a cold reviewer should challenge. Check that each old assertion really pinned the bug and not intended behaviour.
+3. **#363 rewrites `app_start_date` to today when it is garbled** (75c4fa8). If a real start date were ever misclassified, the user's progression would reset permanently. Security traced every historical writer of `app_start_date` and all of them emit `YYYY-MM-DD`. A clamp in `buildHammerTask` (6ff8d0a) was added outside the work order. The tester judged it necessary.
+4. **#367 changes Dashboard behaviour in two ways the user will notice.** Both follow from the semantics the issue asked for, but the product owner should confirm them:
+   - The measurement modal now saves only the fields the user edited (6666af2). This was granted to lane A to stop the read fix copying old values into today's row.
+   - A user can no longer clear a stale value from "latest" by blanking it (#416).
+5. **#380 replaced v35 in the restore replay with new SQL (453d985).** It is restore-only and outside `MIGRATIONS`, but it decides which duplicate rows are deleted on restore. I chose this over the analyst's v39 migration to avoid running a credit-and-DELETE on every device for a restore-only bug. That is a design choice the human should agree with.
+6. **#383 now throws for any write dated after today+7** (c24ba55). No current caller can trigger it. But if a future feature, such as planning ahead, writes daily_log for next week+1, it will fail loudly. That is intended, and it is worth knowing.
+7. **Analyst-picked bounds nobody signed off on:**
+   - set logger: reps 1–100, weight 0.5–500 kg (#364)
+   - profile: height 50–250, age 10–120 (#373)
+   - goals: > 0 with no cap (#373)
+   The #373 bounds combine with Onboarding's looser `> 0` check to cause the small regression filed on #405.
+8. **#311's reconcile skip map** assumes notification content is static. If reminder text ever becomes dynamic, the skip will leave stale text. There is also a test-only export, `resetReconcileStateForTests`, in production code.
+9. **Error wording:**
+   - The restore failure alert will show "Restore failed" twice: once as the title, and again as the start of the new message from #315. This is cosmetic and was not fixed.
+   - #366 added Alerts with fixed English strings.
+10. **History warts, all disclosed and none force-pushed:**
+    - #366 contains a revert (8f7573d) followed by its split re-application.
+    - #315's display test commit d866f2a doesn't typecheck on its own.
+    - Several test-first commits are intentionally red on their own.
 
-1. **Migration v35 deletes users' rows (#303).** It dedupes `weekly_meal_plan` slots before adding the unique index. The survivor rule is mine, not the issue's: keep the consumed row if one exists, otherwise `MAX(id)`. It runs once on every device and can't be undone. If a user has two rows in a slot that both mean something, one is gone. Read the v35 SQL and decide whether that rule is what you want **before** it ships.
-2. **Migration v37 rewrites every `workout_set_log.set_index` (#317)** and adds a UNIQUE index. It's proven kill-safe and fast (12 ms on 5,000 rows) on a bundled SQLite 3.50.3, and security approved it. It's still a whole-table rewrite of user data on upgrade.
-3. **`restoreFromPayload` was changed by four issues (#303, #310, #315, #317).** It now drops two unique indexes, restores through a column whitelist, then replays v35 and v37 SQL taken from `MIGRATIONS`, all in one transaction. Each piece was reviewed, but the combination is the most complex code path in the app, and it's the path that runs when a user is already in trouble. The new `backupRoundTrip.test.ts` (#336) proves a real export then restore reproduces every table exactly on sql.js, and `restoreLegacyDuplicates` / `workoutSetIndexCollision` cover legacy payloads. None of that runs on a device. Test a real restore on a device before merging.
-4. **Transactions are more heavily used, and #369 isn't fixed.** expo-sqlite's `withTransactionAsync` is a bare, non-queued BEGIN/COMMIT on one shared connection, so two overlapping transactions can roll back each other's work. I checked this against the source; an analyst's claim that it queues was false. Tonight's fixes (#303, #314, #320, restore) lean on transactions more than before, which widens #369's exposure. #319 uses a promise chain precisely to avoid this. #369 is the most important open bug after this PR.
-5. **Semantic decisions I made that the issues didn't specify:**
-   - Unticking a meal consumed **before** v34 credits nothing, because there's no batch pointer (#302).
-   - Reassigning a consumed slot to the same recipe refunds it, which "un-eats" it (#303).
-   - #310's "honest alert" criterion was judged moot.
-   Each is defensible, and each is a product call you haven't made.
-6. **User-visible number changes.** Analytics streaks and the 30-day grid now read up to 90 days of real history instead of the ~8 days the old prune left (#300). Users will see streaks jump. That's correct, but it will look like a bug to anyone not expecting it.
-7. **Residual gaps accepted by design:**
-   - A Dashboard left open and foregrounded across midnight gets no reload trigger (#304). A reload always happens on focus or foreground.
-   - A force-kill inside the stepper debounce window loses the last taps (#313).
-   - During a background reload, the previous day's content shows briefly instead of a spinner (#325).
-8. **Needs device verification, which no test here can do:**
-   - #309 relies on expo-notifications upserting by `identifier` on Android.
-   - #318's timeouts use `AbortController` on RN's fetch.
-   - #314 and #317's migrations should be tested with an app upgrade on a real device holding real data.
-9. **History wrinkles, disclosed rather than rewritten:** #312's `3189d8f` and one intermediate #322 test commit don't run on their own (a jest.mock scoping error fixed in the next commit). Bisecting through them will show a spurious failure.
-10. **Partials merged under `Refs`, not `Closes`:** #311 (AC #4), #314 (already-bricked devices, dead-end screen), #315 (skipped-column reporting not shown in the UI), #318 (abort-on-navigation needs unowned screens). Don't let the PR auto-close them.
-11. **The green CI check is green because of a cap, not a cure (#377).** `test.yml` runs jest with `--maxWorkers=2`. The crash underneath is real, it is on Linux, and this sprint caused it by multiplying the sql.js suites. Two consequences: CI is now slower and serialised, and a contributor running the full suite in parallel on Linux can still hit a SIGSEGV that looks like a random suite failing. Treat #377 as part of this PR's cost, not as an unrelated issue.
+## 7. Before the PR
+
+Leave these unticked. The human ticks them.
+
+**Cold review**
+- [ ] A fresh Claude Code session with no sprint context runs `/code-review` on `main...sprint/auto-fixes`.
+
+**Device checks.** Run on the phone from `sprint/auto-fixes`, installed over an existing build.
+- [ ] **#316:** Delete a custom recipe. It disappears from the library and the meal-prep picker. Its cooked portions still show in inventory. Re-importing it from Discover brings it back. (v38 runs on the startup path, so watch the first launch.)
+- [ ] **#371 / #382 (startup path):** Cold-start the app. The Dashboard lists today's exercises. Navigate away and back: no crash, nothing changes.
+- [ ] **#311:** Enable workout, cook-day and backup reminders, each 2 minutes ahead. Change only the cook-day time. Each reminder fires exactly once at the right time. Toggle one meal reminder off and on, and confirm it fires. Restore a backup and confirm the reminders still fire.
+- [ ] **#361 (optional):** Toggle the workout reminder off and on in Settings. Exactly one notification fires.
+- [ ] **#318:** In Discover, search "chicken", then immediately change to "beef" and search. Only beef results show. Search, then navigate away: no red box or warning in Metro.
+- [ ] **#364:** Use a comma-decimal keyboard (fr-CH). Log a set with "78,4" and the row reads "@ 78.4 kg". Enter "12abc" for reps: an alert appears and the text stays.
+- [ ] **#365 (startup path):** A first-run onboarding still completes and lands on the Dashboard.
+- [ ] **#367:** Log only waist on one day and only chest the next. The pills show both values. Open the measurement modal, change only chest, and save. Today's row must **not** get the old waist (check history in Analytics).
+- [ ] **#315:** Restore a hand-edited backup that has an extra column. The alert names the dropped table and column.
+- [ ] **#366 (optional):** The happy path still closes the Log Cooked Meal modal.
+- [ ] **#375 (optional):** Save a height, leave Settings, return. The value persists.
+- [ ] **General, from SPRINT.md §8:** Open the app in Expo Go or a dev build before the PR. No native dependency changed this sprint, and `package.json` was untouched.

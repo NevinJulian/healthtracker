@@ -30,6 +30,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -239,6 +240,9 @@ export default function OnboardingScreen({ onComplete, latestWeight }: Props) {
 
       await setOnboardingComplete(true);
       onComplete();
+    } catch (error) {
+      console.error('Failed to save onboarding profile', error);
+      Alert.alert('Error', 'Failed to save your profile. Please try again.');
     } finally {
       setSaving(false);
     }

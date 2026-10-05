@@ -30,6 +30,11 @@
 import path from 'path';
 import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 import { MIGRATIONS } from '../schema';
+import {
+  WORKOUT_SETS_FOR_DAY_SQL,
+  WORKOUT_HISTORY_SQL,
+  WORKOUT_HISTORY_SINCE_SQL,
+} from '../database';
 
 let SQL: SqlJsStatic;
 
@@ -57,8 +62,8 @@ function buildMigratedDb(): Database {
 }
 
 /** Returns the `detail` column of every EXPLAIN QUERY PLAN row, joined. */
-function planDetail(db: Database, sql: string): string {
-  const res = db.exec(`EXPLAIN QUERY PLAN ${sql}`);
+function planDetail(db: Database, sql: string, params: string[] = []): string {
+  const res = db.exec(`EXPLAIN QUERY PLAN ${sql}`, params);
   expect(res.length).toBeGreaterThan(0);
   const detailIdx = res[0].columns.indexOf('detail');
   return (res[0].values as unknown[][]).map((row) => String(row[detailIdx])).join(' | ');
@@ -101,22 +106,19 @@ describe('v36 indexes (#331)', () => {
     expect(names).toContain('idx_meal_inventory_recipe');
   });
 
-  it("getWorkoutSetsForDay's query (WHERE date = ?) uses idx_workout_set_log_date", () => {
-    const detail = planDetail(
-      db,
-      `SELECT * FROM workout_set_log WHERE date = '2024-01-01'
-       ORDER BY exercise ASC, created_at ASC, id ASC`
-    );
-    expect(usesIndex(detail, 'idx_workout_set_log_date')).toBe(true);
+  it("getWorkoutSetsForDay's query uses idx_workout_set_log_date_exercise_set_index with no sort", () => {
+    const detail = planDetail(db, WORKOUT_SETS_FOR_DAY_SQL, ['2024-01-01']);
+    expect(usesIndex(detail, 'idx_workout_set_log_date_exercise_set_index')).toBe(true);
+    expect(detail).not.toContain('TEMP B-TREE');
   });
 
-  it("getWorkoutHistory's query (WHERE exercise = ? AND date >= ? ORDER BY date) uses idx_workout_set_log_exercise_date", () => {
-    const detail = planDetail(
-      db,
-      `SELECT * FROM workout_set_log WHERE exercise = 'Bench Press' AND date >= '2024-01-01'
-       ORDER BY date ASC, created_at ASC, id ASC`
-    );
-    expect(usesIndex(detail, 'idx_workout_set_log_exercise_date')).toBe(true);
+  // A partial sort (TEMP B-TREE FOR RIGHT PART OF ORDER BY) is accepted here:
+  // the index yields rows by date, only set_index needs sorting within a date.
+  it("getWorkoutHistory's queries use idx_workout_set_log_exercise_date", () => {
+    const since = planDetail(db, WORKOUT_HISTORY_SINCE_SQL, ['Bench Press', '2024-01-01']);
+    const all = planDetail(db, WORKOUT_HISTORY_SQL, ['Bench Press']);
+    expect(usesIndex(since, 'idx_workout_set_log_exercise_date')).toBe(true);
+    expect(usesIndex(all, 'idx_workout_set_log_exercise_date')).toBe(true);
   });
 
   it("the meal_inventory active-stock query (WHERE recipe_id = ? AND portions_available > 0) uses idx_meal_inventory_recipe", () => {

@@ -281,7 +281,7 @@ export async function writeSafetySnapshot(): Promise<string> {
  * backup, write a safety snapshot of the current data, then restore all
  * tables transactionally.
  *
- * Safety snapshot behaviour (#293):
+ * Safety snapshot behaviour:
  *   - Written to cacheDirectory before any data is modified.
  *   - If the write fails the user is asked whether to continue; the restore
  *     is aborted when they say no.
@@ -289,7 +289,7 @@ export async function writeSafetySnapshot(): Promise<string> {
  *     offer to share it.
  *
  * On a successful restore, scheduled OS notifications are also resynced to
- * the restored settings (#310) — see the module docblock above for why that
+ * the restored settings — see the module docblock above for why that
  * needs a full cancelAllScheduledNotificationsAsync() rather than just
  * reconcileScheduledNotifications(). This resync is best-effort and never
  * turns a successful restore into a reported failure.
@@ -355,14 +355,20 @@ export async function importBackup(
     // Caller chose to proceed despite failed snapshot — continue without URI.
   }
 
-  const { tablesRestored, rowsRestored, skipped, consumedMealsWithoutRefund } =
-    await restoreFromPayload(payload.tables);
+  let restored: Awaited<ReturnType<typeof restoreFromPayload>>;
+  try {
+    restored = await restoreFromPayload(payload.tables);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Restore failed — your existing data was not changed. Details: ${detail}`,
+      { cause: err }
+    );
+  }
+  const { tablesRestored, rowsRestored, skipped, consumedMealsWithoutRefund } = restored;
 
-  // ── Resync scheduled notifications to the restored settings (#310) ──────
-  // Runs only after a successful restore; nothing above this point touches
-  // notifications, so a restore that throws leaves existing reminders
-  // untouched. Best-effort: a failure here must not turn a successful data
-  // restore into a reported failure.
+  // Best-effort: a failure here must not turn a successful restore into a
+  // reported failure.
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
     await reconcileScheduledNotifications();

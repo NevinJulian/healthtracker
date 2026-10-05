@@ -82,4 +82,69 @@ describe('mealdb — fetch timeout + retry + cache (#318)', () => {
     expect(second?.name).toBe('Teriyaki Chicken Casserole');
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
   });
+
+  it('searchMeals rejects and never fetches when given an already-aborted signal', async () => {
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    const { searchMeals } = require('../mealdb');
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(searchMeals('x', controller.signal)).rejects.toThrow();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('searchMeals rejects when the signal aborts mid-flight', async () => {
+    let fetchSignal: AbortSignal | undefined;
+    global.fetch = jest.fn((_url: string, init?: RequestInit) => {
+      fetchSignal = init?.signal ?? undefined;
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          const err = new Error('aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      });
+    }) as unknown as typeof fetch;
+    const { searchMeals } = require('../mealdb');
+    const controller = new AbortController();
+
+    const pending = searchMeals('x', controller.signal);
+    controller.abort();
+
+    await expect(pending).rejects.toThrow();
+    expect(fetchSignal?.aborted).toBe(true);
+  });
+
+  it('fetchMealById rejects on an aborted signal and does not cache the aborted call', async () => {
+    const meal = { idMeal: '1', strMeal: 'Soup' };
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ meals: [meal] }),
+    })) as unknown as typeof fetch;
+    const { fetchMealById } = require('../mealdb');
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(fetchMealById('1', controller.signal)).rejects.toThrow();
+
+    const result = await fetchMealById('1');
+    expect(result?.name).toBe('Soup');
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
+  });
+
+  it('fetchMealById does not cache a result that resolved after its signal aborted', async () => {
+    const meal = { idMeal: '2', strMeal: 'Stew' };
+    const controller = new AbortController();
+    global.fetch = jest.fn(async () => {
+      controller.abort();
+      return { ok: true, status: 200, json: async () => ({ meals: [meal] }) };
+    }) as unknown as typeof fetch;
+    const { fetchMealById } = require('../mealdb');
+
+    await fetchMealById('2', controller.signal).catch(() => undefined);
+    await fetchMealById('2');
+
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(2);
+  });
 });

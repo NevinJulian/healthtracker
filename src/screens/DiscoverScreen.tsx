@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -117,19 +117,29 @@ export default function DiscoverScreen() {
   const [state, setState] = useState<SearchState>('idle');
   const navigation = useNavigation<any>();
 
+  const controllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => controllerRef.current?.abort(), []);
+
   const runSearch = async (q: string) => {
+    controllerRef.current?.abort();
     const trimmed = q.trim();
     if (!trimmed) {
+      controllerRef.current = null;
       setResults([]);
       setState('idle');
       return;
     }
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setState('loading');
     try {
-      const meals = await searchMeals(trimmed);
+      const meals = await searchMeals(trimmed, controller.signal);
+      if (controller.signal.aborted) return;
       setResults(meals);
       setState('results');
     } catch {
+      if (controller.signal.aborted) return;
       setState('error');
     }
   };

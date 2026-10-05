@@ -20,12 +20,10 @@
  *
  * Fix: restoreFromPayload() now (1) drops the unique index before the
  * restore loop, (2) restores every table exactly as before, then (3) —
- * still inside the same transaction — re-runs v35's own SQL (looked up at
- * runtime via `MIGRATIONS.find(m => m.version === 35)!.sql`, never copied
- * or reimplemented) against the just-restored data. That credits any
- * consumed loser's batch in the just-restored meal_inventory, deletes the
- * losers per the exact same survivor rule the migration uses, and recreates
- * the unique index. A clean, already-deduped (post-v35) backup is
+ * still inside the same transaction — runs RESTORE_SLOT_DEDUPE_SQL against
+ * the just-restored data. That credits any consumed loser's batch, deletes
+ * the losers (preferring a consumed row whose inventory pointer is live),
+ * and recreates the unique index. A clean, already-deduped backup is
  * unaffected: nothing matches the credit or delete WHERE clauses, and the
  * index is simply recreated.
  *
@@ -110,7 +108,7 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
     expect(await uniqueIndexExists(db)).toBe(true);
   });
 
-  it('restores a legacy backup with two CONSUMED duplicate rows: the loser is deleted and its batch is credited +1, matching v35', async () => {
+  it('restores a legacy backup with two CONSUMED duplicate rows: the row with a live pointer survives, the pointerless loser is deleted, and the survivor stays refundable', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
 
@@ -119,9 +117,9 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
         { id: 2, recipe_id: RECIPE_ID, portions_available: 2, date_cooked: '2024-01-01' },
       ],
       weekly_meal_plan: [
-        // Loser: consumed, lower id, points at the batch.
+        // Survivor: consumed, lower id, live pointer to the batch.
         { id: 20, date: '2024-06-03', meal_type: 'breakfast', recipe_id: RECIPE_ID, is_consumed: 1, consumed_from_inventory_id: 2 },
-        // Survivor: consumed, higher id, no pointer of its own.
+        // Loser: consumed, higher id, no pointer — crediting it is impossible.
         { id: 21, date: '2024-06-03', meal_type: 'breakfast', recipe_id: RECIPE_ID, is_consumed: 1, consumed_from_inventory_id: null },
       ],
     };
@@ -134,15 +132,56 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
       "SELECT * FROM weekly_meal_plan WHERE date = '2024-06-03' AND meal_type = 'breakfast'"
     );
     expect(planRows).toHaveLength(1);
-    expect(planRows[0].id).toBe(21);
+    expect(planRows[0].id).toBe(20);
     expect(planRows[0].is_consumed).toBe(1);
+    expect(planRows[0].consumed_from_inventory_id).toBe(2);
 
     const inv = await raw.getFirstAsync<{ portions_available: number }>(
       'SELECT portions_available FROM meal_inventory WHERE id = 2'
     );
-    expect(inv?.portions_available).toBe(3); // 2 + 1 credited back from the deleted loser
+    expect(inv?.portions_available).toBe(2); // the loser had no pointer, nothing to credit
+
+    await db.toggleMealConsumed(20, false);
+    const after = await raw.getFirstAsync<{ portions_available: number }>(
+      'SELECT portions_available FROM meal_inventory WHERE id = 2'
+    );
+    expect(after?.portions_available).toBe(3); // the survivor refunds its batch
 
     expect(await uniqueIndexExists(db)).toBe(true);
+  });
+
+  it('keeps the consumed row with a live pointer over a higher-id consumed row with a NULL pointer, conserving portions and leaving it refundable', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.restoreFromPayload({
+      meal_inventory: [
+        { id: 4, recipe_id: RECIPE_ID, portions_available: 3, date_cooked: '2024-01-01' },
+      ],
+      weekly_meal_plan: [
+        { id: 10, date: '2024-06-07', meal_type: 'dinner', recipe_id: RECIPE_ID, is_consumed: 1, consumed_from_inventory_id: 4 },
+        { id: 11, date: '2024-06-07', meal_type: 'dinner', recipe_id: RECIPE_ID, is_consumed: 1, consumed_from_inventory_id: null },
+      ],
+    });
+
+    const raw = db.getDatabase();
+    const ids = await raw.getAllAsync<{ id: number }>(
+      "SELECT id FROM weekly_meal_plan WHERE date = '2024-06-07' AND meal_type = 'dinner'"
+    );
+    expect(ids.map((r) => r.id)).toEqual([10]);
+    expect(await uniqueIndexExists(db)).toBe(true);
+
+    const portions = async () =>
+      (await raw.getFirstAsync<{ portions_available: number }>(
+        'SELECT portions_available FROM meal_inventory WHERE id = 4'
+      ))?.portions_available;
+    const liveConsumed = await raw.getFirstAsync<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM weekly_meal_plan WHERE is_consumed = 1 AND consumed_from_inventory_id IN (SELECT id FROM meal_inventory)'
+    );
+    expect((await portions())! + liveConsumed!.n).toBe(4);
+
+    await db.toggleMealConsumed(10, false);
+    expect(await portions()).toBe(4);
   });
 
   it('restores a clean post-v35 backup (no duplicates) exactly as before, and the index exists afterwards', async () => {
