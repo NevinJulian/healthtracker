@@ -1266,7 +1266,7 @@ function mapLogRow(row: {
     is_meal_prep_day: row.is_meal_prep_day === 1,
     exercises: parseExercises(row.exercises),
     body_weight: row.body_weight ?? null,
-    additional_workouts: parseAdditionalWorkouts(row?.additional_workouts),
+    additional_workouts: parseAdditionalWorkouts(row.additional_workouts),
   };
 }
 
