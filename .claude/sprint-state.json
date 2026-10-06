@@ -150,7 +150,7 @@
   "issues": {
     "318": {
       "lane": "E",
-      "status": "in_test",
+      "status": "in_security",
       "roundTrips": 0,
       "commits": [
         "9cbac95",
@@ -165,7 +165,8 @@
       "workOrder": "C:/git/ht-lanes/wo/318.md",
       "decisionSource": "owner comment on #318 2026-10-06 (4 items)",
       "deviceCheck": "1) Import a Discover recipe with many unknown ingredients, tap Cancel mid-spinner: spinner stops, recipe absent from library. 2) Wi-Fi without internet: save a recipe containing dragonfruit; save completes in ~10 s with local-table macros.",
-      "notes": "after this WO the issue is complete -> Closes #318"
+      "notes": "tester APPROVE r0. HUMAN: Cancel pressed after dbImportRecipe has started is ignored - recipe saved, Imported! shown; ms-wide window but not strictly the owner wording (saves nothing); strict fix = hide/disable Cancel once the write starts. Budget is module-level, shared by editor recompute and imports; over-budget estimate is silent. Commit 2aefe47 alone does not typecheck (test-first artefact, breaks bisect at that commit).",
+      "regressionProof": "UA 4/5 fail at 9cbac95 srcs; budget 3/5 fail at 8bac828 srcs; cancel 5/7 fail at 7eb26f4 srcs; deadline 1/1 fails at d65c497 src; all pass at d780c4c (tester reproduced); 873/84"
     },
     "397": {
       "lane": "F",
@@ -250,7 +251,7 @@
     },
     "419": {
       "lane": "B",
-      "status": "in_test",
+      "status": "in_security",
       "roundTrips": 0,
       "commits": [
         "93da3f8",
@@ -263,18 +264,21 @@
       "workOrder": "C:/git/ht-lanes/wo/419.md",
       "decisionSource": "owner decision in #419 body",
       "deviceCheck": "Force a throw at top of init try in App.tsx (first attempt only, uncommitted). Launch: title, error, Retry, Save data, no-reset sentence, no other button. Save data: share sheet for db (non-zero size), second sheet for wal if present, both files arrive. Retry: normal app, data intact.",
-      "notes": "dev: global expo-file-system/sharing mocks did not suffice (jest-expo mock precedence) -> inline jest.mock in the new test files, config untouched; Retry re-runs installStress369 + reconcile"
+      "notes": "tester APPROVE r0. DB path verified against expo-sqlite defaultDatabaseDirectory (filesDir/SQLite). Inline fs/sharing mocks are necessary (global mock shadowed by jest-expo, filed #425). No in-flight guard on Retry in code: button unmounts on press, but 2 presses in one act() overlapped 2 initDatabase calls (sent to security). App test silences console.error globally. DB filename hard-coded in service + test.",
+      "regressionProof": "App.startFailure 7/7 fail with 2e1ac1e App.tsx, pass at 45d91de; rescueExport 5/5 at tip (tester reproduced); 874/83"
     }
   },
   "foundDuringSprint": [
     422,
     423,
-    424
+    424,
+    425
   ],
   "smallFindings": [
     "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
     "Onboarding age field is number-pad (no decimal key) but accepts decimals via paste - #405 analyst",
-    "src/components Button.tsx has raw borderRadius: 13 and minHeight: 48 instead of tokens - #419 dev"
+    "src/components Button.tsx has raw borderRadius: 13 and minHeight: 48 instead of tokens - #419 dev",
+    "RecipeEditorScreen: SAVE_RECOMPUTE_DEADLINE_MS is declared between DEFAULT_SERVINGS and DEFAULT_PREP, splitting two related constants - #318 tester (handed to lane E cleanup)"
   ],
   "log": [
     {
@@ -333,6 +337,10 @@
     {
       "at": "2026-10-06T17:11:42Z",
       "event": "#412 in_test (975/82 per dev)"
+    },
+    {
+      "at": "2026-10-06T17:13:26Z",
+      "event": "#419 tester APPROVE r0 -> security; #318 tester APPROVE r0 -> security; filed #425 (shadowed expo-file-system mock)"
     }
   ]
 }
