@@ -174,9 +174,13 @@
     },
     "405": {
       "lane": "F",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "230f75e",
+        "47bf4aa",
+        "e9842df"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/405.md",
       "decisionSource": "owner comments on #405 2026-09-30 and 2026-10-05",
       "deviceCheck": "Fresh install. Step 1: height 1.8 -> Continue disabled, error shown. Enter 178,5 and age 30, continue. Step 3: weight 78,4, finish. Settings shows height 178.5 and age 30.",
@@ -276,6 +280,10 @@
     {
       "at": "2026-10-06T17:07:48Z",
       "event": "#414 in_test (972/82 per dev)"
+    },
+    {
+      "at": "2026-10-06T17:08:08Z",
+      "event": "#405 in_test (875/81 per dev)"
     }
   ]
 }
