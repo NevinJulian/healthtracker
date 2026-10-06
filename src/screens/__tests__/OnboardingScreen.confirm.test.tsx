@@ -27,11 +27,12 @@ jest.mock('../../db/database', () => ({
 }));
 
 import OnboardingScreen from '../OnboardingScreen';
-import { upsertBodyWeight, setOnboardingComplete } from '../../db/database';
+import { upsertBodyWeight, setOnboardingComplete, setProfileHeightCm } from '../../db/database';
 
 describe('OnboardingScreen confirm', () => {
   const mockUpsertBodyWeight = jest.mocked(upsertBodyWeight);
   const mockSetOnboardingComplete = jest.mocked(setOnboardingComplete);
+  const mockSetProfileHeightCm = jest.mocked(setProfileHeightCm);
   let alertSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
 
@@ -47,16 +48,16 @@ describe('OnboardingScreen confirm', () => {
     errorSpy.mockRestore();
   });
 
-  function renderAtStep3(onComplete: () => void) {
+  function renderAtStep3(onComplete: () => void, height = '180', weight = '80') {
     const utils = render(<OnboardingScreen onComplete={onComplete} />);
     fireEvent.press(utils.getByLabelText('Male'));
-    fireEvent.changeText(utils.getByLabelText('Height in centimetres'), '180');
+    fireEvent.changeText(utils.getByLabelText('Height in centimetres'), height);
     fireEvent.changeText(utils.getByLabelText('Age in years'), '30');
     fireEvent.press(utils.getByLabelText('Continue to step 2'));
     fireEvent.press(utils.getByLabelText('Moderate: Exercise 3–5 days/week'));
     fireEvent.press(utils.getByLabelText('Maintain: Eat at your TDEE'));
     fireEvent.press(utils.getByLabelText('Continue to step 3'));
-    fireEvent.changeText(utils.getByLabelText('Body weight in kilograms'), '80');
+    fireEvent.changeText(utils.getByLabelText('Body weight in kilograms'), weight);
     return utils;
   }
 
@@ -103,5 +104,68 @@ describe('OnboardingScreen confirm', () => {
     expect(mockSetOnboardingComplete).toHaveBeenCalledWith(true);
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  function fillStep1(utils: ReturnType<typeof render>, height: string, age: string) {
+    fireEvent.press(utils.getByLabelText('Male'));
+    fireEvent.changeText(utils.getByLabelText('Height in centimetres'), height);
+    fireEvent.changeText(utils.getByLabelText('Age in years'), age);
+  }
+
+  const continueDisabled = (utils: ReturnType<typeof render>) =>
+    utils.getByLabelText('Continue to step 2').props.accessibilityState?.disabled;
+
+  it('keeps Continue disabled for a height with trailing characters', () => {
+    const utils = render(<OnboardingScreen onComplete={jest.fn()} />);
+    fillStep1(utils, '180abc', '30');
+
+    expect(continueDisabled(utils)).toBe(true);
+    fireEvent.press(utils.getByLabelText('Continue to step 2'));
+    expect(mockSetProfileHeightCm).not.toHaveBeenCalled();
+  });
+
+  it.each(['1.8', '40', '300'])('rejects height %s with an inline range error', (height) => {
+    const utils = render(<OnboardingScreen onComplete={jest.fn()} />);
+    fillStep1(utils, height, '30');
+
+    expect(continueDisabled(utils)).toBe(true);
+    expect(utils.getByText(/50.{1,3}250/)).toBeTruthy();
+  });
+
+  it.each(['5', '150'])('rejects age %s with an inline range error', (age) => {
+    const utils = render(<OnboardingScreen onComplete={jest.fn()} />);
+    fillStep1(utils, '180', age);
+
+    expect(continueDisabled(utils)).toBe(true);
+    expect(utils.getByText(/10.{1,3}120/)).toBeTruthy();
+  });
+
+  it.each([['50', '10'], ['250', '120']])('accepts height %s and age %s', (height, age) => {
+    const utils = render(<OnboardingScreen onComplete={jest.fn()} />);
+    fillStep1(utils, height, age);
+
+    expect(continueDisabled(utils)).toBeFalsy();
+  });
+
+  it.each(['10', '500'])('keeps Confirm disabled for weight %s', (weight) => {
+    const utils = renderAtStep3(jest.fn(), '180', weight);
+
+    expect(utils.getByLabelText('Confirm and get started').props.accessibilityState?.disabled).toBe(true);
+    expect(utils.getByText(/20.{1,3}400/)).toBeTruthy();
+  });
+
+  it.each(['20', '400'])('accepts weight %s', (weight) => {
+    const utils = renderAtStep3(jest.fn(), '180', weight);
+
+    expect(utils.getByLabelText('Confirm and get started').props.accessibilityState?.disabled).toBeFalsy();
+  });
+
+  it('saves a comma-decimal weight and height as numbers', async () => {
+    const utils = renderAtStep3(jest.fn(), '178,5', '78,4');
+
+    await pressGetStarted(utils);
+
+    expect(mockUpsertBodyWeight).toHaveBeenCalledWith('2026-01-15', 78.4);
+    expect(mockSetProfileHeightCm).toHaveBeenCalledWith(178.5);
   });
 });
