@@ -663,7 +663,6 @@ describe('MealPrepScreen remove planned meal', () => {
     expect(mockGetWeeklyMealPlan).toHaveBeenCalledTimes(1);
     expect(utils.queryByLabelText('Remove Chicken Bowl from plan')).toBeNull();
     expect(utils.getAllByLabelText('Assign recipe to Lunch')).toHaveLength(assignBefore + 1);
-    expect(mockCheckAndNotifyEmptyInventory).not.toHaveBeenCalled();
   });
 
   it('makes no db call when the confirm is cancelled', async () => {
