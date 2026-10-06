@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,8 @@ import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from './src/
 import { installStress369 } from './src/db/devStress369';
 import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
-import { Colors, Typography } from './src/theme/tokens';
+import Button from './src/components/Button';
+import { Colors, Spacing, Typography } from './src/theme/tokens';
 import {
   configureNotificationHandler,
   ensureAndroidChannel,
@@ -43,41 +44,40 @@ export default function App() {
     PlusJakartaSans_700Bold,
   });
 
-  useEffect(() => {
-    // Configure the foreground notification handler immediately (synchronous).
-    configureNotificationHandler();
-
-    (async () => {
-      try {
-        await initDatabase();
-        // Dev builds only: exposes globalThis.stress369() for the #369
-        // device stress run. A no-op in release (see src/db/devStress369.ts).
-        installStress369();
-        // Ensure the Android notification channel exists and reconcile any
-        // persisted reminder settings with the OS scheduler. Both are
-        // fire-and-forget: failures are logged but must not block startup.
-        await ensureAndroidChannel();
-        await reconcileScheduledNotifications();
-        // Read onboarding state and latest weight after DB is ready.
-        const [onboardingComplete, weight] = await Promise.all([
-          getOnboardingComplete(),
-          getLatestBodyWeight(),
-        ]);
-        setLatestWeight(weight);
-        setOnboardingDone(onboardingComplete);
-        setDbReady(true);
-      } catch (err: any) {
-        console.error('[App] DB init failed:', err);
-        // Build a readable detail string: message + first 8 stack lines  (#34)
-        const stackLines = (err?.stack as string | undefined)
-          ?.split('\n')
-          .slice(0, 8)
-          .join('\n');
-        const detail = [err?.message, stackLines].filter(Boolean).join('\n\n');
-        setError(detail || 'Unknown error during database initialisation');
-      }
-    })();
+  const runInit = useCallback(async () => {
+    try {
+      await initDatabase();
+      // Dev builds only: exposes globalThis.stress369().
+      installStress369();
+      await ensureAndroidChannel();
+      await reconcileScheduledNotifications();
+      const [onboardingComplete, weight] = await Promise.all([
+        getOnboardingComplete(),
+        getLatestBodyWeight(),
+      ]);
+      setLatestWeight(weight);
+      setOnboardingDone(onboardingComplete);
+      setDbReady(true);
+    } catch (err: any) {
+      console.error('[App] DB init failed:', err);
+      const stackLines = (err?.stack as string | undefined)
+        ?.split('\n')
+        .slice(0, 8)
+        .join('\n');
+      const detail = [err?.message, stackLines].filter(Boolean).join('\n\n');
+      setError(detail || 'Unknown error during database initialisation');
+    }
   }, []);
+
+  useEffect(() => {
+    configureNotificationHandler();
+    runInit();
+  }, [runInit]);
+
+  const retry = () => {
+    setError(null);
+    runInit();
+  };
 
   if (error || fontError) {
     const displayError = error ?? fontError?.message ?? 'Unknown font loading error';
@@ -85,6 +85,7 @@ export default function App() {
       <View style={styles.splash}>
         <Text style={styles.errorText}>Failed to initialise app</Text>
         <Text style={styles.errorDetail} selectable>{displayError}</Text>
+        {!fontError && <Button title="Retry" onPress={retry} style={styles.button} />}
       </View>
     );
   }
@@ -161,6 +162,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: Typography.sizes.sm,
     textAlign: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: Spacing.xxl,
+  },
+  button: {
+    alignSelf: 'stretch',
+    marginHorizontal: Spacing.xxl,
   },
 });

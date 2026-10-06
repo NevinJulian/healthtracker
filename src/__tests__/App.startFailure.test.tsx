@@ -2,6 +2,9 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
 jest.mock('react-native-gesture-handler', () => ({}));
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
 jest.mock('expo-font', () => ({ useFonts: jest.fn() }));
 jest.mock('@expo-google-fonts/fraunces', () => ({ Fraunces_600SemiBold: 'Fraunces_600SemiBold' }));
 jest.mock('@expo-google-fonts/plus-jakarta-sans', () => ({
@@ -49,13 +52,13 @@ describe('App start failure screen', () => {
     init.mockRejectedValueOnce(new Error('disk exploded'));
     render(<App />);
     expect(await screen.findByText(/disk exploded/)).toBeTruthy();
-    expect(screen.getByText('Retry')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
   });
 
   it('re-runs init on Retry and renders the navigator once it succeeds', async () => {
     init.mockRejectedValueOnce(new Error('disk exploded')).mockResolvedValueOnce(undefined);
     render(<App />);
-    fireEvent.press(await screen.findByText('Retry'));
+    fireEvent.press(await screen.findByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('NAVIGATOR')).toBeTruthy();
     expect(init).toHaveBeenCalledTimes(2);
   });
@@ -63,7 +66,7 @@ describe('App start failure screen', () => {
   it('keeps the failure screen when Retry fails again', async () => {
     init.mockRejectedValueOnce(new Error('first')).mockRejectedValueOnce(new Error('second'));
     render(<App />);
-    fireEvent.press(await screen.findByText('Retry'));
+    fireEvent.press(await screen.findByRole('button', { name: 'Retry' }));
     expect(await screen.findByText(/second/)).toBeTruthy();
   });
 });
