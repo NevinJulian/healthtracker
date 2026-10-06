@@ -2541,16 +2541,14 @@ export async function dumpTable(
  * every time restoreFromPayload() runs — because a backup taken before a
  * step shipped, or before it happened to run, can legitimately still need it.
  * Their unique indexes are dropped before the restore loop (see the
- * restoreFromPayload doc comment above) and recreated here. A `version` step
- * is looked up from MIGRATIONS at runtime so it can never drift from the
- * real migration.
+ * restoreFromPayload doc comment above) and recreated here.
  *
  *   - RESTORE_SLOT_DEDUPE_SQL: weekly_meal_plan (date, meal_type) dedupe +
  *     unique index, preferring a consumed row whose inventory pointer is live.
  *   - RESTORE_SET_INDEX_SQL: workout_set_log renumber of colliding
  *     (date, exercise) partitions only + unique index.
  */
-const POST_RESTORE_STEPS: readonly ({ sql: string } | { version: number })[] = [
+const POST_RESTORE_STEPS: readonly { sql: string }[] = [
   { sql: RESTORE_SLOT_DEDUPE_SQL },
   { sql: RESTORE_SET_INDEX_SQL },
 ];
@@ -2668,21 +2666,7 @@ async function _restoreFromPayload(
     // while it existed — matching the ordering both the dedupe and the
     // renumber require.
     for (const step of POST_RESTORE_STEPS) {
-      if ('sql' in step) {
-        await db.execAsync(step.sql);
-        continue;
-      }
-      const migration = MIGRATIONS.find((m) => m.version === step.version);
-      if (!migration) {
-        throw new Error(
-          `restoreFromPayload: migration v${step.version} not found in MIGRATIONS — cannot rebuild its post-restore state.`
-        );
-      }
-      // Same contract as runMigrations: a migration's precondition runs
-      // immediately before its SQL, in the same transaction. Here it is
-      // also a live check that the DROP INDEX above really happened.
-      if (migration.precondition) await migration.precondition(db);
-      await db.execAsync(migration.sql);
+      await db.execAsync(step.sql);
     }
 
     if (legacyPayload) {
