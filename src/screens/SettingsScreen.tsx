@@ -456,6 +456,15 @@ export default function SettingsScreen() {
   };
   const backupEnabledGuard = useWriteGuard();
   const backupDayGuard = useWriteGuard();
+  const workoutEditGuard = useWriteGuard();
+  const cookDayEditGuard = useWriteGuard();
+  const breakfastEditGuard = useWriteGuard();
+  const lunchEditGuard = useWriteGuard();
+  const dinnerEditGuard = useWriteGuard();
+  const backupEditGuard = useWriteGuard();
+  const caloriesEditGuard = useWriteGuard();
+  const proteinEditGuard = useWriteGuard();
+  const hydrationEditGuard = useWriteGuard();
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [recalcBusy, setRecalcBusy] = useState(false);
 
@@ -471,6 +480,12 @@ export default function SettingsScreen() {
   const proteinDirtyRef = useRef(false);
   const hydrationDirtyRef = useRef(false);
   const backupTimeDirtyRef = useRef(false);
+
+  const mealEditGuards: Record<MealType, WriteGuard> = {
+    breakfast: breakfastEditGuard,
+    lunch: lunchEditGuard,
+    dinner: dinnerEditGuard,
+  };
 
   const mealTimeDirtyRefs: Record<MealType, React.MutableRefObject<boolean>> = {
     breakfast: breakfastTimeDirtyRef,
@@ -591,6 +606,15 @@ export default function SettingsScreen() {
       };
       const backupEnabledSeqAtStart = backupEnabledGuard.seqRef.current;
       const backupDaySeqAtStart = backupDayGuard.seqRef.current;
+      const workoutEditSeqAtStart = workoutEditGuard.seqRef.current;
+      const cookDayEditSeqAtStart = cookDayEditGuard.seqRef.current;
+      const breakfastEditSeqAtStart = breakfastEditGuard.seqRef.current;
+      const lunchEditSeqAtStart = lunchEditGuard.seqRef.current;
+      const dinnerEditSeqAtStart = dinnerEditGuard.seqRef.current;
+      const backupEditSeqAtStart = backupEditGuard.seqRef.current;
+      const caloriesEditSeqAtStart = caloriesEditGuard.seqRef.current;
+      const proteinEditSeqAtStart = proteinEditGuard.seqRef.current;
+      const hydrationEditSeqAtStart = hydrationEditGuard.seqRef.current;
       (async () => {
         const [
           workoutEnabled,
@@ -634,12 +658,12 @@ export default function SettingsScreen() {
           getBackupReminderTime(),
         ]);
         if (active) {
-          const workoutTimeKept = workoutTimeDirtyRef.current;
-          const cookDayTimeKept = cookDayTimeDirtyRef.current;
-          const breakfastTimeKept = breakfastTimeDirtyRef.current;
-          const lunchTimeKept = lunchTimeDirtyRef.current;
-          const dinnerTimeKept = dinnerTimeDirtyRef.current;
-          const backupTimeKept = backupTimeDirtyRef.current;
+          const workoutTimeKept = workoutTimeDirtyRef.current || editedSince(workoutEditGuard, workoutEditSeqAtStart);
+          const cookDayTimeKept = cookDayTimeDirtyRef.current || editedSince(cookDayEditGuard, cookDayEditSeqAtStart);
+          const breakfastTimeKept = breakfastTimeDirtyRef.current || editedSince(breakfastEditGuard, breakfastEditSeqAtStart);
+          const lunchTimeKept = lunchTimeDirtyRef.current || editedSince(lunchEditGuard, lunchEditSeqAtStart);
+          const dinnerTimeKept = dinnerTimeDirtyRef.current || editedSince(dinnerEditGuard, dinnerEditSeqAtStart);
+          const backupTimeKept = backupTimeDirtyRef.current || editedSince(backupEditGuard, backupEditSeqAtStart);
           setReminder((prev) => ({
             ...prev,
             enabled: editedSince(workoutEnabledGuard, workoutEnabledSeqAtStart) ? prev.enabled : workoutEnabled,
@@ -689,9 +713,9 @@ export default function SettingsScreen() {
             time: backupTimeKept ? prev.time : backupTime,
             permissionDenied: false,
           }));
-          if (!caloriesDirtyRef.current) setGoalCalories(nutritionGoals.calories);
-          if (!proteinDirtyRef.current) setGoalProtein(nutritionGoals.protein);
-          if (!hydrationDirtyRef.current) setHydrationGoalMl(hydrationGoal);
+          if (!caloriesDirtyRef.current && !editedSince(caloriesEditGuard, caloriesEditSeqAtStart)) setGoalCalories(nutritionGoals.calories);
+          if (!proteinDirtyRef.current && !editedSince(proteinEditGuard, proteinEditSeqAtStart)) setGoalProtein(nutritionGoals.protein);
+          if (!hydrationDirtyRef.current && !editedSince(hydrationEditGuard, hydrationEditSeqAtStart)) setHydrationGoalMl(hydrationGoal);
           const heightEditedSince =
             heightWriteSeqRef.current !== heightSeqAtStart || heightPendingWritesRef.current > 0;
           const ageEditedSince =
@@ -762,6 +786,7 @@ export default function SettingsScreen() {
 
   function adjustWorkoutTime(hourDelta: number, minuteDelta: number) {
     workoutTimeDirtyRef.current = true;
+    workoutEditGuard.seqRef.current += 1;
     setReminder((prev) => {
       const { hour, minute } = parseTimeString(prev.time);
       const newHour = stepHour(hour, hourDelta);
@@ -829,6 +854,7 @@ export default function SettingsScreen() {
 
   function adjustCookDayTime(hourDelta: number, minuteDelta: number) {
     cookDayTimeDirtyRef.current = true;
+    cookDayEditGuard.seqRef.current += 1;
     setCooking((prev) => {
       const { hour, minute } = parseTimeString(prev.weeklyCookDayTime);
       const newHour = stepHour(hour, hourDelta);
@@ -871,6 +897,7 @@ export default function SettingsScreen() {
 
   function adjustMealTime(meal: MealType, hourDelta: number, minuteDelta: number) {
     mealTimeDirtyRefs[meal].current = true;
+    mealEditGuards[meal].seqRef.current += 1;
     setMealReminders((prev) => {
       const { hour, minute } = parseTimeString(prev[meal].time);
       const newHour = stepHour(hour, hourDelta);
@@ -883,11 +910,13 @@ export default function SettingsScreen() {
 
   function adjustCalories(delta: number) {
     caloriesDirtyRef.current = true;
+    caloriesEditGuard.seqRef.current += 1;
     setGoalCalories((prev) => Math.min(CALORIES_MAX, Math.max(CALORIES_MIN, prev + delta)));
   }
 
   function adjustProtein(delta: number) {
     proteinDirtyRef.current = true;
+    proteinEditGuard.seqRef.current += 1;
     setGoalProtein((prev) => Math.min(PROTEIN_MAX, Math.max(PROTEIN_MIN, prev + delta)));
   }
 
@@ -895,6 +924,7 @@ export default function SettingsScreen() {
 
   function adjustHydrationGoal(delta: number) {
     hydrationDirtyRef.current = true;
+    hydrationEditGuard.seqRef.current += 1;
     setHydrationGoalMl((prev) => Math.min(HYDRATION_MAX, Math.max(HYDRATION_MIN, prev + delta)));
   }
 
@@ -1171,6 +1201,7 @@ export default function SettingsScreen() {
 
   function adjustBackupReminderTime(hourDelta: number, minuteDelta: number) {
     backupTimeDirtyRef.current = true;
+    backupEditGuard.seqRef.current += 1;
     setBackupReminder((prev) => {
       const { hour, minute } = parseTimeString(prev.time);
       const newHour = stepHour(hour, hourDelta);
