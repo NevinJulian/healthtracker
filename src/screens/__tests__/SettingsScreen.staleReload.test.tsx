@@ -189,3 +189,103 @@ describe('SettingsScreen toggles and day chips racing a reload', () => {
     expect(utils.getByText(/Reminder every Fri at/)).toBeTruthy();
   });
 });
+
+describe('SettingsScreen steppers racing a reload', () => {
+  const enabledGetters = [
+    db.getWorkoutReminderEnabled,
+    db.getWeeklyCookDayEnabled,
+    db.getMealReminderEnabled,
+    db.getBackupReminderEnabled,
+  ] as jest.Mock[];
+
+  afterEach(() => {
+    enabledGetters.forEach((getter) => getter.mockResolvedValue(false));
+  });
+
+  async function mountSettled() {
+    const utils = render(<SettingsScreen />);
+    await act(async () => {
+      mockFocusCallback?.();
+    });
+    await settle();
+    return utils;
+  }
+
+  async function startHeldReload(reload: ReturnType<typeof deferred<Profile>>) {
+    jest.mocked(db.getUserProfile).mockReturnValueOnce(reload.promise);
+    await act(async () => {
+      mockFocusCallback?.();
+    });
+  }
+
+  async function waitForCommit() {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    });
+  }
+
+  it('keeps edited reminder times and commits them after a stale reload', async () => {
+    enabledGetters.forEach((getter) => getter.mockResolvedValue(true));
+    const utils = await mountSettled();
+    const reload = deferred<Profile>();
+    await startHeldReload(reload);
+
+    const increaseHour = utils.getAllByLabelText('Increase Hour');
+    expect(increaseHour).toHaveLength(6);
+    for (const button of increaseHour) {
+      await act(async () => {
+        fireEvent.press(button);
+      });
+    }
+    await act(async () => {
+      reload.resolve(emptyProfile);
+    });
+    await settle();
+    await waitForCommit();
+
+    expect(db.setWorkoutReminderTime).toHaveBeenLastCalledWith('10:15');
+    expect(db.setWeeklyCookDayTime).toHaveBeenLastCalledWith('11:00');
+    expect(db.setMealReminderTime).toHaveBeenCalledWith('breakfast', '09:00');
+    expect(db.setMealReminderTime).toHaveBeenCalledWith('lunch', '09:00');
+    expect(db.setMealReminderTime).toHaveBeenCalledWith('dinner', '09:00');
+    expect(db.setBackupReminderTime).toHaveBeenLastCalledWith('19:00');
+  });
+
+  it('keeps edited calorie, protein and hydration goals after a stale reload', async () => {
+    const utils = await mountSettled();
+    const reload = deferred<Profile>();
+    await startHeldReload(reload);
+
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Increase calorie goal'));
+      fireEvent.press(utils.getByLabelText('Increase protein goal'));
+      fireEvent.press(utils.getByLabelText('Increase hydration goal'));
+    });
+    await act(async () => {
+      reload.resolve(emptyProfile);
+    });
+    await settle();
+    await waitForCommit();
+
+    expect(db.setNutritionGoalCalories).toHaveBeenLastCalledWith(1850);
+    expect(db.setNutritionGoalProtein).toHaveBeenLastCalledWith(155);
+    expect(db.setHydrationGoal).toHaveBeenLastCalledWith(2250);
+  });
+
+  it('hydrates a stepper from a later reload once its edit was committed', async () => {
+    const utils = await mountSettled();
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Increase calorie goal'));
+    });
+    await waitForCommit();
+    expect(db.setNutritionGoalCalories).toHaveBeenLastCalledWith(1850);
+
+    jest.mocked(db.getNutritionGoals).mockResolvedValueOnce({ calories: 1700, protein: 150 });
+    await act(async () => {
+      mockFocusCallback?.();
+    });
+    await settle();
+
+    expect(utils.getByText('1700')).toBeTruthy();
+  });
+});
