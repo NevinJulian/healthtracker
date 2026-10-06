@@ -81,6 +81,7 @@ export default function MealPrepScreen() {
   const [inventory, setInventory] = useState<MealInventoryWithRecipe[]>([]);
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyMealPlanItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const [logModalVisible, setLogModalVisible] = useState(false);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
@@ -119,6 +120,7 @@ export default function MealPrepScreen() {
 
   const loadData = useCallback(async () => {
     const runId = ++runIdRef.current;
+    setLoadError(false);
     if (!hasLoadedOnceRef.current) {
       setLoading(true);
     }
@@ -138,6 +140,7 @@ export default function MealPrepScreen() {
     } catch (err) {
       if (!mountedRef.current || runIdRef.current !== runId) return;
       logDbError(err);
+      if (!hasLoadedOnceRef.current) setLoadError(true);
     } finally {
       if (mountedRef.current && runIdRef.current === runId) {
         setLoading(false);
@@ -406,6 +409,12 @@ export default function MealPrepScreen() {
       {loading ? (
         <View style={styles.loadingState}>
           <Text style={styles.loadingText}>Loading meals…</Text>
+        </View>
+      ) : loadError ? (
+        <View style={styles.errorState}>
+          <Text style={styles.emptyTitle}>Couldn't load your meals</Text>
+          <Text style={styles.emptySub}>Your data is safe. Try again.</Text>
+          <Button title="Retry" onPress={loadData} style={styles.errorRetry} />
         </View>
       ) : activeTab === 'weekly' ? renderWeeklyTab() : renderInventoryTab()}
 
@@ -948,6 +957,19 @@ const styles = StyleSheet.create({
     fontFamily: Typography.body,
     fontSize: Typography.sizes.sm,
     color: Colors.textMuted,
+  },
+
+  // ── Load error ─────────────────────────────────────────────
+  errorState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xxl,
+    gap: Spacing.sm,
+  },
+  errorRetry: {
+    marginTop: Spacing.md,
   },
 
   // ── Empty states ───────────────────────────────────────────
