@@ -439,13 +439,18 @@
     },
     "415": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "ab1eb9f",
+        "2c3cb5b",
+        "780df0d",
+        "4e1e264"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/415.md",
       "decisionSource": "owner comment on #415 (a date per pill)",
       "deviceCheck": "Waist today, chest on an earlier date: each pill shows its own date, no Last: header. Log one field: only that pill date becomes today. Fresh install: No measurements logged yet.",
-      "notes": "WO ready; waits for #411"
+      "notes": "dev edited four EXISTING assertions in bodyMeasurements.test.ts inside the feature commit without stopping to report (shape change forces .value; .date/.id assertions removed) - sent to tester for a line-by-line judgement. 2c3cb5b alone does not typecheck."
     },
     "416": {
       "lane": "C",
@@ -527,7 +532,8 @@
     "eslint-disable comments also sit in src/services/backup.ts and src/services/expoNotifications.ts (not test files, outside #409) - #409 analyst",
     "MealPrep handleToggleConsumed is not behind runGuarded: a double tap fires toggleMealConsumed twice (second is a no-op in the db; visual-feedback gap only) - #408 dev / #403 analyst",
     "MealPrepScreen.test.tsx has an issue number in a describe title (refresh failure banner (#401)) - lane D cleanup",
-    "MealPrepScreen.tsx: pre-existing comments carry issue refs (#324 backstop comment, hasLoadedOnceRef comment) - lane D cleanup"
+    "MealPrepScreen.tsx: pre-existing comments carry issue refs (#324 backstop comment, hasLoadedOnceRef comment) - lane D cleanup",
+    "DashboardScreen.tsx: comment above the measurements modal state initialisers references #325 and tells history - #415 dev (handed to lane C cleanup if the lane touches those lines)"
   ],
   "log": [
     {
@@ -710,6 +716,10 @@
     {
       "at": "2026-10-06T17:43:51Z",
       "event": "#411 ready (security APPROVE)"
+    },
+    {
+      "at": "2026-10-06T17:45:07Z",
+      "event": "#415 in_test (1035/89 per dev)"
     }
   ]
 }
