@@ -54,7 +54,6 @@ function loadFreshDatabaseModule(): DatabaseModule {
     deleteDatabaseAsync: async () => {},
     SQLiteDatabase: class {},
   }));
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require('../database') as DatabaseModule;
 }
 
@@ -79,7 +78,6 @@ function loadFreshDatabaseModuleWithRaw(raw: SqljsExpoDb): DatabaseModule {
     deleteDatabaseAsync: async () => {},
     SQLiteDatabase: class {},
   }));
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require('../database') as DatabaseModule;
 }
 
@@ -125,7 +123,6 @@ describe('logWorkoutSet() atomic set_index assignment (#317)', () => {
   ): Promise<void> {
     const existing = await db.getWorkoutSetsForDay(date);
     const setIndex = existing.filter((s) => s.exercise === exercise).length;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db.logWorkoutSet as any)(date, exercise, { reps, weightKg, setIndex });
   }
 

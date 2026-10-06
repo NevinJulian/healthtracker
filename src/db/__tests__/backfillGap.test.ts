@@ -46,7 +46,6 @@ function loadFreshDatabaseModule(): DatabaseModule {
     deleteDatabaseAsync: async () => {},
     SQLiteDatabase: class {},
   }));
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require('../database') as DatabaseModule;
 }
 

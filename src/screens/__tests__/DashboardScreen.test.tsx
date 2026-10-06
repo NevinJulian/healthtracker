@@ -11,7 +11,6 @@ import { render, fireEvent, act } from '@testing-library/react-native';
 // mount effect (same pattern as MealPrepScreen.test.tsx / SettingsScreen.test.tsx).
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useEffect } = require('react');
     useEffect(callback, []);
   },

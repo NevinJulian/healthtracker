@@ -66,7 +66,6 @@ function loadFreshDatabaseModule(
       ...schemaOverride,
     }));
   }
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require('../database') as DatabaseModule;
 }
 

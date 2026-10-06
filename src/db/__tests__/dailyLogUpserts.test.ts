@@ -35,7 +35,6 @@ function loadFreshDatabaseModule(): DatabaseModule {
     deleteDatabaseAsync: async () => {},
     SQLiteDatabase: class {},
   }));
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require('../database') as DatabaseModule;
 }
 
@@ -810,7 +809,6 @@ describe('resetCorruptDayColumn keeps the corrupt text and writes a fresh value'
     await seed(db, date, 'additional_workouts', '{bad');
     await db.resetCorruptDayColumn(date, 'additional_workouts');
 
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { buildBackupPayload } = require('../../services/backup') as typeof import('../../services/backup');
     const payload = await buildBackupPayload();
     expect(payload.tables.app_state).toEqual(

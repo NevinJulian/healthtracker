@@ -38,9 +38,7 @@ function loadFreshModules(): { db: DatabaseModule; backup: BackupModule } {
     deleteDatabaseAsync: async () => {},
     SQLiteDatabase: class {},
   }));
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const db = require('../database') as DatabaseModule;
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const backup = require('../../services/backup') as BackupModule;
   return { db, backup };
 }
