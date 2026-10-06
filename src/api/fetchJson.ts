@@ -45,6 +45,8 @@ export interface FetchJsonOptions {
   retries?: number;
   /** External abort signal. An abort here rejects immediately and is never retried. */
   signal?: AbortSignal;
+  /** Extra request headers. */
+  headers?: Record<string, string>;
 }
 
 /** Internal marker: this attempt was aborted by the caller's own signal. */
@@ -120,6 +122,7 @@ async function attemptFetch(
   url: string,
   timeoutMs: number,
   externalSignal?: AbortSignal,
+  headers?: Record<string, string>,
 ): Promise<Response> {
   if (externalSignal?.aborted) {
     throw new ExternalAbortError();
@@ -143,7 +146,7 @@ async function attemptFetch(
   }, timeoutMs);
 
   try {
-    return await fetch(url, { signal: controller.signal });
+    return await fetch(url, { signal: controller.signal, headers });
   } catch (err) {
     if (reason === 'external') throw new ExternalAbortError();
     if (reason === 'timeout') throw new TimeoutAbortError(timeoutMs);
@@ -166,12 +169,17 @@ export async function fetchJson<T = unknown>(
   url: string,
   options: FetchJsonOptions = {},
 ): Promise<T> {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, retries = DEFAULT_RETRIES, signal } = options;
+  const {
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    retries = DEFAULT_RETRIES,
+    signal,
+    headers,
+  } = options;
 
   let attempt = 0;
   for (;;) {
     try {
-      const res = await attemptFetch(url, timeoutMs, signal);
+      const res = await attemptFetch(url, timeoutMs, signal, headers);
 
       if (!res.ok) {
         if (res.status >= 500 && attempt < retries) {

@@ -13,6 +13,7 @@
  */
 
 import { getDatabase, putOFFCache } from '../db/database';
+import { expo } from '../../app.json';
 import { fetchJson } from './fetchJson';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -85,6 +86,10 @@ async function putCache(name: string, nutrition: OFFNutrition): Promise<void> {
 const OFF_SEARCH_URL =
   'https://world.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=5';
 
+const OFF_HEADERS = {
+  'User-Agent': `HealthTracker/${expo.version} (https://github.com/NevinJulian/healthtracker)`,
+};
+
 /**
  * Fetch per-100g nutrition data from Open Food Facts for the given search term.
  * Returns null when: no products found, fields are missing, or network fails.
@@ -93,7 +98,7 @@ const OFF_SEARCH_URL =
 async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutrition | null> {
   try {
     const url = `${OFF_SEARCH_URL}&search_terms=${encodeURIComponent(term)}`;
-    const data = await fetchJson<OFFResponse>(url, { signal });
+    const data = await fetchJson<OFFResponse>(url, { signal, headers: OFF_HEADERS });
     if (!data.products || data.products.length === 0) return null;
 
     // Pick the first product that has all four macro fields
