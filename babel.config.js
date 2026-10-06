@@ -1,8 +1,7 @@
 module.exports = function (api) {
   api.cache(true);
   return {
-    // babel-preset-expo (SDK 54) automatically includes the
-    // react-native-worklets Babel plugin required by react-native-reanimated 4.
+    // The preset includes the react-native-worklets plugin that reanimated 4 needs.
     presets: ['babel-preset-expo'],
   };
 };
