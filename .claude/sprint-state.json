@@ -104,7 +104,7 @@
     "D": {
       "branch": "sprint/lane-d-mealprep",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "in_progress",
+      "status": "merged",
       "waitsFor": "lane A merged",
       "order": [
         417,
@@ -120,7 +120,9 @@
         408
       ],
       "parked": [],
-      "base": "62cc088"
+      "base": "62cc088",
+      "mergeSha": "30ee844",
+      "cleanup": "no changes needed"
     },
     "E": {
       "branch": "sprint/lane-e-api",
@@ -239,7 +241,7 @@
     },
     "401": {
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "a10a41a",
@@ -251,11 +253,12 @@
       "deviceCheck": "Open MealPrep: loading then data, no banner. Switch tabs / leave and return: no banner, no blank flash. Empty inventory shows the normal empty state, not the error.",
       "notes": "tester APPROVE r0. Race orderings (cleared-at-start then superseded; late older run) were checked by reading the run-id guard, NOT by deferred-promise probes. HUMAN: wording is an analyst pick; banner uses the clay palette (no warning token).",
       "securityReview": "skipped: UI load-error state only; no db/api/backup code in the diff",
-      "regressionProof": "5 tests fail with a10a41a MealPrepScreen.tsx; banner test fails with 71cee01; pass at 49b5ccd; 1010/88 (tester reproduced)"
+      "regressionProof": "5 tests fail with a10a41a MealPrepScreen.tsx; banner test fails with 71cee01; pass at 49b5ccd; 1010/88 (tester reproduced)",
+      "mergeSha": "30ee844"
     },
     "403": {
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "2caeb78",
@@ -265,7 +268,8 @@
       "deviceCheck": "Log Cooked Meal: 4 portions, double-tap Save fast -> +4 not +8. Assign: double-tap a recipe row -> one assignment, modal closes.",
       "notes": "tester APPROVE r0. Assign-row disabled visual is untested (prop threaded). runGuarded does not catch: callers handle their own rejections. logCookedMeal still has no db-level idempotency (#432).",
       "securityReview": "skipped: UI in-flight guard only; no db/api/backup code in the diff",
-      "regressionProof": "2 double-press tests fail with 2caeb78 MealPrepScreen.tsx (2 calls), pass at 9c1374a; 1014/88 (tester reproduced)"
+      "regressionProof": "2 double-press tests fail with 2caeb78 MealPrepScreen.tsx (2 calls), pass at 9c1374a; 1014/88 (tester reproduced)",
+      "mergeSha": "30ee844"
     },
     "404": {
       "lane": "F",
@@ -337,7 +341,7 @@
     },
     "408": {
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "5dd3c00",
@@ -349,7 +353,8 @@
       "deviceCheck": "Lunch assigned and eaten: Remove -> eaten-meal confirm text; Cancel changes nothing; Remove -> slot shows Assign, inventory +1, meal gone from nutrition history. Unticked meal: simple confirm, inventory unchanged. Archived-recipe meal: same.",
       "notes": "tester APPROVE r0. HUMAN: eaten legacy rows (NULL inventory pointer) are removed and credit nothing, while the confirm says the portion goes back; Remove hit area is ~26x26 px (below 44) - look at it on the device; Alert title Remove meal and placement are picks.",
       "securityReview": "skipped: the diff is UI only (MealPrepScreen + its test) calling the existing removeMealFromPlan, whose transactional credit+delete was security-reviewed in sprint 2 (#368); tester ran it end to end against the real db function",
-      "regressionProof": "8 new tests fail with 2a487ae MealPrepScreen.tsx, 32/32 at 0712db9; 1022/88 (tester reproduced). Probes: each Remove button deletes its own slot id (4 slots, shared recipe); real-db credit goes to the right batch; plan ids are AUTOINCREMENT and not reused; stale id is a no-op."
+      "regressionProof": "8 new tests fail with 2a487ae MealPrepScreen.tsx, 32/32 at 0712db9; 1022/88 (tester reproduced). Probes: each Remove button deletes its own slot id (4 slots, shared recipe); real-db credit goes to the right batch; plan ids are AUTOINCREMENT and not reused; stale id is a no-op.",
+      "mergeSha": "30ee844"
     },
     "409": {
       "lane": "G",
@@ -451,7 +456,7 @@
     },
     "417": {
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "5662af0",
@@ -465,7 +470,8 @@
       "deviceCheck": "Cook a recipe, assign to today Lunch, tick consumed. Delete the recipe (archives it). Meal Plan weekly: slot shows title and kcal, day card shows CONSUMED TODAY with kcal. + Log Cooked Meal: deleted recipe not listed.",
       "notes": "tester APPROVE r0. Only the Lunch slot is exercised by the new render test (Dinner symmetric by reading). 5662af0 alone does not typecheck. An archived recipe row with malformed ingredients now also breaks MealPrep load (#430).",
       "regressionProof": "db test fails with 5662af0 database.ts; screen test fails with fa4a656 MealPrepScreen.tsx (Archived Curry not found); pass at ef83ef1; 1003/88 (tester reproduced)",
-      "securityReview": "APPROVE: static read-only SELECT; planRecipes feeds only the slot title Text and the kcal sums; no write path can pick an archived recipe id it could not before. Note: a malformed archived row now breaks the MealPrep load like an active one already did (#430)."
+      "securityReview": "APPROVE: static read-only SELECT; planRecipes feeds only the slot title Text and the kcal sums; no write path can pick an archived recipe id it could not before. Note: a malformed archived row now breaks the MealPrep load like an active one already did (#430).",
+      "mergeSha": "30ee844"
     },
     "419": {
       "lane": "B",
@@ -515,7 +521,9 @@
     "AppNavigator.tsx has stale emoji-icon comments - #398 analyst",
     "jest.config.js comment still says Jest 30 although jest is ~29.7 (owner said not to touch the jest config in #400) - #400 analyst",
     "eslint-disable comments also sit in src/services/backup.ts and src/services/expoNotifications.ts (not test files, outside #409) - #409 analyst",
-    "MealPrep handleToggleConsumed is not behind runGuarded: a double tap fires toggleMealConsumed twice (second is a no-op in the db; visual-feedback gap only) - #408 dev / #403 analyst"
+    "MealPrep handleToggleConsumed is not behind runGuarded: a double tap fires toggleMealConsumed twice (second is a no-op in the db; visual-feedback gap only) - #408 dev / #403 analyst",
+    "MealPrepScreen.test.tsx has an issue number in a describe title (refresh failure banner (#401)) - lane D cleanup",
+    "MealPrepScreen.tsx: pre-existing comments carry issue refs (#324 backstop comment, hasLoadedOnceRef comment) - lane D cleanup"
   ],
   "log": [
     {
@@ -686,6 +694,10 @@
     {
       "at": "2026-10-06T17:38:39Z",
       "event": "#408 ready (APPROVE r0, security skipped); lane D out of issues (4 done) -> cleanup"
+    },
+    {
+      "at": "2026-10-06T17:39:27Z",
+      "event": "merged lane D into integration 30ee844; gates green: typecheck clean, 1073/91"
     }
   ]
 }
