@@ -213,6 +213,25 @@
       "securityReview": "skipped: UI state hydration guards only; no db/api/backup code in the diff",
       "regressionProof": "pickers 2/9 fail with 1bc96c5 SettingsScreen.tsx (stale values reach suggestGoals); toggles 4 fail with 23faef1; steppers 2 fail with 7b567cd; round 2: 2 fail with 40da49c; all pass at d61488d; 907/84 (tester reproduced)"
     },
+    "398": {
+      "lane": "G",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
+      "deviceCheck": "Expo Go from the integration branch: open the drawer, visit every drawer screen, Recipes -> RecipeDetail and Discover -> DiscoverDetail and back; no red screen, no missing-module error.",
+      "notes": "WO ready; no jest regression test possible (grep + gates + build-check APK on the PR stand in)"
+    },
+    "400": {
+      "lane": "G",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
+      "deviceCheck": "none",
+      "decisionSource": "owner comment on #400 (fix CLAUDE.md jest wording, do not touch jest config)",
+      "notes": "WO ready; includes CLAUDE.md corrections limited to facts the code contradicts"
+    },
     "401": {
       "lane": "D",
       "status": "ready",
@@ -312,6 +331,15 @@
       "decisionSource": "owner comment on #408 2026-10-06 (wire into MealPrep with a confirm)",
       "deviceCheck": "Lunch assigned and eaten: Remove -> eaten-meal confirm text; Cancel changes nothing; Remove -> slot shows Assign, inventory +1, meal gone from nutrition history. Unticked meal: simple confirm, inventory unchanged. Archived-recipe meal: same.",
       "notes": "WO ready; waits for #403. Placement and wording are analyst picks. Confirm text says the portion returns even for legacy rows with a NULL inventory pointer (which credit nothing)."
+    },
+    "409": {
+      "lane": "G",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
+      "deviceCheck": "none",
+      "notes": "WO ready; grep-driven, deletions only"
     },
     "410": {
       "lane": "C",
@@ -455,7 +483,10 @@
     "A payload row with is_consumed null makes the whole restore throw on NOT NULL (pre-existing; payload validation) - #406 tester",
     "src/db/__tests__/backupRoundTrip.test.ts:137 comment still says POST_RESTORE_STEPS includes v37 (outside lane A diff) - lane A cleanup",
     "restoreFromPayload docblock (~2500-2520) still carries pre-existing issue refs (#303, #317, #315) and v37 history - lane A cleanup",
-    "Restore alert: column names from a hand-edited backup containing newlines or commas render verbatim in the skipped summary (could fake an alert line; max 40 chars after #407) - #407 tester"
+    "Restore alert: column names from a hand-edited backup containing newlines or commas render verbatim in the skipped summary (could fake an alert line; max 40 chars after #407) - #407 tester",
+    "AppNavigator.tsx has stale emoji-icon comments - #398 analyst",
+    "jest.config.js comment still says Jest 30 although jest is ~29.7 (owner said not to touch the jest config in #400) - #400 analyst",
+    "eslint-disable comments also sit in src/services/backup.ts and src/services/expoNotifications.ts (not test files, outside #409) - #409 analyst"
   ],
   "log": [
     {
@@ -598,6 +629,10 @@
     {
       "at": "2026-10-06T17:30:51Z",
       "event": "#401 ready (APPROVE r0, security skipped); lane D -> #403 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:31:21Z",
+      "event": "lane G work orders ready (#398 #400 #409), none parked; waits for lanes C, D, F to merge"
     }
   ]
 }
