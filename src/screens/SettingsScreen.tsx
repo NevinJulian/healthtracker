@@ -634,10 +634,16 @@ export default function SettingsScreen() {
           getBackupReminderTime(),
         ]);
         if (active) {
+          const workoutTimeKept = workoutTimeDirtyRef.current;
+          const cookDayTimeKept = cookDayTimeDirtyRef.current;
+          const breakfastTimeKept = breakfastTimeDirtyRef.current;
+          const lunchTimeKept = lunchTimeDirtyRef.current;
+          const dinnerTimeKept = dinnerTimeDirtyRef.current;
+          const backupTimeKept = backupTimeDirtyRef.current;
           setReminder((prev) => ({
             ...prev,
             enabled: editedSince(workoutEnabledGuard, workoutEnabledSeqAtStart) ? prev.enabled : workoutEnabled,
-            time: workoutTime,
+            time: workoutTimeKept ? prev.time : workoutTime,
             permissionDenied: false,
           }));
           setCooking((prev) => ({
@@ -651,7 +657,7 @@ export default function SettingsScreen() {
             weeklyCookDay: editedSince(weeklyCookDayGuard, weeklyCookDaySeqAtStart)
               ? prev.weeklyCookDay
               : weeklyCookDay,
-            weeklyCookDayTime,
+            weeklyCookDayTime: cookDayTimeKept ? prev.weeklyCookDayTime : weeklyCookDayTime,
             permissionDenied: false,
           }));
           setMealReminders((prev) => ({
@@ -660,19 +666,19 @@ export default function SettingsScreen() {
               enabled: editedSince(mealEnabledGuards.breakfast, mealEnabledSeqAtStart.breakfast)
                 ? prev.breakfast.enabled
                 : breakfastEnabled,
-              time: breakfastTime,
+              time: breakfastTimeKept ? prev.breakfast.time : breakfastTime,
             },
             lunch: {
               enabled: editedSince(mealEnabledGuards.lunch, mealEnabledSeqAtStart.lunch)
                 ? prev.lunch.enabled
                 : lunchEnabled,
-              time: lunchTime,
+              time: lunchTimeKept ? prev.lunch.time : lunchTime,
             },
             dinner: {
               enabled: editedSince(mealEnabledGuards.dinner, mealEnabledSeqAtStart.dinner)
                 ? prev.dinner.enabled
                 : dinnerEnabled,
-              time: dinnerTime,
+              time: dinnerTimeKept ? prev.dinner.time : dinnerTime,
             },
             permissionDenied: false,
           }));
@@ -680,12 +686,12 @@ export default function SettingsScreen() {
             ...prev,
             enabled: editedSince(backupEnabledGuard, backupEnabledSeqAtStart) ? prev.enabled : backupEnabled,
             day: editedSince(backupDayGuard, backupDaySeqAtStart) ? prev.day : backupDay,
-            time: backupTime,
+            time: backupTimeKept ? prev.time : backupTime,
             permissionDenied: false,
           }));
-          setGoalCalories(nutritionGoals.calories);
-          setGoalProtein(nutritionGoals.protein);
-          setHydrationGoalMl(hydrationGoal);
+          if (!caloriesDirtyRef.current) setGoalCalories(nutritionGoals.calories);
+          if (!proteinDirtyRef.current) setGoalProtein(nutritionGoals.protein);
+          if (!hydrationDirtyRef.current) setHydrationGoalMl(hydrationGoal);
           const heightEditedSince =
             heightWriteSeqRef.current !== heightSeqAtStart || heightPendingWritesRef.current > 0;
           const ageEditedSince =
