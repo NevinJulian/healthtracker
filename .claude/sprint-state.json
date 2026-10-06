@@ -68,7 +68,7 @@
     "B": {
       "branch": "sprint/lane-b-start",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "in_progress",
+      "status": "merged",
       "order": [
         419
       ],
@@ -77,7 +77,8 @@
         419
       ],
       "parked": [],
-      "cleanup": "no changes needed"
+      "cleanup": "no changes needed",
+      "mergeSha": "0987514"
     },
     "C": {
       "branch": "sprint/lane-c-dashboard",
@@ -120,7 +121,8 @@
       "done": [
         318
       ],
-      "parked": []
+      "parked": [],
+      "cleanup": "c296e5b constant order only"
     },
     "F": {
       "branch": "sprint/lane-f-settings",
@@ -272,7 +274,7 @@
     },
     "419": {
       "lane": "B",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "93da3f8",
@@ -287,7 +289,8 @@
       "deviceCheck": "Force a throw at top of init try in App.tsx (first attempt only, uncommitted). Launch: title, error, Retry, Save data, no-reset sentence, no other button. Save data: share sheet for db (non-zero size), second sheet for wal if present, both files arrive. Retry: normal app, data intact.",
       "notes": "tester APPROVE r0. DB path verified against expo-sqlite defaultDatabaseDirectory (filesDir/SQLite). Inline fs/sharing mocks are necessary (global mock shadowed by jest-expo, filed #425). No in-flight guard on Retry in code: button unmounts on press, but 2 presses in one act() overlapped 2 initDatabase calls (sent to security). App test silences console.error globally. DB filename hard-coded in service + test.",
       "regressionProof": "App.startFailure 7/7 fail with 2e1ac1e App.tsx, pass at 45d91de; rescueExport 5/5 at tip (tester reproduced); 874/83",
-      "securityReview": "APPROVE: live db is only ever a copy source; no SQL; errors surfaced. Overlapping initDatabase runs are serialised by the write queue (only the start-date check-then-insert is unguarded: cosmetic). Rescue pair is best-effort (wal copied after db). Copies stay in app-private cache. NOTE: Retry re-runs resetIfIncompatibleSchema, the one existing path that deletes the DB (pre-existing, filed #427)."
+      "securityReview": "APPROVE: live db is only ever a copy source; no SQL; errors surfaced. Overlapping initDatabase runs are serialised by the write queue (only the start-date check-then-insert is unguarded: cosmetic). Rescue pair is best-effort (wal copied after db). Copies stay in app-private cache. NOTE: Retry re-runs resetIfIncompatibleSchema, the one existing path that deletes the DB (pre-existing, filed #427).",
+      "mergeSha": "0987514"
     }
   },
   "foundDuringSprint": [
@@ -375,6 +378,10 @@
     {
       "at": "2026-10-06T17:15:17Z",
       "event": "#419 ready (security APPROVE, cleanup no-op); #412 ready (security APPROVE); #318 ready (security APPROVE, cleanup running); #406 and #404 in_test; filed #426 #427 #428"
+    },
+    {
+      "at": "2026-10-06T17:15:45Z",
+      "event": "merged lane B into integration 0987514; gates green: typecheck clean, 874/83. Lane E cleanup c296e5b"
     }
   ]
 }
