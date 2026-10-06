@@ -71,6 +71,20 @@ const ACTIVITY_OPTIONS: Array<{ value: ActivityLevel; label: string; description
   { value: 'very_active', label: 'Very active', description: 'Physical job or twice-daily training' },
 ];
 
+const HEIGHT_RANGE = { min: 50, max: 250 } as const;
+const AGE_RANGE = { min: 10, max: 120 } as const;
+const WEIGHT_RANGE = { min: 20, max: 400 } as const;
+
+function parseInRange(text: string, range: { min: number; max: number }): number | null {
+  const t = text.trim();
+  const n = t === '' ? NaN : Number(t.replace(',', '.'));
+  return Number.isFinite(n) && n >= range.min && n <= range.max ? n : null;
+}
+
+function rangeError(label: string, unit: string, range: { min: number; max: number }): string {
+  return `${label} must be between ${range.min} and ${range.max} ${unit}.`;
+}
+
 const GOAL_OPTIONS: Array<{ value: GoalType; label: string; description: string }> = [
   { value: 'cut',      label: 'Lose weight',    description: '−500 kcal/day deficit' },
   { value: 'maintain', label: 'Maintain',       description: 'Eat at your TDEE' },
@@ -162,20 +176,20 @@ export default function OnboardingScreen({ onComplete, latestWeight }: Props) {
 
   // ── Computed goals (step 3 preview) ──────────────────────────────────────
 
-  const heightNum = parseFloat(heightStr);
-  const ageNum    = parseFloat(ageStr);
-  const weightNum = parseFloat(weightStr);
+  const heightNum = parseInRange(heightStr, HEIGHT_RANGE);
+  const ageNum    = parseInRange(ageStr, AGE_RANGE);
+  const weightNum = parseInRange(weightStr, WEIGHT_RANGE);
 
   const profileReady =
     sex !== null &&
-    Number.isFinite(heightNum) && heightNum > 0 &&
-    Number.isFinite(ageNum)    && ageNum > 0 &&
+    heightNum !== null &&
+    ageNum !== null &&
     activityLevel !== null &&
     goalType !== null &&
-    Number.isFinite(weightNum) && weightNum > 0;
+    weightNum !== null;
 
   const computedGoals =
-    profileReady
+    profileReady && heightNum !== null && ageNum !== null && weightNum !== null
       ? suggestGoals(
           {
             sex: sex!,
@@ -191,11 +205,7 @@ export default function OnboardingScreen({ onComplete, latestWeight }: Props) {
   // ── Navigation helpers ────────────────────────────────────────────────────
 
   function canAdvanceStep1(): boolean {
-    return (
-      sex !== null &&
-      Number.isFinite(parseFloat(heightStr)) && parseFloat(heightStr) > 0 &&
-      Number.isFinite(parseFloat(ageStr)) && parseFloat(ageStr) > 0
-    );
+    return sex !== null && heightNum !== null && ageNum !== null;
   }
 
   function canAdvanceStep2(): boolean {
@@ -217,7 +227,9 @@ export default function OnboardingScreen({ onComplete, latestWeight }: Props) {
   // ── Confirm + save ────────────────────────────────────────────────────────
 
   async function handleConfirm() {
-    if (!profileReady || !computedGoals) return;
+    if (!profileReady || !computedGoals || heightNum === null || ageNum === null || weightNum === null) {
+      return;
+    }
     setSaving(true);
     try {
       // Persist profile fields
@@ -234,9 +246,7 @@ export default function OnboardingScreen({ onComplete, latestWeight }: Props) {
       await setNutritionGoalProtein(computedGoals.protein);
 
       // Write today's body weight if not already logged
-      if (Number.isFinite(weightNum) && weightNum > 0) {
-        await upsertBodyWeight(toISODate(), weightNum);
-      }
+      await upsertBodyWeight(toISODate(), weightNum);
 
       await setOnboardingComplete(true);
       onComplete();
@@ -313,6 +323,9 @@ export default function OnboardingScreen({ onComplete, latestWeight }: Props) {
               accessibilityLabel="Height in centimetres"
               returnKeyType="done"
             />
+            {heightStr.trim() !== '' && heightNum === null && (
+              <Text style={styles.errorText}>{rangeError('Height', 'cm', HEIGHT_RANGE)}</Text>
+            )}
 
             {/* Age */}
             <SectionLabel>Age (years)</SectionLabel>
@@ -326,6 +339,9 @@ export default function OnboardingScreen({ onComplete, latestWeight }: Props) {
               accessibilityLabel="Age in years"
               returnKeyType="done"
             />
+            {ageStr.trim() !== '' && ageNum === null && (
+              <Text style={styles.errorText}>{rangeError('Age', 'years', AGE_RANGE)}</Text>
+            )}
 
             <View style={styles.actionRow}>
               <TouchableOpacity
@@ -423,6 +439,9 @@ export default function OnboardingScreen({ onComplete, latestWeight }: Props) {
               accessibilityLabel="Body weight in kilograms"
               returnKeyType="done"
             />
+            {weightStr.trim() !== '' && weightNum === null && (
+              <Text style={styles.errorText}>{rangeError('Weight', 'kg', WEIGHT_RANGE)}</Text>
+            )}
 
             {/* Computed goals preview */}
             {computedGoals != null && (
@@ -716,6 +735,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.clayTint,
     borderRadius: Radius.sm,
     padding: Spacing.md,
+  },
+  errorText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.danger,
+    lineHeight: Typography.sizes.xs * 1.5,
   },
   noticeText: {
     flex: 1,
