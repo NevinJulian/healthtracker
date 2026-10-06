@@ -59,7 +59,9 @@
         406
       ],
       "current": 412,
-      "done": [],
+      "done": [
+        414
+      ],
       "parked": []
     },
     "B": {
@@ -229,7 +231,7 @@
     },
     "414": {
       "lane": "A",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "da71967",
@@ -239,17 +241,25 @@
       "deviceCheck": "none",
       "decisionSource": "owner comment on #414: items 1-3, one strict parser, item 4 dropped",
       "notes": "tester APPROVE r0. Setters throw RangeError; only callers are SettingsScreen pickers which cannot produce invalid values (tester traced). Stored 8:00-style values now read as default (intended).",
-      "regressionProof": "82/110 fail with da71967 database.ts, 110/110 at e85f913 (tester reproduced); 972/82"
+      "regressionProof": "82/110 fail with da71967 database.ts, 110/110 at e85f913 (tester reproduced); 972/82",
+      "securityReview": "APPROVE: no new SQL, writes parameterised, restored app_state values now always canonical HH:MM / 0-6 before reaching the scheduler; RangeError thrown before any write and not swallowed; restore/startup/reconcile call no setter. Note: Settings debounced flush callbacks have no try/catch around the setters (unreachable today)."
     },
     "419": {
       "lane": "B",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "93da3f8",
+        "402ccd6",
+        "afb133e",
+        "dd62bcd",
+        "fc607ec",
+        "45d91de"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/419.md",
       "decisionSource": "owner decision in #419 body",
       "deviceCheck": "Force a throw at top of init try in App.tsx (first attempt only, uncommitted). Launch: title, error, Retry, Save data, no-reset sentence, no other button. Save data: share sheet for db (non-zero size), second sheet for wal if present, both files arrive. Retry: normal app, data intact.",
-      "notes": "DB name hard-coded in rescueExport.ts (no lane-A edit); Retry hidden on font error"
+      "notes": "dev: global expo-file-system/sharing mocks did not suffice (jest-expo mock precedence) -> inline jest.mock in the new test files, config untouched; Retry re-runs installStress369 + reconcile"
     }
   },
   "foundDuringSprint": [
@@ -259,7 +269,8 @@
   ],
   "smallFindings": [
     "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
-    "Onboarding age field is number-pad (no decimal key) but accepts decimals via paste - #405 analyst"
+    "Onboarding age field is number-pad (no decimal key) but accepts decimals via paste - #405 analyst",
+    "src/components Button.tsx has raw borderRadius: 13 and minHeight: 48 instead of tokens - #419 dev"
   ],
   "log": [
     {
@@ -310,6 +321,10 @@
     {
       "at": "2026-10-06T17:10:21Z",
       "event": "#318 in_test (873/84 per dev; dev report mislabelled 2 SHAs, corrected from git log)"
+    },
+    {
+      "at": "2026-10-06T17:10:44Z",
+      "event": "#414 ready (security APPROVE); #419 in_test (874/83 per dev)"
     }
   ]
 }
