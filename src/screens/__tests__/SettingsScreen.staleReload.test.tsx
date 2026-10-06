@@ -272,6 +272,53 @@ describe('SettingsScreen steppers racing a reload', () => {
     expect(db.setHydrationGoal).toHaveBeenLastCalledWith(2250);
   });
 
+  it('keeps a goal edited and committed while the reload was in flight, and steps from it', async () => {
+    const utils = await mountSettled();
+    const reload = deferred<Profile>();
+    await startHeldReload(reload);
+
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Increase calorie goal'));
+    });
+    await waitForCommit();
+    expect(db.setNutritionGoalCalories).toHaveBeenLastCalledWith(1850);
+
+    await act(async () => {
+      reload.resolve(emptyProfile);
+    });
+    await settle();
+    expect(utils.getByText('1850')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Increase calorie goal'));
+    });
+    await waitForCommit();
+    expect(db.setNutritionGoalCalories).toHaveBeenLastCalledWith(1900);
+  });
+
+  it('keeps a time edited and committed while the reload was in flight, and steps from it', async () => {
+    enabledGetters.forEach((getter) => getter.mockResolvedValue(true));
+    const utils = await mountSettled();
+    const reload = deferred<Profile>();
+    await startHeldReload(reload);
+
+    await act(async () => {
+      fireEvent.press(utils.getAllByLabelText('Increase Hour')[0]);
+    });
+    await waitForCommit();
+    expect(db.setWorkoutReminderTime).toHaveBeenLastCalledWith('10:15');
+
+    await act(async () => {
+      reload.resolve(emptyProfile);
+    });
+    await settle();
+    await act(async () => {
+      fireEvent.press(utils.getAllByLabelText('Increase Hour')[0]);
+    });
+    await waitForCommit();
+    expect(db.setWorkoutReminderTime).toHaveBeenLastCalledWith('11:15');
+  });
+
   it('hydrates a stepper from a later reload once its edit was committed', async () => {
     const utils = await mountSettled();
     await act(async () => {
