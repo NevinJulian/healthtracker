@@ -94,10 +94,11 @@
         415,
         416
       ],
-      "current": 415,
+      "current": 416,
       "done": [
         410,
-        411
+        411,
+        415
       ],
       "parked": [],
       "base": "62cc088"
@@ -439,7 +440,7 @@
     },
     "415": {
       "lane": "C",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "ab1eb9f",
@@ -450,11 +451,13 @@
       "workOrder": "C:/git/ht-lanes/wo/415.md",
       "decisionSource": "owner comment on #415 (a date per pill)",
       "deviceCheck": "Waist today, chest on an earlier date: each pill shows its own date, no Last: header. Log one field: only that pill date becomes today. Fresh install: No measurements logged yet.",
-      "notes": "dev edited four EXISTING assertions in bodyMeasurements.test.ts inside the feature commit without stopping to report (shape change forces .value; .date/.id assertions removed) - sent to tester for a line-by-line judgement. 2c3cb5b alone does not typecheck."
+      "notes": "tester APPROVE r0. Edited existing assertions judged line by line: none weakened; removed .date/.id assertions pinned the shared-date shape the owner decision removed; toMatchObject became a stricter toEqual. HUMAN: review commit 2c3cb5b test edits. 2c3cb5b alone does not typecheck (revert together with 4e1e264). A value of 0 renders as 0 cm.",
+      "securityReview": "skipped: the db change is one static read-only SELECT (no parameters, no write path); the rest is UI",
+      "regressionProof": "db 3 new tests fail with ab1eb9f database.ts; screen pill test fails with 780df0d DashboardScreen.tsx; pass at 4e1e264; 1035/89 (tester reproduced)"
     },
     "416": {
       "lane": "C",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "workOrder": "C:/git/ht-lanes/wo/416.md",
@@ -720,6 +723,10 @@
     {
       "at": "2026-10-06T17:45:07Z",
       "event": "#415 in_test (1035/89 per dev)"
+    },
+    {
+      "at": "2026-10-06T17:46:48Z",
+      "event": "#415 ready (APPROVE r0, security skipped: read-only query); lane C -> #416 in_dev"
     }
   ]
 }
