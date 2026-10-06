@@ -23,6 +23,7 @@ import { installStress369 } from './src/db/devStress369';
 import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import Button from './src/components/Button';
+import { exportRawDatabase } from './src/services/rescueExport';
 import { Colors, Spacing, Typography } from './src/theme/tokens';
 import {
   configureNotificationHandler,
@@ -30,11 +31,16 @@ import {
   reconcileScheduledNotifications,
 } from './src/services/notifications';
 
+const NO_RESET_NOTICE =
+  "Clearing the app's storage in Android settings deletes all your data, so there is no reset button here.";
+
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // null = unknown (still loading), false = show onboarding, true = show navigator
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
 
   const [fontsLoaded, fontError] = useFonts({
@@ -76,7 +82,20 @@ export default function App() {
 
   const retry = () => {
     setError(null);
+    setSaveError(null);
     runInit();
+  };
+
+  const saveData = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await exportRawDatabase();
+    } catch (err: any) {
+      setSaveError(err?.message || 'Could not save your data.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (error || fontError) {
@@ -86,6 +105,15 @@ export default function App() {
         <Text style={styles.errorText}>Failed to initialise app</Text>
         <Text style={styles.errorDetail} selectable>{displayError}</Text>
         {!fontError && <Button title="Retry" onPress={retry} style={styles.button} />}
+        <Button
+          title="Save data"
+          variant="ghost"
+          onPress={saveData}
+          disabled={saving}
+          style={styles.button}
+        />
+        {saveError && <Text style={styles.errorText}>{saveError}</Text>}
+        <Text style={styles.errorDetail}>{NO_RESET_NOTICE}</Text>
       </View>
     );
   }
