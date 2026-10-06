@@ -457,13 +457,19 @@
     },
     "416": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "c45058c",
+        "45363f6",
+        "e5a6f8f",
+        "118af59",
+        "329d70e"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/416.md",
       "decisionSource": "owner comment on #416 (clearing not supported; placeholders; only typed fields saved; no all-NULL row)",
       "deviceCheck": "Modal opens with empty inputs and old values as placeholders. Type chest only, save: chest pill today, waist keeps old date. Save with nothing typed: nothing changes. abc: error, nothing changes. Restart: values persist, Analytics card shows no empty entry.",
-      "notes": "WO ready; waits for #415. Authorized rewriting the existing prefill test that pins null-on-blank (own commit, flagged for human review)."
+      "notes": "WO ready; waits for #415. Authorized rewriting the existing prefill test that pins null-on-blank (own commit, flagged for human review). | dev: e5a6f8f rewrites 6 existing assertions (HUMAN review); existing db test returns-null-when-all-NULL no longer seeds real all-NULL rows (sent to tester)."
     },
     "417": {
       "lane": "D",
@@ -727,6 +733,10 @@
     {
       "at": "2026-10-06T17:46:48Z",
       "event": "#415 ready (APPROVE r0, security skipped: read-only query); lane C -> #416 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:49:44Z",
+      "event": "#416 in_test (1041/89 per dev)"
     }
   ]
 }
