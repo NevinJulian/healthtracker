@@ -3095,12 +3095,12 @@ type MeasurementInput = {
 /**
  * Upsert a body-measurement entry for `date`.
  *
- * Only fields that are neither null nor undefined are written; existing values
+ * Only finite numeric fields are written (null, undefined, NaN and Infinity are ignored); existing values
  * are never overwritten with NULL. If no field qualifies, nothing is written
  * and no row is created.
  *
  * @param date   - YYYY-MM-DD date key.
- * @param fields - Partial measurement object; null and undefined fields are ignored.
+ * @param fields - Partial measurement object; non-finite fields are ignored.
  */
 export function logBodyMeasurement(
   date: string,
@@ -3115,7 +3115,7 @@ async function _logBodyMeasurementImpl(
 ): Promise<void> {
   const db = getDatabase();
   const columns = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
-  const provided = columns.filter((c) => fields[c] != null);
+  const provided = columns.filter((c) => Number.isFinite(fields[c]));
   if (provided.length === 0) return;
 
   const existing = await db.getFirstAsync<{ id: number }>(
