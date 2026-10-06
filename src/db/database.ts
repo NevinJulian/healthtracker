@@ -18,7 +18,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, RESTORE_SLOT_DEDUPE_SQL, Exercise } from './schema';
+import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, RESTORE_SLOT_DEDUPE_SQL, RESTORE_SET_INDEX_SQL, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
 import { recipes } from '../data/recipes';
 import { NUTRITION_GOALS, NutritionGoals } from '../nutrition/goals';
@@ -2276,6 +2276,30 @@ async function _deleteSettingImpl(key: string): Promise<void> {
 
 // ── Typed setting keys ────────────────────────
 
+function parseDaySetting(raw: string | null): number | null {
+  if (raw === null) return null;
+  const trimmed = raw.trim();
+  return /^[0-6]$/.test(trimmed) ? Number(trimmed) : null;
+}
+
+function parseTimeSetting(raw: string | null): string | null {
+  if (raw === null) return null;
+  const trimmed = raw.trim();
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed) ? trimmed : null;
+}
+
+function assertDay(day: number): void {
+  if (!Number.isInteger(day) || day < 0 || day > 6) {
+    throw new RangeError(`Invalid day setting: ${day}`);
+  }
+}
+
+function assertTime(time: string): void {
+  if (parseTimeSetting(time) !== time) {
+    throw new RangeError(`Invalid time setting: ${time}`);
+  }
+}
+
 const SETTING_WORKOUT_REMINDER_ENABLED = 'workoutReminderEnabled';
 const SETTING_WORKOUT_REMINDER_TIME = 'workoutReminderTime';
 const DEFAULT_WORKOUT_REMINDER_TIME = '08:00';
@@ -2290,11 +2314,11 @@ export async function setWorkoutReminderEnabled(enabled: boolean): Promise<void>
 }
 
 export async function getWorkoutReminderTime(): Promise<string> {
-  const raw = await getSetting(SETTING_WORKOUT_REMINDER_TIME);
-  return raw ?? DEFAULT_WORKOUT_REMINDER_TIME;
+  return parseTimeSetting(await getSetting(SETTING_WORKOUT_REMINDER_TIME)) ?? DEFAULT_WORKOUT_REMINDER_TIME;
 }
 
 export async function setWorkoutReminderTime(time: string): Promise<void> {
+  assertTime(time);
   await setSetting(SETTING_WORKOUT_REMINDER_TIME, time);
 }
 
@@ -2329,22 +2353,20 @@ export async function setWeeklyCookDayEnabled(enabled: boolean): Promise<void> {
 
 /** Returns the cook day as 0–6 (0 = Sunday). */
 export async function getWeeklyCookDay(): Promise<number> {
-  const raw = await getSetting(SETTING_WEEKLY_COOK_DAY);
-  if (raw === null) return DEFAULT_WEEKLY_COOK_DAY;
-  const trimmed = raw.trim();
-  return /^[0-6]$/.test(trimmed) ? Number(trimmed) : DEFAULT_WEEKLY_COOK_DAY;
+  return parseDaySetting(await getSetting(SETTING_WEEKLY_COOK_DAY)) ?? DEFAULT_WEEKLY_COOK_DAY;
 }
 
 export async function setWeeklyCookDay(day: number): Promise<void> {
+  assertDay(day);
   await setSetting(SETTING_WEEKLY_COOK_DAY, String(day));
 }
 
 export async function getWeeklyCookDayTime(): Promise<string> {
-  const raw = await getSetting(SETTING_WEEKLY_COOK_DAY_TIME);
-  return raw ?? DEFAULT_WEEKLY_COOK_DAY_TIME;
+  return parseTimeSetting(await getSetting(SETTING_WEEKLY_COOK_DAY_TIME)) ?? DEFAULT_WEEKLY_COOK_DAY_TIME;
 }
 
 export async function setWeeklyCookDayTime(time: string): Promise<void> {
+  assertTime(time);
   await setSetting(SETTING_WEEKLY_COOK_DAY_TIME, time);
 }
 
@@ -2408,11 +2430,11 @@ export async function setMealReminderEnabled(meal: MealType, enabled: boolean): 
 
 /** Returns the saved reminder time for the meal, or the default if not yet persisted. */
 export async function getMealReminderTime(meal: MealType): Promise<string> {
-  const raw = await getSetting(MEAL_REMINDER_TIME_KEYS[meal]);
-  return raw ?? MEAL_REMINDER_DEFAULT_TIMES[meal];
+  return parseTimeSetting(await getSetting(MEAL_REMINDER_TIME_KEYS[meal])) ?? MEAL_REMINDER_DEFAULT_TIMES[meal];
 }
 
 export async function setMealReminderTime(meal: MealType, time: string): Promise<void> {
+  assertTime(time);
   await setSetting(MEAL_REMINDER_TIME_KEYS[meal], time);
 }
 
@@ -2488,15 +2510,14 @@ export async function dumpTable(
  *     just-restored data, in order, inside the same transaction.
  *     RESTORE_SLOT_DEDUPE_SQL credits any consumed loser's batch, dedupes
  *     weekly_meal_plan per (date, meal_type), preferring a consumed row whose
- *     inventory pointer is live, and recreates its index. v37 renumbers
- *     workout_set_log densely per (date, exercise) by (created_at, id) and
- *     recreates its index — the SAME ordering requirement the migration
- *     itself relies on (the renumber must run before its own index is
- *     (re)created) holds here for the same reason: it runs after the
- *     index was dropped above, never while it exists. A clean,
- *     already-migrated backup is unaffected by either re-run: nothing
- *     matches the dedupe's credit/delete WHERE clauses, and v37's renumber
- *     reassigns every row the value it already has.
+ *     inventory pointer is live, and recreates its index.
+ *     RESTORE_SET_INDEX_SQL renumbers a workout_set_log (date, exercise)
+ *     partition densely by (set_index, created_at, id) only if two of its
+ *     rows share a set_index, then recreates its index. Both run after their
+ *     index was dropped above, never while it exists. A clean backup is
+ *     unaffected by either: nothing matches the dedupe's credit/delete WHERE
+ *     clauses, and collision-free partitions keep their set_index values,
+ *     gaps included.
  *
  * A row's own keys are NOT trusted as column identifiers: unlike values,
  * column names can't be parameterised, so a backup file (user-supplied,
@@ -2520,17 +2541,16 @@ export async function dumpTable(
  * every time restoreFromPayload() runs — because a backup taken before a
  * step shipped, or before it happened to run, can legitimately still need it.
  * Their unique indexes are dropped before the restore loop (see the
- * restoreFromPayload doc comment above) and recreated here. A `version` step
- * is looked up from MIGRATIONS at runtime so it can never drift from the
- * real migration.
+ * restoreFromPayload doc comment above) and recreated here.
  *
  *   - RESTORE_SLOT_DEDUPE_SQL: weekly_meal_plan (date, meal_type) dedupe +
  *     unique index, preferring a consumed row whose inventory pointer is live.
- *   - v37: workout_set_log set_index renumber + unique index.
+ *   - RESTORE_SET_INDEX_SQL: workout_set_log renumber of colliding
+ *     (date, exercise) partitions only + unique index.
  */
-const POST_RESTORE_STEPS: readonly ({ sql: string } | { version: number })[] = [
+const POST_RESTORE_STEPS: readonly { sql: string }[] = [
   { sql: RESTORE_SLOT_DEDUPE_SQL },
-  { version: 37 },
+  { sql: RESTORE_SET_INDEX_SQL },
 ];
 
 type RestoreFromPayloadResult = {
@@ -2559,19 +2579,17 @@ async function _restoreFromPayload(
   let tablesRestored = 0;
   let rowsRestored = 0;
   const skipped: { table: string; columns: string[]; rows: number }[] = [];
-  // Consumed weekly_meal_plan rows restored from a pre-v34 backup, i.e. one
-  // whose rows predate the consumed_from_inventory_id column (#302). They
-  // restore fine — the column just lands NULL — but _creditPortion() only
-  // credits a batch it can point at, so unticking one of these meals will
-  // silently return nothing to inventory. Counted here so the caller can
-  // say so instead of the user discovering it a portion at a time (#310).
+  // Consumed meals from a pre-v34 backup restore with a NULL
+  // consumed_from_inventory_id, so unticking them credits no batch. Counted
+  // after the dedupe replay so only surviving rows are reported.
+  let legacyPayload = false;
   let consumedMealsWithoutRefund = 0;
 
   await db.withTransactionAsync(async () => {
     // Drop first so a legacy backup's duplicate weekly_meal_plan rows or
     // colliding/gapped workout_set_log rows (see above) can all be inserted
-    // below; both are recreated by re-running their migrations' own SQL
-    // (POST_RESTORE_STEPS) after the restore loop.
+    // below; both indexes are recreated by POST_RESTORE_STEPS after the
+    // restore loop.
     await db.execAsync('DROP INDEX IF EXISTS idx_weekly_meal_plan_date_meal_type');
     await db.execAsync('DROP INDEX IF EXISTS idx_workout_set_log_date_exercise_set_index');
 
@@ -2582,17 +2600,12 @@ async function _restoreFromPayload(
       // A pre-v34 backup's weekly_meal_plan rows carry no
       // consumed_from_inventory_id key at all. Detect that on the payload
       // (not on the restored rows, where the column exists and is simply
-      // NULL) and count the consumed ones, which are the rows that can
-      // never refund.
+      // NULL).
       if (tableName === 'weekly_meal_plan' && rows.length > 0) {
         const payloadHasRefundPointer = rows.some(
           (row) => 'consumed_from_inventory_id' in row
         );
-        if (!payloadHasRefundPointer) {
-          consumedMealsWithoutRefund = rows.filter(
-            (row) => row.is_consumed === 1 || row.is_consumed === true
-          ).length;
-        }
+        if (!payloadHasRefundPointer) legacyPayload = true;
       }
 
       // Wipe existing rows
@@ -2653,21 +2666,14 @@ async function _restoreFromPayload(
     // while it existed — matching the ordering both the dedupe and the
     // renumber require.
     for (const step of POST_RESTORE_STEPS) {
-      if ('sql' in step) {
-        await db.execAsync(step.sql);
-        continue;
-      }
-      const migration = MIGRATIONS.find((m) => m.version === step.version);
-      if (!migration) {
-        throw new Error(
-          `restoreFromPayload: migration v${step.version} not found in MIGRATIONS — cannot rebuild its post-restore state.`
-        );
-      }
-      // Same contract as runMigrations: a migration's precondition runs
-      // immediately before its SQL, in the same transaction. Here it is
-      // also a live check that the DROP INDEX above really happened.
-      if (migration.precondition) await migration.precondition(db);
-      await db.execAsync(migration.sql);
+      await db.execAsync(step.sql);
+    }
+
+    if (legacyPayload) {
+      const consumed = await db.getFirstAsync<{ n: number }>(
+        'SELECT COUNT(*) AS n FROM weekly_meal_plan WHERE is_consumed = 1'
+      );
+      consumedMealsWithoutRefund = consumed?.n ?? 0;
     }
   });
 
@@ -3128,7 +3134,7 @@ async function _logWorkoutSetImpl(
   );
 }
 
-// set_index is the display order: dense and unique per (date, exercise), and immune to clock changes.
+// set_index is the display order: unique per (date, exercise) and independent of created_at, so clock changes cannot reorder sets.
 export const WORKOUT_SETS_FOR_DAY_SQL = `SELECT * FROM workout_set_log WHERE date = ?
      ORDER BY exercise ASC, set_index ASC`;
 
@@ -3222,26 +3228,22 @@ export async function setBackupReminderEnabled(enabled: boolean): Promise<void> 
 
 /** Returns the saved weekday (0–6, 0 = Sunday) for the backup reminder. */
 export async function getBackupReminderDay(): Promise<number> {
-  const raw = await getSetting(SETTING_BACKUP_REMINDER_DAY);
-  if (raw === null) return DEFAULT_BACKUP_REMINDER_DAY;
-  const parsed = parseInt(raw, 10);
-  return isNaN(parsed) || parsed < 0 || parsed > 6
-    ? DEFAULT_BACKUP_REMINDER_DAY
-    : parsed;
+  return parseDaySetting(await getSetting(SETTING_BACKUP_REMINDER_DAY)) ?? DEFAULT_BACKUP_REMINDER_DAY;
 }
 
 /** Persist the weekday (0–6) for the backup reminder. */
 export async function setBackupReminderDay(day: number): Promise<void> {
+  assertDay(day);
   await setSetting(SETTING_BACKUP_REMINDER_DAY, String(day));
 }
 
 /** Returns the saved time ("HH:MM") for the backup reminder. Default: "18:00". */
 export async function getBackupReminderTime(): Promise<string> {
-  const raw = await getSetting(SETTING_BACKUP_REMINDER_TIME);
-  return raw ?? DEFAULT_BACKUP_REMINDER_TIME;
+  return parseTimeSetting(await getSetting(SETTING_BACKUP_REMINDER_TIME)) ?? DEFAULT_BACKUP_REMINDER_TIME;
 }
 
 /** Persist the time ("HH:MM") for the backup reminder. */
 export async function setBackupReminderTime(time: string): Promise<void> {
+  assertTime(time);
   await setSetting(SETTING_BACKUP_REMINDER_TIME, time);
 }

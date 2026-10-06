@@ -24,12 +24,13 @@
  *     (date, exercise), ordered by (created_at, id), then adds
  *     `UNIQUE(date, exercise, set_index)` so the database itself rejects any
  *     future collision.
- *   - `restoreFromPayload` (database.ts) generalises the #303 v35
- *     post-restore-step pattern into `POST_RESTORE_STEPS`: both unique
- *     indexes are dropped before the restore loop (so a legacy backup with
- *     colliding/gapped workout_set_log rows can be inserted at all) and both
- *     repair steps are re-run, in order, after the loop, inside the same
- *     transaction.
+ *   - `restoreFromPayload` (database.ts) drops both unique indexes before the
+ *     restore loop (so a legacy backup with colliding/gapped workout_set_log
+ *     rows can be inserted at all) and runs `POST_RESTORE_STEPS` after the
+ *     loop, inside the same transaction. Its set_index step is
+ *     `RESTORE_SET_INDEX_SQL`, not v37: it renumbers only the (date, exercise)
+ *     partitions that actually collide, ordered by (set_index, created_at,
+ *     id), and then recreates the index.
  *
  * Uses the same sql.js-backed adapter and fresh-module-per-test pattern as
  * restoreLegacyDuplicates.test.ts / migrationAtomicity.test.ts.
@@ -434,6 +435,83 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
       "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_workout_set_log_date_exercise_set_index'"
     );
     expect(indexRow).not.toBeNull();
+  });
+
+  it('keeps the set order from the backup when a partition has no collisions, even if created_at disagrees', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.restoreFromPayload({
+      workout_set_log: [
+        { id: 31, date: '2024-09-01', exercise: 'Squat', set_index: 0, reps: 5, weight_kg: 80, created_at: '2024-09-01T10:20:00.000Z' },
+        { id: 32, date: '2024-09-01', exercise: 'Squat', set_index: 1, reps: 5, weight_kg: 80, created_at: '2024-09-01T10:10:00.000Z' },
+        { id: 33, date: '2024-09-01', exercise: 'Squat', set_index: 2, reps: 5, weight_kg: 80, created_at: '2024-09-01T10:00:00.000Z' },
+      ],
+    });
+
+    const raw = db.getDatabase();
+    const rows = await raw.getAllAsync<{ id: number; set_index: number }>(
+      "SELECT id, set_index FROM workout_set_log WHERE date = '2024-09-01' ORDER BY id ASC"
+    );
+    expect(rows).toEqual([
+      { id: 31, set_index: 0 },
+      { id: 32, set_index: 1 },
+      { id: 33, set_index: 2 },
+    ]);
+    const indexRow = await raw.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_workout_set_log_date_exercise_set_index'"
+    );
+    expect(indexRow).not.toBeNull();
+  });
+
+  it('keeps gaps in a collision-free partition', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.restoreFromPayload({
+      workout_set_log: [
+        { id: 41, date: '2024-09-02', exercise: 'Press', set_index: 0, reps: 5, weight_kg: 40, created_at: '2024-09-02T10:00:00.000Z' },
+        { id: 42, date: '2024-09-02', exercise: 'Press', set_index: 5, reps: 5, weight_kg: 40, created_at: '2024-09-02T10:05:00.000Z' },
+        { id: 43, date: '2024-09-02', exercise: 'Press', set_index: 9, reps: 5, weight_kg: 40, created_at: '2024-09-02T10:10:00.000Z' },
+      ],
+    });
+
+    const rows = await db.getDatabase().getAllAsync<{ id: number; set_index: number }>(
+      "SELECT id, set_index FROM workout_set_log WHERE date = '2024-09-02' ORDER BY id ASC"
+    );
+    expect(rows.map((r) => r.set_index)).toEqual([0, 5, 9]);
+  });
+
+  it('renumbers a colliding partition densely by set_index first, then created_at, id, and leaves a clean neighbouring partition untouched', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.restoreFromPayload({
+      workout_set_log: [
+        { id: 51, date: '2024-09-03', exercise: 'Curl', set_index: 3, reps: 10, weight_kg: 15, created_at: '2024-09-03T10:00:00.000Z' },
+        { id: 52, date: '2024-09-03', exercise: 'Curl', set_index: 1, reps: 10, weight_kg: 15, created_at: '2024-09-03T10:30:00.000Z' },
+        { id: 53, date: '2024-09-03', exercise: 'Curl', set_index: 1, reps: 10, weight_kg: 15, created_at: '2024-09-03T10:10:00.000Z' },
+        { id: 54, date: '2024-09-03', exercise: 'Dip', set_index: 2, reps: 10, weight_kg: 0, created_at: '2024-09-03T10:40:00.000Z' },
+        { id: 55, date: '2024-09-03', exercise: 'Dip', set_index: 7, reps: 10, weight_kg: 0, created_at: '2024-09-03T10:20:00.000Z' },
+      ],
+    });
+
+    const raw = db.getDatabase();
+    const curl = await raw.getAllAsync<{ id: number; set_index: number }>(
+      "SELECT id, set_index FROM workout_set_log WHERE exercise = 'Curl' ORDER BY set_index ASC"
+    );
+    expect(curl).toEqual([
+      { id: 53, set_index: 0 },
+      { id: 52, set_index: 1 },
+      { id: 51, set_index: 2 },
+    ]);
+    const dip = await raw.getAllAsync<{ id: number; set_index: number }>(
+      "SELECT id, set_index FROM workout_set_log WHERE exercise = 'Dip' ORDER BY id ASC"
+    );
+    expect(dip).toEqual([
+      { id: 54, set_index: 2 },
+      { id: 55, set_index: 7 },
+    ]);
   });
 
   it('restores a payload with BOTH legacy weekly_meal_plan duplicates (#303) and workout_set_log collisions (#317) in one transaction: both post-restore migrations run in order, and both unique indexes exist afterwards', async () => {
