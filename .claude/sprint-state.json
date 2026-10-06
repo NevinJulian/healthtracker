@@ -58,7 +58,7 @@
         412,
         406
       ],
-      "current": 414,
+      "current": 412,
       "done": [],
       "parked": []
     },
@@ -210,7 +210,7 @@
     },
     "412": {
       "lane": "A",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "notes": "WO ready; waits for #414. ORCHESTRATOR RULING: MIGRATIONS stays byte-identical, so the stale v37 comment (schema.ts:766-771) is NOT fixed although the owner decision asks for it; explanation goes on RESTORE_SET_INDEX_SQL. HUMAN: fix that comment by hand or confirm. Whole colliding partition renumbered (analyst interpretation).",
@@ -220,7 +220,7 @@
     },
     "414": {
       "lane": "A",
-      "status": "in_test",
+      "status": "in_security",
       "roundTrips": 0,
       "commits": [
         "da71967",
@@ -229,7 +229,8 @@
       "workOrder": "C:/git/ht-lanes/wo/414.md",
       "deviceCheck": "none",
       "decisionSource": "owner comment on #414: items 1-3, one strict parser, item 4 dropped",
-      "notes": "setters throw RangeError on invalid input (analyst choice)"
+      "notes": "tester APPROVE r0. Setters throw RangeError; only callers are SettingsScreen pickers which cannot produce invalid values (tester traced). Stored 8:00-style values now read as default (intended).",
+      "regressionProof": "82/110 fail with da71967 database.ts, 110/110 at e85f913 (tester reproduced); 972/82"
     },
     "419": {
       "lane": "B",
@@ -292,6 +293,10 @@
     {
       "at": "2026-10-06T17:09:16Z",
       "event": "#405 ready (tester APPROVE r0, security skipped); lane F -> #404 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:09:38Z",
+      "event": "#414 tester APPROVE r0 -> security (read-only, parallel); lane A -> #412 in_dev"
     }
   ]
 }
