@@ -529,6 +529,93 @@ describe('upsertAdditionalWorkouts refuses to overwrite malformed stored JSON (#
   });
 });
 
+describe('addAdditionalWorkout and toggleAdditionalWorkout read-modify-write inside one queued unit', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const A = { id: 'a', name: 'Curls', muscle_group: 'Arms', sets: '3', reps: '10', completed: false };
+  const B = { id: 'b', name: 'Run', muscle_group: 'Legs', sets: '1', reps: '1', completed: false };
+
+  async function readRaw(db: DatabaseModule, date: string): Promise<string | undefined> {
+    const row = await db.getDatabase().getFirstAsync<{ additional_workouts: string }>(
+      'SELECT additional_workouts FROM daily_log WHERE date = ?',
+      [date]
+    );
+    return row?.additional_workouts;
+  }
+
+  async function seedRaw(db: DatabaseModule, date: string, raw: string): Promise<void> {
+    await db
+      .getDatabase()
+      .runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [raw, date]);
+  }
+
+  it('un-awaited add(A) and toggle(B) on a row seeded with B both persist', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await seedRaw(db, date, JSON.stringify([B]));
+
+    const add = db.addAdditionalWorkout(date, A);
+    const toggle = db.toggleAdditionalWorkout(date, B.id);
+    await Promise.all([add, toggle]);
+
+    expect(JSON.parse((await readRaw(db, date)) as string)).toEqual([{ ...B, completed: true }, A]);
+  });
+
+  it('two un-awaited adds leave both workouts stored', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+
+    await Promise.all([db.addAdditionalWorkout(date, A), db.addAdditionalWorkout(date, B)]);
+
+    expect(JSON.parse((await readRaw(db, date)) as string)).toEqual([A, B]);
+  });
+
+  it.each(['{not json', '{}'])('add and toggle reject on malformed stored value %s and leave it unchanged', async (raw) => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await seedRaw(db, date, raw);
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(db.addAdditionalWorkout(date, A)).rejects.toThrow(date);
+    await expect(db.toggleAdditionalWorkout(date, A.id)).rejects.toThrow(date);
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(await readRaw(db, date)).toBe(raw);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('add and toggle create the row for a date with none', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const added = FAR_PAST();
+    const toggled = addDays(FAR_PAST(), -1);
+
+    await db.addAdditionalWorkout(added, A);
+    await db.toggleAdditionalWorkout(toggled, 'missing');
+
+    expect(JSON.parse((await readRaw(db, added)) as string)).toEqual([A]);
+    expect(await readRaw(db, toggled)).toBe('[]');
+  });
+
+  it('toggle with an unknown id resolves and leaves the stored value unchanged', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    const raw = '[ {"id":"b","name":"Run","completed":false} ]';
+    await seedRaw(db, date, raw);
+
+    await expect(db.toggleAdditionalWorkout(date, 'nope')).resolves.toBeUndefined();
+
+    expect(await readRaw(db, date)).toBe(raw);
+  });
+});
+
 describe('daily_log writers reject dates outside the valid range', () => {
   afterEach(() => {
     jest.dontMock('expo-sqlite');
