@@ -2276,6 +2276,30 @@ async function _deleteSettingImpl(key: string): Promise<void> {
 
 // ── Typed setting keys ────────────────────────
 
+function parseDaySetting(raw: string | null): number | null {
+  if (raw === null) return null;
+  const trimmed = raw.trim();
+  return /^[0-6]$/.test(trimmed) ? Number(trimmed) : null;
+}
+
+function parseTimeSetting(raw: string | null): string | null {
+  if (raw === null) return null;
+  const trimmed = raw.trim();
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed) ? trimmed : null;
+}
+
+function assertDay(day: number): void {
+  if (!Number.isInteger(day) || day < 0 || day > 6) {
+    throw new RangeError(`Invalid day setting: ${day}`);
+  }
+}
+
+function assertTime(time: string): void {
+  if (parseTimeSetting(time) !== time) {
+    throw new RangeError(`Invalid time setting: ${time}`);
+  }
+}
+
 const SETTING_WORKOUT_REMINDER_ENABLED = 'workoutReminderEnabled';
 const SETTING_WORKOUT_REMINDER_TIME = 'workoutReminderTime';
 const DEFAULT_WORKOUT_REMINDER_TIME = '08:00';
@@ -2290,11 +2314,11 @@ export async function setWorkoutReminderEnabled(enabled: boolean): Promise<void>
 }
 
 export async function getWorkoutReminderTime(): Promise<string> {
-  const raw = await getSetting(SETTING_WORKOUT_REMINDER_TIME);
-  return raw ?? DEFAULT_WORKOUT_REMINDER_TIME;
+  return parseTimeSetting(await getSetting(SETTING_WORKOUT_REMINDER_TIME)) ?? DEFAULT_WORKOUT_REMINDER_TIME;
 }
 
 export async function setWorkoutReminderTime(time: string): Promise<void> {
+  assertTime(time);
   await setSetting(SETTING_WORKOUT_REMINDER_TIME, time);
 }
 
@@ -2329,22 +2353,20 @@ export async function setWeeklyCookDayEnabled(enabled: boolean): Promise<void> {
 
 /** Returns the cook day as 0–6 (0 = Sunday). */
 export async function getWeeklyCookDay(): Promise<number> {
-  const raw = await getSetting(SETTING_WEEKLY_COOK_DAY);
-  if (raw === null) return DEFAULT_WEEKLY_COOK_DAY;
-  const trimmed = raw.trim();
-  return /^[0-6]$/.test(trimmed) ? Number(trimmed) : DEFAULT_WEEKLY_COOK_DAY;
+  return parseDaySetting(await getSetting(SETTING_WEEKLY_COOK_DAY)) ?? DEFAULT_WEEKLY_COOK_DAY;
 }
 
 export async function setWeeklyCookDay(day: number): Promise<void> {
+  assertDay(day);
   await setSetting(SETTING_WEEKLY_COOK_DAY, String(day));
 }
 
 export async function getWeeklyCookDayTime(): Promise<string> {
-  const raw = await getSetting(SETTING_WEEKLY_COOK_DAY_TIME);
-  return raw ?? DEFAULT_WEEKLY_COOK_DAY_TIME;
+  return parseTimeSetting(await getSetting(SETTING_WEEKLY_COOK_DAY_TIME)) ?? DEFAULT_WEEKLY_COOK_DAY_TIME;
 }
 
 export async function setWeeklyCookDayTime(time: string): Promise<void> {
+  assertTime(time);
   await setSetting(SETTING_WEEKLY_COOK_DAY_TIME, time);
 }
 
@@ -2408,11 +2430,11 @@ export async function setMealReminderEnabled(meal: MealType, enabled: boolean): 
 
 /** Returns the saved reminder time for the meal, or the default if not yet persisted. */
 export async function getMealReminderTime(meal: MealType): Promise<string> {
-  const raw = await getSetting(MEAL_REMINDER_TIME_KEYS[meal]);
-  return raw ?? MEAL_REMINDER_DEFAULT_TIMES[meal];
+  return parseTimeSetting(await getSetting(MEAL_REMINDER_TIME_KEYS[meal])) ?? MEAL_REMINDER_DEFAULT_TIMES[meal];
 }
 
 export async function setMealReminderTime(meal: MealType, time: string): Promise<void> {
+  assertTime(time);
   await setSetting(MEAL_REMINDER_TIME_KEYS[meal], time);
 }
 
@@ -3222,26 +3244,22 @@ export async function setBackupReminderEnabled(enabled: boolean): Promise<void> 
 
 /** Returns the saved weekday (0–6, 0 = Sunday) for the backup reminder. */
 export async function getBackupReminderDay(): Promise<number> {
-  const raw = await getSetting(SETTING_BACKUP_REMINDER_DAY);
-  if (raw === null) return DEFAULT_BACKUP_REMINDER_DAY;
-  const parsed = parseInt(raw, 10);
-  return isNaN(parsed) || parsed < 0 || parsed > 6
-    ? DEFAULT_BACKUP_REMINDER_DAY
-    : parsed;
+  return parseDaySetting(await getSetting(SETTING_BACKUP_REMINDER_DAY)) ?? DEFAULT_BACKUP_REMINDER_DAY;
 }
 
 /** Persist the weekday (0–6) for the backup reminder. */
 export async function setBackupReminderDay(day: number): Promise<void> {
+  assertDay(day);
   await setSetting(SETTING_BACKUP_REMINDER_DAY, String(day));
 }
 
 /** Returns the saved time ("HH:MM") for the backup reminder. Default: "18:00". */
 export async function getBackupReminderTime(): Promise<string> {
-  const raw = await getSetting(SETTING_BACKUP_REMINDER_TIME);
-  return raw ?? DEFAULT_BACKUP_REMINDER_TIME;
+  return parseTimeSetting(await getSetting(SETTING_BACKUP_REMINDER_TIME)) ?? DEFAULT_BACKUP_REMINDER_TIME;
 }
 
 /** Persist the time ("HH:MM") for the backup reminder. */
 export async function setBackupReminderTime(time: string): Promise<void> {
+  assertTime(time);
   await setSetting(SETTING_BACKUP_REMINDER_TIME, time);
 }
