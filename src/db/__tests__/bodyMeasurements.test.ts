@@ -74,3 +74,48 @@ describe('getLatestMeasurements carries each field forward from its newest non-n
     expect((await db.getLatestMeasurements())?.waist_cm).toBe(78);
   });
 });
+
+describe('getLatestMeasurements reports the date each value was measured', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('gives waist its own day and chest its own day', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.logBodyMeasurement('2026-01-01', { waist_cm: 80 });
+    await db.logBodyMeasurement('2026-01-02', { chest_cm: 90 });
+
+    const latest = await db.getLatestMeasurements();
+    expect(latest?.waist_cm).toEqual({ value: 80, date: '2026-01-01' });
+    expect(latest?.chest_cm).toEqual({ value: 90, date: '2026-01-02' });
+    expect(latest?.hips_cm).toBeNull();
+    expect(latest?.thigh_cm).toBeNull();
+    expect(latest?.arm_cm).toBeNull();
+  });
+
+  it('reports the older row date for a field the newest row leaves NULL', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.logBodyMeasurement('2026-01-01', { waist_cm: 80, arm_cm: 30 });
+    await db.logBodyMeasurement('2026-01-05', { waist_cm: 78 });
+    await db.logBodyMeasurement('2026-01-09', { chest_cm: 90 });
+
+    const latest = await db.getLatestMeasurements();
+    expect(latest?.waist_cm).toEqual({ value: 78, date: '2026-01-05' });
+    expect(latest?.arm_cm).toEqual({ value: 30, date: '2026-01-01' });
+    expect(latest?.chest_cm).toEqual({ value: 90, date: '2026-01-09' });
+  });
+
+  it('returns null when every stored row is all NULL', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.logBodyMeasurement('2026-01-01', {});
+    await db.logBodyMeasurement('2026-01-02', { waist_cm: null });
+
+    expect(await db.getLatestMeasurements()).toBeNull();
+  });
+});
