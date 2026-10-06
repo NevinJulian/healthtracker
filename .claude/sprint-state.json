@@ -45,7 +45,8 @@
     "Each lane runs in its own git worktree at C:/git/ht-lanes/lane-<x>. A, B, E, F branch from sprint/auto-fixes at 58a7f3f; C and D branch after lane A merges; G after every other lane merges.",
     "Agents must not use git stash: the stash stack is shared across worktrees (2 pre-sprint human stashes exist).",
     "Security review required for every lane A issue, lane E, #419 (rescue export touches filesystem/db), and any issue whose diff reaches src/db, backup.ts, src/api or external input; skip decisions recorded per issue.",
-    "After each integration push, read the real GitHub test check via the public REST check-runs endpoint (curl, read-only; gh CLI forbidden)."
+    "After each integration push, read the real GitHub test check via the public REST check-runs endpoint (curl, read-only; gh CLI forbidden).",
+    "Work orders are saved verbatim at C:/git/ht-lanes/wo/<issue>.md (outside the repo) so a resumed session can re-dispatch without re-analysing."
   ],
   "lanes": {
     "A": {
@@ -181,7 +182,9 @@
       "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "notes": "analysis dispatched ahead (read-only); dev waits for its turn in the lane"
+      "notes": "work order ready (column cap 5, name cap 40 chars: analyst picks, HUMAN to confirm); waits for #405 #404 #397",
+      "workOrder": "C:/git/ht-lanes/wo/407.md",
+      "deviceCheck": "none"
     },
     "412": {
       "lane": "A",
@@ -222,6 +225,10 @@
     {
       "at": "2026-10-06T17:02:49Z",
       "event": "worktrees a/b/e/f created at 2e1ac1e, npm ci running; analysts dispatched for #414 #419 #318 #405 (current) and #412 #406 #404 #397 #407 (ahead, read-only)"
+    },
+    {
+      "at": "2026-10-06T17:03:29Z",
+      "event": "#407 work order ready (queued last in lane F)"
     }
   ]
 }
