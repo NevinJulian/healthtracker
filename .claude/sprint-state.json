@@ -112,10 +112,11 @@
         403,
         408
       ],
-      "current": 403,
+      "current": 408,
       "done": [
         417,
-        401
+        401,
+        403
       ],
       "parked": [],
       "base": "62cc088"
@@ -253,7 +254,7 @@
     },
     "403": {
       "lane": "D",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "2caeb78",
@@ -261,7 +262,9 @@
       ],
       "workOrder": "C:/git/ht-lanes/wo/403.md",
       "deviceCheck": "Log Cooked Meal: 4 portions, double-tap Save fast -> +4 not +8. Assign: double-tap a recipe row -> one assignment, modal closes.",
-      "notes": "WO ready; waits for #401"
+      "notes": "tester APPROVE r0. Assign-row disabled visual is untested (prop threaded). runGuarded does not catch: callers handle their own rejections. logCookedMeal still has no db-level idempotency (#432).",
+      "securityReview": "skipped: UI in-flight guard only; no db/api/backup code in the diff",
+      "regressionProof": "2 double-press tests fail with 2caeb78 MealPrepScreen.tsx (2 calls), pass at 9c1374a; 1014/88 (tester reproduced)"
     },
     "404": {
       "lane": "F",
@@ -333,7 +336,7 @@
     },
     "408": {
       "lane": "D",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "workOrder": "C:/git/ht-lanes/wo/408.md",
@@ -659,6 +662,14 @@
     {
       "at": "2026-10-06T17:32:45Z",
       "event": "merged lane F into integration b9e0d1e; gates green: typecheck clean, 1051/90; #403 in_test (1014/88 per dev)"
+    },
+    {
+      "at": "2026-10-06T17:33:54Z",
+      "event": "GitHub CI test check on integration 62cc088 (lanes A, B, E merged): completed success"
+    },
+    {
+      "at": "2026-10-06T17:33:54Z",
+      "event": "#403 ready (APPROVE r0, security skipped); lane D -> #408 in_dev"
     }
   ]
 }
