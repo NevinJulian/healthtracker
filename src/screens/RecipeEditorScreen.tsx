@@ -102,6 +102,10 @@ function ingredientsToRows(ingredients: RecipeIngredient[]): IngredientRow[] {
   }));
 }
 
+function macroInputsKey(ingredients: RecipeIngredient[], servings: number): string {
+  return JSON.stringify([ingredients, servings]);
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function RecipeEditorScreen() {
@@ -139,6 +143,7 @@ export default function RecipeEditorScreen() {
   // ── Refs ──────────────────────────────────────────────────────────────────
   const recomputeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lookupController = useRef<AbortController | null>(null);
+  const latestRecompute = useRef<{ inputs: string; result: Promise<ComputedMacros | null> } | null>(null);
 
   useEffect(() => () => lookupController.current?.abort(), []);
 
@@ -216,15 +221,27 @@ export default function RecipeEditorScreen() {
     };
   }, [ingredients, servings]);
 
-  const recomputeMacros = async () => {
+  const recomputeMacros = (): Promise<ComputedMacros | null> => {
     const validIngredients = rowsToIngredients(ingredients);
+    const numServings = Math.max(1, parseInt(servings, 10) || 1);
+    const result = runMacroRecompute(validIngredients, numServings);
+    latestRecompute.current = { inputs: macroInputsKey(validIngredients, numServings), result };
+    return result;
+  };
+
+  const runMacroRecompute = async (
+    validIngredients: RecipeIngredient[],
+    numServings: number,
+  ): Promise<ComputedMacros | null> => {
+    lookupController.current?.abort();
+    lookupController.current = null;
+
     if (validIngredients.length === 0) {
       setMacros(null);
       setEstimatedIngredients([]);
-      return;
+      setMacroLoading(false);
+      return null;
     }
-
-    const numServings = Math.max(1, parseInt(servings, 10) || 1);
 
     const controller = new AbortController();
     lookupController.current = controller;
@@ -240,10 +257,10 @@ export default function RecipeEditorScreen() {
       });
 
       for (const ing of needsOFF) {
-        if (signal.aborted) return;
+        if (signal.aborted) return null;
         try {
           const nutrition = await lookupNutrition(ing.name, signal);
-          if (signal.aborted) return;
+          if (signal.aborted) return null;
           if (nutrition) {
             const key = normaliseIngredientName(ing.name);
             offOverrides[key] = nutrition;
@@ -268,10 +285,13 @@ export default function RecipeEditorScreen() {
 
       setMacros(result.macros);
       setEstimatedIngredients(result.unmatchedIngredients);
+      return result.macros;
     } catch {
-      // Leave previous macros displayed if recompute throws
+      return null;
     } finally {
-      setMacroLoading(false);
+      if (lookupController.current === controller) {
+        setMacroLoading(false);
+      }
     }
   };
 
@@ -324,41 +344,39 @@ export default function RecipeEditorScreen() {
       ? customCategory.trim()
       : category;
 
-    // Compute final macros synchronously for the saved recipe
-    let finalMacros = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-    if (macros) {
-      finalMacros = macros;
-    } else {
-      const result = computeRecipeMacros(
-        validIngredients.map((i) => ({ name: i.name, baseQuantity: i.baseQuantity, unit: i.unit })),
-        numServings,
-      );
-      finalMacros = result.macros;
+    if (recomputeTimer.current) {
+      clearTimeout(recomputeTimer.current);
+      recomputeTimer.current = null;
     }
-
-    const recipe: Recipe = {
-      id: isEdit ? recipeId : `custom-${Date.now()}`,
-      title: title.trim(),
-      category: resolvedCategory,
-      calories: finalMacros.calories,
-      protein: finalMacros.protein,
-      carbs: finalMacros.carbs,
-      fat: finalMacros.fat,
-      prepTimeMinutes: numPrepTime,
-      defaultServings: numServings,
-      ingredients: validIngredients,
-      instructions: instructions.trim(),
-      freezerTips: freezerTips.trim(),
-    };
 
     setSaving(true);
     try {
+      const latest = latestRecompute.current;
+      const pending = latest?.inputs === macroInputsKey(validIngredients, numServings)
+        ? latest.result
+        : recomputeMacros();
+      const finalMacros = (await pending) ?? computeRecipeMacros(validIngredients, numServings).macros;
+
+      const recipe: Recipe = {
+        id: isEdit ? recipeId : `custom-${Date.now()}`,
+        title: title.trim(),
+        category: resolvedCategory,
+        calories: finalMacros.calories,
+        protein: finalMacros.protein,
+        carbs: finalMacros.carbs,
+        fat: finalMacros.fat,
+        prepTimeMinutes: numPrepTime,
+        defaultServings: numServings,
+        ingredients: validIngredients,
+        instructions: instructions.trim(),
+        freezerTips: freezerTips.trim(),
+      };
+
       if (isEdit) {
         await updateRecipe(recipe);
         navigation.goBack();
       } else {
         await createRecipe(recipe);
-        // Navigate to the new recipe's detail screen
         navigation.replace('RecipeDetail', { recipeId: recipe.id });
       }
     } catch {

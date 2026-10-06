@@ -63,6 +63,24 @@ function formatInstructions(raw: string): string {
 
 const DEFAULT_SERVINGS = 4;
 const DEFAULT_PREP_MINUTES = 30;
+const OFF_LOOKUP_CONCURRENCY = 3;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
 
 /**
  * Build an ImportResult from a TheMealDB MealDetail.
@@ -94,19 +112,27 @@ export async function buildImportResult(
   const offOverrides: Record<string, { kcal: number; protein: number; carbs: number; fat: number }> = {};
   const offResolvedIngredients: string[] = [];
 
-  for (const name of needsOFF) {
-    try {
-      const nutrition: OFFNutrition | null = await lookupNutrition(name);
-      if (nutrition) {
-        const key = normaliseIngredientName(name);
-        offOverrides[key] = nutrition;
-        offOverrides[name.toLowerCase()] = nutrition;
-        offResolvedIngredients.push(name);
+  const lookups = await mapWithConcurrency(
+    needsOFF,
+    OFF_LOOKUP_CONCURRENCY,
+    async (name): Promise<OFFNutrition | null> => {
+      try {
+        return await lookupNutrition(name);
+      } catch {
+        return null;
       }
-    } catch {
-      // OFF lookup failed — ingredient contributes 0 macros
+    },
+  );
+
+  needsOFF.forEach((name, i) => {
+    const nutrition = lookups[i];
+    if (nutrition) {
+      const key = normaliseIngredientName(name);
+      offOverrides[key] = nutrition;
+      offOverrides[name.toLowerCase()] = nutrition;
+      offResolvedIngredients.push(name);
     }
-  }
+  });
 
   // ── 4. Build ComputeIngredient array ─────────────────────────────────────────
   const computeIngredients: ComputeIngredient[] = parsed.map((p) => ({
