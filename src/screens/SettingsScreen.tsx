@@ -345,6 +345,11 @@ const stepperStyles = StyleSheet.create({
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
+function reportWriteFailure(error: unknown) {
+  console.error('[SettingsScreen] failed to save setting:', error);
+  Alert.alert('Error', 'Failed to save your setting. Please try again.');
+}
+
 const MAX_SKIPPED_TABLES_SHOWN = 5;
 
 function formatSkippedSummary(
@@ -662,9 +667,13 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await setWorkoutReminderEnabled(value);
-    setReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
-    await reconcileScheduledNotifications();
+    try {
+      await setWorkoutReminderEnabled(value);
+      setReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
+      await reconcileScheduledNotifications();
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   // ── Workout: Time adjustments ───────────────────────────────────────────
@@ -689,8 +698,12 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await setCookWhenEmptyEnabled(value);
-    setCooking((prev) => ({ ...prev, cookWhenEmptyEnabled: value, permissionDenied: false }));
+    try {
+      await setCookWhenEmptyEnabled(value);
+      setCooking((prev) => ({ ...prev, cookWhenEmptyEnabled: value, permissionDenied: false }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   // ── Cooking: Weekly cook-day toggle ────────────────────────────────────
@@ -703,18 +716,26 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await setWeeklyCookDayEnabled(value);
-    setCooking((prev) => ({ ...prev, weeklyCookDayEnabled: value, permissionDenied: false }));
-    await reconcileScheduledNotifications();
+    try {
+      await setWeeklyCookDayEnabled(value);
+      setCooking((prev) => ({ ...prev, weeklyCookDayEnabled: value, permissionDenied: false }));
+      await reconcileScheduledNotifications();
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   // ── Cooking: Weekday chip selection ────────────────────────────────────
 
   async function handleWeekdaySelect(day: number) {
-    await setWeeklyCookDay(day);
-    setCooking((prev) => ({ ...prev, weeklyCookDay: day }));
-    if (cooking.weeklyCookDayEnabled) {
-      await reconcileScheduledNotifications();
+    try {
+      await setWeeklyCookDay(day);
+      setCooking((prev) => ({ ...prev, weeklyCookDay: day }));
+      if (cooking.weeklyCookDayEnabled) {
+        await reconcileScheduledNotifications();
+      }
+    } catch (error) {
+      reportWriteFailure(error);
     }
   }
 
@@ -740,18 +761,22 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await setMealReminderEnabled(meal, value);
-    setMealReminders((prev) => ({
-      ...prev,
-      [meal]: { ...prev[meal], enabled: value },
-      permissionDenied: false,
-    }));
-    const time = mealReminders[meal].time;
-    const { hour, minute } = parseTimeString(time);
-    if (value) {
-      await scheduleMealReminder(meal, hour, minute);
-    } else {
-      await cancelMealReminder(meal);
+    try {
+      await setMealReminderEnabled(meal, value);
+      setMealReminders((prev) => ({
+        ...prev,
+        [meal]: { ...prev[meal], enabled: value },
+        permissionDenied: false,
+      }));
+      const time = mealReminders[meal].time;
+      const { hour, minute } = parseTimeString(time);
+      if (value) {
+        await scheduleMealReminder(meal, hour, minute);
+      } else {
+        await cancelMealReminder(meal);
+      }
+    } catch (error) {
+      reportWriteFailure(error);
     }
   }
 
