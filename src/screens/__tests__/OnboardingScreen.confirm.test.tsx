@@ -129,7 +129,7 @@ describe('OnboardingScreen confirm', () => {
     fillStep1(utils, height, '30');
 
     expect(continueDisabled(utils)).toBe(true);
-    expect(utils.getByText(/50.{1,3}250/)).toBeTruthy();
+    expect(utils.getByText(/between 50 and 250 cm/)).toBeTruthy();
   });
 
   it.each(['5', '150'])('rejects age %s with an inline range error', (age) => {
@@ -137,7 +137,7 @@ describe('OnboardingScreen confirm', () => {
     fillStep1(utils, '180', age);
 
     expect(continueDisabled(utils)).toBe(true);
-    expect(utils.getByText(/10.{1,3}120/)).toBeTruthy();
+    expect(utils.getByText(/between 10 and 120 years/)).toBeTruthy();
   });
 
   it.each([['50', '10'], ['250', '120']])('accepts height %s and age %s', (height, age) => {
@@ -151,7 +151,7 @@ describe('OnboardingScreen confirm', () => {
     const utils = renderAtStep3(jest.fn(), '180', weight);
 
     expect(utils.getByLabelText('Confirm and get started').props.accessibilityState?.disabled).toBe(true);
-    expect(utils.getByText(/20.{1,3}400/)).toBeTruthy();
+    expect(utils.getByText(/between 20 and 400 kg/)).toBeTruthy();
   });
 
   it.each(['20', '400'])('accepts weight %s', (weight) => {
