@@ -75,6 +75,7 @@ const KNOWN_CATEGORIES = [
 
 const DEFAULT_SERVINGS = '4';
 const DEFAULT_PREP = '30';
+const SAVE_RECOMPUTE_DEADLINE_MS = 10_000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -355,7 +356,20 @@ export default function RecipeEditorScreen() {
       const pending = latest?.inputs === macroInputsKey(validIngredients, numServings)
         ? latest.result
         : recomputeMacros();
-      const finalMacros = (await pending) ?? computeRecipeMacros(validIngredients, numServings).macros;
+      let deadline: ReturnType<typeof setTimeout> | undefined;
+      const timedOut = new Promise<'timeout'>((resolve) => {
+        deadline = setTimeout(() => resolve('timeout'), SAVE_RECOMPUTE_DEADLINE_MS);
+      });
+      let settled: ComputedMacros | null | 'timeout';
+      try {
+        settled = await Promise.race([pending, timedOut]);
+      } finally {
+        clearTimeout(deadline);
+      }
+      if (settled === 'timeout') lookupController.current?.abort();
+      const finalMacros =
+        (settled === 'timeout' ? null : settled) ??
+        computeRecipeMacros(validIngredients, numServings).macros;
 
       const recipe: Recipe = {
         id: isEdit ? recipeId : `custom-${Date.now()}`,
