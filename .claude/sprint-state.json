@@ -152,7 +152,8 @@
         397,
         407
       ],
-      "parked": []
+      "parked": [],
+      "cleanup": "704e0f6 line wrapping only in the focus-reload merge (SettingsScreen.tsx +30/-9). Cleanup agent returned an EMPTY report (placeholder); orchestrator verified the commit by reading the diff: formatting only, pushed, worktree clean, stash untouched."
     },
     "G": {
       "branch": "sprint/lane-g-repo",
@@ -349,7 +350,8 @@
         "86459a2",
         "4f463ea",
         "d30e74c",
-        "3b42af2"
+        "3b42af2",
+        "99b49b4"
       ],
       "workOrder": "C:/git/ht-lanes/wo/410.md",
       "decisionSource": "owner comment on #410 2026-10-06 (fix in the database)",
@@ -360,13 +362,21 @@
     },
     "411": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "99b49b4",
+        "6b795d6",
+        "53a29a8",
+        "eb27325",
+        "041a198",
+        "fb86fb9",
+        "e6bf37b"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/411.md",
       "decisionSource": "owner comment on #411 (Alert + Reset this day, corrupt text kept in app_state)",
       "deviceCheck": "Corrupt today additional_workouts; add a workout -> Alert; Reset this day -> empty list, adding works. Repeat for exercises -> template exercises return unchecked. Export a backup: corrupt text is in it under corrupt_json:...",
-      "notes": "WO ready; waits for #410. ORCHESTRATOR RULINGS: (1) resetCorruptDayColumn + CorruptJsonError count as lane-C writers in database.ts; (2) key collision -> suffix :2, :3 instead of overwriting (departs from the literal key only on collision; HUMAN to confirm)."
+      "notes": "WO ready; waits for #410. ORCHESTRATOR RULINGS: (1) resetCorruptDayColumn + CorruptJsonError count as lane-C writers in database.ts; (2) key collision -> suffix :2, :3 instead of overwriting (departs from the literal key only on collision; HUMAN to confirm). | dev: Alert title Cannot save: unreadable data; Reset this day (destructive) / Cancel; reset failure -> Reset failed. Existing Dashboard suites mock factories lack CorruptJsonError (instanceof undefined would throw if a writer rejects there) - sent to tester."
     },
     "412": {
       "lane": "A",
@@ -633,6 +643,10 @@
     {
       "at": "2026-10-06T17:31:21Z",
       "event": "lane G work orders ready (#398 #400 #409), none parked; waits for lanes C, D, F to merge"
+    },
+    {
+      "at": "2026-10-06T17:32:01Z",
+      "event": "#411 in_test (1030/89 per dev); lane F cleanup 704e0f6 verified by diff (agent report was empty)"
     }
   ]
 }
