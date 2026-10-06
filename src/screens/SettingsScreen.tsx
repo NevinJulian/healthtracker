@@ -835,8 +835,12 @@ export default function SettingsScreen() {
       // write leaves the saved value untouched.
       profileHeightInvalidRef.current = false;
       setProfileHeightError(null);
-      await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, clearProfileHeightCm);
-      setProfile((prev) => ({ ...prev, heightCm: null }));
+      try {
+        await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, clearProfileHeightCm);
+        setProfile((prev) => ({ ...prev, heightCm: null }));
+      } catch (error) {
+        reportWriteFailure(error);
+      }
       return;
     }
     // A comma decimal separator ("178,5") is plausible input here: the
@@ -850,8 +854,12 @@ export default function SettingsScreen() {
     }
     profileHeightInvalidRef.current = false;
     setProfileHeightError(null);
-    await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, () => setProfileHeightCm(val));
-    setProfile((prev) => ({ ...prev, heightCm: val }));
+    try {
+      await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, () => setProfileHeightCm(val));
+      setProfile((prev) => ({ ...prev, heightCm: val }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   async function handleProfileAgeBlur() {
@@ -859,8 +867,12 @@ export default function SettingsScreen() {
     if (trimmed === '') {
       profileAgeInvalidRef.current = false;
       setProfileAgeError(null);
-      await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, clearProfileAge);
-      setProfile((prev) => ({ ...prev, age: null }));
+      try {
+        await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, clearProfileAge);
+        setProfile((prev) => ({ ...prev, age: null }));
+      } catch (error) {
+        reportWriteFailure(error);
+      }
       return;
     }
     const val = Number(trimmed.replace(',', '.'));
@@ -871,23 +883,39 @@ export default function SettingsScreen() {
     }
     profileAgeInvalidRef.current = false;
     setProfileAgeError(null);
-    await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, () => setProfileAge(val));
-    setProfile((prev) => ({ ...prev, age: val }));
+    try {
+      await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, () => setProfileAge(val));
+      setProfile((prev) => ({ ...prev, age: val }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   async function handleProfileSex(sex: Sex) {
-    await setProfileSex(sex);
-    setProfile((prev) => ({ ...prev, sex }));
+    try {
+      await setProfileSex(sex);
+      setProfile((prev) => ({ ...prev, sex }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   async function handleProfileActivity(level: ActivityLevel) {
-    await setProfileActivityLevel(level);
-    setProfile((prev) => ({ ...prev, activityLevel: level }));
+    try {
+      await setProfileActivityLevel(level);
+      setProfile((prev) => ({ ...prev, activityLevel: level }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   async function handleProfileGoal(goal: GoalType) {
-    await setProfileGoalType(goal);
-    setProfile((prev) => ({ ...prev, goalType: goal }));
+    try {
+      await setProfileGoalType(goal);
+      setProfile((prev) => ({ ...prev, goalType: goal }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   // ── Profile: recalculate goals ────────────────────────────────────────
@@ -916,6 +944,8 @@ export default function SettingsScreen() {
         'Goals updated',
         `Daily goals set to ${goals.calories} kcal and ${goals.protein} g protein.`
       );
+    } catch (error) {
+      reportWriteFailure(error);
     } finally {
       setRecalcBusy(false);
     }
