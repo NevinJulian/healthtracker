@@ -168,7 +168,7 @@
     "G": {
       "branch": "sprint/lane-g-repo",
       "worktree": "C:/git/ht-lanes/lane-g",
-      "status": "in_progress",
+      "status": "merged",
       "waitsFor": "all other lanes merged",
       "order": [
         398,
@@ -182,7 +182,9 @@
         409
       ],
       "parked": [],
-      "base": "85442f8"
+      "base": "85442f8",
+      "mergeSha": "ca7c4ee",
+      "cleanup": "no changes needed"
     }
   },
   "issues": {
@@ -232,7 +234,7 @@
     },
     "398": {
       "lane": "G",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "1b300e1"
@@ -241,11 +243,12 @@
       "deviceCheck": "Expo Go from the integration branch: open the drawer, visit every drawer screen, Recipes -> RecipeDetail and Discover -> DiscoverDetail and back; no red screen, no missing-module error.",
       "notes": "WO ready; no jest regression test possible (grep + gates + build-check APK on the PR stand in) | dev: lockfile diff deletions only (bottom-tabs + sf-symbols-typescript blocks); expo install --check and expo-doctor identical before/after (4 pre-existing patch mismatches, app.json splash schema error -> filed #436). | tester APPROVE r0. RESIDUAL (only the PR build and the device can close): Android Gradle autolinking + Metro production bundle with the packages gone (build-check.yml runs on the PR because package.json changed); app launch + drawer/stack navigation on the device.",
       "securityReview": "skipped: dependency removal only, no code path changed",
-      "regressionProof": "no jest regression test possible. Stand-ins run by the tester: diff is 29 deletions / 0 insertions in exactly 3 lockfile blocks; repo-wide greps for bottom-tabs / createBottomTabNavigator / sf-symbols / expo-router find nothing; no remaining package references either removed package; npm ci --dry-run exits 0; 1118/93; expo install --check shows the same 4 pre-existing mismatches."
+      "regressionProof": "no jest regression test possible. Stand-ins run by the tester: diff is 29 deletions / 0 insertions in exactly 3 lockfile blocks; repo-wide greps for bottom-tabs / createBottomTabNavigator / sf-symbols / expo-router find nothing; no remaining package references either removed package; npm ci --dry-run exits 0; 1118/93; expo install --check shows the same 4 pre-existing mismatches.",
+      "mergeSha": "ca7c4ee"
     },
     "400": {
       "lane": "G",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 1,
       "commits": [
         "5749fbf",
@@ -257,7 +260,8 @@
       "decisionSource": "owner comment on #400 (fix CLAUDE.md jest wording, do not touch jest config)",
       "notes": "WO ready; includes CLAUDE.md corrections limited to facts the code contradicts | orchestrator read the full CLAUDE.md diff (3 lines): descriptive facts only, no instruction added or removed. Dev could not verify that the dynamic-import block still happens on Jest 29 (wording now names no Jest version). | tester REJECT r1: new CLAUDE.md sentence stated the dynamic-import mechanism as current fact; tester found no import( in the installed expo/src/winter and one screen suite passes on Jest 29.7 without the mapping (single-suite probe). Also: Retry is hidden on a font error; DiscoverScreen.test mocks the api not the db; two Analytics suites render sub-cards only. Orchestrator wording: origin stated as history, need on 29.7 stated as unverified. CLAUDE.md will contain Jest 30 once in a historical clause (grep criterion superseded on that point). | APPROVE r2 (1 round trip). Remaining imprecision accepted by the tester: @expo/vector-icons is stubbed for native font loading, grouped under needs-native-modules. HUMAN: read the CLAUDE.md diff (it is the agent instruction file); descriptive only, no instruction changed (tester + orchestrator both read it).",
       "securityReview": "skipped: comment + docs only",
-      "regressionProof": "no jest regression test (docs). Tester fact-checked every changed CLAUDE.md sentence against the code twice; babel config object unchanged; 1118/93."
+      "regressionProof": "no jest regression test (docs). Tester fact-checked every changed CLAUDE.md sentence against the code twice; babel config object unchanged; 1118/93.",
+      "mergeSha": "ca7c4ee"
     },
     "401": {
       "lane": "D",
@@ -378,7 +382,7 @@
     },
     "409": {
       "lane": "G",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "9c337cd"
@@ -387,7 +391,8 @@
       "deviceCheck": "none",
       "notes": "WO ready; grep-driven, deletions only | dev: 53 lines in 47 test files, deletions only; typecheck exit code not captured by dev (tester to capture). | tester APPROVE r0. Dev misreported the per-folder split (actual: 39 in src/db/__tests__, 14 in src/screens/__tests__); total correct.",
       "securityReview": "skipped: comment-line deletions in test files only",
-      "regressionProof": "no jest regression test. Stand-ins run by the tester: 53 removed lines, every one matches a standalone // eslint-disable comment, 0 insertions, 47 files all under __tests__, no line-ending churn, grep for eslint in test files empty, typecheck exit 0, 1118/93 unchanged."
+      "regressionProof": "no jest regression test. Stand-ins run by the tester: 53 removed lines, every one matches a standalone // eslint-disable comment, 0 insertions, 47 files all under __tests__, no line-ending churn, grep for eslint in test files empty, typecheck exit 0, 1118/93 unchanged.",
+      "mergeSha": "ca7c4ee"
     },
     "410": {
       "lane": "C",
@@ -844,6 +849,10 @@
     {
       "at": "2026-10-06T18:06:38Z",
       "event": "#409 ready (APPROVE r0, security skipped); lane G out of issues (3 done) -> cleanup"
+    },
+    {
+      "at": "2026-10-06T18:08:13Z",
+      "event": "merged lane G into integration ca7c4ee; npm ci against the merged lockfile; final gates green: typecheck clean, 1118/93; schema.ts add-only vs main"
     }
   ],
   "smallFindingsIssue": 437
