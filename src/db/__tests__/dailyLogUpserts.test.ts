@@ -616,6 +616,57 @@ describe('addAdditionalWorkout and toggleAdditionalWorkout read-modify-write ins
   });
 });
 
+describe('refused writes throw a typed CorruptJsonError naming the column and date', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const workout = { id: 'a', name: 'Curls', muscle_group: 'Arms', sets: '3', reps: '10', completed: false };
+
+  async function seed(db: DatabaseModule, date: string, column: string, raw: string): Promise<void> {
+    await db.getDatabase().runAsync(`UPDATE daily_log SET ${column} = ? WHERE date = ?`, [raw, date]);
+  }
+
+  it('upsertExerciseCompleted rejects with column=exercises', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await seed(db, date, 'exercises', '{not json');
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const err = await db.upsertExerciseCompleted(date, 'x', true).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(db.CorruptJsonError);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toMatchObject({ column: 'exercises', date });
+    spy.mockRestore();
+  });
+
+  it.each(['upsert', 'add', 'toggle'] as const)(
+    '%s on additional_workouts rejects with column=additional_workouts',
+    async (kind) => {
+      const db = loadFreshDatabaseModule();
+      await db.initDatabase();
+      const date = todayKey();
+      await seed(db, date, 'additional_workouts', '{}');
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const call =
+        kind === 'upsert'
+          ? db.upsertAdditionalWorkouts(date, [workout])
+          : kind === 'add'
+            ? db.addAdditionalWorkout(date, workout)
+            : db.toggleAdditionalWorkout(date, 'a');
+      const err = await call.catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(db.CorruptJsonError);
+      expect(err).toMatchObject({ column: 'additional_workouts', date });
+      spy.mockRestore();
+    }
+  );
+});
+
 describe('daily_log writers reject dates outside the valid range', () => {
   afterEach(() => {
     jest.dontMock('expo-sqlite');
