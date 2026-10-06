@@ -230,3 +230,39 @@ describe('DashboardScreen measurements modal (#325)', () => {
     expect(fields.chest_cm).toBe(78.4);
   });
 });
+
+describe('DashboardScreen measurement pills show their own date', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetLogByDate.mockResolvedValue({ ...mockEntry });
+  });
+
+  it('renders each pill with its own date and no shared "Last:" label', async () => {
+    mockGetLatestMeasurements.mockResolvedValue({
+      waist_cm: { value: 80, date: '2026-09-19' },
+      chest_cm: { value: 90, date: '2026-08-30' },
+      hips_cm: null,
+      thigh_cm: null,
+      arm_cm: null,
+    });
+    const utils = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    expect(utils.getByText('80 cm')).toBeTruthy();
+    expect(utils.getByText('2026-09-19')).toBeTruthy();
+    expect(utils.getByText('90 cm')).toBeTruthy();
+    expect(utils.getByText('2026-08-30')).toBeTruthy();
+    expect(utils.queryByText(/^Last:/)).toBeNull();
+    expect(utils.queryByText('Hips')).toBeNull();
+    expect(utils.queryByText('Thigh')).toBeNull();
+    expect(utils.queryByText('Arm')).toBeNull();
+  });
+
+  it('shows the empty-state subtitle only when nothing has been logged', async () => {
+    mockGetLatestMeasurements.mockResolvedValue(null);
+    const utils = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    expect(utils.getByText('No measurements logged yet')).toBeTruthy();
+  });
+});
