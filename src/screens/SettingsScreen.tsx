@@ -345,18 +345,54 @@ const stepperStyles = StyleSheet.create({
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
+function reportWriteFailure(error: unknown) {
+  console.error('[SettingsScreen] failed to save setting:', error);
+  Alert.alert('Error', 'Failed to save your setting. Please try again.');
+}
+
+interface WriteGuard {
+  seqRef: React.MutableRefObject<number>;
+  pendingRef: React.MutableRefObject<number>;
+}
+
+function useWriteGuard(): WriteGuard {
+  const seqRef = useRef(0);
+  const pendingRef = useRef(0);
+  return { seqRef, pendingRef };
+}
+
+function editedSince(guard: WriteGuard, seqAtStart: number): boolean {
+  return guard.seqRef.current !== seqAtStart || guard.pendingRef.current > 0;
+}
+
 const MAX_SKIPPED_TABLES_SHOWN = 5;
+const MAX_SKIPPED_COLUMNS_SHOWN = 5;
+const MAX_SKIPPED_NAME_LENGTH = 40;
+
+function truncateName(name: string): string {
+  const points = Array.from(name);
+  return points.length > MAX_SKIPPED_NAME_LENGTH
+    ? `${points.slice(0, MAX_SKIPPED_NAME_LENGTH).join('')}…`
+    : name;
+}
+
+function formatSkippedColumns(columns: string[]): string {
+  const shown = columns.slice(0, MAX_SKIPPED_COLUMNS_SHOWN).map(truncateName).join(', ');
+  const extra = columns.length - MAX_SKIPPED_COLUMNS_SHOWN;
+  return extra > 0 ? `${shown} and ${extra} more` : shown;
+}
 
 function formatSkippedSummary(
   skipped: { table: string; columns: string[]; rows: number }[] | undefined
 ): string {
   if (!skipped?.length) return '';
   const parts = skipped.slice(0, MAX_SKIPPED_TABLES_SHOWN).map(({ table, columns, rows }) => {
+    const name = truncateName(table);
     const detail = [
-      columns.join(', '),
+      formatSkippedColumns(columns),
       rows > 0 ? `${rows} row${rows === 1 ? '' : 's'}` : '',
     ].filter(Boolean);
-    return detail.length ? `${table} (${detail.join('; ')})` : table;
+    return detail.length ? `${name} (${detail.join('; ')})` : name;
   });
   const extra = skipped.length - MAX_SKIPPED_TABLES_SHOWN;
   const more = extra > 0 ? ` and ${extra} more` : '';
@@ -422,6 +458,29 @@ export default function SettingsScreen() {
   const heightPendingWritesRef = useRef(0);
   const ageWriteSeqRef = useRef(0);
   const agePendingWritesRef = useRef(0);
+  const sexGuard = useWriteGuard();
+  const activityGuard = useWriteGuard();
+  const goalGuard = useWriteGuard();
+  const workoutEnabledGuard = useWriteGuard();
+  const cookWhenEmptyGuard = useWriteGuard();
+  const weeklyCookDayEnabledGuard = useWriteGuard();
+  const weeklyCookDayGuard = useWriteGuard();
+  const mealEnabledGuards: Record<MealType, WriteGuard> = {
+    breakfast: useWriteGuard(),
+    lunch: useWriteGuard(),
+    dinner: useWriteGuard(),
+  };
+  const backupEnabledGuard = useWriteGuard();
+  const backupDayGuard = useWriteGuard();
+  const workoutEditGuard = useWriteGuard();
+  const cookDayEditGuard = useWriteGuard();
+  const breakfastEditGuard = useWriteGuard();
+  const lunchEditGuard = useWriteGuard();
+  const dinnerEditGuard = useWriteGuard();
+  const backupEditGuard = useWriteGuard();
+  const caloriesEditGuard = useWriteGuard();
+  const proteinEditGuard = useWriteGuard();
+  const hydrationEditGuard = useWriteGuard();
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [recalcBusy, setRecalcBusy] = useState(false);
 
@@ -437,6 +496,12 @@ export default function SettingsScreen() {
   const proteinDirtyRef = useRef(false);
   const hydrationDirtyRef = useRef(false);
   const backupTimeDirtyRef = useRef(false);
+
+  const mealEditGuards: Record<MealType, WriteGuard> = {
+    breakfast: breakfastEditGuard,
+    lunch: lunchEditGuard,
+    dinner: dinnerEditGuard,
+  };
 
   const mealTimeDirtyRefs: Record<MealType, React.MutableRefObject<boolean>> = {
     breakfast: breakfastTimeDirtyRef,
@@ -543,6 +608,29 @@ export default function SettingsScreen() {
       let active = true;
       const heightSeqAtStart = heightWriteSeqRef.current;
       const ageSeqAtStart = ageWriteSeqRef.current;
+      const sexSeqAtStart = sexGuard.seqRef.current;
+      const activitySeqAtStart = activityGuard.seqRef.current;
+      const goalSeqAtStart = goalGuard.seqRef.current;
+      const workoutEnabledSeqAtStart = workoutEnabledGuard.seqRef.current;
+      const cookWhenEmptySeqAtStart = cookWhenEmptyGuard.seqRef.current;
+      const weeklyCookDayEnabledSeqAtStart = weeklyCookDayEnabledGuard.seqRef.current;
+      const weeklyCookDaySeqAtStart = weeklyCookDayGuard.seqRef.current;
+      const mealEnabledSeqAtStart: Record<MealType, number> = {
+        breakfast: mealEnabledGuards.breakfast.seqRef.current,
+        lunch: mealEnabledGuards.lunch.seqRef.current,
+        dinner: mealEnabledGuards.dinner.seqRef.current,
+      };
+      const backupEnabledSeqAtStart = backupEnabledGuard.seqRef.current;
+      const backupDaySeqAtStart = backupDayGuard.seqRef.current;
+      const workoutEditSeqAtStart = workoutEditGuard.seqRef.current;
+      const cookDayEditSeqAtStart = cookDayEditGuard.seqRef.current;
+      const breakfastEditSeqAtStart = breakfastEditGuard.seqRef.current;
+      const lunchEditSeqAtStart = lunchEditGuard.seqRef.current;
+      const dinnerEditSeqAtStart = dinnerEditGuard.seqRef.current;
+      const backupEditSeqAtStart = backupEditGuard.seqRef.current;
+      const caloriesEditSeqAtStart = caloriesEditGuard.seqRef.current;
+      const proteinEditSeqAtStart = proteinEditGuard.seqRef.current;
+      const hydrationEditSeqAtStart = hydrationEditGuard.seqRef.current;
       (async () => {
         const [
           workoutEnabled,
@@ -586,32 +674,85 @@ export default function SettingsScreen() {
           getBackupReminderTime(),
         ]);
         if (active) {
-          setReminder((prev) => ({ ...prev, enabled: workoutEnabled, time: workoutTime, permissionDenied: false }));
+          const workoutTimeKept =
+            workoutTimeDirtyRef.current ||
+            editedSince(workoutEditGuard, workoutEditSeqAtStart);
+          const cookDayTimeKept =
+            cookDayTimeDirtyRef.current ||
+            editedSince(cookDayEditGuard, cookDayEditSeqAtStart);
+          const breakfastTimeKept =
+            breakfastTimeDirtyRef.current ||
+            editedSince(breakfastEditGuard, breakfastEditSeqAtStart);
+          const lunchTimeKept =
+            lunchTimeDirtyRef.current ||
+            editedSince(lunchEditGuard, lunchEditSeqAtStart);
+          const dinnerTimeKept =
+            dinnerTimeDirtyRef.current ||
+            editedSince(dinnerEditGuard, dinnerEditSeqAtStart);
+          const backupTimeKept =
+            backupTimeDirtyRef.current ||
+            editedSince(backupEditGuard, backupEditSeqAtStart);
+          setReminder((prev) => ({
+            ...prev,
+            enabled: editedSince(workoutEnabledGuard, workoutEnabledSeqAtStart) ? prev.enabled : workoutEnabled,
+            time: workoutTimeKept ? prev.time : workoutTime,
+            permissionDenied: false,
+          }));
           setCooking((prev) => ({
             ...prev,
-            cookWhenEmptyEnabled,
-            weeklyCookDayEnabled,
-            weeklyCookDay,
-            weeklyCookDayTime,
+            cookWhenEmptyEnabled: editedSince(cookWhenEmptyGuard, cookWhenEmptySeqAtStart)
+              ? prev.cookWhenEmptyEnabled
+              : cookWhenEmptyEnabled,
+            weeklyCookDayEnabled: editedSince(weeklyCookDayEnabledGuard, weeklyCookDayEnabledSeqAtStart)
+              ? prev.weeklyCookDayEnabled
+              : weeklyCookDayEnabled,
+            weeklyCookDay: editedSince(weeklyCookDayGuard, weeklyCookDaySeqAtStart)
+              ? prev.weeklyCookDay
+              : weeklyCookDay,
+            weeklyCookDayTime: cookDayTimeKept ? prev.weeklyCookDayTime : weeklyCookDayTime,
             permissionDenied: false,
           }));
           setMealReminders((prev) => ({
             ...prev,
-            breakfast: { enabled: breakfastEnabled, time: breakfastTime },
-            lunch:     { enabled: lunchEnabled,     time: lunchTime },
-            dinner:    { enabled: dinnerEnabled,     time: dinnerTime },
+            breakfast: {
+              enabled: editedSince(mealEnabledGuards.breakfast, mealEnabledSeqAtStart.breakfast)
+                ? prev.breakfast.enabled
+                : breakfastEnabled,
+              time: breakfastTimeKept ? prev.breakfast.time : breakfastTime,
+            },
+            lunch: {
+              enabled: editedSince(mealEnabledGuards.lunch, mealEnabledSeqAtStart.lunch)
+                ? prev.lunch.enabled
+                : lunchEnabled,
+              time: lunchTimeKept ? prev.lunch.time : lunchTime,
+            },
+            dinner: {
+              enabled: editedSince(mealEnabledGuards.dinner, mealEnabledSeqAtStart.dinner)
+                ? prev.dinner.enabled
+                : dinnerEnabled,
+              time: dinnerTimeKept ? prev.dinner.time : dinnerTime,
+            },
             permissionDenied: false,
           }));
           setBackupReminder((prev) => ({
             ...prev,
-            enabled: backupEnabled,
-            day: backupDay,
-            time: backupTime,
+            enabled: editedSince(backupEnabledGuard, backupEnabledSeqAtStart) ? prev.enabled : backupEnabled,
+            day: editedSince(backupDayGuard, backupDaySeqAtStart) ? prev.day : backupDay,
+            time: backupTimeKept ? prev.time : backupTime,
             permissionDenied: false,
           }));
-          setGoalCalories(nutritionGoals.calories);
-          setGoalProtein(nutritionGoals.protein);
-          setHydrationGoalMl(hydrationGoal);
+          if (!caloriesDirtyRef.current && !editedSince(caloriesEditGuard, caloriesEditSeqAtStart)) {
+            setGoalCalories(nutritionGoals.calories);
+          }
+          if (!proteinDirtyRef.current && !editedSince(proteinEditGuard, proteinEditSeqAtStart)) {
+            setGoalProtein(nutritionGoals.protein);
+          }
+          if (
+            !hydrationDirtyRef.current &&
+            !editedSince(hydrationEditGuard, hydrationEditSeqAtStart)
+          ) {
+            setHydrationGoalMl(hydrationGoal);
+          }
           const heightEditedSince =
             heightWriteSeqRef.current !== heightSeqAtStart || heightPendingWritesRef.current > 0;
           const ageEditedSince =
@@ -620,6 +761,11 @@ export default function SettingsScreen() {
             ...userProfile,
             heightCm: heightEditedSince ? prev.heightCm : userProfile.heightCm,
             age: ageEditedSince ? prev.age : userProfile.age,
+            sex: editedSince(sexGuard, sexSeqAtStart) ? prev.sex : userProfile.sex,
+            activityLevel: editedSince(activityGuard, activitySeqAtStart)
+              ? prev.activityLevel
+              : userProfile.activityLevel,
+            goalType: editedSince(goalGuard, goalSeqAtStart) ? prev.goalType : userProfile.goalType,
           }));
           // A field with an unsaved invalid edit, or a write that landed
           // after this load began, keeps its local text.
@@ -662,15 +808,22 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await setWorkoutReminderEnabled(value);
-    setReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
-    await reconcileScheduledNotifications();
+    try {
+      await trackProfileWrite(workoutEnabledGuard.seqRef, workoutEnabledGuard.pendingRef, () =>
+        setWorkoutReminderEnabled(value)
+      );
+      setReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
+      await reconcileScheduledNotifications();
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   // ── Workout: Time adjustments ───────────────────────────────────────────
 
   function adjustWorkoutTime(hourDelta: number, minuteDelta: number) {
     workoutTimeDirtyRef.current = true;
+    workoutEditGuard.seqRef.current += 1;
     setReminder((prev) => {
       const { hour, minute } = parseTimeString(prev.time);
       const newHour = stepHour(hour, hourDelta);
@@ -689,8 +842,14 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await setCookWhenEmptyEnabled(value);
-    setCooking((prev) => ({ ...prev, cookWhenEmptyEnabled: value, permissionDenied: false }));
+    try {
+      await trackProfileWrite(cookWhenEmptyGuard.seqRef, cookWhenEmptyGuard.pendingRef, () =>
+        setCookWhenEmptyEnabled(value)
+      );
+      setCooking((prev) => ({ ...prev, cookWhenEmptyEnabled: value, permissionDenied: false }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   // ── Cooking: Weekly cook-day toggle ────────────────────────────────────
@@ -703,18 +862,28 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await setWeeklyCookDayEnabled(value);
-    setCooking((prev) => ({ ...prev, weeklyCookDayEnabled: value, permissionDenied: false }));
-    await reconcileScheduledNotifications();
+    try {
+      await trackProfileWrite(weeklyCookDayEnabledGuard.seqRef, weeklyCookDayEnabledGuard.pendingRef, () =>
+        setWeeklyCookDayEnabled(value)
+      );
+      setCooking((prev) => ({ ...prev, weeklyCookDayEnabled: value, permissionDenied: false }));
+      await reconcileScheduledNotifications();
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   // ── Cooking: Weekday chip selection ────────────────────────────────────
 
   async function handleWeekdaySelect(day: number) {
-    await setWeeklyCookDay(day);
-    setCooking((prev) => ({ ...prev, weeklyCookDay: day }));
-    if (cooking.weeklyCookDayEnabled) {
-      await reconcileScheduledNotifications();
+    try {
+      await trackProfileWrite(weeklyCookDayGuard.seqRef, weeklyCookDayGuard.pendingRef, () => setWeeklyCookDay(day));
+      setCooking((prev) => ({ ...prev, weeklyCookDay: day }));
+      if (cooking.weeklyCookDayEnabled) {
+        await reconcileScheduledNotifications();
+      }
+    } catch (error) {
+      reportWriteFailure(error);
     }
   }
 
@@ -722,6 +891,7 @@ export default function SettingsScreen() {
 
   function adjustCookDayTime(hourDelta: number, minuteDelta: number) {
     cookDayTimeDirtyRef.current = true;
+    cookDayEditGuard.seqRef.current += 1;
     setCooking((prev) => {
       const { hour, minute } = parseTimeString(prev.weeklyCookDayTime);
       const newHour = stepHour(hour, hourDelta);
@@ -740,18 +910,23 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await setMealReminderEnabled(meal, value);
-    setMealReminders((prev) => ({
-      ...prev,
-      [meal]: { ...prev[meal], enabled: value },
-      permissionDenied: false,
-    }));
-    const time = mealReminders[meal].time;
-    const { hour, minute } = parseTimeString(time);
-    if (value) {
-      await scheduleMealReminder(meal, hour, minute);
-    } else {
-      await cancelMealReminder(meal);
+    try {
+      const guard = mealEnabledGuards[meal];
+      await trackProfileWrite(guard.seqRef, guard.pendingRef, () => setMealReminderEnabled(meal, value));
+      setMealReminders((prev) => ({
+        ...prev,
+        [meal]: { ...prev[meal], enabled: value },
+        permissionDenied: false,
+      }));
+      const time = mealReminders[meal].time;
+      const { hour, minute } = parseTimeString(time);
+      if (value) {
+        await scheduleMealReminder(meal, hour, minute);
+      } else {
+        await cancelMealReminder(meal);
+      }
+    } catch (error) {
+      reportWriteFailure(error);
     }
   }
 
@@ -759,6 +934,7 @@ export default function SettingsScreen() {
 
   function adjustMealTime(meal: MealType, hourDelta: number, minuteDelta: number) {
     mealTimeDirtyRefs[meal].current = true;
+    mealEditGuards[meal].seqRef.current += 1;
     setMealReminders((prev) => {
       const { hour, minute } = parseTimeString(prev[meal].time);
       const newHour = stepHour(hour, hourDelta);
@@ -771,11 +947,13 @@ export default function SettingsScreen() {
 
   function adjustCalories(delta: number) {
     caloriesDirtyRef.current = true;
+    caloriesEditGuard.seqRef.current += 1;
     setGoalCalories((prev) => Math.min(CALORIES_MAX, Math.max(CALORIES_MIN, prev + delta)));
   }
 
   function adjustProtein(delta: number) {
     proteinDirtyRef.current = true;
+    proteinEditGuard.seqRef.current += 1;
     setGoalProtein((prev) => Math.min(PROTEIN_MAX, Math.max(PROTEIN_MIN, prev + delta)));
   }
 
@@ -783,6 +961,7 @@ export default function SettingsScreen() {
 
   function adjustHydrationGoal(delta: number) {
     hydrationDirtyRef.current = true;
+    hydrationEditGuard.seqRef.current += 1;
     setHydrationGoalMl((prev) => Math.min(HYDRATION_MAX, Math.max(HYDRATION_MIN, prev + delta)));
   }
 
@@ -810,8 +989,12 @@ export default function SettingsScreen() {
       // write leaves the saved value untouched.
       profileHeightInvalidRef.current = false;
       setProfileHeightError(null);
-      await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, clearProfileHeightCm);
-      setProfile((prev) => ({ ...prev, heightCm: null }));
+      try {
+        await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, clearProfileHeightCm);
+        setProfile((prev) => ({ ...prev, heightCm: null }));
+      } catch (error) {
+        reportWriteFailure(error);
+      }
       return;
     }
     // A comma decimal separator ("178,5") is plausible input here: the
@@ -825,8 +1008,12 @@ export default function SettingsScreen() {
     }
     profileHeightInvalidRef.current = false;
     setProfileHeightError(null);
-    await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, () => setProfileHeightCm(val));
-    setProfile((prev) => ({ ...prev, heightCm: val }));
+    try {
+      await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, () => setProfileHeightCm(val));
+      setProfile((prev) => ({ ...prev, heightCm: val }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   async function handleProfileAgeBlur() {
@@ -834,8 +1021,12 @@ export default function SettingsScreen() {
     if (trimmed === '') {
       profileAgeInvalidRef.current = false;
       setProfileAgeError(null);
-      await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, clearProfileAge);
-      setProfile((prev) => ({ ...prev, age: null }));
+      try {
+        await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, clearProfileAge);
+        setProfile((prev) => ({ ...prev, age: null }));
+      } catch (error) {
+        reportWriteFailure(error);
+      }
       return;
     }
     const val = Number(trimmed.replace(',', '.'));
@@ -846,23 +1037,39 @@ export default function SettingsScreen() {
     }
     profileAgeInvalidRef.current = false;
     setProfileAgeError(null);
-    await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, () => setProfileAge(val));
-    setProfile((prev) => ({ ...prev, age: val }));
+    try {
+      await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, () => setProfileAge(val));
+      setProfile((prev) => ({ ...prev, age: val }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   async function handleProfileSex(sex: Sex) {
-    await setProfileSex(sex);
-    setProfile((prev) => ({ ...prev, sex }));
+    try {
+      await trackProfileWrite(sexGuard.seqRef, sexGuard.pendingRef, () => setProfileSex(sex));
+      setProfile((prev) => ({ ...prev, sex }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   async function handleProfileActivity(level: ActivityLevel) {
-    await setProfileActivityLevel(level);
-    setProfile((prev) => ({ ...prev, activityLevel: level }));
+    try {
+      await trackProfileWrite(activityGuard.seqRef, activityGuard.pendingRef, () => setProfileActivityLevel(level));
+      setProfile((prev) => ({ ...prev, activityLevel: level }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   async function handleProfileGoal(goal: GoalType) {
-    await setProfileGoalType(goal);
-    setProfile((prev) => ({ ...prev, goalType: goal }));
+    try {
+      await trackProfileWrite(goalGuard.seqRef, goalGuard.pendingRef, () => setProfileGoalType(goal));
+      setProfile((prev) => ({ ...prev, goalType: goal }));
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   // ── Profile: recalculate goals ────────────────────────────────────────
@@ -891,6 +1098,8 @@ export default function SettingsScreen() {
         'Goals updated',
         `Daily goals set to ${goals.calories} kcal and ${goals.protein} g protein.`
       );
+    } catch (error) {
+      reportWriteFailure(error);
     } finally {
       setRecalcBusy(false);
     }
@@ -1000,18 +1209,28 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await setBackupReminderEnabled(value);
-    setBackupReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
-    await reconcileScheduledNotifications();
+    try {
+      await trackProfileWrite(backupEnabledGuard.seqRef, backupEnabledGuard.pendingRef, () =>
+        setBackupReminderEnabled(value)
+      );
+      setBackupReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
+      await reconcileScheduledNotifications();
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   // ── Backup reminder: weekday chip ─────────────────────────────────────────
 
   async function handleBackupReminderDaySelect(day: number) {
-    await setBackupReminderDay(day);
-    setBackupReminder((prev) => ({ ...prev, day }));
-    if (backupReminder.enabled) {
-      await reconcileScheduledNotifications();
+    try {
+      await trackProfileWrite(backupDayGuard.seqRef, backupDayGuard.pendingRef, () => setBackupReminderDay(day));
+      setBackupReminder((prev) => ({ ...prev, day }));
+      if (backupReminder.enabled) {
+        await reconcileScheduledNotifications();
+      }
+    } catch (error) {
+      reportWriteFailure(error);
     }
   }
 
@@ -1019,6 +1238,7 @@ export default function SettingsScreen() {
 
   function adjustBackupReminderTime(hourDelta: number, minuteDelta: number) {
     backupTimeDirtyRef.current = true;
+    backupEditGuard.seqRef.current += 1;
     setBackupReminder((prev) => {
       const { hour, minute } = parseTimeString(prev.time);
       const newHour = stepHour(hour, hourDelta);
