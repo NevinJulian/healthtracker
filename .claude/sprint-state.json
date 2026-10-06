@@ -243,11 +243,12 @@
     },
     "400": {
       "lane": "G",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "commits": [
         "5749fbf",
-        "0d3d36e"
+        "0d3d36e",
+        "5cd6477"
       ],
       "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
       "deviceCheck": "none",
@@ -810,6 +811,10 @@
     {
       "at": "2026-10-06T18:02:39Z",
       "event": "#400 REJECT r1 (unsupported winter-runtime claim in CLAUDE.md + 2 imprecise sentences) -> back to dev, roundTrips=1"
+    },
+    {
+      "at": "2026-10-06T18:03:32Z",
+      "event": "#400 round 2 (5cd6477) in_test"
     }
   ]
 }
