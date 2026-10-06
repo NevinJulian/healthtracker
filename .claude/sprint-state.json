@@ -228,12 +228,14 @@
     },
     "398": {
       "lane": "G",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "1b300e1"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
       "deviceCheck": "Expo Go from the integration branch: open the drawer, visit every drawer screen, Recipes -> RecipeDetail and Discover -> DiscoverDetail and back; no red screen, no missing-module error.",
-      "notes": "WO ready; no jest regression test possible (grep + gates + build-check APK on the PR stand in)"
+      "notes": "WO ready; no jest regression test possible (grep + gates + build-check APK on the PR stand in) | dev: lockfile diff deletions only (bottom-tabs + sf-symbols-typescript blocks); expo install --check and expo-doctor identical before/after (4 pre-existing patch mismatches, app.json splash schema error -> filed #436)."
     },
     "400": {
       "lane": "G",
@@ -539,7 +541,8 @@
     432,
     433,
     434,
-    435
+    435,
+    436
   ],
   "smallFindings": [
     "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
@@ -779,6 +782,14 @@
     {
       "at": "2026-10-06T17:56:02Z",
       "event": "worktree g created at 85442f8 (npm ci ok); lane G -> #398 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:57:55Z",
+      "event": "GitHub CI test check on integration 5b23394 (lanes A, B, D, E, F merged): completed success"
+    },
+    {
+      "at": "2026-10-06T17:57:55Z",
+      "event": "#398 in_test (1118/93 per dev); filed #436 (expo patch mismatches, app.json splash)"
     }
   ]
 }
