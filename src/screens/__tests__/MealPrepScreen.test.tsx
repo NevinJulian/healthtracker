@@ -8,7 +8,6 @@ jest.mock('@react-navigation/native', () => ({
   // MealPrepScreen's load-on-focus effect only needs to run once on mount
   // for these tests, so the focus effect is modeled as a plain mount effect.
   useFocusEffect: (callback: () => void | (() => void)) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useEffect } = require('react');
     useEffect(callback, []);
   },
