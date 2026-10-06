@@ -15,8 +15,16 @@ Read these before anything else. They exist to stop the run going sideways while
    minute and never grows. Not for a good idea, not for an obvious adjacent fix, not for anything.
 2. **New findings become issues, not work.** If any agent finds a bug that is not in the frozen list,
    file a GitHub issue labelled `found-during-sprint` and move on. Do not fix it. Do not schedule it.
-   The one exception: a regression *caused by this sprint's own change*, which the owning developer
-   fixes as part of that issue.
+   Two exceptions:
+   - A regression *caused by this sprint's own change*, which the owning developer fixes as part of
+     that issue.
+   - The same bug in a sibling spot: same root cause as the issue being fixed, in a file the lane
+     owns. The analyst lists these siblings in the work order, and they are fixed and tested as part
+     of that issue. A sibling in another lane's files is filed as usual.
+
+   Findings that only affect comments, wording, log text or other cosmetics don't get an issue each.
+   The orchestrator collects them in one issue per sprint, titled `Sprint <n>: small findings`, one
+   checkbox per finding.
 3. **Three round trips per issue, then park it.** If an issue has gone developer → tester → developer
    three times without passing, park it: comment on the GitHub issue explaining exactly where it
    stalled, mark it `parked` in state, move to the next. Never a fourth attempt.
@@ -24,8 +32,8 @@ Read these before anything else. They exist to stop the run going sideways while
    there to `main` after review. No agent is permitted to merge to `main` under any circumstance.
 5. **A red gate is a stop, not a suggestion.** `npm run typecheck` and `npm test -- --maxWorkers=2` must both exit 0
    before anything merges to the integration branch. No exceptions, no "it was already failing".
-   The worker cap is part of the gate, not a speed tweak: the sql.js WASM suites crash under default
-   jest parallelism on Linux (#377), and CI runs with the same cap. Drop it only when #377 is fixed.
+   The worker cap is part of the gate, not a speed tweak: jest workers crash under default parallelism
+   on Linux, and CI runs with the same cap. The cap is permanent (#377).
 6. **Never edit an existing migration.** Append-only, integer-versioned. This rule has no exceptions
    and breaking it corrupts live databases.
 7. **Stay in your lane.** Each lane owns its files exclusively (see §3). A developer who needs to
@@ -72,54 +80,49 @@ The orchestrator does neither. It lists both as outstanding in the report.
 
 ## 3. Lanes — this is how conflicts are prevented, not resolved
 
-Most of the scope touches `src/db/database.ts`. Running those issues as parallel worktrees
-guarantees conflicts on every merge. So issues are grouped into lanes by file ownership, lanes run in
-parallel, and **issues within a lane run serially on one branch**.
+Most of the scope touches `src/db/database.ts` or one of the big screens. Running those issues as
+parallel worktrees guarantees conflicts on every merge. So issues are grouped into lanes by file
+ownership, lanes run in parallel, and **issues within a lane run serially on one branch**.
 
-This table is sprint 2's scope. `/sprint` freezes exactly the issues in the Issues column that are
-still open. Sprint 1 (#300–#336) is done. Its lanes are in git history.
+This table is sprint 3's scope. `/sprint` freezes exactly the issues in the Issues column that are
+still open. Sprints 1 and 2 are done. Their lanes are in git history.
 
 | Lane | Branch | Owns | Issues, in order |
 |---|---|---|---|
-| A — db core | `sprint/lane-a-db` | `src/db/**` except `src/db/testHelpers/**`, `src/services/backup.ts` | #314, #316, #315, #363, #378, #380, #368, #370, #371, #381, #379, #382, #383, #372, #373, #367, #362 |
-| B — notifications | `sprint/lane-b-notify` | `src/services/notifications.ts` | #311, #361 |
-| C — analytics screen | `sprint/lane-c-analytics` | `src/screens/AnalyticsDashboardScreen.tsx`, `src/screens/analyticsHelpers.ts` | #328 |
-| D — other screens | `sprint/lane-d-screens` | `src/screens/{Settings,MealPrep,Dashboard,Onboarding}Screen.tsx` | #375, #366, #365, #364 |
-| E — network | `sprint/lane-e-api` | `src/api/**` | #318 |
-| F — repo hygiene | `sprint/lane-f-repo` | root config, docs | #374 |
-| G — tests | `sprint/lane-g-tests` | `src/db/testHelpers/**`, `jest.config.js`, `.github/workflows/test.yml` | #377 |
+| A — db core | `sprint/lane-a-db` | `src/db/**` and `src/services/backup.ts`, except the functions granted to lanes C and D | #414, #412, #406 |
+| B — app start | `sprint/lane-b-start` | `App.tsx`, and new files under `src/services/` for the rescue export | #419 |
+| C — Dashboard | `sprint/lane-c-dashboard` | `src/screens/DashboardScreen.tsx`, and in `database.ts` the additional-workout and exercise writers and the body-measurement functions | #410, #411, #415, #416 |
+| D — MealPrep | `sprint/lane-d-mealprep` | `src/screens/MealPrepScreen.tsx`, and in `database.ts` the recipe getters and `removeMealFromPlan` | #417, #401, #403, #408 |
+| E — network | `sprint/lane-e-api` | `src/api/**`, `src/nutrition/**`, `src/screens/{Discover,DiscoverDetail,RecipeEditor}Screen.tsx` | #318 |
+| F — onboarding and settings | `sprint/lane-f-settings` | `src/screens/{Onboarding,Settings}Screen.tsx` | #405, #404, #397, #407 |
+| G — repo hygiene | `sprint/lane-g-repo` | `package.json`, `package-lock.json`, `babel.config.js`, `CLAUDE.md`, the `eslint-disable` lines in test files | #398, #400, #409 |
 
-`backup.ts` moved from lane B to lane A for this sprint, because #315's fix spans
-`restoreFromPayload` (`database.ts`) and `validatePayload` (`backup.ts`).
+Each lane also owns the tests for what it changes.
 
-**Partials.** Sprint 1 landed part of #311, #314, #315 and #318. The analyst reads the issue's latest
-comments and the code on `main`, and scopes the work order to what is still open. It does not redo
-what already landed.
+**Partials and known patterns.** Sprints 1 and 2 landed most of #318. The analyst reads the issue's
+latest comments and the code on `main`, and scopes the work order to what is still open. #397 and
+#404 are the same bugs as #375 and #365, which sprint 2 fixed. Follow those fixes.
 
-**Ordering constraints inside lanes** — these are real dependencies, not preferences:
+**Ordering constraints** — these are real dependencies, not preferences:
 
-- Lane A: #314 first. Migrations must be atomic before this sprint appends any new ones, and #316 and
-  #380 may need one each.
-- Lane A: #315 before #363 and #378. Restore validation is where a garbled `app_start_date` gets in,
-  and #363 points there for the sturdier fix. Take #363 and #378 back to back. If #363's fix also
-  closes #378, the tester says so and #378 is closed as done by #363's commit, not re-implemented.
-- Lane G: #377 last overall. It changes the sql.js adapter every db suite runs on. After it lands, the
-  whole suite must pass at default parallelism and at `--maxWorkers=3`.
+- Lanes C and D start after lane A has merged into the integration branch, because they also edit
+  `database.ts`. Lanes B, E and F start right away.
+- Lane C: #410 before #411, both change the same writers. #415 before #416, because #416 builds on
+  #415's per-field dates.
+- Lane D: #417 first. It changes the recipe lookup the other three issues render through.
+- Lane G runs last, after every other lane has merged. #409 edits test files the other lanes may
+  touch, and #398 changes `package.json`, which runs `build-check.yml` on the PR.
 
-**Cross-lane dependencies** are the orchestrator's problem. Lane G waits for everything. If #377
-removes the worker cap, update the gate in §1 rule 5 in the same lane.
+**Cross-lane dependencies** are the orchestrator's problem. A developer who finds that its issue needs
+a file another lane owns stops and reports, as rule 7 says.
 
-**Decisions a human should make before the run**, or the analyst parks the issue:
-
-- #316: when a recipe still has inventory and cook-log rows, is deleting it blocked, confirmed or
-  cascaded?
-- #363: what `app_start_date` falls back to when the stored value is invalid.
+**Decisions** for every issue that needed one are in the issue bodies or comments: #318, #405, #408,
+#410, #411, #412, #414, #415, #416, #417, #419. The latest decision comment is binding.
 
 ### Excluded from this sprint
 
-- **#360** — PR #394, landed by hand.
-- **#334 (`.gitattributes`)** — PR #393, landed by hand. Before it's merged, no agent touches line
-  endings.
+- **#402 and #399** — PR #420, landed by hand before this sprint.
+- **#396 (`PRAGMA foreign_keys`)** — needs the restore rework and a per-table cascade decision first.
 - **#392 and every other feature request.** Features run one at a time, outside the sprint.
 
 ---
