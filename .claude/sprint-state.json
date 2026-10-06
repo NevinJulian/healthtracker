@@ -148,9 +148,18 @@
   "issues": {
     "318": {
       "lane": "E",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "9cbac95",
+        "8bac828",
+        "839ac34",
+        "7eb26f4",
+        "2aefe47",
+        "d65c497",
+        "34af795",
+        "d780c4c"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/318.md",
       "decisionSource": "owner comment on #318 2026-10-06 (4 items)",
       "deviceCheck": "1) Import a Discover recipe with many unknown ingredients, tap Cancel mid-spinner: spinner stops, recipe absent from library. 2) Wi-Fi without internet: save a recipe containing dragonfruit; save completes in ~10 s with local-table macros.",
@@ -297,6 +306,10 @@
     {
       "at": "2026-10-06T17:09:38Z",
       "event": "#414 tester APPROVE r0 -> security (read-only, parallel); lane A -> #412 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:10:21Z",
+      "event": "#318 in_test (873/84 per dev; dev report mislabelled 2 SHAs, corrected from git log)"
     }
   ]
 }
