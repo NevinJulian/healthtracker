@@ -1074,11 +1074,11 @@ export function upsertAdditionalWorkouts(
   return _enqueueWrite('upsertAdditionalWorkouts', () => _upsertAdditionalWorkoutsImpl(date, workouts));
 }
 
-async function _upsertAdditionalWorkoutsImpl(
+async function _readAdditionalWorkoutsForWrite(
+  db: SQLite.SQLiteDatabase,
   date: string,
-  workouts: AdditionalWorkout[]
-): Promise<void> {
-  const db = getDatabase();
+  caller: string
+): Promise<AdditionalWorkout[]> {
   await _ensureDailyLogRow(db, date);
   const row = await db.getFirstAsync<{ additional_workouts: string }>(
     'SELECT additional_workouts FROM daily_log WHERE date = ?',
@@ -1086,15 +1086,51 @@ async function _upsertAdditionalWorkoutsImpl(
   );
   if (!_isStoredJsonArray(row?.additional_workouts)) {
     console.error(
-      `[DB] upsertAdditionalWorkouts: malformed additional_workouts JSON for date=${date} — refusing to write, stored value left unchanged`
+      `[DB] ${caller}: malformed additional_workouts JSON for date=${date} — refusing to write, stored value left unchanged`
     );
-    throw new Error(`[DB] upsertAdditionalWorkouts: malformed additional_workouts JSON for date=${date}`);
+    throw new Error(`[DB] ${caller}: malformed additional_workouts JSON for date=${date}`);
   }
+  return parseAdditionalWorkouts(row?.additional_workouts);
+}
+
+async function _writeAdditionalWorkouts(
+  db: SQLite.SQLiteDatabase,
+  date: string,
+  workouts: AdditionalWorkout[],
+  caller: string
+): Promise<void> {
   const result = await db.runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [
     JSON.stringify(workouts),
     date,
   ]);
-  _assertWrote(result, 'upsertAdditionalWorkouts', date);
+  _assertWrote(result, caller, date);
+}
+
+async function _upsertAdditionalWorkoutsImpl(
+  date: string,
+  workouts: AdditionalWorkout[]
+): Promise<void> {
+  const db = getDatabase();
+  await _readAdditionalWorkoutsForWrite(db, date, 'upsertAdditionalWorkouts');
+  await _writeAdditionalWorkouts(db, date, workouts, 'upsertAdditionalWorkouts');
+}
+
+export function addAdditionalWorkout(date: string, workout: AdditionalWorkout): Promise<void> {
+  return _enqueueWrite('addAdditionalWorkout', async () => {
+    const db = getDatabase();
+    const current = await _readAdditionalWorkoutsForWrite(db, date, 'addAdditionalWorkout');
+    await _writeAdditionalWorkouts(db, date, [...current, workout], 'addAdditionalWorkout');
+  });
+}
+
+export function toggleAdditionalWorkout(date: string, id: string): Promise<void> {
+  return _enqueueWrite('toggleAdditionalWorkout', async () => {
+    const db = getDatabase();
+    const current = await _readAdditionalWorkoutsForWrite(db, date, 'toggleAdditionalWorkout');
+    if (!current.some((w) => w.id === id)) return;
+    const updated = current.map((w) => (w.id === id ? { ...w, completed: !w.completed } : w));
+    await _writeAdditionalWorkouts(db, date, updated, 'toggleAdditionalWorkout');
+  });
 }
 
 export async function getWeightHistory(days: number): Promise<{ date: string; weight: number }[]> {
@@ -1230,7 +1266,7 @@ function mapLogRow(row: {
     is_meal_prep_day: row.is_meal_prep_day === 1,
     exercises: parseExercises(row.exercises),
     body_weight: row.body_weight ?? null,
-    additional_workouts: parseAdditionalWorkouts(row.additional_workouts),
+    additional_workouts: parseAdditionalWorkouts(row?.additional_workouts),
   };
 }
 
