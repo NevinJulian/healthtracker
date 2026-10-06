@@ -84,3 +84,31 @@ describe('buildImportResult nutrition lookups', () => {
     expect(result.estimatedIngredients).toEqual(['zzz unknown b']);
   });
 });
+
+describe('buildImportResult abort signal', () => {
+  beforeEach(() => {
+    mockLookup.mockReset();
+  });
+
+  it('forwards the signal to each lookup', async () => {
+    mockLookup.mockResolvedValue(NUTRITION);
+    const controller = new AbortController();
+
+    await buildImportResult(meal(NAMES.slice(0, 2)), 4, controller.signal);
+
+    expect(mockLookup).toHaveBeenCalledTimes(2);
+    for (const call of mockLookup.mock.calls) expect(call[1]).toBe(controller.signal);
+  });
+
+  it('starts no further lookups once aborted', async () => {
+    const controller = new AbortController();
+    mockLookup.mockImplementation(async () => {
+      controller.abort();
+      return null;
+    });
+
+    await buildImportResult(meal(NAMES), 4, controller.signal);
+
+    expect(mockLookup.mock.calls.length).toBeLessThanOrEqual(3);
+  });
+});
