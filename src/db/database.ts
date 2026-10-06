@@ -224,6 +224,20 @@ function parseExercises(raw: string | null | undefined): Exercise[] {
   }
 }
 
+export type CorruptJsonColumn = 'exercises' | 'additional_workouts';
+
+export class CorruptJsonError extends Error {
+  readonly column: CorruptJsonColumn;
+  readonly date: string;
+
+  constructor(caller: string, column: CorruptJsonColumn, date: string) {
+    super(`[DB] ${caller}: malformed ${column} JSON for date=${date}`);
+    this.name = 'CorruptJsonError';
+    this.column = column;
+    this.date = date;
+  }
+}
+
 /**
  * Strict counterpart to parseExercises(), used ONLY by the write path in
  * upsertExerciseCompleted() (#319). parseExercises() is the read path and
@@ -1041,7 +1055,7 @@ async function _upsertExerciseCompletedImpl(
     console.error(
       `[DB] upsertExerciseCompleted: malformed exercises JSON for date=${date} — refusing to write, stored value left unchanged`
     );
-    throw new Error(`[DB] upsertExerciseCompleted: malformed exercises JSON for date=${date}`);
+    throw new CorruptJsonError('upsertExerciseCompleted', 'exercises', date);
   }
   const updated = parsed.value.map((ex) =>
     ex.id === exerciseId ? { ...ex, completed: value } : ex
@@ -1074,11 +1088,11 @@ export function upsertAdditionalWorkouts(
   return _enqueueWrite('upsertAdditionalWorkouts', () => _upsertAdditionalWorkoutsImpl(date, workouts));
 }
 
-async function _upsertAdditionalWorkoutsImpl(
+async function _readAdditionalWorkoutsForWrite(
+  db: SQLite.SQLiteDatabase,
   date: string,
-  workouts: AdditionalWorkout[]
-): Promise<void> {
-  const db = getDatabase();
+  caller: string
+): Promise<AdditionalWorkout[]> {
   await _ensureDailyLogRow(db, date);
   const row = await db.getFirstAsync<{ additional_workouts: string }>(
     'SELECT additional_workouts FROM daily_log WHERE date = ?',
@@ -1086,15 +1100,116 @@ async function _upsertAdditionalWorkoutsImpl(
   );
   if (!_isStoredJsonArray(row?.additional_workouts)) {
     console.error(
-      `[DB] upsertAdditionalWorkouts: malformed additional_workouts JSON for date=${date} — refusing to write, stored value left unchanged`
+      `[DB] ${caller}: malformed additional_workouts JSON for date=${date} — refusing to write, stored value left unchanged`
     );
-    throw new Error(`[DB] upsertAdditionalWorkouts: malformed additional_workouts JSON for date=${date}`);
+    throw new CorruptJsonError(caller, 'additional_workouts', date);
   }
+  return parseAdditionalWorkouts(row?.additional_workouts);
+}
+
+async function _writeAdditionalWorkouts(
+  db: SQLite.SQLiteDatabase,
+  date: string,
+  workouts: AdditionalWorkout[],
+  caller: string
+): Promise<void> {
   const result = await db.runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [
     JSON.stringify(workouts),
     date,
   ]);
-  _assertWrote(result, 'upsertAdditionalWorkouts', date);
+  _assertWrote(result, caller, date);
+}
+
+async function _upsertAdditionalWorkoutsImpl(
+  date: string,
+  workouts: AdditionalWorkout[]
+): Promise<void> {
+  const db = getDatabase();
+  await _readAdditionalWorkoutsForWrite(db, date, 'upsertAdditionalWorkouts');
+  await _writeAdditionalWorkouts(db, date, workouts, 'upsertAdditionalWorkouts');
+}
+
+export function addAdditionalWorkout(date: string, workout: AdditionalWorkout): Promise<void> {
+  return _enqueueWrite('addAdditionalWorkout', async () => {
+    const db = getDatabase();
+    const current = await _readAdditionalWorkoutsForWrite(db, date, 'addAdditionalWorkout');
+    await _writeAdditionalWorkouts(db, date, [...current, workout], 'addAdditionalWorkout');
+  });
+}
+
+export function toggleAdditionalWorkout(date: string, id: string): Promise<void> {
+  return _enqueueWrite('toggleAdditionalWorkout', async () => {
+    const db = getDatabase();
+    const current = await _readAdditionalWorkoutsForWrite(db, date, 'toggleAdditionalWorkout');
+    if (!current.some((w) => w.id === id)) return;
+    const updated = current.map((w) => (w.id === id ? { ...w, completed: !w.completed } : w));
+    await _writeAdditionalWorkouts(db, date, updated, 'toggleAdditionalWorkout');
+  });
+}
+
+const CORRUPT_JSON_SELECT: Record<CorruptJsonColumn, string> = {
+  exercises: 'SELECT exercises AS raw FROM daily_log WHERE date = ?',
+  additional_workouts: 'SELECT additional_workouts AS raw FROM daily_log WHERE date = ?',
+};
+
+const CORRUPT_JSON_UPDATE: Record<CorruptJsonColumn, string> = {
+  exercises: 'UPDATE daily_log SET exercises = ? WHERE date = ?',
+  additional_workouts: 'UPDATE daily_log SET additional_workouts = ? WHERE date = ?',
+};
+
+/**
+ * Replaces one unreadable JSON column of a day with a fresh value, after
+ * keeping the unreadable text in app_state under `corrupt_json:<column>:<date>`
+ * (`:2`, `:3`, … when that key already holds different text). Refuses when
+ * the stored JSON is readable. The kept text and the new value commit together.
+ */
+export function resetCorruptDayColumn(date: string, column: CorruptJsonColumn): Promise<void> {
+  return _enqueueWrite('resetCorruptDayColumn', () => _resetCorruptDayColumnImpl(date, column));
+}
+
+async function _resetCorruptDayColumnImpl(date: string, column: CorruptJsonColumn): Promise<void> {
+  if (!(column in CORRUPT_JSON_SELECT)) {
+    throw new Error(`[DB] resetCorruptDayColumn: unsupported column "${column}"`);
+  }
+  if (!isValidDateKey(date)) {
+    throw new Error(`Invalid date key: "${date}"`);
+  }
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ raw: string | null }>(CORRUPT_JSON_SELECT[column], [date]);
+  if (!row || _isStoredJsonArray(row.raw)) {
+    throw new Error(`[DB] resetCorruptDayColumn: ${column} for date=${date} is not corrupt, nothing reset`);
+  }
+  const raw = row.raw as string;
+
+  let fresh = '[]';
+  if (column === 'exercises') {
+    const { date: startDateISO } = await _readEffectiveStartDate(db);
+    const templateRows = await db.getAllAsync<WeeklyTemplateRow>('SELECT * FROM weekly_template');
+    const templateMap = new Map<number, WeeklyTemplateRow>(templateRows.map((r) => [r.day_of_week, r]));
+    const rowValues = _buildDailyLogRowValues(date, templateMap, startDateISO);
+    if (!rowValues) {
+      throw new Error(`[DB] resetCorruptDayColumn: no weekly_template row for date=${date}`);
+    }
+    fresh = rowValues.exercises;
+  }
+
+  const baseKey = `corrupt_json:${column}:${date}`;
+  await db.withTransactionAsync(async () => {
+    for (let n = 1; ; n++) {
+      const key = n === 1 ? baseKey : `${baseKey}:${n}`;
+      const existing = await db.getFirstAsync<{ value: string }>(
+        'SELECT value FROM app_state WHERE key = ?',
+        [key]
+      );
+      if (existing === null || existing === undefined) {
+        await db.runAsync('INSERT INTO app_state (key, value) VALUES (?, ?)', [key, raw]);
+        break;
+      }
+      if (existing.value === raw) break;
+    }
+    const result = await db.runAsync(CORRUPT_JSON_UPDATE[column], [fresh, date]);
+    _assertWrote(result, 'resetCorruptDayColumn', date);
+  });
 }
 
 export async function getWeightHistory(days: number): Promise<{ date: string; weight: number }[]> {
@@ -2989,12 +3104,12 @@ type MeasurementInput = {
 /**
  * Upsert a body-measurement entry for `date`.
  *
- * If no row exists for that date, inserts a new one with only the provided
- * fields set (others stay NULL).  If a row already exists, updates only the
- * non-undefined fields so previous measurements are preserved.
+ * Only finite numeric fields are written (null, undefined, NaN and Infinity
+ * are ignored); existing values are never overwritten with NULL. If no field
+ * qualifies, nothing is written and no row is created.
  *
  * @param date   - YYYY-MM-DD date key.
- * @param fields - Partial measurement object; undefined fields are ignored.
+ * @param fields - Partial measurement object; non-finite fields are ignored.
  */
 export function logBodyMeasurement(
   date: string,
@@ -3008,39 +3123,26 @@ async function _logBodyMeasurementImpl(
   fields: MeasurementInput
 ): Promise<void> {
   const db = getDatabase();
+  const columns = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
+  const provided = columns.filter((c) => Number.isFinite(fields[c]));
+  if (provided.length === 0) return;
+
   const existing = await db.getFirstAsync<{ id: number }>(
     'SELECT id FROM body_measurements WHERE date = ?',
     [date]
   );
 
   if (!existing) {
-    // Insert — only supply provided fields; missing ones default to NULL
     await db.runAsync(
-      `INSERT INTO body_measurements (date, waist_cm, chest_cm, hips_cm, thigh_cm, arm_cm)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        date,
-        fields.waist_cm ?? null,
-        fields.chest_cm ?? null,
-        fields.hips_cm ?? null,
-        fields.thigh_cm ?? null,
-        fields.arm_cm ?? null,
-      ]
+      `INSERT INTO body_measurements (date, ${provided.join(', ')})
+       VALUES (?, ${provided.map(() => '?').join(', ')})`,
+      [date, ...provided.map((c) => fields[c] as number)]
     );
     return;
   }
 
-  // Update — only the explicitly provided (non-undefined) fields
-  const setClauses: string[] = [];
-  const values: (number | null)[] = [];
-
-  if (fields.waist_cm !== undefined) { setClauses.push('waist_cm = ?'); values.push(fields.waist_cm ?? null); }
-  if (fields.chest_cm !== undefined) { setClauses.push('chest_cm = ?'); values.push(fields.chest_cm ?? null); }
-  if (fields.hips_cm  !== undefined) { setClauses.push('hips_cm = ?');  values.push(fields.hips_cm  ?? null); }
-  if (fields.thigh_cm !== undefined) { setClauses.push('thigh_cm = ?'); values.push(fields.thigh_cm ?? null); }
-  if (fields.arm_cm   !== undefined) { setClauses.push('arm_cm = ?');   values.push(fields.arm_cm   ?? null); }
-
-  if (setClauses.length === 0) return; // Nothing to update
+  const setClauses = provided.map((c) => `${c} = ?`);
+  const values: number[] = provided.map((c) => fields[c] as number);
 
   await db.runAsync(
     `UPDATE body_measurements SET ${setClauses.join(', ')} WHERE id = ?`,
@@ -3072,23 +3174,50 @@ export async function getBodyMeasurements(
   return rows;
 }
 
+const MEASUREMENT_FIELDS = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
+
+export type MeasurementField = (typeof MEASUREMENT_FIELDS)[number];
+
+/** The newest non-NULL value of one measurement column and the date of the row it came from. */
+export type DatedMeasurement = { value: number; date: string };
+
+export type LatestMeasurements = Record<MeasurementField, DatedMeasurement | null>;
+
 /**
- * Return the current body measurements: `id` and `date` come from the newest
- * row, and each `*_cm` is that column's newest non-NULL value across all rows
- * (null if never logged). Returns null when no rows exist.
+ * Return each body measurement's newest non-NULL value together with the date
+ * of the row it came from (null per field if never logged). Returns null when
+ * no field has ever had a value.
  */
-export async function getLatestMeasurements(): Promise<BodyMeasurement | null> {
+export async function getLatestMeasurements(): Promise<LatestMeasurements | null> {
   const db = getDatabase();
-  const row = await db.getFirstAsync<BodyMeasurement>(
-    `SELECT id, date,
+  const row = await db.getFirstAsync<Record<string, number | string | null>>(
+    `SELECT
        (SELECT waist_cm FROM body_measurements WHERE waist_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS waist_cm,
+       (SELECT date FROM body_measurements WHERE waist_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS waist_date,
        (SELECT chest_cm FROM body_measurements WHERE chest_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS chest_cm,
+       (SELECT date FROM body_measurements WHERE chest_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS chest_date,
        (SELECT hips_cm FROM body_measurements WHERE hips_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS hips_cm,
+       (SELECT date FROM body_measurements WHERE hips_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS hips_date,
        (SELECT thigh_cm FROM body_measurements WHERE thigh_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS thigh_cm,
-       (SELECT arm_cm FROM body_measurements WHERE arm_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS arm_cm
-     FROM body_measurements ORDER BY date DESC LIMIT 1`
+       (SELECT date FROM body_measurements WHERE thigh_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS thigh_date,
+       (SELECT arm_cm FROM body_measurements WHERE arm_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS arm_cm,
+       (SELECT date FROM body_measurements WHERE arm_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS arm_date`
   );
-  return row ?? null;
+  if (!row) return null;
+
+  const result = {} as LatestMeasurements;
+  let any = false;
+  for (const field of MEASUREMENT_FIELDS) {
+    const value = row[field];
+    const date = row[field.replace('_cm', '_date')];
+    if (typeof value === 'number' && typeof date === 'string') {
+      result[field] = { value, date };
+      any = true;
+    } else {
+      result[field] = null;
+    }
+  }
+  return any ? result : null;
 }
 
 // ── Workout set log CRUD (workout_set_log table, migration v33) ───────────────

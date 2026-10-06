@@ -40,15 +40,21 @@ function makeMeasurements(
     arm_cm: number | null;
   }> = {}
 ) {
-  return {
-    id: 1,
-    date: mockToday,
+  const values = {
     waist_cm: 80,
     chest_cm: 90,
     hips_cm: 95,
     thigh_cm: 55,
     arm_cm: 30,
     ...overrides,
+  };
+  const dated = (value: number | null) => (value === null ? null : { value, date: mockToday });
+  return {
+    waist_cm: dated(values.waist_cm),
+    chest_cm: dated(values.chest_cm),
+    hips_cm: dated(values.hips_cm),
+    thigh_cm: dated(values.thigh_cm),
+    arm_cm: dated(values.arm_cm),
   };
 }
 
@@ -59,6 +65,8 @@ jest.mock('../../db/database', () => ({
   upsertExerciseCompleted: jest.fn(() => Promise.resolve(undefined)),
   upsertBodyWeight: jest.fn(() => Promise.resolve(undefined)),
   upsertAdditionalWorkouts: jest.fn(() => Promise.resolve(undefined)),
+  addAdditionalWorkout: jest.fn(() => Promise.resolve(undefined)),
+  toggleAdditionalWorkout: jest.fn(() => Promise.resolve(undefined)),
   syncRollingSchedule: jest.fn(() => Promise.resolve(undefined)),
   toISODate: jest.fn(() => '2026-09-19'),
   getTodaysMealsWithRecipe: jest.fn(() => Promise.resolve([])),
@@ -131,9 +139,9 @@ describe('DashboardScreen measurements modal (#325)', () => {
     expect(utils.getByTestId('measurement-waist-input').props.value).toBe('95');
   });
 
-  it('shows fresh DB values on reopen after close', async () => {
+  it('shows fresh DB values as placeholders on reopen after close', async () => {
     const utils = await renderWithModalOpen();
-    expect(utils.getByTestId('measurement-waist-input').props.value).toBe('80');
+    expect(utils.getByTestId('measurement-waist-input').props.placeholder).toBe('80');
 
     fireEvent.press(utils.getByLabelText('Cancel'));
     // Conditionally mounted -- closed means it's gone from the tree.
@@ -150,7 +158,7 @@ describe('DashboardScreen measurements modal (#325)', () => {
 
     fireEvent.press(utils.getByLabelText('Log measurements'));
 
-    expect(utils.getByTestId('measurement-waist-input').props.value).toBe('82');
+    expect(utils.getByTestId('measurement-waist-input').props.placeholder).toBe('82');
   });
 
   it('"-5" in waist shows an inline error, keeps the modal open, and does not erase the stored waist value', async () => {
@@ -166,11 +174,7 @@ describe('DashboardScreen measurements modal (#325)', () => {
     // Modal stays open.
     expect(utils.getByLabelText('Save')).toBeTruthy();
 
-    expect(mockLogBodyMeasurement).toHaveBeenCalled();
-    const [, fields] = mockLogBodyMeasurement.mock.calls[0];
-    expect(fields.waist_cm).toBeUndefined();
-    expect(fields).not.toHaveProperty('waist_cm', null);
-    expect(fields).not.toHaveProperty('waist_cm', -5);
+    expect(mockLogBodyMeasurement).not.toHaveBeenCalled();
   });
 
   it('saves the valid fields and leaves the invalid key undefined when only one field is invalid', async () => {
@@ -202,17 +206,14 @@ describe('DashboardScreen measurements modal (#325)', () => {
     expect(utils.queryByLabelText('Save')).toBeNull();
   });
 
-  it('sends null for a field cleared to blank', async () => {
+  it('writes nothing for a field left blank', async () => {
     const utils = await renderWithModalOpen();
 
-    fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '');
     await act(async () => {
       fireEvent.press(utils.getByLabelText('Save'));
     });
 
-    expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(1);
-    const [, fields] = mockLogBodyMeasurement.mock.calls[0];
-    expect(fields.waist_cm).toBeNull();
+    expect(mockLogBodyMeasurement).not.toHaveBeenCalled();
   });
 
   it('parses a comma decimal separator ("78,4")', async () => {
@@ -226,5 +227,41 @@ describe('DashboardScreen measurements modal (#325)', () => {
     expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(1);
     const [, fields] = mockLogBodyMeasurement.mock.calls[0];
     expect(fields.chest_cm).toBe(78.4);
+  });
+});
+
+describe('DashboardScreen measurement pills show their own date', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetLogByDate.mockResolvedValue({ ...mockEntry });
+  });
+
+  it('renders each pill with its own date and no shared "Last:" label', async () => {
+    mockGetLatestMeasurements.mockResolvedValue({
+      waist_cm: { value: 80, date: '2026-09-19' },
+      chest_cm: { value: 90, date: '2026-08-30' },
+      hips_cm: null,
+      thigh_cm: null,
+      arm_cm: null,
+    });
+    const utils = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    expect(utils.getByText('80 cm')).toBeTruthy();
+    expect(utils.getByText('2026-09-19')).toBeTruthy();
+    expect(utils.getByText('90 cm')).toBeTruthy();
+    expect(utils.getByText('2026-08-30')).toBeTruthy();
+    expect(utils.queryByText(/^Last:/)).toBeNull();
+    expect(utils.queryByText('Hips')).toBeNull();
+    expect(utils.queryByText('Thigh')).toBeNull();
+    expect(utils.queryByText('Arm')).toBeNull();
+  });
+
+  it('shows the empty-state subtitle only when nothing has been logged', async () => {
+    mockGetLatestMeasurements.mockResolvedValue(null);
+    const utils = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    expect(utils.getByText('No measurements logged yet')).toBeTruthy();
   });
 });

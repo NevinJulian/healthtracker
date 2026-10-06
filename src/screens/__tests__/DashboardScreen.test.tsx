@@ -39,6 +39,8 @@ jest.mock('../../db/database', () => ({
   upsertExerciseCompleted: jest.fn().mockResolvedValue(undefined),
   upsertBodyWeight: jest.fn().mockResolvedValue(undefined),
   upsertAdditionalWorkouts: jest.fn().mockResolvedValue(undefined),
+  addAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
+  toggleAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   syncRollingSchedule: jest.fn().mockResolvedValue(undefined),
   toISODate: jest.fn(() => '2026-09-19'),
   getTodaysMealsWithRecipe: jest.fn().mockResolvedValue([]),
