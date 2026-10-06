@@ -457,14 +457,18 @@
     },
     "416": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "commits": [
         "c45058c",
         "45363f6",
         "e5a6f8f",
         "118af59",
-        "329d70e"
+        "329d70e",
+        "000a4eb",
+        "58dd654",
+        "fbaa342",
+        "0098d42"
       ],
       "workOrder": "C:/git/ht-lanes/wo/416.md",
       "decisionSource": "owner comment on #416 (clearing not supported; placeholders; only typed fields saved; no all-NULL row)",
@@ -741,6 +745,10 @@
     {
       "at": "2026-10-06T17:51:36Z",
       "event": "#416 REJECT r1 (hollow all-NULL read test; NaN inserts all-NULL row) -> back to dev, roundTrips=1"
+    },
+    {
+      "at": "2026-10-06T17:52:52Z",
+      "event": "#416 round 2 (0098d42, 1045/89 per dev) in_test"
     }
   ]
 }
