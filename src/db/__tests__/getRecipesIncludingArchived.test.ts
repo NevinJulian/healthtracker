@@ -24,7 +24,7 @@ function recipe(id: string, title: string): Parameters<DatabaseModule['importRec
     fat: 10,
     prepTimeMinutes: 20,
     defaultServings: 4,
-    ingredients: [{ name: 'Rice', amount: 100, unit: 'g' }],
+    ingredients: [{ name: 'Rice', baseQuantity: 100, unit: 'g' }],
     instructions: 'Cook it',
     freezerTips: '',
   };
