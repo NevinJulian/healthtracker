@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ jest.mock('../../db/database', () => ({
   assignMealToPlan: jest.fn(() => Promise.resolve(undefined)),
   toggleMealConsumed: jest.fn(() => Promise.resolve(undefined)),
   getRecipes: jest.fn(() => Promise.resolve([])),
+  getRecipesIncludingArchived: jest.fn(() => Promise.resolve([])),
   toISODate: jest.fn(() => '2026-09-19'),
   resetCookEmptyNotified: jest.fn(() => Promise.resolve(undefined)),
 }));
@@ -263,5 +265,73 @@ describe('MealPrepScreen focus/load behaviour (#329)', () => {
 
     expect(utils.queryByText('Second Item')).toBeTruthy();
     expect(utils.queryByText('First Item')).toBeNull();
+  });
+});
+
+describe('MealPrepScreen refresh failure banner (#401)', () => {
+  let errorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockFocusCallback = null;
+    mockFocusCleanup = null;
+    mockGetMealInventory.mockResolvedValue([makeInventoryItem({ id: 1, title: 'Kept Item' })]);
+    mockGetWeeklyMealPlan.mockResolvedValue([]);
+    mockGetRecipes.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  it('keeps the loaded rows and shows a banner when a later load rejects, then clears it on success', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const utils = render(<MealPrepScreen />);
+    await triggerFocus();
+    fireEvent.press(utils.getByLabelText('My Inventory'));
+    expect(utils.queryByText('Kept Item')).toBeTruthy();
+    expect(utils.queryByText("Couldn't refresh. Showing the last loaded data.")).toBeNull();
+
+    mockGetMealInventory.mockRejectedValue(new Error('db down'));
+    await triggerFocus();
+
+    expect(utils.queryByText('Kept Item')).toBeTruthy();
+    expect(utils.getByText("Couldn't refresh. Showing the last loaded data.")).toBeTruthy();
+    expect(utils.queryByText("Couldn't load your meals")).toBeNull();
+    expect(alertSpy).not.toHaveBeenCalled();
+
+    mockGetMealInventory.mockResolvedValue([makeInventoryItem({ id: 1, title: 'Kept Item' })]);
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Retry'));
+    });
+    await flushMicrotasks();
+
+    expect(utils.queryByText("Couldn't refresh. Showing the last loaded data.")).toBeNull();
+    alertSpy.mockRestore();
+  });
+
+  it('sets no error when a blurred load rejects', async () => {
+    const utils = render(<MealPrepScreen />);
+    await triggerFocus();
+
+    let rejectLoad!: (err: Error) => void;
+    mockGetMealInventory.mockReturnValue(
+      new Promise<MealInventoryWithRecipe[]>((_, reject) => {
+        rejectLoad = reject;
+      })
+    );
+    await act(async () => {
+      const cleanup = mockFocusCallback?.();
+      mockFocusCleanup = typeof cleanup === 'function' ? cleanup : null;
+    });
+    await triggerBlur();
+    await act(async () => {
+      rejectLoad(new Error('late'));
+    });
+    await flushMicrotasks();
+
+    expect(utils.queryByText("Couldn't refresh. Showing the last loaded data.")).toBeNull();
+    expect(utils.queryByText("Couldn't load your meals")).toBeNull();
   });
 });

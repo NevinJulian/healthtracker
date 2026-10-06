@@ -1256,6 +1256,15 @@ export async function getRecipes(category?: string): Promise<Recipe[]> {
   }));
 }
 
+export async function getRecipesIncludingArchived(): Promise<Recipe[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<any>('SELECT * FROM recipe_library');
+  return rows.map((r) => ({
+    ...r,
+    ingredients: JSON.parse(r.ingredients),
+  }));
+}
+
 export async function getRecipeById(id: string): Promise<Recipe | null> {
   const db = getDatabase();
   const row = await db.getFirstAsync<any>(
