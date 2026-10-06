@@ -188,7 +188,7 @@
     },
     "397": {
       "lane": "F",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "commits": [
         "1bc96c5",
@@ -196,7 +196,9 @@
         "23faef1",
         "b8a14da",
         "7b567cd",
-        "f3a6afd"
+        "f3a6afd",
+        "40da49c",
+        "d61488d"
       ],
       "notes": "tester REJECT r1: stepper guard only checks the dirty ref at reload resolve; edit flushed before a held reload resolves is overwritten on screen and the next step commits a value derived from the stale number (probe: calls [[1850],[1850]]). Groups 1 and 2 sound (toggle windows probed, none found). Fix: per-field edit-sequence snapshot.",
       "workOrder": "C:/git/ht-lanes/wo/397.md",
@@ -534,6 +536,10 @@
     {
       "at": "2026-10-06T17:24:40Z",
       "event": "#397 REJECT r1 (stepper guard gap) -> back to dev, roundTrips=1; #417 in_test (1003/88 per dev)"
+    },
+    {
+      "at": "2026-10-06T17:26:02Z",
+      "event": "#397 round 2 (d61488d, 907/84 per dev) in_test"
     }
   ]
 }
