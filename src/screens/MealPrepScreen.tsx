@@ -163,36 +163,55 @@ export default function MealPrepScreen() {
 
   // ─── Actions ─────────────────────────────────────────────────
 
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+
+  const runGuarded = async (action: () => Promise<void>) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await action();
+    } finally {
+      savingRef.current = false;
+      if (mountedRef.current) setSaving(false);
+    }
+  };
+
   const handleLogCookedMeal = async (recipe_id: string, portions: number) => {
     // Backstop — the modal's own Save button is disabled for anything
     // outside this range, but never trust the caller alone (#324).
     if (!Number.isInteger(portions) || portions < 1 || portions > 50) return;
-    try {
-      await logCookedMeal(recipe_id, portions);
-    } catch (err) {
-      logDbError(err);
-      Alert.alert('Error', 'Failed to record your cooked meal. Please try again.');
-      return;
-    }
-    try {
-      await resetCookEmptyNotified();
-    } catch (err) {
-      console.warn('[MealPrepScreen] resetCookEmptyNotified failed:', err);
-    }
-    setLogModalVisible(false);
-    loadData();
+    await runGuarded(async () => {
+      try {
+        await logCookedMeal(recipe_id, portions);
+      } catch (err) {
+        logDbError(err);
+        Alert.alert('Error', 'Failed to record your cooked meal. Please try again.');
+        return;
+      }
+      try {
+        await resetCookEmptyNotified();
+      } catch (err) {
+        console.warn('[MealPrepScreen] resetCookEmptyNotified failed:', err);
+      }
+      setLogModalVisible(false);
+      loadData();
+    });
   };
 
   const handleAssignMeal = async (recipe_id: string) => {
     if (!assignTarget) return;
-    try {
-      await assignMealToPlan(assignTarget.date, assignTarget.meal_type, recipe_id);
-      setAssignModalVisible(false);
-      loadData();
-    } catch (err) {
-      logDbError(err);
-      Alert.alert('Error', 'Failed to assign the meal. Please try again.');
-    }
+    await runGuarded(async () => {
+      try {
+        await assignMealToPlan(assignTarget.date, assignTarget.meal_type, recipe_id);
+        setAssignModalVisible(false);
+        loadData();
+      } catch (err) {
+        logDbError(err);
+        Alert.alert('Error', 'Failed to assign the meal. Please try again.');
+      }
+    });
   };
 
   const handleToggleConsumed = async (planId: number, currentVal: boolean) => {
@@ -441,6 +460,7 @@ export default function MealPrepScreen() {
           onClose={() => setLogModalVisible(false)}
           recipes={recipes}
           onSave={handleLogCookedMeal}
+          saving={saving}
         />
       )}
 
@@ -449,6 +469,7 @@ export default function MealPrepScreen() {
         onClose={() => setAssignModalVisible(false)}
         inventory={inventory}
         onSave={handleAssignMeal}
+        saving={saving}
       />
     </View>
   );
@@ -546,11 +567,12 @@ function MacroChip({ label, value }: { label: string; value: string }) {
 
 // ─── Log Meal Modal ───────────────────────────────────────────
 
-function LogMealModal({ visible, onClose, recipes, onSave }: {
+function LogMealModal({ visible, onClose, recipes, onSave, saving }: {
   visible: boolean;
   onClose: () => void;
   recipes: Recipe[];
   onSave: (recipe_id: string, portions: number) => void;
+  saving: boolean;
 }) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [portions, setPortions] = useState('4');
@@ -625,7 +647,7 @@ function LogMealModal({ visible, onClose, recipes, onSave }: {
                   onSave(selectedRecipeId, parsedPortions);
                 }
               }}
-              disabled={!canSave}
+              disabled={!canSave || saving}
               style={styles.modalBtnHalf}
             />
           </View>
@@ -637,11 +659,12 @@ function LogMealModal({ visible, onClose, recipes, onSave }: {
 
 // ─── Assign Meal Modal ────────────────────────────────────────
 
-function AssignMealModal({ visible, onClose, inventory, onSave }: {
+function AssignMealModal({ visible, onClose, inventory, onSave, saving }: {
   visible: boolean;
   onClose: () => void;
   inventory: MealInventoryWithRecipe[];
   onSave: (recipe_id: string) => void;
+  saving: boolean;
 }) {
   if (!visible) return null;
 
@@ -667,6 +690,7 @@ function AssignMealModal({ visible, onClose, inventory, onSave }: {
                 <TouchableOpacity
                   style={styles.recipeOpt}
                   onPress={() => onSave(item.recipe_id)}
+                  disabled={saving}
                   activeOpacity={0.75}
                 >
                   <Text style={styles.recipeOptText}>{item.recipe.title}</Text>
