@@ -134,6 +134,59 @@ describe('SettingsScreen restore result alert', () => {
     expect(body).toContain('and 3 more');
   });
 
+  it('caps the columns listed per table', async () => {
+    const columns = Array.from({ length: 8 }, (_, i) => `c${i}`);
+    const [, body] = await runRestore({ ...base, skipped: [{ table: 'wide', columns, rows: 0 }] });
+    expect(body).toContain('c4');
+    expect(body).not.toContain('c5');
+    expect(body).toContain('and 3 more');
+  });
+
+  it('lists exactly five columns without a more suffix', async () => {
+    const columns = Array.from({ length: 5 }, (_, i) => `c${i}`);
+    const [, body] = await runRestore({ ...base, skipped: [{ table: 'wide', columns, rows: 0 }] });
+    expect(body).toContain('wide (c0, c1, c2, c3, c4)');
+    expect(body).not.toContain('more');
+  });
+
+  it('keeps the row count after the column cap', async () => {
+    const columns = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+    const [, body] = await runRestore({ ...base, skipped: [{ table: 'wide', columns, rows: 4 }] });
+    expect(body).toContain('wide (a, b, c, d, e and 2 more; 4 rows)');
+  });
+
+  it('truncates long table and column names with an ellipsis', async () => {
+    const longTable = 'T'.repeat(100);
+    const longColumn = 'C'.repeat(100);
+    const [, body] = await runRestore({
+      ...base,
+      skipped: [{ table: longTable, columns: [longColumn], rows: 0 }],
+    });
+    expect(body).not.toContain(longTable);
+    expect(body).not.toContain(longColumn);
+    expect(body).toContain(`${'T'.repeat(40)}…`);
+    expect(body).toContain(`${'C'.repeat(40)}…`);
+    expect(body).not.toContain(`${'T'.repeat(41)}`);
+    expect(body).not.toContain(`${'C'.repeat(41)}`);
+  });
+
+  it('leaves a 40 character name unchanged', async () => {
+    const name = 'N'.repeat(40);
+    const [, body] = await runRestore({
+      ...base,
+      skipped: [{ table: name, columns: [name], rows: 0 }],
+    });
+    expect(body).toContain(`${name} (${name})`);
+    expect(body).not.toContain('…');
+  });
+
+  it('truncates by code point without splitting a surrogate pair', async () => {
+    const name = '😀'.repeat(41);
+    const [, body] = await runRestore({ ...base, skipped: [{ table: name, columns: [], rows: 0 }] });
+    expect(body).toContain(`${'😀'.repeat(40)}…`);
+    expect(body).not.toContain('😀'.repeat(41));
+  });
+
   it('leaves the text unchanged without skipped data', async () => {
     const expected = 'Restored 3 tables and 10 rows. Revisit each screen to see the updated data.';
     const [, a] = await runRestore({ ...base });
