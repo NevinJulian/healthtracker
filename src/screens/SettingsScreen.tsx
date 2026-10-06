@@ -445,6 +445,17 @@ export default function SettingsScreen() {
   const sexGuard = useWriteGuard();
   const activityGuard = useWriteGuard();
   const goalGuard = useWriteGuard();
+  const workoutEnabledGuard = useWriteGuard();
+  const cookWhenEmptyGuard = useWriteGuard();
+  const weeklyCookDayEnabledGuard = useWriteGuard();
+  const weeklyCookDayGuard = useWriteGuard();
+  const mealEnabledGuards: Record<MealType, WriteGuard> = {
+    breakfast: useWriteGuard(),
+    lunch: useWriteGuard(),
+    dinner: useWriteGuard(),
+  };
+  const backupEnabledGuard = useWriteGuard();
+  const backupDayGuard = useWriteGuard();
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [recalcBusy, setRecalcBusy] = useState(false);
 
@@ -569,6 +580,17 @@ export default function SettingsScreen() {
       const sexSeqAtStart = sexGuard.seqRef.current;
       const activitySeqAtStart = activityGuard.seqRef.current;
       const goalSeqAtStart = goalGuard.seqRef.current;
+      const workoutEnabledSeqAtStart = workoutEnabledGuard.seqRef.current;
+      const cookWhenEmptySeqAtStart = cookWhenEmptyGuard.seqRef.current;
+      const weeklyCookDayEnabledSeqAtStart = weeklyCookDayEnabledGuard.seqRef.current;
+      const weeklyCookDaySeqAtStart = weeklyCookDayGuard.seqRef.current;
+      const mealEnabledSeqAtStart: Record<MealType, number> = {
+        breakfast: mealEnabledGuards.breakfast.seqRef.current,
+        lunch: mealEnabledGuards.lunch.seqRef.current,
+        dinner: mealEnabledGuards.dinner.seqRef.current,
+      };
+      const backupEnabledSeqAtStart = backupEnabledGuard.seqRef.current;
+      const backupDaySeqAtStart = backupDayGuard.seqRef.current;
       (async () => {
         const [
           workoutEnabled,
@@ -612,26 +634,52 @@ export default function SettingsScreen() {
           getBackupReminderTime(),
         ]);
         if (active) {
-          setReminder((prev) => ({ ...prev, enabled: workoutEnabled, time: workoutTime, permissionDenied: false }));
+          setReminder((prev) => ({
+            ...prev,
+            enabled: editedSince(workoutEnabledGuard, workoutEnabledSeqAtStart) ? prev.enabled : workoutEnabled,
+            time: workoutTime,
+            permissionDenied: false,
+          }));
           setCooking((prev) => ({
             ...prev,
-            cookWhenEmptyEnabled,
-            weeklyCookDayEnabled,
-            weeklyCookDay,
+            cookWhenEmptyEnabled: editedSince(cookWhenEmptyGuard, cookWhenEmptySeqAtStart)
+              ? prev.cookWhenEmptyEnabled
+              : cookWhenEmptyEnabled,
+            weeklyCookDayEnabled: editedSince(weeklyCookDayEnabledGuard, weeklyCookDayEnabledSeqAtStart)
+              ? prev.weeklyCookDayEnabled
+              : weeklyCookDayEnabled,
+            weeklyCookDay: editedSince(weeklyCookDayGuard, weeklyCookDaySeqAtStart)
+              ? prev.weeklyCookDay
+              : weeklyCookDay,
             weeklyCookDayTime,
             permissionDenied: false,
           }));
           setMealReminders((prev) => ({
             ...prev,
-            breakfast: { enabled: breakfastEnabled, time: breakfastTime },
-            lunch:     { enabled: lunchEnabled,     time: lunchTime },
-            dinner:    { enabled: dinnerEnabled,     time: dinnerTime },
+            breakfast: {
+              enabled: editedSince(mealEnabledGuards.breakfast, mealEnabledSeqAtStart.breakfast)
+                ? prev.breakfast.enabled
+                : breakfastEnabled,
+              time: breakfastTime,
+            },
+            lunch: {
+              enabled: editedSince(mealEnabledGuards.lunch, mealEnabledSeqAtStart.lunch)
+                ? prev.lunch.enabled
+                : lunchEnabled,
+              time: lunchTime,
+            },
+            dinner: {
+              enabled: editedSince(mealEnabledGuards.dinner, mealEnabledSeqAtStart.dinner)
+                ? prev.dinner.enabled
+                : dinnerEnabled,
+              time: dinnerTime,
+            },
             permissionDenied: false,
           }));
           setBackupReminder((prev) => ({
             ...prev,
-            enabled: backupEnabled,
-            day: backupDay,
+            enabled: editedSince(backupEnabledGuard, backupEnabledSeqAtStart) ? prev.enabled : backupEnabled,
+            day: editedSince(backupDayGuard, backupDaySeqAtStart) ? prev.day : backupDay,
             time: backupTime,
             permissionDenied: false,
           }));
@@ -694,7 +742,9 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await setWorkoutReminderEnabled(value);
+      await trackProfileWrite(workoutEnabledGuard.seqRef, workoutEnabledGuard.pendingRef, () =>
+        setWorkoutReminderEnabled(value)
+      );
       setReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
       await reconcileScheduledNotifications();
     } catch (error) {
@@ -725,7 +775,9 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await setCookWhenEmptyEnabled(value);
+      await trackProfileWrite(cookWhenEmptyGuard.seqRef, cookWhenEmptyGuard.pendingRef, () =>
+        setCookWhenEmptyEnabled(value)
+      );
       setCooking((prev) => ({ ...prev, cookWhenEmptyEnabled: value, permissionDenied: false }));
     } catch (error) {
       reportWriteFailure(error);
@@ -743,7 +795,9 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await setWeeklyCookDayEnabled(value);
+      await trackProfileWrite(weeklyCookDayEnabledGuard.seqRef, weeklyCookDayEnabledGuard.pendingRef, () =>
+        setWeeklyCookDayEnabled(value)
+      );
       setCooking((prev) => ({ ...prev, weeklyCookDayEnabled: value, permissionDenied: false }));
       await reconcileScheduledNotifications();
     } catch (error) {
@@ -755,7 +809,7 @@ export default function SettingsScreen() {
 
   async function handleWeekdaySelect(day: number) {
     try {
-      await setWeeklyCookDay(day);
+      await trackProfileWrite(weeklyCookDayGuard.seqRef, weeklyCookDayGuard.pendingRef, () => setWeeklyCookDay(day));
       setCooking((prev) => ({ ...prev, weeklyCookDay: day }));
       if (cooking.weeklyCookDayEnabled) {
         await reconcileScheduledNotifications();
@@ -788,7 +842,8 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await setMealReminderEnabled(meal, value);
+      const guard = mealEnabledGuards[meal];
+      await trackProfileWrite(guard.seqRef, guard.pendingRef, () => setMealReminderEnabled(meal, value));
       setMealReminders((prev) => ({
         ...prev,
         [meal]: { ...prev[meal], enabled: value },
@@ -1082,7 +1137,9 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await setBackupReminderEnabled(value);
+      await trackProfileWrite(backupEnabledGuard.seqRef, backupEnabledGuard.pendingRef, () =>
+        setBackupReminderEnabled(value)
+      );
       setBackupReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
       await reconcileScheduledNotifications();
     } catch (error) {
@@ -1094,7 +1151,7 @@ export default function SettingsScreen() {
 
   async function handleBackupReminderDaySelect(day: number) {
     try {
-      await setBackupReminderDay(day);
+      await trackProfileWrite(backupDayGuard.seqRef, backupDayGuard.pendingRef, () => setBackupReminderDay(day));
       setBackupReminder((prev) => ({ ...prev, day }));
       if (backupReminder.enabled) {
         await reconcileScheduledNotifications();
