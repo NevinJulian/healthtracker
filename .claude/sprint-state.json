@@ -135,9 +135,10 @@
         397,
         407
       ],
-      "current": 404,
+      "current": 397,
       "done": [
-        405
+        405,
+        404
       ],
       "parked": []
     },
@@ -182,7 +183,7 @@
     },
     "397": {
       "lane": "F",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "notes": "WO ready; waits for #404. Siblings: toggles, day chips, steppers",
@@ -191,7 +192,7 @@
     },
     "404": {
       "lane": "F",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "51ad899",
@@ -203,9 +204,11 @@
         "9a55908",
         "6ce3d58"
       ],
-      "notes": "dev: catch also covers the notification follow-up call (write ok + reconcile fails -> alert, UI keeps old value); recalc can save calories and fail protein; bb436c5 amended before push only",
+      "notes": "tester APPROVE r0. Dev report was wrong on one point (harmlessly): state IS set before the notification follow-up, so write-ok + reconcile-fail leaves UI = DB plus an error alert. HUMAN: the expect(unhandled).toEqual([]) assertions are vacuous under jest (filed #429); recalc can save calories and fail protein (pre-existing, #429).",
       "workOrder": "C:/git/ht-lanes/wo/404.md",
-      "deviceCheck": "Fresh install: tap Skip; app opens to Dashboard."
+      "deviceCheck": "Fresh install: tap Skip; app opens to Dashboard.",
+      "securityReview": "skipped: UI error surfacing only (try/catch + alert around existing writes); no db/api/backup code in the diff",
+      "regressionProof": "skip: 2 failure cases fail with 51ad899 OnboardingScreen.tsx; settings: 15/15 fail with f0ea442 SettingsScreen.tsx and flip per fix commit (5 at daef76e, 8 at 28689b9, 2 at 6ce3d58); 894/83 (tester reproduced)"
     },
     "405": {
       "lane": "F",
@@ -225,15 +228,16 @@
     },
     "406": {
       "lane": "A",
-      "status": "in_test",
+      "status": "in_security",
       "roundTrips": 0,
       "commits": [
         "7033d36",
         "3f9cf8c"
       ],
-      "notes": "WO ready; waits for #412",
+      "notes": "tester APPROVE r0. Survivor of the dedupe prefers a consumed row, so the post-dedupe count = slots still showing a consumed meal; cannot under-report. Old code counted string 1 as 0; new counts the stored value.",
       "workOrder": "C:/git/ht-lanes/wo/406.md",
-      "deviceCheck": "none"
+      "deviceCheck": "none",
+      "regressionProof": "2 new tests fail with 7033d36 database.ts (4 vs 2, 2 vs 1), 6/6 at 3f9cf8c (tester reproduced); 977/82"
     },
     "407": {
       "lane": "F",
@@ -303,14 +307,16 @@
     425,
     426,
     427,
-    428
+    428,
+    429
   ],
   "smallFindings": [
     "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
     "Onboarding age field is number-pad (no decimal key) but accepts decimals via paste - #405 analyst",
     "src/components Button.tsx has raw borderRadius: 13 and minHeight: 48 instead of tokens - #419 dev",
     "RecipeEditorScreen: SAVE_RECOMPUTE_DEADLINE_MS is declared between DEFAULT_SERVINGS and DEFAULT_PREP, splitting two related constants - #318 tester (handed to lane E cleanup)",
-    "workoutSetIndexCollision.test.ts header comment (~lines 22-40) still says restore re-runs v37 - #412 tester (handed to lane A cleanup)"
+    "workoutSetIndexCollision.test.ts header comment (~lines 22-40) still says restore re-runs v37 - #412 tester (handed to lane A cleanup)",
+    "A payload row with is_consumed null makes the whole restore throw on NOT NULL (pre-existing; payload validation) - #406 tester"
   ],
   "log": [
     {
@@ -389,6 +395,10 @@
     {
       "at": "2026-10-06T17:16:12Z",
       "event": "merged lane E into integration 976cd0e; gates green: typecheck clean, 885/86"
+    },
+    {
+      "at": "2026-10-06T17:17:11Z",
+      "event": "#404 ready (APPROVE r0, security skipped); lane F -> #397 in_dev; #406 tester APPROVE r0 -> security; lane A cleanup running in parallel; filed #429"
     }
   ]
 }
