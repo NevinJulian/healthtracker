@@ -2581,21 +2581,17 @@ async function _restoreFromPayload(
   let tablesRestored = 0;
   let rowsRestored = 0;
   const skipped: { table: string; columns: string[]; rows: number }[] = [];
-  // Consumed weekly_meal_plan rows restored from a pre-v34 backup, i.e. one
-  // whose rows predate the consumed_from_inventory_id column (#302). They
-  // restore fine — the column just lands NULL — but _creditPortion() only
-  // credits a batch it can point at, so unticking one of these meals will
-  // silently return nothing to inventory. Counted here so the caller can
-  // say so instead of the user discovering it a portion at a time (#310).
-  // Counted after the dedupe replay, so only surviving rows are reported.
+  // Consumed meals from a pre-v34 backup restore with a NULL
+  // consumed_from_inventory_id, so unticking them credits no batch. Counted
+  // after the dedupe replay so only surviving rows are reported.
   let legacyPayload = false;
   let consumedMealsWithoutRefund = 0;
 
   await db.withTransactionAsync(async () => {
     // Drop first so a legacy backup's duplicate weekly_meal_plan rows or
     // colliding/gapped workout_set_log rows (see above) can all be inserted
-    // below; both are recreated by re-running their migrations' own SQL
-    // (POST_RESTORE_STEPS) after the restore loop.
+    // below; both indexes are recreated by POST_RESTORE_STEPS after the
+    // restore loop.
     await db.execAsync('DROP INDEX IF EXISTS idx_weekly_meal_plan_date_meal_type');
     await db.execAsync('DROP INDEX IF EXISTS idx_workout_set_log_date_exercise_set_index');
 
