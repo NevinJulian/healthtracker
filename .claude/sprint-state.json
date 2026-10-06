@@ -111,7 +111,9 @@
         408
       ],
       "current": 401,
-      "done": [],
+      "done": [
+        417
+      ],
       "parked": [],
       "base": "62cc088"
     },
@@ -373,7 +375,7 @@
     },
     "417": {
       "lane": "D",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "5662af0",
@@ -386,7 +388,8 @@
       "decisionSource": "owner decision in #417 body (picker stays on getRecipes; plan lookup includes archived)",
       "deviceCheck": "Cook a recipe, assign to today Lunch, tick consumed. Delete the recipe (archives it). Meal Plan weekly: slot shows title and kcal, day card shows CONSUMED TODAY with kcal. + Log Cooked Meal: deleted recipe not listed.",
       "notes": "tester APPROVE r0. Only the Lunch slot is exercised by the new render test (Dinner symmetric by reading). 5662af0 alone does not typecheck. An archived recipe row with malformed ingredients now also breaks MealPrep load (#430).",
-      "regressionProof": "db test fails with 5662af0 database.ts; screen test fails with fa4a656 MealPrepScreen.tsx (Archived Curry not found); pass at ef83ef1; 1003/88 (tester reproduced)"
+      "regressionProof": "db test fails with 5662af0 database.ts; screen test fails with fa4a656 MealPrepScreen.tsx (Archived Curry not found); pass at ef83ef1; 1003/88 (tester reproduced)",
+      "securityReview": "APPROVE: static read-only SELECT; planRecipes feeds only the slot title Text and the kcal sums; no write path can pick an archived recipe id it could not before. Note: a malformed archived row now breaks the MealPrep load like an active one already did (#430)."
     },
     "419": {
       "lane": "B",
@@ -546,6 +549,10 @@
     {
       "at": "2026-10-06T17:26:51Z",
       "event": "#410 and #417 tester APPROVE r0 -> security (read-only, parallel); lane C -> #411 in_dev (first commit reverts the mapLogRow drive-by); lane D -> #401 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:27:18Z",
+      "event": "#417 ready (security APPROVE)"
     }
   ]
 }
