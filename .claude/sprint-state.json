@@ -94,11 +94,12 @@
         415,
         416
       ],
-      "current": 416,
+      "current": null,
       "done": [
         410,
         411,
-        415
+        415,
+        416
       ],
       "parked": [],
       "base": "62cc088"
@@ -457,7 +458,7 @@
     },
     "416": {
       "lane": "C",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 1,
       "commits": [
         "c45058c",
@@ -474,7 +475,8 @@
       "decisionSource": "owner comment on #416 (clearing not supported; placeholders; only typed fields saved; no all-NULL row)",
       "deviceCheck": "Modal opens with empty inputs and old values as placeholders. Type chest only, save: chest pill today, waist keeps old date. Save with nothing typed: nothing changes. abc: error, nothing changes. Restart: values persist, Analytics card shows no empty entry.",
       "notes": "WO ready; waits for #415. Authorized rewriting the existing prefill test that pins null-on-blank (own commit, flagged for human review). | dev: e5a6f8f rewrites 6 existing assertions (HUMAN review); existing db test returns-null-when-all-NULL no longer seeds real all-NULL rows (sent to tester). | tester REJECT r1: fix sound and e5a6f8f accepted line by line, but the existing all-NULL read test is now hollow (seeds via the writer, which writes nothing) and no other test seeds a legacy all-NULL row; also NaN/Infinity still insert an all-NULL row. Sent back: raw-SQL seeded tests, non-finite guard, dash-placeholder test. NOTE for human: mixed valid+invalid input saves the valid fields and keeps the modal open (pre-existing rule, still pinned). | APPROVE r2. The legacy returns-null-for-all-NULL-rows test did not fail under the tester mutation (it pins only the null result). Number.isFinite now also skips numeric strings (no real caller passes one).",
-      "regressionProof": "db 2 fail with c45058c database.ts; modal 5/8 fail with 118af59 DashboardScreen.tsx; NaN test fails with 58dd654 database.ts; all pass at 0098d42; 1045/89 (tester reproduced). Mutation of getLatestMeasurements (NULL filters removed) fails 6 tests incl. the new carry-forward-past-legacy-row test."
+      "regressionProof": "db 2 fail with c45058c database.ts; modal 5/8 fail with 118af59 DashboardScreen.tsx; NaN test fails with 58dd654 database.ts; all pass at 0098d42; 1045/89 (tester reproduced). Mutation of getLatestMeasurements (NULL filters removed) fails 6 tests incl. the new carry-forward-past-legacy-row test.",
+      "securityReview": "APPROVE: column identifiers only from a const tuple, values bound, on both insert and update branches; read-then-write inside one queued unit (date UNIQUE as backstop); restore never calls this function. Note: handleSaveMeasurements catches and only logs a write error, so the modal closes as if saved (pre-existing, filed #435)."
     },
     "417": {
       "lane": "D",
@@ -529,7 +531,8 @@
     431,
     432,
     433,
-    434
+    434,
+    435
   ],
   "smallFindings": [
     "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
@@ -754,6 +757,10 @@
     {
       "at": "2026-10-06T17:54:06Z",
       "event": "#416 tester APPROVE r2 (1 round trip) -> security; lane C cleanup running in parallel"
+    },
+    {
+      "at": "2026-10-06T17:54:46Z",
+      "event": "#416 ready (security APPROVE); filed #435 (silent measurement-save failure); lane C out of issues (4 done), cleanup running"
     }
   ]
 }
