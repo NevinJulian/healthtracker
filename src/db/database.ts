@@ -18,7 +18,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, RESTORE_SLOT_DEDUPE_SQL, Exercise } from './schema';
+import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, RESTORE_SLOT_DEDUPE_SQL, RESTORE_SET_INDEX_SQL, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
 import { recipes } from '../data/recipes';
 import { NUTRITION_GOALS, NutritionGoals } from '../nutrition/goals';
@@ -2552,7 +2552,7 @@ export async function dumpTable(
  */
 const POST_RESTORE_STEPS: readonly ({ sql: string } | { version: number })[] = [
   { sql: RESTORE_SLOT_DEDUPE_SQL },
-  { version: 37 },
+  { sql: RESTORE_SET_INDEX_SQL },
 ];
 
 type RestoreFromPayloadResult = {

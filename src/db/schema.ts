@@ -890,3 +890,34 @@ export const RESTORE_SLOT_DEDUPE_SQL = `
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_meal_plan_date_meal_type ON weekly_meal_plan(date, meal_type);
 `;
+
+/**
+ * Restore-only replacement for v37's renumber. Not a migration: it runs only
+ * inside restoreFromPayload's transaction, after the unique index is dropped.
+ * A (date, exercise) partition is renumbered densely from 0 only if two of its
+ * rows share a set_index, ordered by set_index, created_at, id. Collision-free
+ * partitions keep their set_index values, gaps included. The new indexes are
+ * staged in a temp table so the ordering never reads values it has already
+ * rewritten.
+ */
+export const RESTORE_SET_INDEX_SQL = `
+  CREATE TEMP TABLE restore_set_index_new AS
+  SELECT id, ROW_NUMBER() OVER (PARTITION BY date, exercise ORDER BY set_index ASC, created_at ASC, id ASC) - 1 AS new_index
+  FROM workout_set_log w
+  WHERE EXISTS (
+    SELECT 1 FROM workout_set_log c
+    WHERE c.date = w.date AND c.exercise = w.exercise
+      AND EXISTS (
+        SELECT 1 FROM workout_set_log d
+        WHERE d.date = c.date AND d.exercise = c.exercise AND d.set_index = c.set_index AND d.id != c.id
+      )
+  );
+
+  UPDATE workout_set_log
+  SET set_index = (SELECT new_index FROM restore_set_index_new n WHERE n.id = workout_set_log.id)
+  WHERE id IN (SELECT id FROM restore_set_index_new);
+
+  DROP TABLE restore_set_index_new;
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_set_log_date_exercise_set_index ON workout_set_log(date, exercise, set_index);
+`;
