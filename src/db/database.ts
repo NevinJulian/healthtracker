@@ -3095,12 +3095,12 @@ type MeasurementInput = {
 /**
  * Upsert a body-measurement entry for `date`.
  *
- * If no row exists for that date, inserts a new one with only the provided
- * fields set (others stay NULL).  If a row already exists, updates only the
- * non-undefined fields so previous measurements are preserved.
+ * Only fields that are neither null nor undefined are written; existing values
+ * are never overwritten with NULL. If no field qualifies, nothing is written
+ * and no row is created.
  *
  * @param date   - YYYY-MM-DD date key.
- * @param fields - Partial measurement object; undefined fields are ignored.
+ * @param fields - Partial measurement object; null and undefined fields are ignored.
  */
 export function logBodyMeasurement(
   date: string,
@@ -3114,39 +3114,26 @@ async function _logBodyMeasurementImpl(
   fields: MeasurementInput
 ): Promise<void> {
   const db = getDatabase();
+  const columns = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
+  const provided = columns.filter((c) => fields[c] != null);
+  if (provided.length === 0) return;
+
   const existing = await db.getFirstAsync<{ id: number }>(
     'SELECT id FROM body_measurements WHERE date = ?',
     [date]
   );
 
   if (!existing) {
-    // Insert — only supply provided fields; missing ones default to NULL
     await db.runAsync(
-      `INSERT INTO body_measurements (date, waist_cm, chest_cm, hips_cm, thigh_cm, arm_cm)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        date,
-        fields.waist_cm ?? null,
-        fields.chest_cm ?? null,
-        fields.hips_cm ?? null,
-        fields.thigh_cm ?? null,
-        fields.arm_cm ?? null,
-      ]
+      `INSERT INTO body_measurements (date, ${provided.join(', ')})
+       VALUES (?, ${provided.map(() => '?').join(', ')})`,
+      [date, ...provided.map((c) => fields[c] as number)]
     );
     return;
   }
 
-  // Update — only the explicitly provided (non-undefined) fields
-  const setClauses: string[] = [];
-  const values: (number | null)[] = [];
-
-  if (fields.waist_cm !== undefined) { setClauses.push('waist_cm = ?'); values.push(fields.waist_cm ?? null); }
-  if (fields.chest_cm !== undefined) { setClauses.push('chest_cm = ?'); values.push(fields.chest_cm ?? null); }
-  if (fields.hips_cm  !== undefined) { setClauses.push('hips_cm = ?');  values.push(fields.hips_cm  ?? null); }
-  if (fields.thigh_cm !== undefined) { setClauses.push('thigh_cm = ?'); values.push(fields.thigh_cm ?? null); }
-  if (fields.arm_cm   !== undefined) { setClauses.push('arm_cm = ?');   values.push(fields.arm_cm   ?? null); }
-
-  if (setClauses.length === 0) return; // Nothing to update
+  const setClauses = provided.map((c) => `${c} = ?`);
+  const values: number[] = provided.map((c) => fields[c] as number);
 
   await db.runAsync(
     `UPDATE body_measurements SET ${setClauses.join(', ')} WHERE id = ?`,
