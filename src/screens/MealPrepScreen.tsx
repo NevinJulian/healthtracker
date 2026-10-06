@@ -20,6 +20,7 @@ import {
   assignMealToPlan,
   toggleMealConsumed,
   getRecipes,
+  getRecipesIncludingArchived,
   Recipe,
   MealInventoryWithRecipe,
   WeeklyMealPlanItem,
@@ -86,6 +87,7 @@ export default function MealPrepScreen() {
   const [assignTarget, setAssignTarget] = useState<{ date: string; meal_type: string } | null>(null);
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [planRecipes, setPlanRecipes] = useState<Recipe[]>([]);
 
   // Tracks whether the screen has completed its first load. Post-action
   // refreshes (handleLogCookedMeal, handleAssignMeal, handleToggleConsumed)
@@ -121,15 +123,17 @@ export default function MealPrepScreen() {
       setLoading(true);
     }
     try {
-      const [inv, plan, allRecipes] = await Promise.all([
+      const [inv, plan, allRecipes, allPlanRecipes] = await Promise.all([
         getMealInventory(),
         getWeeklyMealPlan(),
         getRecipes(),
+        getRecipesIncludingArchived(),
       ]);
       if (!mountedRef.current || runIdRef.current !== runId) return;
       setInventory(inv);
       setWeeklyPlan(plan);
       setRecipes(allRecipes);
+      setPlanRecipes(allPlanRecipes);
       hasLoadedOnceRef.current = true;
     } catch (err) {
       if (!mountedRef.current || runIdRef.current !== runId) return;
@@ -309,8 +313,8 @@ export default function MealPrepScreen() {
           const lunchPlan = weeklyPlan.find(p => p.date === dateStr && p.meal_type === 'Lunch');
           const dinnerPlan = weeklyPlan.find(p => p.date === dateStr && p.meal_type === 'Dinner');
 
-          const lunchRecipe = lunchPlan ? recipes.find(r => r.id === lunchPlan.recipe_id) : null;
-          const dinnerRecipe = dinnerPlan ? recipes.find(r => r.id === dinnerPlan.recipe_id) : null;
+          const lunchRecipe = lunchPlan ? planRecipes.find(r => r.id === lunchPlan.recipe_id) : null;
+          const dinnerRecipe = dinnerPlan ? planRecipes.find(r => r.id === dinnerPlan.recipe_id) : null;
 
           // Daily totals
           const consumed = [
