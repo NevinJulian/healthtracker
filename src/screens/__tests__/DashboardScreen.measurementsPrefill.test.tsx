@@ -90,9 +90,9 @@ describe('DashboardScreen measurements modal only submits edited fields', () => 
     );
   });
 
-  it('skips the untouched prefilled waist when only chest is edited', async () => {
+  it('skips the untouched waist when only chest is edited', async () => {
     const utils = await renderWithModalOpen();
-    expect(utils.getByTestId('measurement-waist-input').props.value).toBe('80');
+    expect(utils.getByTestId('measurement-waist-input').props.value).toBe('');
 
     fireEvent.changeText(utils.getByTestId('measurement-chest-input'), '90');
     await pressSave(utils);
@@ -103,17 +103,17 @@ describe('DashboardScreen measurements modal only submits edited fields', () => 
     expect(fields.chest_cm).toBe(90);
   });
 
-  it('sends null for a prefilled field the user blanked', async () => {
+  it('writes nothing when a field the user typed in is blanked again', async () => {
     const utils = await renderWithModalOpen();
 
+    fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '81');
     fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '');
     await pressSave(utils);
 
-    expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(1);
-    expect(mockLogBodyMeasurement.mock.calls[0][1].waist_cm).toBeNull();
+    expect(mockLogBodyMeasurement).not.toHaveBeenCalled();
   });
 
-  it('sends the parsed number for an edited prefilled field', async () => {
+  it('sends the parsed number for a typed field', async () => {
     const utils = await renderWithModalOpen();
 
     fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '78,5');

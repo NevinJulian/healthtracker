@@ -139,9 +139,9 @@ describe('DashboardScreen measurements modal (#325)', () => {
     expect(utils.getByTestId('measurement-waist-input').props.value).toBe('95');
   });
 
-  it('shows fresh DB values on reopen after close', async () => {
+  it('shows fresh DB values as placeholders on reopen after close', async () => {
     const utils = await renderWithModalOpen();
-    expect(utils.getByTestId('measurement-waist-input').props.value).toBe('80');
+    expect(utils.getByTestId('measurement-waist-input').props.placeholder).toBe('80');
 
     fireEvent.press(utils.getByLabelText('Cancel'));
     // Conditionally mounted -- closed means it's gone from the tree.
@@ -158,7 +158,7 @@ describe('DashboardScreen measurements modal (#325)', () => {
 
     fireEvent.press(utils.getByLabelText('Log measurements'));
 
-    expect(utils.getByTestId('measurement-waist-input').props.value).toBe('82');
+    expect(utils.getByTestId('measurement-waist-input').props.placeholder).toBe('82');
   });
 
   it('"-5" in waist shows an inline error, keeps the modal open, and does not erase the stored waist value', async () => {
@@ -174,11 +174,7 @@ describe('DashboardScreen measurements modal (#325)', () => {
     // Modal stays open.
     expect(utils.getByLabelText('Save')).toBeTruthy();
 
-    expect(mockLogBodyMeasurement).toHaveBeenCalled();
-    const [, fields] = mockLogBodyMeasurement.mock.calls[0];
-    expect(fields.waist_cm).toBeUndefined();
-    expect(fields).not.toHaveProperty('waist_cm', null);
-    expect(fields).not.toHaveProperty('waist_cm', -5);
+    expect(mockLogBodyMeasurement).not.toHaveBeenCalled();
   });
 
   it('saves the valid fields and leaves the invalid key undefined when only one field is invalid', async () => {
@@ -210,17 +206,14 @@ describe('DashboardScreen measurements modal (#325)', () => {
     expect(utils.queryByLabelText('Save')).toBeNull();
   });
 
-  it('sends null for a field cleared to blank', async () => {
+  it('writes nothing for a field left blank', async () => {
     const utils = await renderWithModalOpen();
 
-    fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '');
     await act(async () => {
       fireEvent.press(utils.getByLabelText('Save'));
     });
 
-    expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(1);
-    const [, fields] = mockLogBodyMeasurement.mock.calls[0];
-    expect(fields.waist_cm).toBeNull();
+    expect(mockLogBodyMeasurement).not.toHaveBeenCalled();
   });
 
   it('parses a comma decimal separator ("78,4")', async () => {
