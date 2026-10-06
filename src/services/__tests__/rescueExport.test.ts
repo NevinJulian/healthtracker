@@ -1,3 +1,11 @@
+jest.mock('expo-file-system/legacy', () => ({
+  documentDirectory: 'file:///document/',
+  cacheDirectory: 'file:///cache/',
+  getInfoAsync: jest.fn(),
+  copyAsync: jest.fn(),
+}));
+jest.mock('expo-sharing', () => ({ shareAsync: jest.fn() }));
+
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { exportRawDatabase } from '../rescueExport';
