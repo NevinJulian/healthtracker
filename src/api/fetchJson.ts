@@ -47,6 +47,11 @@ export interface FetchJsonOptions {
   signal?: AbortSignal;
   /** Extra request headers. */
   headers?: Record<string, string>;
+  /**
+   * Called before every HTTP attempt, retries included. A throw rejects with
+   * `FetchJsonError` and is not retried.
+   */
+  beforeAttempt?: () => void;
 }
 
 /** Internal marker: this attempt was aborted by the caller's own signal. */
@@ -174,11 +179,19 @@ export async function fetchJson<T = unknown>(
     retries = DEFAULT_RETRIES,
     signal,
     headers,
+    beforeAttempt,
   } = options;
 
   let attempt = 0;
   for (;;) {
     try {
+      if (beforeAttempt) {
+        try {
+          beforeAttempt();
+        } catch (err) {
+          throw new FetchJsonError(err instanceof Error ? err.message : String(err));
+        }
+      }
       const res = await attemptFetch(url, timeoutMs, signal, headers);
 
       if (!res.ok) {

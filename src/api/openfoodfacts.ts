@@ -90,6 +90,21 @@ const OFF_HEADERS = {
   'User-Agent': `HealthTracker/${expo.version} (https://github.com/NevinJulian/healthtracker)`,
 };
 
+const OFF_BUDGET_MAX = 10;
+const OFF_BUDGET_WINDOW_MS = 60_000;
+const attemptTimes: number[] = [];
+
+function takeSearchSlot(): void {
+  const now = Date.now();
+  while (attemptTimes.length > 0 && now - attemptTimes[0] >= OFF_BUDGET_WINDOW_MS) {
+    attemptTimes.shift();
+  }
+  if (attemptTimes.length >= OFF_BUDGET_MAX) {
+    throw new Error('Open Food Facts search budget exhausted');
+  }
+  attemptTimes.push(now);
+}
+
 /**
  * Fetch per-100g nutrition data from Open Food Facts for the given search term.
  * Returns null when: no products found, fields are missing, or network fails.
@@ -98,7 +113,11 @@ const OFF_HEADERS = {
 async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutrition | null> {
   try {
     const url = `${OFF_SEARCH_URL}&search_terms=${encodeURIComponent(term)}`;
-    const data = await fetchJson<OFFResponse>(url, { signal, headers: OFF_HEADERS });
+    const data = await fetchJson<OFFResponse>(url, {
+      signal,
+      headers: OFF_HEADERS,
+      beforeAttempt: takeSearchSlot,
+    });
     if (!data.products || data.products.length === 0) return null;
 
     // Pick the first product that has all four macro fields
