@@ -3,15 +3,43 @@
   "startedAt": "2026-10-06T17:01:16Z",
   "integrationBranch": "sprint/auto-fixes",
   "baseSha": "58a7f3f",
-  "baseline": { "typecheck": "pass", "testSuites": 81, "tests": 862 },
-  "frozenScope": [414, 412, 406, 419, 410, 411, 415, 416, 417, 401, 403, 408, 318, 405, 404, 397, 407, 398, 400, 409],
-  "excluded": {
-    "402": "PR #420, landed by hand",
-    "399": "PR #420, landed by hand",
-    "396": "needs restore rework + cascade decision",
-    "392": "feature, runs outside the sprint"
+  "baseline": {
+    "typecheck": "pass",
+    "testSuites": 81,
+    "tests": 862
   },
-  "budget": { "maxRoundTripsPerIssue": 3, "maxParkedBeforeAbort": 8 },
+  "frozenScope": [
+    414,
+    412,
+    406,
+    419,
+    410,
+    411,
+    415,
+    416,
+    417,
+    401,
+    403,
+    408,
+    318,
+    405,
+    404,
+    397,
+    407,
+    398,
+    400,
+    409
+  ],
+  "excluded": {
+    "392": "feature, runs outside the sprint",
+    "396": "needs restore rework + cascade decision",
+    "399": "PR #420, landed by hand",
+    "402": "PR #420, landed by hand"
+  },
+  "budget": {
+    "maxRoundTripsPerIssue": 3,
+    "maxParkedBeforeAbort": 8
+  },
   "worktreeRoot": "C:/git/ht-lanes",
   "orchestratorDecisions": [
     "Each lane runs in its own git worktree at C:/git/ht-lanes/lane-<x>. A, B, E, F branch from sprint/auto-fixes at 58a7f3f; C and D branch after lane A merges; G after every other lane merges.",
@@ -20,20 +48,180 @@
     "After each integration push, read the real GitHub test check via the public REST check-runs endpoint (curl, read-only; gh CLI forbidden)."
   ],
   "lanes": {
-    "A": { "branch": "sprint/lane-a-db", "worktree": "C:/git/ht-lanes/lane-a", "status": "pending", "order": [414, 412, 406], "current": null, "done": [], "parked": [] },
-    "B": { "branch": "sprint/lane-b-start", "worktree": "C:/git/ht-lanes/lane-b", "status": "pending", "order": [419], "current": null, "done": [], "parked": [] },
-    "C": { "branch": "sprint/lane-c-dashboard", "worktree": "C:/git/ht-lanes/lane-c", "status": "pending", "waitsFor": "lane A merged", "order": [410, 411, 415, 416], "current": null, "done": [], "parked": [] },
-    "D": { "branch": "sprint/lane-d-mealprep", "worktree": "C:/git/ht-lanes/lane-d", "status": "pending", "waitsFor": "lane A merged", "order": [417, 401, 403, 408], "current": null, "done": [], "parked": [] },
-    "E": { "branch": "sprint/lane-e-api", "worktree": "C:/git/ht-lanes/lane-e", "status": "pending", "order": [318], "current": null, "done": [], "parked": [] },
-    "F": { "branch": "sprint/lane-f-settings", "worktree": "C:/git/ht-lanes/lane-f", "status": "pending", "order": [405, 404, 397, 407], "current": null, "done": [], "parked": [] },
-    "G": { "branch": "sprint/lane-g-repo", "worktree": "C:/git/ht-lanes/lane-g", "status": "pending", "waitsFor": "all other lanes merged", "order": [398, 400, 409], "current": null, "done": [], "parked": [] }
+    "A": {
+      "branch": "sprint/lane-a-db",
+      "worktree": "C:/git/ht-lanes/lane-a",
+      "status": "in_progress",
+      "order": [
+        414,
+        412,
+        406
+      ],
+      "current": 414,
+      "done": [],
+      "parked": []
+    },
+    "B": {
+      "branch": "sprint/lane-b-start",
+      "worktree": "C:/git/ht-lanes/lane-b",
+      "status": "in_progress",
+      "order": [
+        419
+      ],
+      "current": 419,
+      "done": [],
+      "parked": []
+    },
+    "C": {
+      "branch": "sprint/lane-c-dashboard",
+      "worktree": "C:/git/ht-lanes/lane-c",
+      "status": "pending",
+      "waitsFor": "lane A merged",
+      "order": [
+        410,
+        411,
+        415,
+        416
+      ],
+      "current": null,
+      "done": [],
+      "parked": []
+    },
+    "D": {
+      "branch": "sprint/lane-d-mealprep",
+      "worktree": "C:/git/ht-lanes/lane-d",
+      "status": "pending",
+      "waitsFor": "lane A merged",
+      "order": [
+        417,
+        401,
+        403,
+        408
+      ],
+      "current": null,
+      "done": [],
+      "parked": []
+    },
+    "E": {
+      "branch": "sprint/lane-e-api",
+      "worktree": "C:/git/ht-lanes/lane-e",
+      "status": "in_progress",
+      "order": [
+        318
+      ],
+      "current": 318,
+      "done": [],
+      "parked": []
+    },
+    "F": {
+      "branch": "sprint/lane-f-settings",
+      "worktree": "C:/git/ht-lanes/lane-f",
+      "status": "in_progress",
+      "order": [
+        405,
+        404,
+        397,
+        407
+      ],
+      "current": 405,
+      "done": [],
+      "parked": []
+    },
+    "G": {
+      "branch": "sprint/lane-g-repo",
+      "worktree": "C:/git/ht-lanes/lane-g",
+      "status": "pending",
+      "waitsFor": "all other lanes merged",
+      "order": [
+        398,
+        400,
+        409
+      ],
+      "current": null,
+      "done": [],
+      "parked": []
+    }
   },
-  "issues": {},
+  "issues": {
+    "318": {
+      "lane": "E",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": []
+    },
+    "397": {
+      "lane": "F",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "notes": "analysis dispatched ahead (read-only); dev waits for its turn in the lane"
+    },
+    "404": {
+      "lane": "F",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "notes": "analysis dispatched ahead (read-only); dev waits for its turn in the lane"
+    },
+    "405": {
+      "lane": "F",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": []
+    },
+    "406": {
+      "lane": "A",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "notes": "analysis dispatched ahead (read-only); dev waits for its turn in the lane"
+    },
+    "407": {
+      "lane": "F",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "notes": "analysis dispatched ahead (read-only); dev waits for its turn in the lane"
+    },
+    "412": {
+      "lane": "A",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "notes": "analysis dispatched ahead (read-only); dev waits for its turn in the lane"
+    },
+    "414": {
+      "lane": "A",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": []
+    },
+    "419": {
+      "lane": "B",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": []
+    }
+  },
   "foundDuringSprint": [],
   "smallFindings": [],
   "log": [
-    { "at": "2026-10-06T17:01:16Z", "event": "preflight green on main 58a7f3f: tree clean, identity verified, typecheck pass, 862 tests / 81 suites" },
-    { "at": "2026-10-06T17:01:16Z", "event": "created and pushed sprint/auto-fixes from main", "sha": "58a7f3f" },
-    { "at": "2026-10-06T17:01:16Z", "event": "scope frozen: 20 open issues from SPRINT.md §3 (all listed issues are open)" }
+    {
+      "at": "2026-10-06T17:01:16Z",
+      "event": "preflight green on main 58a7f3f: tree clean, identity verified, typecheck pass, 862 tests / 81 suites"
+    },
+    {
+      "at": "2026-10-06T17:01:16Z",
+      "event": "created and pushed sprint/auto-fixes from main",
+      "sha": "58a7f3f"
+    },
+    {
+      "at": "2026-10-06T17:01:16Z",
+      "event": "scope frozen: 20 open issues from SPRINT.md §3 (all listed issues are open)"
+    },
+    {
+      "at": "2026-10-06T17:02:49Z",
+      "event": "worktrees a/b/e/f created at 2e1ac1e, npm ci running; analysts dispatched for #414 #419 #318 #405 (current) and #412 #406 #404 #397 #407 (ahead, read-only)"
+    }
   ]
 }
