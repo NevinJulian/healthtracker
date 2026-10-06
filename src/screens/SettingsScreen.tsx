@@ -366,17 +366,33 @@ function editedSince(guard: WriteGuard, seqAtStart: number): boolean {
 }
 
 const MAX_SKIPPED_TABLES_SHOWN = 5;
+const MAX_SKIPPED_COLUMNS_SHOWN = 5;
+const MAX_SKIPPED_NAME_LENGTH = 40;
+
+function truncateName(name: string): string {
+  const points = Array.from(name);
+  return points.length > MAX_SKIPPED_NAME_LENGTH
+    ? `${points.slice(0, MAX_SKIPPED_NAME_LENGTH).join('')}…`
+    : name;
+}
+
+function formatSkippedColumns(columns: string[]): string {
+  const shown = columns.slice(0, MAX_SKIPPED_COLUMNS_SHOWN).map(truncateName).join(', ');
+  const extra = columns.length - MAX_SKIPPED_COLUMNS_SHOWN;
+  return extra > 0 ? `${shown} and ${extra} more` : shown;
+}
 
 function formatSkippedSummary(
   skipped: { table: string; columns: string[]; rows: number }[] | undefined
 ): string {
   if (!skipped?.length) return '';
   const parts = skipped.slice(0, MAX_SKIPPED_TABLES_SHOWN).map(({ table, columns, rows }) => {
+    const name = truncateName(table);
     const detail = [
-      columns.join(', '),
+      formatSkippedColumns(columns),
       rows > 0 ? `${rows} row${rows === 1 ? '' : 's'}` : '',
     ].filter(Boolean);
-    return detail.length ? `${table} (${detail.join('; ')})` : table;
+    return detail.length ? `${name} (${detail.join('; ')})` : name;
   });
   const extra = skipped.length - MAX_SKIPPED_TABLES_SHOWN;
   const more = extra > 0 ? ` and ${extra} more` : '';
