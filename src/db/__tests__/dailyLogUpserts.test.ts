@@ -789,7 +789,7 @@ describe('resetCorruptDayColumn keeps the corrupt text and writes a fresh value'
     await expect(db.resetCorruptDayColumn(date, 'exercises')).rejects.toThrow();
 
     expect(await keptCount(db)).toBe(0);
-    expect(await logRow(db, date)).toBeUndefined();
+    expect(await logRow(db, date)).toBeNull();
   });
 
   it('rolls the kept text back when the fresh-value write fails', async () => {

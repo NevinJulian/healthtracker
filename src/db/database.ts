@@ -1147,6 +1147,71 @@ export function toggleAdditionalWorkout(date: string, id: string): Promise<void>
   });
 }
 
+const CORRUPT_JSON_SELECT: Record<CorruptJsonColumn, string> = {
+  exercises: 'SELECT exercises AS raw FROM daily_log WHERE date = ?',
+  additional_workouts: 'SELECT additional_workouts AS raw FROM daily_log WHERE date = ?',
+};
+
+const CORRUPT_JSON_UPDATE: Record<CorruptJsonColumn, string> = {
+  exercises: 'UPDATE daily_log SET exercises = ? WHERE date = ?',
+  additional_workouts: 'UPDATE daily_log SET additional_workouts = ? WHERE date = ?',
+};
+
+/**
+ * Replaces one unreadable JSON column of a day with a fresh value, after
+ * keeping the unreadable text in app_state under `corrupt_json:<column>:<date>`
+ * (`:2`, `:3`, … when that key already holds different text). Refuses when
+ * the stored JSON is readable. The kept text and the new value commit together.
+ */
+export function resetCorruptDayColumn(date: string, column: CorruptJsonColumn): Promise<void> {
+  return _enqueueWrite('resetCorruptDayColumn', () => _resetCorruptDayColumnImpl(date, column));
+}
+
+async function _resetCorruptDayColumnImpl(date: string, column: CorruptJsonColumn): Promise<void> {
+  if (!(column in CORRUPT_JSON_SELECT)) {
+    throw new Error(`[DB] resetCorruptDayColumn: unsupported column "${column}"`);
+  }
+  if (!isValidDateKey(date)) {
+    throw new Error(`Invalid date key: "${date}"`);
+  }
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ raw: string | null }>(CORRUPT_JSON_SELECT[column], [date]);
+  if (!row || _isStoredJsonArray(row.raw)) {
+    throw new Error(`[DB] resetCorruptDayColumn: ${column} for date=${date} is not corrupt, nothing reset`);
+  }
+  const raw = row.raw as string;
+
+  let fresh = '[]';
+  if (column === 'exercises') {
+    const { date: startDateISO } = await _readEffectiveStartDate(db);
+    const templateRows = await db.getAllAsync<WeeklyTemplateRow>('SELECT * FROM weekly_template');
+    const templateMap = new Map<number, WeeklyTemplateRow>(templateRows.map((r) => [r.day_of_week, r]));
+    const rowValues = _buildDailyLogRowValues(date, templateMap, startDateISO);
+    if (!rowValues) {
+      throw new Error(`[DB] resetCorruptDayColumn: no weekly_template row for date=${date}`);
+    }
+    fresh = rowValues.exercises;
+  }
+
+  const baseKey = `corrupt_json:${column}:${date}`;
+  await db.withTransactionAsync(async () => {
+    for (let n = 1; ; n++) {
+      const key = n === 1 ? baseKey : `${baseKey}:${n}`;
+      const existing = await db.getFirstAsync<{ value: string }>(
+        'SELECT value FROM app_state WHERE key = ?',
+        [key]
+      );
+      if (existing === null || existing === undefined) {
+        await db.runAsync('INSERT INTO app_state (key, value) VALUES (?, ?)', [key, raw]);
+        break;
+      }
+      if (existing.value === raw) break;
+    }
+    const result = await db.runAsync(CORRUPT_JSON_UPDATE[column], [fresh, date]);
+    _assertWrote(result, 'resetCorruptDayColumn', date);
+  });
+}
+
 export async function getWeightHistory(days: number): Promise<{ date: string; weight: number }[]> {
   const db = getDatabase();
   const cutoffISO = _addDaysKey(toISODate(), -days);
