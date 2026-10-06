@@ -27,14 +27,12 @@ describe('getLatestMeasurements carries each field forward from its newest non-n
 
     const latest = await db.getLatestMeasurements();
     expect(latest).not.toBeNull();
-    expect(latest?.date).toBe('2026-01-02');
-    expect(latest?.waist_cm).toBe(80);
-    expect(latest?.chest_cm).toBe(90);
+    expect(latest?.waist_cm?.value).toBe(80);
+    expect(latest?.chest_cm?.value).toBe(90);
 
     const history = await db.getBodyMeasurements();
     const day2 = history.find((r) => r.date === '2026-01-02');
     expect(day2?.waist_cm).toBeNull();
-    expect(latest?.id).toBe(day2?.id);
   });
 
   it('returns null when no rows exist', async () => {
@@ -53,13 +51,12 @@ describe('getLatestMeasurements carries each field forward from its newest non-n
     await db.logBodyMeasurement('2026-01-03', { hips_cm: 100 });
 
     const latest = await db.getLatestMeasurements();
-    expect(latest).toMatchObject({
-      date: '2026-01-03',
-      waist_cm: 80,
-      chest_cm: 90,
-      hips_cm: 100,
+    expect(latest).toEqual({
+      waist_cm: { value: 80, date: '2026-01-01' },
+      chest_cm: { value: 90, date: '2026-01-02' },
+      hips_cm: { value: 100, date: '2026-01-03' },
       thigh_cm: null,
-      arm_cm: 30,
+      arm_cm: { value: 30, date: '2026-01-01' },
     });
   });
 
@@ -71,7 +68,7 @@ describe('getLatestMeasurements carries each field forward from its newest non-n
     await db.logBodyMeasurement('2026-01-02', { waist_cm: 78 });
     await db.logBodyMeasurement('2026-01-03', { chest_cm: 90 });
 
-    expect((await db.getLatestMeasurements())?.waist_cm).toBe(78);
+    expect((await db.getLatestMeasurements())?.waist_cm?.value).toBe(78);
   });
 });
 

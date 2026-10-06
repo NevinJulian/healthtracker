@@ -3178,23 +3178,50 @@ export async function getBodyMeasurements(
   return rows;
 }
 
+const MEASUREMENT_FIELDS = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
+
+export type MeasurementField = (typeof MEASUREMENT_FIELDS)[number];
+
+/** The newest non-NULL value of one measurement column and the date of the row it came from. */
+export type DatedMeasurement = { value: number; date: string };
+
+export type LatestMeasurements = Record<MeasurementField, DatedMeasurement | null>;
+
 /**
- * Return the current body measurements: `id` and `date` come from the newest
- * row, and each `*_cm` is that column's newest non-NULL value across all rows
- * (null if never logged). Returns null when no rows exist.
+ * Return each body measurement's newest non-NULL value together with the date
+ * of the row it came from (null per field if never logged). Returns null when
+ * no field has ever had a value.
  */
-export async function getLatestMeasurements(): Promise<BodyMeasurement | null> {
+export async function getLatestMeasurements(): Promise<LatestMeasurements | null> {
   const db = getDatabase();
-  const row = await db.getFirstAsync<BodyMeasurement>(
-    `SELECT id, date,
+  const row = await db.getFirstAsync<Record<string, number | string | null>>(
+    `SELECT
        (SELECT waist_cm FROM body_measurements WHERE waist_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS waist_cm,
+       (SELECT date FROM body_measurements WHERE waist_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS waist_date,
        (SELECT chest_cm FROM body_measurements WHERE chest_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS chest_cm,
+       (SELECT date FROM body_measurements WHERE chest_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS chest_date,
        (SELECT hips_cm FROM body_measurements WHERE hips_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS hips_cm,
+       (SELECT date FROM body_measurements WHERE hips_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS hips_date,
        (SELECT thigh_cm FROM body_measurements WHERE thigh_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS thigh_cm,
-       (SELECT arm_cm FROM body_measurements WHERE arm_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS arm_cm
-     FROM body_measurements ORDER BY date DESC LIMIT 1`
+       (SELECT date FROM body_measurements WHERE thigh_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS thigh_date,
+       (SELECT arm_cm FROM body_measurements WHERE arm_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS arm_cm,
+       (SELECT date FROM body_measurements WHERE arm_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS arm_date`
   );
-  return row ?? null;
+  if (!row) return null;
+
+  const result = {} as LatestMeasurements;
+  let any = false;
+  for (const field of MEASUREMENT_FIELDS) {
+    const value = row[field];
+    const date = row[field.replace('_cm', '_date')];
+    if (typeof value === 'number' && typeof date === 'string') {
+      result[field] = { value, date };
+      any = true;
+    } else {
+      result[field] = null;
+    }
+  }
+  return any ? result : null;
 }
 
 // ── Workout set log CRUD (workout_set_log table, migration v33) ───────────────
