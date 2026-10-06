@@ -674,12 +674,24 @@ export default function SettingsScreen() {
           getBackupReminderTime(),
         ]);
         if (active) {
-          const workoutTimeKept = workoutTimeDirtyRef.current || editedSince(workoutEditGuard, workoutEditSeqAtStart);
-          const cookDayTimeKept = cookDayTimeDirtyRef.current || editedSince(cookDayEditGuard, cookDayEditSeqAtStart);
-          const breakfastTimeKept = breakfastTimeDirtyRef.current || editedSince(breakfastEditGuard, breakfastEditSeqAtStart);
-          const lunchTimeKept = lunchTimeDirtyRef.current || editedSince(lunchEditGuard, lunchEditSeqAtStart);
-          const dinnerTimeKept = dinnerTimeDirtyRef.current || editedSince(dinnerEditGuard, dinnerEditSeqAtStart);
-          const backupTimeKept = backupTimeDirtyRef.current || editedSince(backupEditGuard, backupEditSeqAtStart);
+          const workoutTimeKept =
+            workoutTimeDirtyRef.current ||
+            editedSince(workoutEditGuard, workoutEditSeqAtStart);
+          const cookDayTimeKept =
+            cookDayTimeDirtyRef.current ||
+            editedSince(cookDayEditGuard, cookDayEditSeqAtStart);
+          const breakfastTimeKept =
+            breakfastTimeDirtyRef.current ||
+            editedSince(breakfastEditGuard, breakfastEditSeqAtStart);
+          const lunchTimeKept =
+            lunchTimeDirtyRef.current ||
+            editedSince(lunchEditGuard, lunchEditSeqAtStart);
+          const dinnerTimeKept =
+            dinnerTimeDirtyRef.current ||
+            editedSince(dinnerEditGuard, dinnerEditSeqAtStart);
+          const backupTimeKept =
+            backupTimeDirtyRef.current ||
+            editedSince(backupEditGuard, backupEditSeqAtStart);
           setReminder((prev) => ({
             ...prev,
             enabled: editedSince(workoutEnabledGuard, workoutEnabledSeqAtStart) ? prev.enabled : workoutEnabled,
@@ -729,9 +741,18 @@ export default function SettingsScreen() {
             time: backupTimeKept ? prev.time : backupTime,
             permissionDenied: false,
           }));
-          if (!caloriesDirtyRef.current && !editedSince(caloriesEditGuard, caloriesEditSeqAtStart)) setGoalCalories(nutritionGoals.calories);
-          if (!proteinDirtyRef.current && !editedSince(proteinEditGuard, proteinEditSeqAtStart)) setGoalProtein(nutritionGoals.protein);
-          if (!hydrationDirtyRef.current && !editedSince(hydrationEditGuard, hydrationEditSeqAtStart)) setHydrationGoalMl(hydrationGoal);
+          if (!caloriesDirtyRef.current && !editedSince(caloriesEditGuard, caloriesEditSeqAtStart)) {
+            setGoalCalories(nutritionGoals.calories);
+          }
+          if (!proteinDirtyRef.current && !editedSince(proteinEditGuard, proteinEditSeqAtStart)) {
+            setGoalProtein(nutritionGoals.protein);
+          }
+          if (
+            !hydrationDirtyRef.current &&
+            !editedSince(hydrationEditGuard, hydrationEditSeqAtStart)
+          ) {
+            setHydrationGoalMl(hydrationGoal);
+          }
           const heightEditedSince =
             heightWriteSeqRef.current !== heightSeqAtStart || heightPendingWritesRef.current > 0;
           const ageEditedSince =
