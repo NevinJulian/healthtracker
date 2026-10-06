@@ -231,8 +231,15 @@
       "notes": "DB name hard-coded in rescueExport.ts (no lane-A edit); Retry hidden on font error"
     }
   },
-  "foundDuringSprint": [],
-  "smallFindings": [],
+  "foundDuringSprint": [
+    422,
+    423,
+    424
+  ],
+  "smallFindings": [
+    "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
+    "Onboarding age field is number-pad (no decimal key) but accepts decimals via paste - #405 analyst"
+  ],
   "log": [
     {
       "at": "2026-10-06T17:01:16Z",
@@ -258,6 +265,10 @@
     {
       "at": "2026-10-06T17:06:09Z",
       "event": "all 9 work orders ready, none parked; #414 #419 #318 #405 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:06:36Z",
+      "event": "filed #422 (parseTimeString parseInt), #423 (no error boundary in App.tsx), #424 (OFF Retry-After ignored); 2 cosmetic findings collected for the small-findings issue"
     }
   ]
 }
