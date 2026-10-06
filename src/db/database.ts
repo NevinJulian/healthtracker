@@ -3095,9 +3095,9 @@ type MeasurementInput = {
 /**
  * Upsert a body-measurement entry for `date`.
  *
- * Only finite numeric fields are written (null, undefined, NaN and Infinity are ignored); existing values
- * are never overwritten with NULL. If no field qualifies, nothing is written
- * and no row is created.
+ * Only finite numeric fields are written (null, undefined, NaN and Infinity
+ * are ignored); existing values are never overwritten with NULL. If no field
+ * qualifies, nothing is written and no row is created.
  *
  * @param date   - YYYY-MM-DD date key.
  * @param fields - Partial measurement object; non-finite fields are ignored.
