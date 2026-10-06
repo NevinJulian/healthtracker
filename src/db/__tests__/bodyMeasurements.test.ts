@@ -106,14 +106,42 @@ describe('getLatestMeasurements reports the date each value was measured', () =>
     expect(latest?.chest_cm).toEqual({ value: 90, date: '2026-01-09' });
   });
 
-  it('returns null when every stored row is all NULL', async () => {
+  it('returns null when every stored row is a legacy all-NULL row', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
 
-    await db.logBodyMeasurement('2026-01-01', {});
-    await db.logBodyMeasurement('2026-01-02', { waist_cm: null });
+    await db.getDatabase().runAsync('INSERT INTO body_measurements (date) VALUES (?)', ['2026-01-01']);
+    await db.getDatabase().runAsync('INSERT INTO body_measurements (date) VALUES (?)', ['2026-01-02']);
 
     expect(await db.getLatestMeasurements()).toBeNull();
+  });
+
+  it('carries values forward past a newer legacy all-NULL row', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.logBodyMeasurement('2026-01-01', { waist_cm: 80, arm_cm: 30 });
+    await db.getDatabase().runAsync('INSERT INTO body_measurements (date) VALUES (?)', ['2026-01-05']);
+
+    expect(await db.getLatestMeasurements()).toEqual({
+      waist_cm: { value: 80, date: '2026-01-01' },
+      chest_cm: null,
+      hips_cm: null,
+      thigh_cm: null,
+      arm_cm: { value: 30, date: '2026-01-01' },
+    });
+  });
+
+  it('still returns a legacy all-NULL row from getBodyMeasurements', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.getDatabase().runAsync('INSERT INTO body_measurements (date) VALUES (?)', ['2026-01-05']);
+
+    const rows = await db.getBodyMeasurements();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].date).toBe('2026-01-05');
+    expect(rows[0].waist_cm).toBeNull();
   });
 });
 
