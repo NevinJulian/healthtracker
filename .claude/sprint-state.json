@@ -60,7 +60,8 @@
       ],
       "current": 406,
       "done": [
-        414
+        414,
+        412
       ],
       "parked": []
     },
@@ -71,9 +72,12 @@
       "order": [
         419
       ],
-      "current": 419,
-      "done": [],
-      "parked": []
+      "current": null,
+      "done": [
+        419
+      ],
+      "parked": [],
+      "cleanup": "no changes needed"
     },
     "C": {
       "branch": "sprint/lane-c-dashboard",
@@ -112,8 +116,10 @@
       "order": [
         318
       ],
-      "current": 318,
-      "done": [],
+      "current": null,
+      "done": [
+        318
+      ],
       "parked": []
     },
     "F": {
@@ -150,7 +156,7 @@
   "issues": {
     "318": {
       "lane": "E",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "9cbac95",
@@ -166,7 +172,8 @@
       "decisionSource": "owner comment on #318 2026-10-06 (4 items)",
       "deviceCheck": "1) Import a Discover recipe with many unknown ingredients, tap Cancel mid-spinner: spinner stops, recipe absent from library. 2) Wi-Fi without internet: save a recipe containing dragonfruit; save completes in ~10 s with local-table macros.",
       "notes": "tester APPROVE r0. HUMAN: Cancel pressed after dbImportRecipe has started is ignored - recipe saved, Imported! shown; ms-wide window but not strictly the owner wording (saves nothing); strict fix = hide/disable Cancel once the write starts. Budget is module-level, shared by editor recompute and imports; over-budget estimate is silent. Commit 2aefe47 alone does not typecheck (test-first artefact, breaks bisect at that commit).",
-      "regressionProof": "UA 4/5 fail at 9cbac95 srcs; budget 3/5 fail at 8bac828 srcs; cancel 5/7 fail at 7eb26f4 srcs; deadline 1/1 fails at d65c497 src; all pass at d780c4c (tester reproduced); 873/84"
+      "regressionProof": "UA 4/5 fail at 9cbac95 srcs; budget 3/5 fail at 8bac828 srcs; cancel 5/7 fail at 7eb26f4 srcs; deadline 1/1 fails at d65c497 src; all pass at d780c4c (tester reproduced); 873/84",
+      "securityReview": "APPROVE: UA is a constant (no email/device id); over-budget/aborted/timed-out results never cached or persisted as real; late recompute cannot write after the deadline; dbImportRecipe single-table. Notes: backward clock step wedges the budget until the clock catches up; app.json import bundles projectId/owner/package (not secrets)."
     },
     "397": {
       "lane": "F",
@@ -179,10 +186,19 @@
     },
     "404": {
       "lane": "F",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
-      "notes": "WO ready; waits for #405. 13 SettingsScreen sibling handlers included (sibling rule)",
+      "commits": [
+        "51ad899",
+        "c4cca27",
+        "f0ea442",
+        "daef76e",
+        "bb436c5",
+        "28689b9",
+        "9a55908",
+        "6ce3d58"
+      ],
+      "notes": "dev: catch also covers the notification follow-up call (write ok + reconcile fails -> alert, UI keeps old value); recalc can save calories and fail protein; bb436c5 amended before push only",
       "workOrder": "C:/git/ht-lanes/wo/404.md",
       "deviceCheck": "Fresh install: tap Skip; app opens to Dashboard."
     },
@@ -204,9 +220,12 @@
     },
     "406": {
       "lane": "A",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "7033d36",
+        "3f9cf8c"
+      ],
       "notes": "WO ready; waits for #412",
       "workOrder": "C:/git/ht-lanes/wo/406.md",
       "deviceCheck": "none"
@@ -222,7 +241,7 @@
     },
     "412": {
       "lane": "A",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "8a66e85",
@@ -233,7 +252,8 @@
       "workOrder": "C:/git/ht-lanes/wo/412.md",
       "deviceCheck": "Orchestrator-added (TEMP table + multi-statement execAsync never ran on real expo-sqlite): restore any backup that has logged sets on the phone; restore completes, set order in a workout day is unchanged, logging one more set works.",
       "decisionSource": "owner comment on #412 2026-10-06",
-      "regressionProof": "3 new tests fail with 8a66e85 database.ts+schema.ts (v37 re-sorts by created_at), pass at 5f94a7c; schema.ts diff add-only after MIGRATIONS (tester read the hunk); probes: ties, negatives, 300 rows, order-independence, 2 restores back to back, forced throw after TEMP creation rolls back clean; 975/82"
+      "regressionProof": "3 new tests fail with 8a66e85 database.ts+schema.ts (v37 re-sorts by created_at), pass at 5f94a7c; schema.ts diff add-only after MIGRATIONS (tester read the hunk); probes: ties, negatives, 300 rows, order-independence, 2 restores back to back, forced throw after TEMP creation rolls back clean; 975/82",
+      "securityReview": "APPROVE: static SQL, only set_index written, join key is the INTEGER PK, collision test/partition/unique index use the same comparison so CREATE UNIQUE INDEX cannot be failed by backup values; any throw rolls back the whole restore. Loses v37 runtime precondition (small defence-in-depth reduction). Residual: TEMP table never run on real expo-sqlite."
     },
     "414": {
       "lane": "A",
@@ -252,7 +272,7 @@
     },
     "419": {
       "lane": "B",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "93da3f8",
@@ -266,14 +286,18 @@
       "decisionSource": "owner decision in #419 body",
       "deviceCheck": "Force a throw at top of init try in App.tsx (first attempt only, uncommitted). Launch: title, error, Retry, Save data, no-reset sentence, no other button. Save data: share sheet for db (non-zero size), second sheet for wal if present, both files arrive. Retry: normal app, data intact.",
       "notes": "tester APPROVE r0. DB path verified against expo-sqlite defaultDatabaseDirectory (filesDir/SQLite). Inline fs/sharing mocks are necessary (global mock shadowed by jest-expo, filed #425). No in-flight guard on Retry in code: button unmounts on press, but 2 presses in one act() overlapped 2 initDatabase calls (sent to security). App test silences console.error globally. DB filename hard-coded in service + test.",
-      "regressionProof": "App.startFailure 7/7 fail with 2e1ac1e App.tsx, pass at 45d91de; rescueExport 5/5 at tip (tester reproduced); 874/83"
+      "regressionProof": "App.startFailure 7/7 fail with 2e1ac1e App.tsx, pass at 45d91de; rescueExport 5/5 at tip (tester reproduced); 874/83",
+      "securityReview": "APPROVE: live db is only ever a copy source; no SQL; errors surfaced. Overlapping initDatabase runs are serialised by the write queue (only the start-date check-then-insert is unguarded: cosmetic). Rescue pair is best-effort (wal copied after db). Copies stay in app-private cache. NOTE: Retry re-runs resetIfIncompatibleSchema, the one existing path that deletes the DB (pre-existing, filed #427)."
     }
   },
   "foundDuringSprint": [
     422,
     423,
     424,
-    425
+    425,
+    426,
+    427,
+    428
   ],
   "smallFindings": [
     "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
@@ -347,6 +371,10 @@
     {
       "at": "2026-10-06T17:13:53Z",
       "event": "#412 tester APPROVE r0 -> security (read-only, parallel); lane A -> #406 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:15:17Z",
+      "event": "#419 ready (security APPROVE, cleanup no-op); #412 ready (security APPROVE); #318 ready (security APPROVE, cleanup running); #406 and #404 in_test; filed #426 #427 #428"
     }
   ]
 }
