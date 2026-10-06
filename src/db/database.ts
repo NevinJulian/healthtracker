@@ -2587,6 +2587,8 @@ async function _restoreFromPayload(
   // credits a batch it can point at, so unticking one of these meals will
   // silently return nothing to inventory. Counted here so the caller can
   // say so instead of the user discovering it a portion at a time (#310).
+  // Counted after the dedupe replay, so only surviving rows are reported.
+  let legacyPayload = false;
   let consumedMealsWithoutRefund = 0;
 
   await db.withTransactionAsync(async () => {
@@ -2604,17 +2606,12 @@ async function _restoreFromPayload(
       // A pre-v34 backup's weekly_meal_plan rows carry no
       // consumed_from_inventory_id key at all. Detect that on the payload
       // (not on the restored rows, where the column exists and is simply
-      // NULL) and count the consumed ones, which are the rows that can
-      // never refund.
+      // NULL).
       if (tableName === 'weekly_meal_plan' && rows.length > 0) {
         const payloadHasRefundPointer = rows.some(
           (row) => 'consumed_from_inventory_id' in row
         );
-        if (!payloadHasRefundPointer) {
-          consumedMealsWithoutRefund = rows.filter(
-            (row) => row.is_consumed === 1 || row.is_consumed === true
-          ).length;
-        }
+        if (!payloadHasRefundPointer) legacyPayload = true;
       }
 
       // Wipe existing rows
@@ -2690,6 +2687,13 @@ async function _restoreFromPayload(
       // also a live check that the DROP INDEX above really happened.
       if (migration.precondition) await migration.precondition(db);
       await db.execAsync(migration.sql);
+    }
+
+    if (legacyPayload) {
+      const consumed = await db.getFirstAsync<{ n: number }>(
+        'SELECT COUNT(*) AS n FROM weekly_meal_plan WHERE is_consumed = 1'
+      );
+      consumedMealsWithoutRefund = consumed?.n ?? 0;
     }
   });
 
