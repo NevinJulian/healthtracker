@@ -173,4 +173,19 @@ describe('logBodyMeasurement never writes NULL', () => {
     expect(row.waist_cm).toBe(80);
     expect(row.chest_cm).toBe(91);
   });
+
+  it('treats NaN and Infinity like null', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.logBodyMeasurement('2026-01-01', { waist_cm: NaN });
+    await db.logBodyMeasurement('2026-01-02', { chest_cm: Infinity, hips_cm: -Infinity });
+    expect(await db.getBodyMeasurements()).toHaveLength(0);
+
+    await db.logBodyMeasurement('2026-01-03', { waist_cm: 80 });
+    await db.logBodyMeasurement('2026-01-03', { waist_cm: NaN, chest_cm: 90 });
+    const [row] = await db.getBodyMeasurements();
+    expect(row.waist_cm).toBe(80);
+    expect(row.chest_cm).toBe(90);
+  });
 });
