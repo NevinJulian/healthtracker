@@ -21,6 +21,7 @@ jest.mock('../../db/database', () => ({
   assignMealToPlan: jest.fn().mockResolvedValue(undefined),
   toggleMealConsumed: jest.fn().mockResolvedValue(undefined),
   getRecipes: jest.fn().mockResolvedValue([]),
+  getRecipesIncludingArchived: jest.fn().mockResolvedValue([]),
   toISODate: jest.fn(() => '2026-09-19'),
   resetCookEmptyNotified: jest.fn().mockResolvedValue(undefined),
 }));
@@ -32,6 +33,7 @@ jest.mock('../../services/notifications', () => ({
 import MealPrepScreen from '../MealPrepScreen';
 import {
   getRecipes,
+  getRecipesIncludingArchived,
   getMealInventory,
   getWeeklyMealPlan,
   logCookedMeal,
@@ -45,6 +47,7 @@ import {
 import { checkAndNotifyEmptyInventory } from '../../services/notifications';
 
 const mockGetRecipes = jest.mocked(getRecipes);
+const mockGetRecipesIncludingArchived = jest.mocked(getRecipesIncludingArchived);
 const mockGetMealInventory = jest.mocked(getMealInventory);
 const mockGetWeeklyMealPlan = jest.mocked(getWeeklyMealPlan);
 const mockLogCookedMeal = jest.mocked(logCookedMeal);
@@ -105,6 +108,7 @@ describe('MealPrepScreen log meal modal (#324)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetRecipes.mockResolvedValue(mockRecipes);
+    mockGetRecipesIncludingArchived.mockResolvedValue(mockRecipes);
     mockGetMealInventory.mockResolvedValue([]);
     mockGetWeeklyMealPlan.mockResolvedValue([]);
     mockLogCookedMeal.mockResolvedValue(undefined);
@@ -232,6 +236,7 @@ describe('MealPrepScreen write failure feedback', () => {
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockGetRecipes.mockResolvedValue(mockRecipes);
+    mockGetRecipesIncludingArchived.mockResolvedValue(mockRecipes);
     mockGetMealInventory.mockResolvedValue([]);
     mockGetWeeklyMealPlan.mockResolvedValue([]);
     mockLogCookedMeal.mockResolvedValue(undefined);
@@ -341,5 +346,48 @@ describe('MealPrepScreen write failure feedback', () => {
     expect(alertSpy).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalled();
     expect(mockGetWeeklyMealPlan).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MealPrepScreen planned meal of an archived recipe', () => {
+  const archivedRecipe = makeRecipe({
+    id: 'r-archived',
+    title: 'Archived Curry',
+    calories: 777,
+    protein: 55,
+  });
+  const archivedLunch: WeeklyMealPlanItem = {
+    id: 9,
+    date: '2026-09-19',
+    meal_type: 'Lunch',
+    recipe_id: 'r-archived',
+    is_consumed: true,
+    consumed_from_inventory_id: null,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetRecipes.mockResolvedValue([]);
+    mockGetRecipesIncludingArchived.mockResolvedValue([archivedRecipe]);
+    mockGetMealInventory.mockResolvedValue([]);
+    mockGetWeeklyMealPlan.mockResolvedValue([archivedLunch]);
+  });
+
+  it('shows the real title and counts its macros in the consumed total', async () => {
+    const { getByText, getAllByText, queryByText } = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    expect(getByText('Archived Curry')).toBeTruthy();
+    expect(queryByText('Unknown Recipe')).toBeNull();
+    expect(getByText('CONSUMED TODAY')).toBeTruthy();
+    expect(getAllByText('777 kcal · 55g protein')).toHaveLength(2);
+  });
+
+  it('keeps the archived recipe out of the Log Cooked Meal list', async () => {
+    mockGetRecipes.mockResolvedValue([mockRecipes[0]]);
+    const { getByText, queryByText } = await renderWithModalOpen();
+
+    expect(getByText('Chicken Bowl')).toBeTruthy();
+    expect(queryByText('Archived Curry')).toBeNull();
   });
 });
