@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 
 jest.mock('react-native-gesture-handler', () => ({}));
 jest.mock('react-native-safe-area-context', () => ({
@@ -17,6 +17,7 @@ jest.mock('../db/database', () => ({
   getOnboardingComplete: jest.fn(),
   getLatestBodyWeight: jest.fn(),
 }));
+jest.mock('../services/rescueExport', () => ({ exportRawDatabase: jest.fn() }));
 jest.mock('../db/devStress369', () => ({ installStress369: jest.fn() }));
 jest.mock('../services/notifications', () => ({
   configureNotificationHandler: jest.fn(),
@@ -34,7 +35,10 @@ jest.mock('../screens/OnboardingScreen', () => {
 
 import { useFonts } from 'expo-font';
 import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from '../db/database';
+import { exportRawDatabase } from '../services/rescueExport';
 import App from '../../App';
+
+const rescue = exportRawDatabase as jest.Mock;
 
 const init = initDatabase as jest.Mock;
 
@@ -68,5 +72,43 @@ describe('App start failure screen', () => {
     render(<App />);
     fireEvent.press(await screen.findByRole('button', { name: 'Retry' }));
     expect(await screen.findByText(/second/)).toBeTruthy();
+  });
+
+  it('exports the raw database when Save data is pressed', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded'));
+    rescue.mockResolvedValueOnce(undefined);
+    render(<App />);
+    fireEvent.press(await screen.findByRole('button', { name: 'Save data' }));
+    await waitFor(() => expect(rescue).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows a message when Save data fails', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded'));
+    rescue.mockRejectedValueOnce(new Error('The database file was not found on this device.'));
+    render(<App />);
+    fireEvent.press(await screen.findByRole('button', { name: 'Save data' }));
+    expect(await screen.findByText(/database file was not found/)).toBeTruthy();
+  });
+
+  it('states there is no reset and offers no reset, delete or clear action', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded'));
+    render(<App />);
+    await screen.findByRole('button', { name: 'Retry' });
+    expect(
+      screen.getByText(
+        "Clearing the app's storage in Android settings deletes all your data, so there is no reset button here.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getAllByRole('button')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /reset|delete|clear/i })).toBeNull();
+  });
+
+  it('hides Retry but keeps Save data on a font load error', async () => {
+    (useFonts as jest.Mock).mockReturnValue([false, new Error('font failed')]);
+    init.mockResolvedValue(undefined);
+    render(<App />);
+    expect(await screen.findByText(/font failed/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save data' })).toBeTruthy();
   });
 });
