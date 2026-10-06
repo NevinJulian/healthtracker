@@ -52,18 +52,21 @@
     "A": {
       "branch": "sprint/lane-a-db",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "in_progress",
+      "status": "merged",
       "order": [
         414,
         412,
         406
       ],
-      "current": 406,
+      "current": null,
       "done": [
         414,
-        412
+        412,
+        406
       ],
-      "parked": []
+      "parked": [],
+      "mergeSha": "7a97abf",
+      "cleanup": "90b02eb comment corrections (3 spots) + b618b30 removed the dead {version} branch of POST_RESTORE_STEPS (type + loop only)"
     },
     "B": {
       "branch": "sprint/lane-b-start",
@@ -228,7 +231,7 @@
     },
     "406": {
       "lane": "A",
-      "status": "in_security",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "7033d36",
@@ -237,7 +240,9 @@
       "notes": "tester APPROVE r0. Survivor of the dedupe prefers a consumed row, so the post-dedupe count = slots still showing a consumed meal; cannot under-report. Old code counted string 1 as 0; new counts the stored value.",
       "workOrder": "C:/git/ht-lanes/wo/406.md",
       "deviceCheck": "none",
-      "regressionProof": "2 new tests fail with 7033d36 database.ts (4 vs 2, 2 vs 1), 6/6 at 3f9cf8c (tester reproduced); 977/82"
+      "regressionProof": "2 new tests fail with 7033d36 database.ts (4 vs 2, 2 vs 1), 6/6 at 3f9cf8c (tester reproduced); 977/82",
+      "securityReview": "APPROVE: static read-only COUNT inside the restore transaction; count feeds only the informational alert; no swallowed error",
+      "mergeSha": "7a97abf"
     },
     "407": {
       "lane": "F",
@@ -250,7 +255,7 @@
     },
     "412": {
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "8a66e85",
@@ -262,11 +267,12 @@
       "deviceCheck": "Orchestrator-added (TEMP table + multi-statement execAsync never ran on real expo-sqlite): restore any backup that has logged sets on the phone; restore completes, set order in a workout day is unchanged, logging one more set works.",
       "decisionSource": "owner comment on #412 2026-10-06",
       "regressionProof": "3 new tests fail with 8a66e85 database.ts+schema.ts (v37 re-sorts by created_at), pass at 5f94a7c; schema.ts diff add-only after MIGRATIONS (tester read the hunk); probes: ties, negatives, 300 rows, order-independence, 2 restores back to back, forced throw after TEMP creation rolls back clean; 975/82",
-      "securityReview": "APPROVE: static SQL, only set_index written, join key is the INTEGER PK, collision test/partition/unique index use the same comparison so CREATE UNIQUE INDEX cannot be failed by backup values; any throw rolls back the whole restore. Loses v37 runtime precondition (small defence-in-depth reduction). Residual: TEMP table never run on real expo-sqlite."
+      "securityReview": "APPROVE: static SQL, only set_index written, join key is the INTEGER PK, collision test/partition/unique index use the same comparison so CREATE UNIQUE INDEX cannot be failed by backup values; any throw rolls back the whole restore. Loses v37 runtime precondition (small defence-in-depth reduction). Residual: TEMP table never run on real expo-sqlite.",
+      "mergeSha": "7a97abf"
     },
     "414": {
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "da71967",
@@ -277,7 +283,8 @@
       "decisionSource": "owner comment on #414: items 1-3, one strict parser, item 4 dropped",
       "notes": "tester APPROVE r0. Setters throw RangeError; only callers are SettingsScreen pickers which cannot produce invalid values (tester traced). Stored 8:00-style values now read as default (intended).",
       "regressionProof": "82/110 fail with da71967 database.ts, 110/110 at e85f913 (tester reproduced); 972/82",
-      "securityReview": "APPROVE: no new SQL, writes parameterised, restored app_state values now always canonical HH:MM / 0-6 before reaching the scheduler; RangeError thrown before any write and not swallowed; restore/startup/reconcile call no setter. Note: Settings debounced flush callbacks have no try/catch around the setters (unreachable today)."
+      "securityReview": "APPROVE: no new SQL, writes parameterised, restored app_state values now always canonical HH:MM / 0-6 before reaching the scheduler; RangeError thrown before any write and not swallowed; restore/startup/reconcile call no setter. Note: Settings debounced flush callbacks have no try/catch around the setters (unreachable today).",
+      "mergeSha": "7a97abf"
     },
     "419": {
       "lane": "B",
@@ -316,7 +323,9 @@
     "src/components Button.tsx has raw borderRadius: 13 and minHeight: 48 instead of tokens - #419 dev",
     "RecipeEditorScreen: SAVE_RECOMPUTE_DEADLINE_MS is declared between DEFAULT_SERVINGS and DEFAULT_PREP, splitting two related constants - #318 tester (handed to lane E cleanup)",
     "workoutSetIndexCollision.test.ts header comment (~lines 22-40) still says restore re-runs v37 - #412 tester (handed to lane A cleanup)",
-    "A payload row with is_consumed null makes the whole restore throw on NOT NULL (pre-existing; payload validation) - #406 tester"
+    "A payload row with is_consumed null makes the whole restore throw on NOT NULL (pre-existing; payload validation) - #406 tester",
+    "src/db/__tests__/backupRoundTrip.test.ts:137 comment still says POST_RESTORE_STEPS includes v37 (outside lane A diff) - lane A cleanup",
+    "restoreFromPayload docblock (~2500-2520) still carries pre-existing issue refs (#303, #317, #315) and v37 history - lane A cleanup"
   ],
   "log": [
     {
@@ -399,6 +408,10 @@
     {
       "at": "2026-10-06T17:17:11Z",
       "event": "#404 ready (APPROVE r0, security skipped); lane F -> #397 in_dev; #406 tester APPROVE r0 -> security; lane A cleanup running in parallel; filed #429"
+    },
+    {
+      "at": "2026-10-06T17:18:53Z",
+      "event": "#406 ready (security APPROVE); lane A cleanup 90b02eb + b618b30; schema.ts verified add-only (0 removed lines, one hunk after MIGRATIONS); merged lane A into integration 7a97abf; gates green: typecheck clean, 1000/87"
     }
   ]
 }
