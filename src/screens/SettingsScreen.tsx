@@ -1055,18 +1055,26 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await setBackupReminderEnabled(value);
-    setBackupReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
-    await reconcileScheduledNotifications();
+    try {
+      await setBackupReminderEnabled(value);
+      setBackupReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
+      await reconcileScheduledNotifications();
+    } catch (error) {
+      reportWriteFailure(error);
+    }
   }
 
   // ── Backup reminder: weekday chip ─────────────────────────────────────────
 
   async function handleBackupReminderDaySelect(day: number) {
-    await setBackupReminderDay(day);
-    setBackupReminder((prev) => ({ ...prev, day }));
-    if (backupReminder.enabled) {
-      await reconcileScheduledNotifications();
+    try {
+      await setBackupReminderDay(day);
+      setBackupReminder((prev) => ({ ...prev, day }));
+      if (backupReminder.enabled) {
+        await reconcileScheduledNotifications();
+      }
+    } catch (error) {
+      reportWriteFailure(error);
     }
   }
 
