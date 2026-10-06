@@ -96,7 +96,8 @@
       ],
       "current": 415,
       "done": [
-        410
+        410,
+        411
       ],
       "parked": [],
       "base": "62cc088"
@@ -385,7 +386,7 @@
     },
     "411": {
       "lane": "C",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "99b49b4",
@@ -400,7 +401,8 @@
       "decisionSource": "owner comment on #411 (Alert + Reset this day, corrupt text kept in app_state)",
       "deviceCheck": "Corrupt today additional_workouts; add a workout -> Alert; Reset this day -> empty list, adding works. Repeat for exercises -> template exercises return unchecked. Export a backup: corrupt text is in it under corrupt_json:...",
       "notes": "WO ready; waits for #410. ORCHESTRATOR RULINGS: (1) resetCorruptDayColumn + CorruptJsonError count as lane-C writers in database.ts; (2) key collision -> suffix :2, :3 instead of overwriting (departs from the literal key only on collision; HUMAN to confirm). | dev: Alert title Cannot save: unreadable data; Reset this day (destructive) / Cancel; reset failure -> Reset failed. Existing Dashboard suites mock factories lack CorruptJsonError (instanceof undefined would throw if a writer rejects there) - sent to tester. | tester APPROVE r0. An array with null/non-object items is neither editable nor resettable (filed #434). Existing Dashboard suites lack the two mock-factory entries (no path reaches instanceof today). 041a198 carries a one-line test correction inside a feature commit (accepted by tester).",
-      "regressionProof": "writers: 4 fail with 6b795d6 database.ts; reset: 10 fail with 53a29a8 database.ts; screen: 8/9 fail with fb86fb9 DashboardScreen.tsx; all pass at e6bf37b; 1030/89 (tester reproduced). Probes: one corruption predicate shared by writers and reset (8 corrupt forms); kept text byte-identical (2 MB, unicode, CRLF); collisions :2/:3; atomic both directions; fresh exercises byte-identical to sync output for 5 offsets; backup->restore round trip keeps the kept row."
+      "regressionProof": "writers: 4 fail with 6b795d6 database.ts; reset: 10 fail with 53a29a8 database.ts; screen: 8/9 fail with fb86fb9 DashboardScreen.tsx; all pass at e6bf37b; 1030/89 (tester reproduced). Probes: one corruption predicate shared by writers and reset (8 corrupt forms); kept text byte-identical (2 MB, unicode, CRLF); collisions :2/:3; atomic both directions; fresh exercises byte-identical to sync output for 5 offsets; backup->restore round trip keeps the kept row.",
+      "securityReview": "APPROVE: SQL static or from fixed maps, all values bound; column/date come only from a CorruptJsonError built inside the db module; destructive step runs only after the raw text is saved, same transaction; every daily_log writer is queued. Notes: raw read is inside the queued unit but OUTSIDE the transaction (safe only while every daily_log writer goes through _enqueueWrite); a second reset after a successful one shows Reset failed although nothing is wrong; instanceof on an Error subclass must be confirmed on Hermes by the device check."
     },
     "412": {
       "lane": "A",
@@ -704,6 +706,10 @@
     {
       "at": "2026-10-06T17:42:53Z",
       "event": "#411 tester APPROVE r0 -> security (read-only, parallel); lane C -> #415 in_dev; filed #434 (wrong-shaped array items stuck)"
+    },
+    {
+      "at": "2026-10-06T17:43:51Z",
+      "event": "#411 ready (security APPROVE)"
     }
   ]
 }
