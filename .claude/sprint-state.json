@@ -221,10 +221,14 @@
     },
     "412": {
       "lane": "A",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
-      "notes": "WO ready; waits for #414. ORCHESTRATOR RULING: MIGRATIONS stays byte-identical, so the stale v37 comment (schema.ts:766-771) is NOT fixed although the owner decision asks for it; explanation goes on RESTORE_SET_INDEX_SQL. HUMAN: fix that comment by hand or confirm. Whole colliding partition renumbered (analyst interpretation).",
+      "commits": [
+        "8a66e85",
+        "2c86542",
+        "5f94a7c"
+      ],
+      "notes": "WO ready; waits for #414. ORCHESTRATOR RULING: MIGRATIONS stays byte-identical, so the stale v37 comment (schema.ts:766-771) is NOT fixed although the owner decision asks for it; explanation goes on RESTORE_SET_INDEX_SQL. HUMAN: fix that comment by hand or confirm. Whole colliding partition renumbered (analyst interpretation). | dev: RESTORE_SET_INDEX_SQL uses a TEMP staging table (not run on device); unused {version} branch of POST_RESTORE_STEPS left in place.",
       "workOrder": "C:/git/ht-lanes/wo/412.md",
       "deviceCheck": "none",
       "decisionSource": "owner comment on #412 2026-10-06"
@@ -325,6 +329,10 @@
     {
       "at": "2026-10-06T17:10:44Z",
       "event": "#414 ready (security APPROVE); #419 in_test (874/83 per dev)"
+    },
+    {
+      "at": "2026-10-06T17:11:42Z",
+      "event": "#412 in_test (975/82 per dev)"
     }
   ]
 }
