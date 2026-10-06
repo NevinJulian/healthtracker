@@ -112,11 +112,12 @@
         403,
         408
       ],
-      "current": 408,
+      "current": null,
       "done": [
         417,
         401,
-        403
+        403,
+        408
       ],
       "parked": [],
       "base": "62cc088"
@@ -336,7 +337,7 @@
     },
     "408": {
       "lane": "D",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "5dd3c00",
@@ -346,7 +347,9 @@
       "workOrder": "C:/git/ht-lanes/wo/408.md",
       "decisionSource": "owner comment on #408 2026-10-06 (wire into MealPrep with a confirm)",
       "deviceCheck": "Lunch assigned and eaten: Remove -> eaten-meal confirm text; Cancel changes nothing; Remove -> slot shows Assign, inventory +1, meal gone from nutrition history. Unticked meal: simple confirm, inventory unchanged. Archived-recipe meal: same.",
-      "notes": "WO ready; waits for #403. Placement and wording are analyst picks. Confirm text says the portion returns even for legacy rows with a NULL inventory pointer (which credit nothing). | dev: Alert title Remove meal is a developer pick; control is an Ionicons close button left of the consume checkbox."
+      "notes": "tester APPROVE r0. HUMAN: eaten legacy rows (NULL inventory pointer) are removed and credit nothing, while the confirm says the portion goes back; Remove hit area is ~26x26 px (below 44) - look at it on the device; Alert title Remove meal and placement are picks.",
+      "securityReview": "skipped: the diff is UI only (MealPrepScreen + its test) calling the existing removeMealFromPlan, whose transactional credit+delete was security-reviewed in sprint 2 (#368); tester ran it end to end against the real db function",
+      "regressionProof": "8 new tests fail with 2a487ae MealPrepScreen.tsx, 32/32 at 0712db9; 1022/88 (tester reproduced). Probes: each Remove button deletes its own slot id (4 slots, shared recipe); real-db credit goes to the right batch; plan ids are AUTOINCREMENT and not reused; stale id is a no-op."
     },
     "409": {
       "lane": "G",
@@ -679,6 +682,10 @@
     {
       "at": "2026-10-06T17:36:21Z",
       "event": "#408 in_test (1022/88 per dev)"
+    },
+    {
+      "at": "2026-10-06T17:38:39Z",
+      "event": "#408 ready (APPROVE r0, security skipped); lane D out of issues (4 done) -> cleanup"
     }
   ]
 }
