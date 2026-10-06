@@ -463,3 +463,113 @@ describe('MealPrepScreen first-load failure', () => {
     expect(getByText('Chicken Bowl')).toBeTruthy();
   });
 });
+
+describe('MealPrepScreen in-flight write guard', () => {
+  let alertSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+
+  const inventoryItem: MealInventoryWithRecipe = {
+    id: 1,
+    recipe_id: 'r1',
+    portions_available: 3,
+    date_cooked: '2026-09-18',
+    recipe: mockRecipes[0],
+  };
+
+  function deferred() {
+    let resolve!: () => void;
+    let reject!: (e: Error) => void;
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  async function renderWithAssignOpen() {
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+    fireEvent.press(utils.getAllByLabelText('Assign recipe to Lunch')[0]);
+    return utils;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetRecipes.mockResolvedValue(mockRecipes);
+    mockGetRecipesIncludingArchived.mockResolvedValue(mockRecipes);
+    mockGetMealInventory.mockResolvedValue([inventoryItem]);
+    mockGetWeeklyMealPlan.mockResolvedValue([]);
+    mockLogCookedMeal.mockResolvedValue(undefined);
+    mockAssignMealToPlan.mockResolvedValue(undefined);
+    mockResetCookEmptyNotified.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('calls logCookedMeal once for two Save presses in the same tick and disables Save while pending', async () => {
+    const d = deferred();
+    mockLogCookedMeal.mockReturnValue(d.promise);
+    mockGetMealInventory.mockResolvedValue([]);
+    const { getByText, getByLabelText } = await renderWithModalOpen();
+    fireEvent.press(getByText('Chicken Bowl'));
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Save'));
+      fireEvent.press(getByLabelText('Save'));
+    });
+
+    expect(mockLogCookedMeal).toHaveBeenCalledTimes(1);
+    expect(getByLabelText('Save').props.accessibilityState.disabled).toBe(true);
+
+    await act(async () => {
+      d.resolve();
+    });
+  });
+
+  it('clears the log guard after a rejected write so a retry calls again', async () => {
+    mockLogCookedMeal.mockRejectedValue(new Error('x'));
+    mockGetMealInventory.mockResolvedValue([]);
+    const { getByText, getByLabelText } = await renderWithModalOpen();
+    fireEvent.press(getByText('Chicken Bowl'));
+
+    await pressAndFlush(getByLabelText('Save'));
+    expect(getByLabelText('Save').props.accessibilityState.disabled).toBe(false);
+    await pressAndFlush(getByLabelText('Save'));
+
+    expect(mockLogCookedMeal).toHaveBeenCalledTimes(2);
+  });
+
+  it('calls assignMealToPlan once for two row presses in the same tick', async () => {
+    const d = deferred();
+    mockAssignMealToPlan.mockReturnValue(d.promise);
+    const utils = await renderWithAssignOpen();
+    const row = utils.getByText('Chicken Bowl');
+
+    await act(async () => {
+      fireEvent.press(row);
+      fireEvent.press(row);
+    });
+
+    expect(mockAssignMealToPlan).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      d.resolve();
+    });
+  });
+
+  it('clears the assign guard after a rejected write so a retry calls again', async () => {
+    mockAssignMealToPlan.mockRejectedValue(new Error('x'));
+    const utils = await renderWithAssignOpen();
+
+    await pressAndFlush(utils.getByText('Chicken Bowl'));
+    await pressAndFlush(utils.getByText('Chicken Bowl'));
+
+    expect(mockAssignMealToPlan).toHaveBeenCalledTimes(2);
+    expect(alertSpy).toHaveBeenCalledTimes(2);
+  });
+});
