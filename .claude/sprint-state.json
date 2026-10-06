@@ -377,12 +377,14 @@
     },
     "409": {
       "lane": "G",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "9c337cd"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
       "deviceCheck": "none",
-      "notes": "WO ready; grep-driven, deletions only"
+      "notes": "WO ready; grep-driven, deletions only | dev: 53 lines in 47 test files, deletions only; typecheck exit code not captured by dev (tester to capture)."
     },
     "410": {
       "lane": "C",
@@ -822,6 +824,10 @@
     {
       "at": "2026-10-06T18:04:22Z",
       "event": "#400 ready (APPROVE r2 after 1 round trip, security skipped); lane G -> #409 in_dev (last issue)"
+    },
+    {
+      "at": "2026-10-06T18:05:37Z",
+      "event": "#409 in_test (1118/93 per dev)"
     }
   ]
 }
