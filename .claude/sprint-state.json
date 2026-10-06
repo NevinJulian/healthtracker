@@ -113,7 +113,7 @@
     "E": {
       "branch": "sprint/lane-e-api",
       "worktree": "C:/git/ht-lanes/lane-e",
-      "status": "in_progress",
+      "status": "merged",
       "order": [
         318
       ],
@@ -122,7 +122,8 @@
         318
       ],
       "parked": [],
-      "cleanup": "c296e5b constant order only"
+      "cleanup": "c296e5b constant order only",
+      "mergeSha": "976cd0e"
     },
     "F": {
       "branch": "sprint/lane-f-settings",
@@ -158,7 +159,7 @@
   "issues": {
     "318": {
       "lane": "E",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "9cbac95",
@@ -168,14 +169,16 @@
         "2aefe47",
         "d65c497",
         "34af795",
-        "d780c4c"
+        "d780c4c",
+        "c296e5b"
       ],
       "workOrder": "C:/git/ht-lanes/wo/318.md",
       "decisionSource": "owner comment on #318 2026-10-06 (4 items)",
       "deviceCheck": "1) Import a Discover recipe with many unknown ingredients, tap Cancel mid-spinner: spinner stops, recipe absent from library. 2) Wi-Fi without internet: save a recipe containing dragonfruit; save completes in ~10 s with local-table macros.",
       "notes": "tester APPROVE r0. HUMAN: Cancel pressed after dbImportRecipe has started is ignored - recipe saved, Imported! shown; ms-wide window but not strictly the owner wording (saves nothing); strict fix = hide/disable Cancel once the write starts. Budget is module-level, shared by editor recompute and imports; over-budget estimate is silent. Commit 2aefe47 alone does not typecheck (test-first artefact, breaks bisect at that commit).",
       "regressionProof": "UA 4/5 fail at 9cbac95 srcs; budget 3/5 fail at 8bac828 srcs; cancel 5/7 fail at 7eb26f4 srcs; deadline 1/1 fails at d65c497 src; all pass at d780c4c (tester reproduced); 873/84",
-      "securityReview": "APPROVE: UA is a constant (no email/device id); over-budget/aborted/timed-out results never cached or persisted as real; late recompute cannot write after the deadline; dbImportRecipe single-table. Notes: backward clock step wedges the budget until the clock catches up; app.json import bundles projectId/owner/package (not secrets)."
+      "securityReview": "APPROVE: UA is a constant (no email/device id); over-budget/aborted/timed-out results never cached or persisted as real; late recompute cannot write after the deadline; dbImportRecipe single-table. Notes: backward clock step wedges the budget until the clock catches up; app.json import bundles projectId/owner/package (not secrets).",
+      "mergeSha": "976cd0e"
     },
     "397": {
       "lane": "F",
@@ -382,6 +385,10 @@
     {
       "at": "2026-10-06T17:15:45Z",
       "event": "merged lane B into integration 0987514; gates green: typecheck clean, 874/83. Lane E cleanup c296e5b"
+    },
+    {
+      "at": "2026-10-06T17:16:12Z",
+      "event": "merged lane E into integration 976cd0e; gates green: typecheck clean, 885/86"
     }
   ]
 }
