@@ -86,7 +86,7 @@
     "C": {
       "branch": "sprint/lane-c-dashboard",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "pending",
+      "status": "in_progress",
       "waitsFor": "lane A merged",
       "order": [
         410,
@@ -94,14 +94,15 @@
         415,
         416
       ],
-      "current": null,
+      "current": 410,
       "done": [],
-      "parked": []
+      "parked": [],
+      "base": "62cc088"
     },
     "D": {
       "branch": "sprint/lane-d-mealprep",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "pending",
+      "status": "in_progress",
       "waitsFor": "lane A merged",
       "order": [
         417,
@@ -109,9 +110,10 @@
         403,
         408
       ],
-      "current": null,
+      "current": 417,
       "done": [],
-      "parked": []
+      "parked": [],
+      "base": "62cc088"
     },
     "E": {
       "branch": "sprint/lane-e-api",
@@ -186,12 +188,37 @@
     },
     "397": {
       "lane": "F",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
-      "notes": "WO ready; waits for #404. Siblings: toggles, day chips, steppers",
+      "commits": [
+        "1bc96c5",
+        "35f1c89",
+        "23faef1",
+        "b8a14da",
+        "7b567cd",
+        "f3a6afd"
+      ],
+      "notes": "dev admits: stepper guard reads the dirty ref only at reload resolve (if the debounce flushes first, the reload still overwrites the on-screen value); no pending-write test for toggles; rejected-write tests are guards only. Sent to tester as explicit questions.",
       "workOrder": "C:/git/ht-lanes/wo/397.md",
       "deviceCheck": "none"
+    },
+    "401": {
+      "lane": "D",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/401.md",
+      "deviceCheck": "Open MealPrep: loading then data, no banner. Switch tabs / leave and return: no banner, no blank flash. Empty inventory shows the normal empty state, not the error.",
+      "notes": "WO ready; waits for #417. Error-view and banner wording are analyst picks (HUMAN)."
+    },
+    "403": {
+      "lane": "D",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/403.md",
+      "deviceCheck": "Log Cooked Meal: 4 portions, double-tap Save fast -> +4 not +8. Assign: double-tap a recipe row -> one assignment, modal closes.",
+      "notes": "WO ready; waits for #401"
     },
     "404": {
       "lane": "F",
@@ -253,6 +280,35 @@
       "workOrder": "C:/git/ht-lanes/wo/407.md",
       "deviceCheck": "none"
     },
+    "408": {
+      "lane": "D",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/408.md",
+      "decisionSource": "owner comment on #408 2026-10-06 (wire into MealPrep with a confirm)",
+      "deviceCheck": "Lunch assigned and eaten: Remove -> eaten-meal confirm text; Cancel changes nothing; Remove -> slot shows Assign, inventory +1, meal gone from nutrition history. Unticked meal: simple confirm, inventory unchanged. Archived-recipe meal: same.",
+      "notes": "WO ready; waits for #403. Placement and wording are analyst picks. Confirm text says the portion returns even for legacy rows with a NULL inventory pointer (which credit nothing)."
+    },
+    "410": {
+      "lane": "C",
+      "status": "in_dev",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/410.md",
+      "decisionSource": "owner comment on #410 2026-10-06 (fix in the database)",
+      "deviceCheck": "Dashboard with one extra workout: add a second and immediately tick the first; both show. Force-close and reopen: both still there, tick kept."
+    },
+    "411": {
+      "lane": "C",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/411.md",
+      "decisionSource": "owner comment on #411 (Alert + Reset this day, corrupt text kept in app_state)",
+      "deviceCheck": "Corrupt today additional_workouts; add a workout -> Alert; Reset this day -> empty list, adding works. Repeat for exercises -> template exercises return unchecked. Export a backup: corrupt text is in it under corrupt_json:...",
+      "notes": "WO ready; waits for #410. ORCHESTRATOR RULINGS: (1) resetCorruptDayColumn + CorruptJsonError count as lane-C writers in database.ts; (2) key collision -> suffix :2, :3 instead of overwriting (departs from the literal key only on collision; HUMAN to confirm)."
+    },
     "412": {
       "lane": "A",
       "status": "merged",
@@ -285,6 +341,35 @@
       "regressionProof": "82/110 fail with da71967 database.ts, 110/110 at e85f913 (tester reproduced); 972/82",
       "securityReview": "APPROVE: no new SQL, writes parameterised, restored app_state values now always canonical HH:MM / 0-6 before reaching the scheduler; RangeError thrown before any write and not swallowed; restore/startup/reconcile call no setter. Note: Settings debounced flush callbacks have no try/catch around the setters (unreachable today).",
       "mergeSha": "7a97abf"
+    },
+    "415": {
+      "lane": "C",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/415.md",
+      "decisionSource": "owner comment on #415 (a date per pill)",
+      "deviceCheck": "Waist today, chest on an earlier date: each pill shows its own date, no Last: header. Log one field: only that pill date becomes today. Fresh install: No measurements logged yet.",
+      "notes": "WO ready; waits for #411"
+    },
+    "416": {
+      "lane": "C",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/416.md",
+      "decisionSource": "owner comment on #416 (clearing not supported; placeholders; only typed fields saved; no all-NULL row)",
+      "deviceCheck": "Modal opens with empty inputs and old values as placeholders. Type chest only, save: chest pill today, waist keeps old date. Save with nothing typed: nothing changes. abc: error, nothing changes. Restart: values persist, Analytics card shows no empty entry.",
+      "notes": "WO ready; waits for #415. Authorized rewriting the existing prefill test that pins null-on-blank (own commit, flagged for human review)."
+    },
+    "417": {
+      "lane": "D",
+      "status": "in_dev",
+      "roundTrips": 0,
+      "commits": [],
+      "workOrder": "C:/git/ht-lanes/wo/417.md",
+      "decisionSource": "owner decision in #417 body (picker stays on getRecipes; plan lookup includes archived)",
+      "deviceCheck": "Cook a recipe, assign to today Lunch, tick consumed. Delete the recipe (archives it). Meal Plan weekly: slot shows title and kcal, day card shows CONSUMED TODAY with kcal. + Log Cooked Meal: deleted recipe not listed."
     },
     "419": {
       "lane": "B",
@@ -412,6 +497,10 @@
     {
       "at": "2026-10-06T17:18:53Z",
       "event": "#406 ready (security APPROVE); lane A cleanup 90b02eb + b618b30; schema.ts verified add-only (0 removed lines, one hunk after MIGRATIONS); merged lane A into integration 7a97abf; gates green: typecheck clean, 1000/87"
+    },
+    {
+      "at": "2026-10-06T17:21:42Z",
+      "event": "worktrees c/d created at 62cc088 (npm ci ok); all 8 lane C/D work orders ready, none parked; #397 in_test (905/84 per dev); #410 and #417 in_dev"
     }
   ]
 }
