@@ -144,10 +144,11 @@
         397,
         407
       ],
-      "current": 397,
+      "current": 407,
       "done": [
         405,
-        404
+        404,
+        397
       ],
       "parked": []
     },
@@ -192,7 +193,7 @@
     },
     "397": {
       "lane": "F",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 1,
       "commits": [
         "1bc96c5",
@@ -204,9 +205,11 @@
         "40da49c",
         "d61488d"
       ],
-      "notes": "tester REJECT r1: stepper guard only checks the dirty ref at reload resolve; edit flushed before a held reload resolves is overwritten on screen and the next step commits a value derived from the stale number (probe: calls [[1850],[1850]]). Groups 1 and 2 sound (toggle windows probed, none found). Fix: per-field edit-sequence snapshot.",
+      "notes": "tester REJECT r1 (stepper edit flushed during a held reload was overwritten), APPROVE r2: tester probed all nine steppers at the tip (second step derives from the edited value) and read all nine guard pairings. Rejected-write tests are guards only. Long lines in the reload merge (cosmetic).",
       "workOrder": "C:/git/ht-lanes/wo/397.md",
-      "deviceCheck": "none"
+      "deviceCheck": "none",
+      "securityReview": "skipped: UI state hydration guards only; no db/api/backup code in the diff",
+      "regressionProof": "pickers 2/9 fail with 1bc96c5 SettingsScreen.tsx (stale values reach suggestGoals); toggles 4 fail with 23faef1; steppers 2 fail with 7b567cd; round 2: 2 fail with 40da49c; all pass at d61488d; 907/84 (tester reproduced)"
     },
     "401": {
       "lane": "D",
@@ -279,7 +282,7 @@
     },
     "407": {
       "lane": "F",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "notes": "work order ready (column cap 5, name cap 40 chars: analyst picks, HUMAN to confirm); waits for #405 #404 #397",
@@ -560,6 +563,10 @@
     {
       "at": "2026-10-06T17:27:29Z",
       "event": "#410 ready (security APPROVE)"
+    },
+    {
+      "at": "2026-10-06T17:27:59Z",
+      "event": "#397 ready (APPROVE r2 after 1 round trip, security skipped); lane F -> #407 in_dev"
     }
   ]
 }
