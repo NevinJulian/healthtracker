@@ -243,13 +243,16 @@
     },
     "400": {
       "lane": "G",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "5749fbf",
+        "0d3d36e"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
       "deviceCheck": "none",
       "decisionSource": "owner comment on #400 (fix CLAUDE.md jest wording, do not touch jest config)",
-      "notes": "WO ready; includes CLAUDE.md corrections limited to facts the code contradicts"
+      "notes": "WO ready; includes CLAUDE.md corrections limited to facts the code contradicts | orchestrator read the full CLAUDE.md diff (3 lines): descriptive facts only, no instruction added or removed. Dev could not verify that the dynamic-import block still happens on Jest 29 (wording now names no Jest version)."
     },
     "401": {
       "lane": "D",
@@ -798,6 +801,10 @@
     {
       "at": "2026-10-06T17:59:00Z",
       "event": "#398 ready (APPROVE r0, security skipped); lane G -> #400 in_dev"
+    },
+    {
+      "at": "2026-10-06T18:00:36Z",
+      "event": "#400 in_test (1118/93 per dev); orchestrator read the CLAUDE.md diff"
     }
   ]
 }
