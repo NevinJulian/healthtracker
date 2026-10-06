@@ -86,7 +86,7 @@
     "C": {
       "branch": "sprint/lane-c-dashboard",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "in_progress",
+      "status": "merged",
       "waitsFor": "lane A merged",
       "order": [
         410,
@@ -102,7 +102,9 @@
         416
       ],
       "parked": [],
-      "base": "62cc088"
+      "base": "62cc088",
+      "mergeSha": "04468f9",
+      "cleanup": "f47ae3d re-wrapped one docblock line (logBodyMeasurement)"
     },
     "D": {
       "branch": "sprint/lane-d-mealprep",
@@ -370,7 +372,7 @@
     },
     "410": {
       "lane": "C",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "86459a2",
@@ -384,11 +386,12 @@
       "deviceCheck": "Dashboard with one extra workout: add a second and immediately tick the first; both show. Force-close and reopen: both still there, tick kept.",
       "notes": "tester APPROVE r0. Out-of-region edit: mapLogRow row?.additional_workouts (harmless) -> revert ordered as first commit of #411. With entry null the optimistic update is a no-op but the db write still runs for today. Workout id is generated in the modal with Date.now() (same-ms duplicate ids possible; pre-existing). Handlers close over the render-time today (same as the exercise toggle).",
       "regressionProof": "db 6/80 fail with 86459a2 database.ts (functions missing) + tester probe reproduced the data loss on the old whole-array path; screen 1/1 fails with d30e74c DashboardScreen.tsx; all pass at 3b42af2; 1007/88",
-      "securityReview": "APPROVE: parameterised single-row UPDATE; same date guard as existing writers via _ensureDailyLogRow; _assertWrote throws on 0 rows; queued (not transactional) unit is sufficient for one statement. Notes: toggle flips every entry sharing an id; a stored array containing null would throw TypeError (rejects loudly, no write)."
+      "securityReview": "APPROVE: parameterised single-row UPDATE; same date guard as existing writers via _ensureDailyLogRow; _assertWrote throws on 0 rows; queued (not transactional) unit is sufficient for one statement. Notes: toggle flips every entry sharing an id; a stored array containing null would throw TypeError (rejects loudly, no write).",
+      "mergeSha": "04468f9"
     },
     "411": {
       "lane": "C",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "99b49b4",
@@ -404,7 +407,8 @@
       "deviceCheck": "Corrupt today additional_workouts; add a workout -> Alert; Reset this day -> empty list, adding works. Repeat for exercises -> template exercises return unchecked. Export a backup: corrupt text is in it under corrupt_json:...",
       "notes": "WO ready; waits for #410. ORCHESTRATOR RULINGS: (1) resetCorruptDayColumn + CorruptJsonError count as lane-C writers in database.ts; (2) key collision -> suffix :2, :3 instead of overwriting (departs from the literal key only on collision; HUMAN to confirm). | dev: Alert title Cannot save: unreadable data; Reset this day (destructive) / Cancel; reset failure -> Reset failed. Existing Dashboard suites mock factories lack CorruptJsonError (instanceof undefined would throw if a writer rejects there) - sent to tester. | tester APPROVE r0. An array with null/non-object items is neither editable nor resettable (filed #434). Existing Dashboard suites lack the two mock-factory entries (no path reaches instanceof today). 041a198 carries a one-line test correction inside a feature commit (accepted by tester).",
       "regressionProof": "writers: 4 fail with 6b795d6 database.ts; reset: 10 fail with 53a29a8 database.ts; screen: 8/9 fail with fb86fb9 DashboardScreen.tsx; all pass at e6bf37b; 1030/89 (tester reproduced). Probes: one corruption predicate shared by writers and reset (8 corrupt forms); kept text byte-identical (2 MB, unicode, CRLF); collisions :2/:3; atomic both directions; fresh exercises byte-identical to sync output for 5 offsets; backup->restore round trip keeps the kept row.",
-      "securityReview": "APPROVE: SQL static or from fixed maps, all values bound; column/date come only from a CorruptJsonError built inside the db module; destructive step runs only after the raw text is saved, same transaction; every daily_log writer is queued. Notes: raw read is inside the queued unit but OUTSIDE the transaction (safe only while every daily_log writer goes through _enqueueWrite); a second reset after a successful one shows Reset failed although nothing is wrong; instanceof on an Error subclass must be confirmed on Hermes by the device check."
+      "securityReview": "APPROVE: SQL static or from fixed maps, all values bound; column/date come only from a CorruptJsonError built inside the db module; destructive step runs only after the raw text is saved, same transaction; every daily_log writer is queued. Notes: raw read is inside the queued unit but OUTSIDE the transaction (safe only while every daily_log writer goes through _enqueueWrite); a second reset after a successful one shows Reset failed although nothing is wrong; instanceof on an Error subclass must be confirmed on Hermes by the device check.",
+      "mergeSha": "04468f9"
     },
     "412": {
       "lane": "A",
@@ -441,7 +445,7 @@
     },
     "415": {
       "lane": "C",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "ab1eb9f",
@@ -454,11 +458,12 @@
       "deviceCheck": "Waist today, chest on an earlier date: each pill shows its own date, no Last: header. Log one field: only that pill date becomes today. Fresh install: No measurements logged yet.",
       "notes": "tester APPROVE r0. Edited existing assertions judged line by line: none weakened; removed .date/.id assertions pinned the shared-date shape the owner decision removed; toMatchObject became a stricter toEqual. HUMAN: review commit 2c3cb5b test edits. 2c3cb5b alone does not typecheck (revert together with 4e1e264). A value of 0 renders as 0 cm.",
       "securityReview": "skipped: the db change is one static read-only SELECT (no parameters, no write path); the rest is UI",
-      "regressionProof": "db 3 new tests fail with ab1eb9f database.ts; screen pill test fails with 780df0d DashboardScreen.tsx; pass at 4e1e264; 1035/89 (tester reproduced)"
+      "regressionProof": "db 3 new tests fail with ab1eb9f database.ts; screen pill test fails with 780df0d DashboardScreen.tsx; pass at 4e1e264; 1035/89 (tester reproduced)",
+      "mergeSha": "04468f9"
     },
     "416": {
       "lane": "C",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 1,
       "commits": [
         "c45058c",
@@ -476,7 +481,8 @@
       "deviceCheck": "Modal opens with empty inputs and old values as placeholders. Type chest only, save: chest pill today, waist keeps old date. Save with nothing typed: nothing changes. abc: error, nothing changes. Restart: values persist, Analytics card shows no empty entry.",
       "notes": "WO ready; waits for #415. Authorized rewriting the existing prefill test that pins null-on-blank (own commit, flagged for human review). | dev: e5a6f8f rewrites 6 existing assertions (HUMAN review); existing db test returns-null-when-all-NULL no longer seeds real all-NULL rows (sent to tester). | tester REJECT r1: fix sound and e5a6f8f accepted line by line, but the existing all-NULL read test is now hollow (seeds via the writer, which writes nothing) and no other test seeds a legacy all-NULL row; also NaN/Infinity still insert an all-NULL row. Sent back: raw-SQL seeded tests, non-finite guard, dash-placeholder test. NOTE for human: mixed valid+invalid input saves the valid fields and keeps the modal open (pre-existing rule, still pinned). | APPROVE r2. The legacy returns-null-for-all-NULL-rows test did not fail under the tester mutation (it pins only the null result). Number.isFinite now also skips numeric strings (no real caller passes one).",
       "regressionProof": "db 2 fail with c45058c database.ts; modal 5/8 fail with 118af59 DashboardScreen.tsx; NaN test fails with 58dd654 database.ts; all pass at 0098d42; 1045/89 (tester reproduced). Mutation of getLatestMeasurements (NULL filters removed) fails 6 tests incl. the new carry-forward-past-legacy-row test.",
-      "securityReview": "APPROVE: column identifiers only from a const tuple, values bound, on both insert and update branches; read-then-write inside one queued unit (date UNIQUE as backstop); restore never calls this function. Note: handleSaveMeasurements catches and only logs a write error, so the modal closes as if saved (pre-existing, filed #435)."
+      "securityReview": "APPROVE: column identifiers only from a const tuple, values bound, on both insert and update branches; read-then-write inside one queued unit (date UNIQUE as backstop); restore never calls this function. Note: handleSaveMeasurements catches and only logs a write error, so the modal closes as if saved (pre-existing, filed #435).",
+      "mergeSha": "04468f9"
     },
     "417": {
       "lane": "D",
@@ -550,7 +556,10 @@
     "MealPrep handleToggleConsumed is not behind runGuarded: a double tap fires toggleMealConsumed twice (second is a no-op in the db; visual-feedback gap only) - #408 dev / #403 analyst",
     "MealPrepScreen.test.tsx has an issue number in a describe title (refresh failure banner (#401)) - lane D cleanup",
     "MealPrepScreen.tsx: pre-existing comments carry issue refs (#324 backstop comment, hasLoadedOnceRef comment) - lane D cleanup",
-    "DashboardScreen.tsx: comment above the measurements modal state initialisers references #325 and tells history - #415 dev (handed to lane C cleanup if the lane touches those lines)"
+    "DashboardScreen.tsx: comment above the measurements modal state initialisers references #325 and tells history - #415 dev (handed to lane C cleanup if the lane touches those lines)",
+    "upsertAdditionalWorkouts has no non-test caller in src/ any more (orphaned export after #410) - lane C cleanup",
+    "_logBodyMeasurementImpl declares a local columns array duplicating the module-level MEASUREMENT_FIELDS const - lane C cleanup",
+    "DashboardScreen pills map: const entry shadows the component entry state - lane C cleanup"
   ],
   "log": [
     {
@@ -761,6 +770,10 @@
     {
       "at": "2026-10-06T17:54:46Z",
       "event": "#416 ready (security APPROVE); filed #435 (silent measurement-save failure); lane C out of issues (4 done), cleanup running"
+    },
+    {
+      "at": "2026-10-06T17:55:30Z",
+      "event": "merged lane C into integration 04468f9 (no conflicts); gates green: typecheck clean, 1118/93. All lanes A-F merged; lane G starts"
     }
   ]
 }
