@@ -116,3 +116,33 @@ describe('getLatestMeasurements reports the date each value was measured', () =>
     expect(await db.getLatestMeasurements()).toBeNull();
   });
 });
+
+describe('logBodyMeasurement never writes NULL', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('inserts no row for an empty or all-null input', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.logBodyMeasurement('2026-01-01', { waist_cm: 80 });
+    await db.logBodyMeasurement('2026-01-05', {});
+    await db.logBodyMeasurement('2026-01-05', { waist_cm: null });
+
+    expect(await db.getBodyMeasurements()).toHaveLength(1);
+    expect((await db.getLatestMeasurements())?.waist_cm).toEqual({ value: 80, date: '2026-01-01' });
+  });
+
+  it('leaves a stored value unchanged when null is passed for it on the same date', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.logBodyMeasurement('2026-01-01', { waist_cm: 80, chest_cm: 90 });
+    await db.logBodyMeasurement('2026-01-01', { waist_cm: null, chest_cm: 91 });
+
+    const [row] = await db.getBodyMeasurements();
+    expect(row.waist_cm).toBe(80);
+    expect(row.chest_cm).toBe(91);
+  });
+});
