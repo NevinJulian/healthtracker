@@ -188,8 +188,8 @@
     },
     "397": {
       "lane": "F",
-      "status": "in_test",
-      "roundTrips": 0,
+      "status": "in_dev",
+      "roundTrips": 1,
       "commits": [
         "1bc96c5",
         "35f1c89",
@@ -198,7 +198,7 @@
         "7b567cd",
         "f3a6afd"
       ],
-      "notes": "dev admits: stepper guard reads the dirty ref only at reload resolve (if the debounce flushes first, the reload still overwrites the on-screen value); no pending-write test for toggles; rejected-write tests are guards only. Sent to tester as explicit questions.",
+      "notes": "tester REJECT r1: stepper guard only checks the dirty ref at reload resolve; edit flushed before a held reload resolves is overwritten on screen and the next step commits a value derived from the stale number (probe: calls [[1850],[1850]]). Groups 1 and 2 sound (toggle windows probed, none found). Fix: per-field edit-sequence snapshot.",
       "workOrder": "C:/git/ht-lanes/wo/397.md",
       "deviceCheck": "none"
     },
@@ -370,12 +370,19 @@
     },
     "417": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "5662af0",
+        "d0e6e39",
+        "fa4a656",
+        "2de5f80",
+        "ef83ef1"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/417.md",
       "decisionSource": "owner decision in #417 body (picker stays on getRecipes; plan lookup includes archived)",
-      "deviceCheck": "Cook a recipe, assign to today Lunch, tick consumed. Delete the recipe (archives it). Meal Plan weekly: slot shows title and kcal, day card shows CONSUMED TODAY with kcal. + Log Cooked Meal: deleted recipe not listed."
+      "deviceCheck": "Cook a recipe, assign to today Lunch, tick consumed. Delete the recipe (archives it). Meal Plan weekly: slot shows title and kcal, day card shows CONSUMED TODAY with kcal. + Log Cooked Meal: deleted recipe not listed.",
+      "notes": "dev: existing MealPrep test beforeEach blocks gained a mock setup line for the new getter; 5662af0 alone does not typecheck"
     },
     "419": {
       "lane": "B",
@@ -523,6 +530,10 @@
     {
       "at": "2026-10-06T17:24:10Z",
       "event": "#410 in_test (1007/88 per dev)"
+    },
+    {
+      "at": "2026-10-06T17:24:40Z",
+      "event": "#397 REJECT r1 (stepper guard gap) -> back to dev, roundTrips=1; #417 in_test (1003/88 per dev)"
     }
   ]
 }
