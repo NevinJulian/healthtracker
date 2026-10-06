@@ -555,7 +555,8 @@
     433,
     434,
     435,
-    436
+    436,
+    437
   ],
   "smallFindings": [
     "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
@@ -828,6 +829,11 @@
     {
       "at": "2026-10-06T18:05:37Z",
       "event": "#409 in_test (1118/93 per dev)"
+    },
+    {
+      "at": "2026-10-06T18:06:03Z",
+      "event": "filed #437 (Sprint 3: small findings, one checkbox per finding)"
     }
-  ]
+  ],
+  "smallFindingsIssue": 437
 }
