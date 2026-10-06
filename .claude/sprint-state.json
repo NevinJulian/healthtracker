@@ -144,11 +144,12 @@
         397,
         407
       ],
-      "current": 407,
+      "current": null,
       "done": [
         405,
         404,
-        397
+        397,
+        407
       ],
       "parked": []
     },
@@ -287,15 +288,17 @@
     },
     "407": {
       "lane": "F",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "e99af24",
         "c5b3e23"
       ],
-      "notes": "work order ready (column cap 5, name cap 40 chars: analyst picks, HUMAN to confirm); waits for #405 #404 #397",
+      "notes": "tester APPROVE r0. HUMAN: caps 5 columns / 40 chars are analyst picks; worst-case alert now ~1.5 KB. A column name from a hand-edited backup containing newline/comma still renders verbatim (pre-existing, now limited to 40 chars).",
       "workOrder": "C:/git/ht-lanes/wo/407.md",
-      "deviceCheck": "none"
+      "deviceCheck": "none",
+      "securityReview": "skipped: text formatting of the restore alert only; skipped table names are whitelisted against live tables and columns are strings by construction (tester read backup.ts/database.ts); same judgement as sprint 2 for #315-display",
+      "regressionProof": "4/11 fail with e99af24 SettingsScreen.tsx, 11/11 at c5b3e23 (tester reproduced); 913/84"
     },
     "408": {
       "lane": "D",
@@ -448,7 +451,8 @@
     "workoutSetIndexCollision.test.ts header comment (~lines 22-40) still says restore re-runs v37 - #412 tester (handed to lane A cleanup)",
     "A payload row with is_consumed null makes the whole restore throw on NOT NULL (pre-existing; payload validation) - #406 tester",
     "src/db/__tests__/backupRoundTrip.test.ts:137 comment still says POST_RESTORE_STEPS includes v37 (outside lane A diff) - lane A cleanup",
-    "restoreFromPayload docblock (~2500-2520) still carries pre-existing issue refs (#303, #317, #315) and v37 history - lane A cleanup"
+    "restoreFromPayload docblock (~2500-2520) still carries pre-existing issue refs (#303, #317, #315) and v37 history - lane A cleanup",
+    "Restore alert: column names from a hand-edited backup containing newlines or commas render verbatim in the skipped summary (could fake an alert line; max 40 chars after #407) - #407 tester"
   ],
   "log": [
     {
@@ -583,6 +587,10 @@
     {
       "at": "2026-10-06T17:29:21Z",
       "event": "#407 in_test (913/84 per dev)"
+    },
+    {
+      "at": "2026-10-06T17:30:35Z",
+      "event": "#407 ready (APPROVE r0, security skipped); lane F out of issues (4 done) -> cleanup"
     }
   ]
 }
