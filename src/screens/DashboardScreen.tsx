@@ -607,13 +607,7 @@ export default function DashboardScreen() {
 
   // ── Measurement handlers ──────────────────────────────────────────────────────
 
-  const handleSaveMeasurements = async (fields: {
-    waist_cm?: number | null;
-    chest_cm?: number | null;
-    hips_cm?: number | null;
-    thigh_cm?: number | null;
-    arm_cm?: number | null;
-  }) => {
+  const handleSaveMeasurements = async (fields: MeasurementFields) => {
     try {
       await logBodyMeasurement(today, fields);
       const updated = await getLatestMeasurements();
@@ -1055,7 +1049,6 @@ export default function DashboardScreen() {
 
 // ─── Body Measurements Modal ──────────────────────────────────────────────────
 
-/** Valid cm range per measurement field (#325). */
 const MEASUREMENT_PILLS: { field: keyof LatestMeasurements; label: string }[] = [
   { field: 'waist_cm', label: 'Waist' },
   { field: 'chest_cm', label: 'Chest' },
@@ -1064,6 +1057,7 @@ const MEASUREMENT_PILLS: { field: keyof LatestMeasurements; label: string }[] = 
   { field: 'arm_cm', label: 'Arm' },
 ];
 
+/** Valid cm range per measurement field. */
 const MEASUREMENT_RANGES = {
   waist_cm: [40, 200],
   chest_cm: [40, 200],
@@ -1074,22 +1068,19 @@ const MEASUREMENT_RANGES = {
 
 type MeasurementKey = keyof typeof MEASUREMENT_RANGES;
 
+type MeasurementFields = Partial<Record<MeasurementKey, number>>;
+
 /**
- * Parse one measurement field's raw text.
- *
- * - Blank (after trimming) means "clear this field" -> `value: null`.
- * - A number within range -> `value` holds the parsed number.
- * - Non-numeric or out of range -> `value: undefined` (skip; leave the
- *   stored value untouched) and `isError: true` so the caller can show an
- *   inline error without losing what the user typed.
+ * Parse one measurement field's raw text. Blank is not an error and yields
+ * `value: undefined`, as does an invalid entry, which also sets `isError`.
  */
 function parseMeasurementField(
   raw: string,
   key: MeasurementKey
-): { value: number | null | undefined; isError: boolean } {
+): { value: number | undefined; isError: boolean } {
   const trimmed = raw.trim();
   if (trimmed === '') {
-    return { value: null, isError: false };
+    return { value: undefined, isError: false };
   }
   const [min, max] = MEASUREMENT_RANGES[key];
   const parsed = Number(trimmed.replace(',', '.'));
@@ -1107,34 +1098,14 @@ function MeasurementsModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  onSave: (fields: {
-    waist_cm?: number | null;
-    chest_cm?: number | null;
-    hips_cm?: number | null;
-    thigh_cm?: number | null;
-    arm_cm?: number | null;
-  }) => Promise<void>;
+  onSave: (fields: MeasurementFields) => Promise<void>;
   latest: LatestMeasurements | null;
 }) {
-  // The parent now mounts this component only while `visible` (#325), so
-  // this state is fresh on every open -- each field initialises once from
-  // `latest` at mount and no reset effect is needed. Previously this used a
-  // `useEffect(…, [visible, latest])` that re-ran whenever `latest` changed
-  // identity (e.g. on every loadToday() reload), clobbering in-progress
-  // typing.
-  const [waist, setWaist] = useState(() => (latest?.waist_cm != null ? String(latest.waist_cm.value) : ''));
-  const [chest, setChest] = useState(() => (latest?.chest_cm != null ? String(latest.chest_cm.value) : ''));
-  const [hips, setHips] = useState(() => (latest?.hips_cm != null ? String(latest.hips_cm.value) : ''));
-  const [thigh, setThigh] = useState(() => (latest?.thigh_cm != null ? String(latest.thigh_cm.value) : ''));
-  const [arm, setArm] = useState(() => (latest?.arm_cm != null ? String(latest.arm_cm.value) : ''));
-
-  const [initial] = useState(() => ({
-    waist_cm: waist,
-    chest_cm: chest,
-    hips_cm: hips,
-    thigh_cm: thigh,
-    arm_cm: arm,
-  }));
+  const [waist, setWaist] = useState('');
+  const [chest, setChest] = useState('');
+  const [hips, setHips] = useState('');
+  const [thigh, setThigh] = useState('');
+  const [arm, setArm] = useState('');
 
   const waistResult = parseMeasurementField(waist, 'waist_cm');
   const chestResult = parseMeasurementField(chest, 'chest_cm');
@@ -1150,29 +1121,18 @@ function MeasurementsModal({
     arm_cm: armResult,
   };
 
-  const currentText: Record<MeasurementKey, string> = {
-    waist_cm: waist,
-    chest_cm: chest,
-    hips_cm: hips,
-    thigh_cm: thigh,
-    arm_cm: arm,
-  };
-  const isEdited = (key: MeasurementKey) => currentText[key] !== initial[key];
-
-  const submitted = (key: MeasurementKey) =>
-    isEdited(key) ? fieldResults[key].value : undefined;
-
   const handleSave = async () => {
     const keys = Object.keys(fieldResults) as MeasurementKey[];
     const hasError = keys.some((k) => fieldResults[k].isError);
+    const hasValue = keys.some((k) => fieldResults[k].value !== undefined);
 
-    if (keys.some(isEdited)) {
+    if (hasValue) {
       await onSave({
-        waist_cm: submitted('waist_cm'),
-        chest_cm: submitted('chest_cm'),
-        hips_cm: submitted('hips_cm'),
-        thigh_cm: submitted('thigh_cm'),
-        arm_cm: submitted('arm_cm'),
+        waist_cm: waistResult.value,
+        chest_cm: chestResult.value,
+        hips_cm: hipsResult.value,
+        thigh_cm: thighResult.value,
+        arm_cm: armResult.value,
       });
     }
 
@@ -1198,7 +1158,7 @@ function MeasurementsModal({
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>Body Measurements</Text>
-          <Text style={styles.modalSubtitle}>Enter values in cm — a blank field clears it</Text>
+          <Text style={styles.modalSubtitle}>Enter values in cm — leave a field blank to skip it</Text>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
             {fields.map((field) => {
               const [min, max] = MEASUREMENT_RANGES[field.key];
@@ -1211,7 +1171,7 @@ function MeasurementsModal({
                     value={field.value}
                     onChangeText={field.onChange}
                     keyboardType="decimal-pad"
-                    placeholder="—"
+                    placeholder={latest?.[field.key] != null ? String(latest[field.key]?.value) : '—'}
                     placeholderTextColor={Colors.textMuted}
                     returnKeyType="next"
                   />
