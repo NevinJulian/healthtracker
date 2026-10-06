@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -67,24 +67,47 @@ export default function DiscoverDetailScreen() {
   const [importDone, setImportDone] = useState(false);
   const [importEstimated, setImportEstimated] = useState<string[]>([]);
 
+  const loadController = useRef<AbortController | null>(null);
+  const importController = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      loadController.current?.abort();
+      importController.current?.abort();
+    },
+    [],
+  );
+
   const load = async (id: string) => {
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
     setLoading(true);
     setError(false);
     try {
-      const data = await fetchMealById(id);
+      const data = await fetchMealById(id, controller.signal);
+      if (controller.signal.aborted) return;
       setMeal(data);
     } catch {
+      if (controller.signal.aborted) return;
       setError(true);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
+  };
+
+  const handleCancelImport = () => {
+    importController.current?.abort();
   };
 
   const handleImport = async () => {
     if (!meal || importing || importDone) return;
+    const controller = new AbortController();
+    importController.current = controller;
     setImporting(true);
     try {
-      const result = await buildImportResult(meal);
+      const result = await buildImportResult(meal, undefined, controller.signal);
+      if (controller.signal.aborted) return;
       const wasNew = await dbImportRecipe(result.recipe);
       if (!wasNew) {
         Alert.alert(
@@ -106,8 +129,11 @@ export default function DiscoverDetailScreen() {
         `"${meal.name}" has been added to your recipe library.\n\n${macros.calories} kcal · ${macros.protein}g protein · ${macros.carbs}g carbs · ${macros.fat}g fat (per serving)${estimatedNote}`,
       );
     } catch {
-      Alert.alert('Import failed', 'Something went wrong. Please try again.');
+      if (!controller.signal.aborted) {
+        Alert.alert('Import failed', 'Something went wrong. Please try again.');
+      }
     } finally {
+      if (importController.current === controller) importController.current = null;
       setImporting(false);
     }
   };
@@ -283,6 +309,17 @@ export default function DiscoverDetailScreen() {
                   )}
                 </View>
               </Card>
+            </TouchableOpacity>
+          )}
+          {importing && !importDone && (
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={handleCancelImport}
+              activeOpacity={0.78}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel import"
+            >
+              <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -484,6 +521,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  cancelBtn: {
+    alignSelf: 'center',
+    minHeight: 48,
+    paddingHorizontal: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.md,
+    color: Colors.sageDeep,
   },
   importSpinner: {
     width: 36,
