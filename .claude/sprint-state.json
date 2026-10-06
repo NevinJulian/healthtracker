@@ -58,7 +58,7 @@
         412,
         406
       ],
-      "current": 412,
+      "current": 406,
       "done": [
         414
       ],
@@ -204,7 +204,7 @@
     },
     "406": {
       "lane": "A",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "notes": "WO ready; waits for #412",
@@ -222,17 +222,18 @@
     },
     "412": {
       "lane": "A",
-      "status": "in_test",
+      "status": "in_security",
       "roundTrips": 0,
       "commits": [
         "8a66e85",
         "2c86542",
         "5f94a7c"
       ],
-      "notes": "WO ready; waits for #414. ORCHESTRATOR RULING: MIGRATIONS stays byte-identical, so the stale v37 comment (schema.ts:766-771) is NOT fixed although the owner decision asks for it; explanation goes on RESTORE_SET_INDEX_SQL. HUMAN: fix that comment by hand or confirm. Whole colliding partition renumbered (analyst interpretation). | dev: RESTORE_SET_INDEX_SQL uses a TEMP staging table (not run on device); unused {version} branch of POST_RESTORE_STEPS left in place.",
+      "notes": "WO ready; waits for #414. ORCHESTRATOR RULING: MIGRATIONS stays byte-identical, so the stale v37 comment (schema.ts:766-771) is NOT fixed although the owner decision asks for it; explanation goes on RESTORE_SET_INDEX_SQL. HUMAN: fix that comment by hand or confirm. Whole colliding partition renumbered (analyst interpretation). | dev: RESTORE_SET_INDEX_SQL uses a TEMP staging table (not run on device); unused {version} branch of POST_RESTORE_STEPS left in place. | tester APPROVE r0. Dead {version} branch of POST_RESTORE_STEPS type/loop left (cleanup candidate).",
       "workOrder": "C:/git/ht-lanes/wo/412.md",
-      "deviceCheck": "none",
-      "decisionSource": "owner comment on #412 2026-10-06"
+      "deviceCheck": "Orchestrator-added (TEMP table + multi-statement execAsync never ran on real expo-sqlite): restore any backup that has logged sets on the phone; restore completes, set order in a workout day is unchanged, logging one more set works.",
+      "decisionSource": "owner comment on #412 2026-10-06",
+      "regressionProof": "3 new tests fail with 8a66e85 database.ts+schema.ts (v37 re-sorts by created_at), pass at 5f94a7c; schema.ts diff add-only after MIGRATIONS (tester read the hunk); probes: ties, negatives, 300 rows, order-independence, 2 restores back to back, forced throw after TEMP creation rolls back clean; 975/82"
     },
     "414": {
       "lane": "A",
@@ -278,7 +279,8 @@
     "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
     "Onboarding age field is number-pad (no decimal key) but accepts decimals via paste - #405 analyst",
     "src/components Button.tsx has raw borderRadius: 13 and minHeight: 48 instead of tokens - #419 dev",
-    "RecipeEditorScreen: SAVE_RECOMPUTE_DEADLINE_MS is declared between DEFAULT_SERVINGS and DEFAULT_PREP, splitting two related constants - #318 tester (handed to lane E cleanup)"
+    "RecipeEditorScreen: SAVE_RECOMPUTE_DEADLINE_MS is declared between DEFAULT_SERVINGS and DEFAULT_PREP, splitting two related constants - #318 tester (handed to lane E cleanup)",
+    "workoutSetIndexCollision.test.ts header comment (~lines 22-40) still says restore re-runs v37 - #412 tester (handed to lane A cleanup)"
   ],
   "log": [
     {
@@ -341,6 +343,10 @@
     {
       "at": "2026-10-06T17:13:26Z",
       "event": "#419 tester APPROVE r0 -> security; #318 tester APPROVE r0 -> security; filed #425 (shadowed expo-file-system mock)"
+    },
+    {
+      "at": "2026-10-06T17:13:53Z",
+      "event": "#412 tester APPROVE r0 -> security (read-only, parallel); lane A -> #406 in_dev"
     }
   ]
 }
