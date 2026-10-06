@@ -391,3 +391,75 @@ describe('MealPrepScreen planned meal of an archived recipe', () => {
     expect(queryByText('Archived Curry')).toBeNull();
   });
 });
+
+describe('MealPrepScreen first-load failure', () => {
+  let alertSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetRecipes.mockResolvedValue([]);
+    mockGetRecipesIncludingArchived.mockResolvedValue([]);
+    mockGetMealInventory.mockResolvedValue([]);
+    mockGetWeeklyMealPlan.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('shows an error view with Retry and keeps the tab switcher when the first load rejects', async () => {
+    mockGetMealInventory.mockRejectedValue(new Error('db down'));
+    const { getByText, getByLabelText, queryByText } = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    expect(getByText("Couldn't load your meals")).toBeTruthy();
+    expect(getByText('Your data is safe. Try again.')).toBeTruthy();
+    expect(getByLabelText('Retry')).toBeTruthy();
+    expect(getByLabelText('Weekly Plan')).toBeTruthy();
+    expect(getByLabelText('My Inventory')).toBeTruthy();
+    expect(queryByText('Your inventory is empty')).toBeNull();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['getWeeklyMealPlan', mockGetWeeklyMealPlan],
+    ['getRecipes', mockGetRecipes],
+    ['getRecipesIncludingArchived', mockGetRecipesIncludingArchived],
+  ])('shows the error view when %s rejects', async (_name, mock) => {
+    mock.mockRejectedValue(new Error('db down'));
+    const { getByText } = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    expect(getByText("Couldn't load your meals")).toBeTruthy();
+  });
+
+  it('Retry reloads and replaces the error view with the data', async () => {
+    mockGetMealInventory.mockRejectedValueOnce(new Error('db down'));
+    mockGetRecipesIncludingArchived.mockResolvedValue(mockRecipes);
+    mockGetWeeklyMealPlan.mockResolvedValue([
+      {
+        id: 3,
+        date: '2026-09-19',
+        meal_type: 'Lunch',
+        recipe_id: 'r1',
+        is_consumed: false,
+        consumed_from_inventory_id: null,
+      },
+    ]);
+    const { getByText, getByLabelText, queryByText } = render(<MealPrepScreen />);
+    await flushMicrotasks();
+    expect(getByText("Couldn't load your meals")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Retry'));
+    });
+    await flushMicrotasks();
+
+    expect(queryByText("Couldn't load your meals")).toBeNull();
+    expect(getByText('Chicken Bowl')).toBeTruthy();
+  });
+});
