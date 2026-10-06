@@ -19,6 +19,7 @@ import {
   logCookedMeal,
   assignMealToPlan,
   toggleMealConsumed,
+  removeMealFromPlan,
   getRecipes,
   getRecipesIncludingArchived,
   Recipe,
@@ -214,6 +215,19 @@ export default function MealPrepScreen() {
     });
   };
 
+  const handleRemoveMeal = async (planId: number) => {
+    await runGuarded(async () => {
+      try {
+        await removeMealFromPlan(planId);
+      } catch (err) {
+        logDbError(err);
+        Alert.alert('Error', 'Failed to remove the meal. Please try again.');
+        return;
+      }
+      loadData();
+    });
+  };
+
   const handleToggleConsumed = async (planId: number, currentVal: boolean) => {
     try {
       await toggleMealConsumed(planId, !currentVal);
@@ -377,6 +391,7 @@ export default function MealPrepScreen() {
                   plan={lunchPlan}
                   recipe={lunchRecipe ?? null}
                   onToggleConsumed={(id, val) => handleToggleConsumed(id, val)}
+                  onRemove={handleRemoveMeal}
                   onAssign={() => {
                     setAssignTarget({ date: dateStr, meal_type: 'Lunch' });
                     setAssignModalVisible(true);
@@ -388,6 +403,7 @@ export default function MealPrepScreen() {
                   plan={dinnerPlan}
                   recipe={dinnerRecipe ?? null}
                   onToggleConsumed={(id, val) => handleToggleConsumed(id, val)}
+                  onRemove={handleRemoveMeal}
                   onAssign={() => {
                     setAssignTarget({ date: dateStr, meal_type: 'Dinner' });
                     setAssignModalVisible(true);
@@ -482,14 +498,29 @@ function MealSlot({
   plan,
   recipe,
   onToggleConsumed,
+  onRemove,
   onAssign,
 }: {
   label: string;
   plan: WeeklyMealPlanItem | undefined;
   recipe: Recipe | null;
   onToggleConsumed: (id: number, current: boolean) => void;
+  onRemove: (id: number) => void;
   onAssign: () => void;
 }) {
+  const confirmRemove = (planId: number, eaten: boolean) => {
+    Alert.alert(
+      'Remove meal',
+      eaten
+        ? 'This portion will go back to your inventory and the meal will be removed from your nutrition history.'
+        : 'Remove this meal from your plan?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => onRemove(planId) },
+      ]
+    );
+  };
+
   const subtitle = recipe
     ? `${recipe.calories} kcal · ${recipe.protein}g protein`
     : undefined;
@@ -531,6 +562,15 @@ function MealSlot({
               </Text>
             )}
           </View>
+          <TouchableOpacity
+            style={styles.removeBtn}
+            onPress={() => confirmRemove(plan.id, plan.is_consumed)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${recipe?.title ?? label} from plan`}
+          >
+            <Ionicons name="close" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
           <CircleCheck
             checked={plan.is_consumed}
             onToggle={() => onToggleConsumed(plan.id, plan.is_consumed)}
@@ -846,6 +886,10 @@ const styles = StyleSheet.create({
   },
   assignedText: {
     flex: 1,
+  },
+  removeBtn: {
+    padding: Spacing.xs,
+    marginRight: Spacing.sm,
   },
   assignedTitle: {
     fontFamily: Typography.title,
