@@ -24,7 +24,8 @@ import {
   upsertLogField,
   upsertExerciseCompleted,
   upsertBodyWeight,
-  upsertAdditionalWorkouts,
+  addAdditionalWorkout,
+  toggleAdditionalWorkout,
   syncRollingSchedule,
   toISODate,
   getTodaysMealsWithRecipe,
@@ -513,27 +514,32 @@ export default function DashboardScreen() {
     reps: string;
     completed: boolean;
   }) => {
-    if (!entry) return;
-    const updated = [...(entry.additional_workouts || []), workout];
-    setEntry((prev) => (prev ? { ...prev, additional_workouts: updated } : prev));
+    setEntry((prev) =>
+      prev ? { ...prev, additional_workouts: [...(prev.additional_workouts || []), workout] } : prev
+    );
     try {
-      await upsertAdditionalWorkouts(today, updated);
+      await addAdditionalWorkout(today, workout);
     } catch (err) {
-      console.error('upsertAdditionalWorkouts error', err);
+      console.error('addAdditionalWorkout error', err);
       loadToday();
     }
   };
 
   const handleToggleExtraWorkout = async (id: string) => {
-    if (!entry) return;
-    const updated = (entry.additional_workouts || []).map((w) =>
-      w.id === id ? { ...w, completed: !w.completed } : w
+    setEntry((prev) =>
+      prev
+        ? {
+            ...prev,
+            additional_workouts: (prev.additional_workouts || []).map((w) =>
+              w.id === id ? { ...w, completed: !w.completed } : w
+            ),
+          }
+        : prev
     );
-    setEntry((prev) => (prev ? { ...prev, additional_workouts: updated } : prev));
     try {
-      await upsertAdditionalWorkouts(today, updated);
+      await toggleAdditionalWorkout(today, id);
     } catch (err) {
-      console.error('upsertAdditionalWorkouts error', err);
+      console.error('toggleAdditionalWorkout error', err);
       loadToday();
     }
   };
