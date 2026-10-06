@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -73,7 +74,11 @@ import {
   setProfileAge,
   clearProfileHeightCm,
   clearProfileAge,
+  setProfileSex,
+  setNutritionGoalCalories,
+  setNutritionGoalProtein,
 } from '../../db/database';
+import { suggestGoals } from '../../nutrition/tdee';
 
 type Profile = Awaited<ReturnType<typeof getUserProfile>>;
 
@@ -82,6 +87,9 @@ const mockSetProfileHeightCm = jest.mocked(setProfileHeightCm);
 const mockSetProfileAge = jest.mocked(setProfileAge);
 const mockClearProfileHeightCm = jest.mocked(clearProfileHeightCm);
 const mockClearProfileAge = jest.mocked(clearProfileAge);
+const mockSetProfileSex = jest.mocked(setProfileSex);
+const mockSetCalories = jest.mocked(setNutritionGoalCalories);
+const mockSetProtein = jest.mocked(setNutritionGoalProtein);
 
 const baseProfile: Profile = { heightCm: 180, age: 30, sex: null, activityLevel: null, goalType: null };
 
@@ -214,5 +222,90 @@ describe('SettingsScreen profile reload racing a blur write', () => {
 
     expect(getByLabelText('Height in centimetres').props.value).toBe('190');
     expect(getByLabelText('Age in years').props.value).toBe('33');
+  });
+});
+
+describe('SettingsScreen profile pickers racing a reload', () => {
+  const stale: Profile = { heightCm: 180, age: 30, sex: 'male', activityLevel: 'light', goalType: 'maintain' };
+  const input = { age: 30, heightCm: 180 };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFocusCallback = null;
+  });
+
+  async function press(utils: ReturnType<typeof render>, label: string) {
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText(label));
+    });
+  }
+
+  it('keeps sex, activity and goal changed while the reload was in flight', async () => {
+    const utils = await mountWithHeldReload();
+    await press(utils, 'Female');
+    await press(utils, 'Active');
+    await press(utils, 'Build muscle');
+
+    await act(async () => {
+      utils.reload.resolve(stale);
+    });
+    await settle();
+    await press(utils, 'Recalculate nutrition goals from profile');
+
+    const expected = suggestGoals({ ...input, sex: 'female', activityLevel: 'active', goalType: 'gain' }, 80);
+    const staleGoals = suggestGoals({ ...input, sex: 'male', activityLevel: 'light', goalType: 'maintain' }, 80);
+    expect(expected.calories).not.toBe(staleGoals.calories);
+    expect(mockSetCalories).toHaveBeenCalledWith(expected.calories);
+    expect(mockSetProtein).toHaveBeenCalledWith(expected.protein);
+  });
+
+  it('keeps a sex whose write is still pending when the reload resolves', async () => {
+    const write = deferred<void>();
+    mockSetProfileSex.mockReturnValueOnce(write.promise);
+    const utils = await mountWithHeldReload();
+    await press(utils, 'Female');
+    await press(utils, 'Active');
+    await press(utils, 'Build muscle');
+
+    await act(async () => {
+      utils.reload.resolve(stale);
+    });
+    await settle();
+    await act(async () => {
+      write.resolve();
+    });
+    await settle();
+    await press(utils, 'Recalculate nutrition goals from profile');
+
+    const expected = suggestGoals({ ...input, sex: 'female', activityLevel: 'active', goalType: 'gain' }, 80);
+    expect(mockSetCalories).toHaveBeenCalledWith(expected.calories);
+  });
+
+  it('hydrates sex from a later reload after its write was rejected', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetUserProfile.mockResolvedValueOnce(stale);
+    const utils = render(<SettingsScreen />);
+    await act(async () => {
+      mockFocusCallback?.();
+    });
+    await settle();
+
+    mockSetProfileSex.mockRejectedValueOnce(new Error('disk full'));
+    await press(utils, 'Female');
+    await press(utils, 'Recalculate nutrition goals from profile');
+    const savedGoals = suggestGoals({ ...input, sex: 'male', activityLevel: 'light', goalType: 'maintain' }, 80);
+    expect(mockSetCalories).toHaveBeenLastCalledWith(savedGoals.calories);
+
+    mockGetUserProfile.mockResolvedValueOnce({ ...stale, sex: 'female' });
+    await act(async () => {
+      mockFocusCallback?.();
+    });
+    await settle();
+    await press(utils, 'Recalculate nutrition goals from profile');
+
+    const reloaded = suggestGoals({ ...input, sex: 'female', activityLevel: 'light', goalType: 'maintain' }, 80);
+    expect(reloaded.calories).not.toBe(savedGoals.calories);
+    expect(mockSetCalories).toHaveBeenLastCalledWith(reloaded.calories);
   });
 });
