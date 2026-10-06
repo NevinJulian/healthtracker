@@ -151,6 +151,13 @@ describe('DashboardScreen measurements modal only submits edited fields', () => 
     }
   });
 
+  it('uses a dash placeholder for a field with no latest value', async () => {
+    const utils = await renderWithModalOpen();
+
+    expect(utils.getByTestId('measurement-waist-input').props.placeholder).toBe('80');
+    expect(utils.getByTestId('measurement-chest-input').props.placeholder).toBe('—');
+  });
+
   it('shows the skip hint in the subtitle', async () => {
     const utils = await renderWithModalOpen();
 
