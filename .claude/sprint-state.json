@@ -457,8 +457,8 @@
     },
     "416": {
       "lane": "C",
-      "status": "in_test",
-      "roundTrips": 0,
+      "status": "in_dev",
+      "roundTrips": 1,
       "commits": [
         "c45058c",
         "45363f6",
@@ -469,7 +469,7 @@
       "workOrder": "C:/git/ht-lanes/wo/416.md",
       "decisionSource": "owner comment on #416 (clearing not supported; placeholders; only typed fields saved; no all-NULL row)",
       "deviceCheck": "Modal opens with empty inputs and old values as placeholders. Type chest only, save: chest pill today, waist keeps old date. Save with nothing typed: nothing changes. abc: error, nothing changes. Restart: values persist, Analytics card shows no empty entry.",
-      "notes": "WO ready; waits for #415. Authorized rewriting the existing prefill test that pins null-on-blank (own commit, flagged for human review). | dev: e5a6f8f rewrites 6 existing assertions (HUMAN review); existing db test returns-null-when-all-NULL no longer seeds real all-NULL rows (sent to tester)."
+      "notes": "WO ready; waits for #415. Authorized rewriting the existing prefill test that pins null-on-blank (own commit, flagged for human review). | dev: e5a6f8f rewrites 6 existing assertions (HUMAN review); existing db test returns-null-when-all-NULL no longer seeds real all-NULL rows (sent to tester). | tester REJECT r1: fix sound and e5a6f8f accepted line by line, but the existing all-NULL read test is now hollow (seeds via the writer, which writes nothing) and no other test seeds a legacy all-NULL row; also NaN/Infinity still insert an all-NULL row. Sent back: raw-SQL seeded tests, non-finite guard, dash-placeholder test. NOTE for human: mixed valid+invalid input saves the valid fields and keeps the modal open (pre-existing rule, still pinned)."
     },
     "417": {
       "lane": "D",
@@ -737,6 +737,10 @@
     {
       "at": "2026-10-06T17:49:44Z",
       "event": "#416 in_test (1041/89 per dev)"
+    },
+    {
+      "at": "2026-10-06T17:51:36Z",
+      "event": "#416 REJECT r1 (hollow all-NULL read test; NaN inserts all-NULL row) -> back to dev, roundTrips=1"
     }
   ]
 }
