@@ -224,6 +224,20 @@ function parseExercises(raw: string | null | undefined): Exercise[] {
   }
 }
 
+export type CorruptJsonColumn = 'exercises' | 'additional_workouts';
+
+export class CorruptJsonError extends Error {
+  readonly column: CorruptJsonColumn;
+  readonly date: string;
+
+  constructor(caller: string, column: CorruptJsonColumn, date: string) {
+    super(`[DB] ${caller}: malformed ${column} JSON for date=${date}`);
+    this.name = 'CorruptJsonError';
+    this.column = column;
+    this.date = date;
+  }
+}
+
 /**
  * Strict counterpart to parseExercises(), used ONLY by the write path in
  * upsertExerciseCompleted() (#319). parseExercises() is the read path and
@@ -1041,7 +1055,7 @@ async function _upsertExerciseCompletedImpl(
     console.error(
       `[DB] upsertExerciseCompleted: malformed exercises JSON for date=${date} — refusing to write, stored value left unchanged`
     );
-    throw new Error(`[DB] upsertExerciseCompleted: malformed exercises JSON for date=${date}`);
+    throw new CorruptJsonError('upsertExerciseCompleted', 'exercises', date);
   }
   const updated = parsed.value.map((ex) =>
     ex.id === exerciseId ? { ...ex, completed: value } : ex
@@ -1088,7 +1102,7 @@ async function _readAdditionalWorkoutsForWrite(
     console.error(
       `[DB] ${caller}: malformed additional_workouts JSON for date=${date} — refusing to write, stored value left unchanged`
     );
-    throw new Error(`[DB] ${caller}: malformed additional_workouts JSON for date=${date}`);
+    throw new CorruptJsonError(caller, 'additional_workouts', date);
   }
   return parseAdditionalWorkouts(row?.additional_workouts);
 }
