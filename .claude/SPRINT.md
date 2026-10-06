@@ -22,9 +22,10 @@ Read these before anything else. They exist to stop the run going sideways while
      owns. The analyst lists these siblings in the work order, and they are fixed and tested as part
      of that issue. A sibling in another lane's files is filed as usual.
 
-   Findings that only affect comments, wording, log text or other cosmetics don't get an issue each.
-   The orchestrator collects them in one issue per sprint, titled `Sprint <n>: small findings`, one
-   checkbox per finding.
+   A finding gets its own issue only if a user can run into it in normal use, or if it can lose or
+   corrupt data. Everything else, including findings that need hand-edited or corrupted data, a clock
+   change or a crash at one exact moment, and anything about comments, wording or log text, goes into
+   one collected issue per sprint, titled `Sprint <n>: small findings`, one checkbox per finding.
 3. **Three round trips per issue, then park it.** If an issue has gone developer → tester → developer
    three times without passing, park it: comment on the GitHub issue explaining exactly where it
    stalled, mark it `parked` in state, move to the next. Never a fourth attempt.
@@ -35,7 +36,8 @@ Read these before anything else. They exist to stop the run going sideways while
    The worker cap is part of the gate, not a speed tweak: jest workers crash under default parallelism
    on Linux, and CI runs with the same cap. The cap is permanent (#377).
 6. **Never edit an existing migration.** Append-only, integer-versioned. This rule has no exceptions
-   and breaking it corrupts live databases.
+   and breaking it corrupts live databases. The `//` comments above a migration aren't part of it and
+   may be corrected.
 7. **Stay in your lane.** Each lane owns its files exclusively (see §3). A developer who needs to
    touch a file outside its lane stops and reports to the orchestrator instead of editing it.
 
@@ -84,44 +86,43 @@ Most of the scope touches `src/db/database.ts` or one of the big screens. Runnin
 parallel worktrees guarantees conflicts on every merge. So issues are grouped into lanes by file
 ownership, lanes run in parallel, and **issues within a lane run serially on one branch**.
 
-This table is sprint 3's scope. `/sprint` freezes exactly the issues in the Issues column that are
-still open. Sprints 1 and 2 are done. Their lanes are in git history.
+This table is sprint 4's scope. `/sprint` freezes exactly the issues in the Issues column that are
+still open. Sprints 1 to 3 are done. Their lanes are in git history.
 
 | Lane | Branch | Owns | Issues, in order |
 |---|---|---|---|
-| A — db core | `sprint/lane-a-db` | `src/db/**` and `src/services/backup.ts`, except the functions granted to lanes C and D | #414, #412, #406 |
-| B — app start | `sprint/lane-b-start` | `App.tsx`, and new files under `src/services/` for the rescue export | #419 |
-| C — Dashboard | `sprint/lane-c-dashboard` | `src/screens/DashboardScreen.tsx`, and in `database.ts` the additional-workout and exercise writers and the body-measurement functions | #410, #411, #415, #416 |
-| D — MealPrep | `sprint/lane-d-mealprep` | `src/screens/MealPrepScreen.tsx`, and in `database.ts` the recipe getters and `removeMealFromPlan` | #417, #401, #403, #408 |
-| E — network | `sprint/lane-e-api` | `src/api/**`, `src/nutrition/**`, `src/screens/{Discover,DiscoverDetail,RecipeEditor}Screen.tsx` | #318 |
-| F — onboarding and settings | `sprint/lane-f-settings` | `src/screens/{Onboarding,Settings}Screen.tsx` | #405, #404, #397, #407 |
-| G — repo hygiene | `sprint/lane-g-repo` | `package.json`, `package-lock.json`, `babel.config.js`, `CLAUDE.md`, the `eslint-disable` lines in test files | #398, #400, #409 |
+| A — db core | `sprint/lane-a-db` | `src/db/**` and `src/services/backup.ts`, except the functions granted to lanes C and E | #427, #412, #430 |
+| B — app start | `sprint/lane-b-start` | `App.tsx`, `src/services/rescueExport.ts`, and new components they need | #426, #423 |
+| C — Dashboard and Analytics | `sprint/lane-c-dashboard` | `src/screens/DashboardScreen.tsx`, `src/screens/AnalyticsDashboardScreen.tsx`, a new shared error view in `src/components/`, and in `database.ts` the `daily_log` JSON read and write helpers, `mapLogRow`, the exercise and additional-workout writers, `resetCorruptDayColumn` and the body-measurement functions | #434, #411, #435, #432, #431 |
+| D — network | `sprint/lane-d-api` | `src/api/**`, `src/nutrition/**`, `src/screens/{Discover,DiscoverDetail,RecipeEditor}Screen.tsx` | #424, #428 |
+| E — settings and notifications | `sprint/lane-e-settings` | `src/screens/SettingsScreen.tsx`, `src/services/notifications.ts`, and in `database.ts` a new function that saves both nutrition goals in one transaction | #422, #433, #429 |
+| F — repo hygiene | `sprint/lane-f-repo` | `__mocks__/**`, and for #437 the files its checklist names | #425, #437 |
 
 Each lane also owns the tests for what it changes.
 
-**Partials and known patterns.** Sprints 1 and 2 landed most of #318. The analyst reads the issue's
-latest comments and the code on `main`, and scopes the work order to what is still open. #397 and
-#404 are the same bugs as #375 and #365, which sprint 2 fixed. Follow those fixes.
+**Known patterns.** #431 follows MealPrep's error view from #401, as one shared component for the
+Dashboard and Analytics. MealPrep keeps its own view for now. #435 follows #404: an Alert, and the
+modal stays open.
 
 **Ordering constraints** — these are real dependencies, not preferences:
 
-- Lanes C and D start after lane A has merged into the integration branch, because they also edit
-  `database.ts`. Lanes B, E and F start right away.
-- Lane C: #410 before #411, both change the same writers. #415 before #416, because #416 builds on
-  #415's per-field dates.
-- Lane D: #417 first. It changes the recipe lookup the other three issues render through.
-- Lane G runs last, after every other lane has merged. #409 edits test files the other lanes may
-  touch, and #398 changes `package.json`, which runs `build-check.yml` on the PR.
+- Lanes C and E start after lane A has merged into the integration branch, because they also edit
+  `database.ts`. Lanes B and D start right away.
+- Lane C: #434 before #411. Both change what counts as corrupt, and #411 builds on it.
+- Lane F runs last, after every other lane has merged, because #437 touches files in several lanes.
+  For #437, lane F only edits comments, docs and the listed tidy-ups, plus the one behaviour fix its
+  decision names.
 
 **Cross-lane dependencies** are the orchestrator's problem. A developer who finds that its issue needs
 a file another lane owns stops and reports, as rule 7 says.
 
-**Decisions** for every issue that needed one are in the issue bodies or comments: #318, #405, #408,
-#410, #411, #412, #414, #415, #416, #417, #419. The latest decision comment is binding.
+**Decisions** for every issue that needed one are in the issue comments: #411, #412, #423, #424, #425,
+#426, #427, #428, #429, #430, #432, #437. The latest decision comment is binding.
 
 ### Excluded from this sprint
 
-- **#402 and #399** — PR #420, landed by hand before this sprint.
+- **#436 (Expo patch updates and the `splash` key)** — done by hand before this sprint, because it
+  changes `package.json` and needs Expo Go and the build check before the PR.
 - **#396 (`PRAGMA foreign_keys`)** — needs the restore rework and a per-table cascade decision first.
 - **#392 and every other feature request.** Features run one at a time, outside the sprint.
 
