@@ -175,8 +175,10 @@
         400,
         409
       ],
-      "current": 398,
-      "done": [],
+      "current": 400,
+      "done": [
+        398
+      ],
       "parked": [],
       "base": "85442f8"
     }
@@ -228,18 +230,20 @@
     },
     "398": {
       "lane": "G",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "1b300e1"
       ],
       "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
       "deviceCheck": "Expo Go from the integration branch: open the drawer, visit every drawer screen, Recipes -> RecipeDetail and Discover -> DiscoverDetail and back; no red screen, no missing-module error.",
-      "notes": "WO ready; no jest regression test possible (grep + gates + build-check APK on the PR stand in) | dev: lockfile diff deletions only (bottom-tabs + sf-symbols-typescript blocks); expo install --check and expo-doctor identical before/after (4 pre-existing patch mismatches, app.json splash schema error -> filed #436)."
+      "notes": "WO ready; no jest regression test possible (grep + gates + build-check APK on the PR stand in) | dev: lockfile diff deletions only (bottom-tabs + sf-symbols-typescript blocks); expo install --check and expo-doctor identical before/after (4 pre-existing patch mismatches, app.json splash schema error -> filed #436). | tester APPROVE r0. RESIDUAL (only the PR build and the device can close): Android Gradle autolinking + Metro production bundle with the packages gone (build-check.yml runs on the PR because package.json changed); app launch + drawer/stack navigation on the device.",
+      "securityReview": "skipped: dependency removal only, no code path changed",
+      "regressionProof": "no jest regression test possible. Stand-ins run by the tester: diff is 29 deletions / 0 insertions in exactly 3 lockfile blocks; repo-wide greps for bottom-tabs / createBottomTabNavigator / sf-symbols / expo-router find nothing; no remaining package references either removed package; npm ci --dry-run exits 0; 1118/93; expo install --check shows the same 4 pre-existing mismatches."
     },
     "400": {
       "lane": "G",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
@@ -790,6 +794,10 @@
     {
       "at": "2026-10-06T17:57:55Z",
       "event": "#398 in_test (1118/93 per dev); filed #436 (expo patch mismatches, app.json splash)"
+    },
+    {
+      "at": "2026-10-06T17:59:00Z",
+      "event": "#398 ready (APPROVE r0, security skipped); lane G -> #400 in_dev"
     }
   ]
 }
