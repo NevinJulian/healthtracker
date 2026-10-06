@@ -309,3 +309,24 @@ describe('SettingsScreen profile write failures', () => {
     },
   ]);
 });
+
+describe('SettingsScreen backup reminder write failures', () => {
+  runWriteErrorCases([
+    {
+      name: 'backup reminder toggle',
+      write: jest.mocked(db.setBackupReminderEnabled),
+      trigger: (u) => toggle(u, 'Enable weekly backup reminder', true),
+      assertUnsaved: (u) =>
+        expect(u.getByLabelText('Enable weekly backup reminder').props.value).toBe(false),
+    },
+    {
+      name: 'backup reminder day select',
+      write: jest.mocked(db.setBackupReminderDay),
+      hydrate: () => jest.mocked(db.getBackupReminderEnabled).mockResolvedValueOnce(true),
+      trigger: (u) => {
+        fireEvent.press(u.getByLabelText('Select Tue'));
+      },
+      assertUnsaved: (u) => expect(u.getByText(/Reminder every Sun at/)).toBeTruthy(),
+    },
+  ]);
+});
