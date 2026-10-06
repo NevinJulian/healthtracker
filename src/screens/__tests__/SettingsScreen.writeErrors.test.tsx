@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 
 jest.mock('@react-navigation/native', () => ({
@@ -74,8 +74,9 @@ interface WriteErrorCase {
   name: string;
   write: jest.Mock;
   hydrate?: () => void;
+  prepare?: (utils: Utils) => void;
   trigger: (utils: Utils) => void;
-  assertUnsaved: (utils: Utils) => void;
+  assertUnsaved: (utils: Utils) => void | Promise<void>;
 }
 
 async function flush() {
@@ -117,6 +118,12 @@ function runWriteErrorCases(cases: WriteErrorCase[]) {
       const utils = render(<SettingsScreen />);
       await flush();
 
+      if (testCase.prepare) {
+        await act(async () => {
+          testCase.prepare?.(utils);
+        });
+      }
+
       let rejectWrite: (reason: Error) => void = () => undefined;
       testCase.write.mockReturnValueOnce(
         new Promise<void>((_, reject) => {
@@ -136,7 +143,7 @@ function runWriteErrorCases(cases: WriteErrorCase[]) {
       expect(alertSpy).toHaveBeenCalledTimes(1);
       expect(alertSpy.mock.calls[0][0]).toBe('Error');
       expect(errorSpy).toHaveBeenCalledTimes(1);
-      testCase.assertUnsaved(utils);
+      await testCase.assertUnsaved(utils);
       expect(unhandled).toEqual([]);
     });
   });
@@ -179,6 +186,126 @@ describe('SettingsScreen reminder write failures', () => {
       write: jest.mocked(db.setMealReminderEnabled),
       trigger: (u) => toggle(u, 'Enable Lunch reminder', true),
       assertUnsaved: (u) => expect(u.getByLabelText('Enable Lunch reminder').props.value).toBe(false),
+    },
+  ]);
+});
+
+type Profile = Awaited<ReturnType<typeof db.getUserProfile>>;
+
+const completeProfile: Profile = {
+  heightCm: 180,
+  age: 30,
+  sex: 'male',
+  activityLevel: 'moderate',
+  goalType: 'maintain',
+};
+
+function hydrateProfile(profile: Profile) {
+  return () => jest.mocked(db.getUserProfile).mockResolvedValueOnce(profile);
+}
+
+function chipBackground(utils: Utils, label: string) {
+  return StyleSheet.flatten(utils.getByLabelText(label).props.style)?.backgroundColor;
+}
+
+function expectProfileStillIncomplete(utils: Utils) {
+  const alertMock = jest.mocked(Alert.alert);
+  fireEvent.press(utils.getByLabelText('Recalculate nutrition goals from profile'));
+  expect(alertMock).toHaveBeenCalledTimes(2);
+  expect(alertMock.mock.calls[1][0]).toBe('Profile incomplete');
+}
+
+async function expectProfileStillComplete(utils: Utils) {
+  const alertMock = jest.mocked(Alert.alert);
+  await act(async () => {
+    fireEvent.press(utils.getByLabelText('Recalculate nutrition goals from profile'));
+    await flush();
+  });
+  expect(alertMock).toHaveBeenCalledTimes(2);
+  expect(alertMock.mock.calls[1][0]).toBe('Goals updated');
+}
+
+function blurField(utils: Utils, label: string) {
+  fireEvent(utils.getByLabelText(label), 'blur');
+}
+
+describe('SettingsScreen profile write failures', () => {
+  runWriteErrorCases([
+    {
+      name: 'height save',
+      write: jest.mocked(db.setProfileHeightCm),
+      hydrate: hydrateProfile({ ...completeProfile, heightCm: null }),
+      prepare: (u) => fireEvent.changeText(u.getByLabelText('Height in centimetres'), '180'),
+      trigger: (u) => {
+        blurField(u, 'Height in centimetres');
+      },
+      assertUnsaved: expectProfileStillIncomplete,
+    },
+    {
+      name: 'height clear',
+      write: jest.mocked(db.clearProfileHeightCm),
+      hydrate: hydrateProfile(completeProfile),
+      prepare: (u) => fireEvent.changeText(u.getByLabelText('Height in centimetres'), ''),
+      trigger: (u) => {
+        blurField(u, 'Height in centimetres');
+      },
+      assertUnsaved: expectProfileStillComplete,
+    },
+    {
+      name: 'age save',
+      write: jest.mocked(db.setProfileAge),
+      hydrate: hydrateProfile({ ...completeProfile, age: null }),
+      prepare: (u) => fireEvent.changeText(u.getByLabelText('Age in years'), '30'),
+      trigger: (u) => {
+        blurField(u, 'Age in years');
+      },
+      assertUnsaved: expectProfileStillIncomplete,
+    },
+    {
+      name: 'age clear',
+      write: jest.mocked(db.clearProfileAge),
+      hydrate: hydrateProfile(completeProfile),
+      prepare: (u) => fireEvent.changeText(u.getByLabelText('Age in years'), ''),
+      trigger: (u) => {
+        blurField(u, 'Age in years');
+      },
+      assertUnsaved: expectProfileStillComplete,
+    },
+    {
+      name: 'sex chip',
+      write: jest.mocked(db.setProfileSex),
+      trigger: (u) => {
+        fireEvent.press(u.getByLabelText('Female'));
+      },
+      assertUnsaved: (u) => expect(chipBackground(u, 'Female')).toBe(chipBackground(u, 'Male')),
+    },
+    {
+      name: 'activity chip',
+      write: jest.mocked(db.setProfileActivityLevel),
+      trigger: (u) => {
+        fireEvent.press(u.getByLabelText('Active'));
+      },
+      assertUnsaved: (u) => expect(chipBackground(u, 'Active')).toBe(chipBackground(u, 'Light')),
+    },
+    {
+      name: 'goal chip',
+      write: jest.mocked(db.setProfileGoalType),
+      trigger: (u) => {
+        fireEvent.press(u.getByLabelText('Build muscle'));
+      },
+      assertUnsaved: (u) => expect(chipBackground(u, 'Build muscle')).toBe(chipBackground(u, 'Maintain')),
+    },
+    {
+      name: 'recalculate goals',
+      write: jest.mocked(db.setNutritionGoalCalories),
+      hydrate: hydrateProfile(completeProfile),
+      trigger: (u) => {
+        fireEvent.press(u.getByLabelText('Recalculate nutrition goals from profile'));
+      },
+      assertUnsaved: (u) => {
+        expect(u.getByText('1800')).toBeTruthy();
+        expect(u.getByLabelText('Recalculate nutrition goals from profile').props.accessibilityState?.disabled).toBeFalsy();
+      },
     },
   ]);
 });
