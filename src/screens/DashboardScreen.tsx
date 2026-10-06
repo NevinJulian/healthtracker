@@ -38,7 +38,7 @@ import {
   getHydrationGoal,
   logBodyMeasurement,
   getLatestMeasurements,
-  type BodyMeasurement,
+  type LatestMeasurements,
   logWorkoutSet,
   getWorkoutSetsForDay,
   deleteWorkoutSet,
@@ -306,7 +306,7 @@ export default function DashboardScreen() {
 
   // Measurements state
   const [measurementsModalVisible, setMeasurementsModalVisible] = useState(false);
-  const [latestMeasurements, setLatestMeasurements] = useState<BodyMeasurement | null>(null);
+  const [latestMeasurements, setLatestMeasurements] = useState<LatestMeasurements | null>(null);
 
   // Workout set logging state (#285)
   // workoutSets maps exercise name -> sets logged today
@@ -955,11 +955,9 @@ export default function DashboardScreen() {
               />
               <View style={styles.sectionHeaderText}>
                 <Text style={styles.sectionLabel}>MEASUREMENTS</Text>
-                <Text style={styles.sectionSub}>
-                  {latestMeasurements
-                    ? `Last: ${latestMeasurements.date}`
-                    : 'No measurements logged yet'}
-                </Text>
+                {!latestMeasurements && (
+                  <Text style={styles.sectionSub}>No measurements logged yet</Text>
+                )}
               </View>
               <TouchableOpacity
                 style={styles.measureLogBtn}
@@ -974,36 +972,17 @@ export default function DashboardScreen() {
             </View>
             {latestMeasurements && (
               <View style={styles.measurementPills}>
-                {latestMeasurements.waist_cm != null && (
-                  <View style={styles.measurePill}>
-                    <Text style={styles.measurePillLabel}>Waist</Text>
-                    <Text style={styles.measurePillValue}>{latestMeasurements.waist_cm} cm</Text>
-                  </View>
-                )}
-                {latestMeasurements.chest_cm != null && (
-                  <View style={styles.measurePill}>
-                    <Text style={styles.measurePillLabel}>Chest</Text>
-                    <Text style={styles.measurePillValue}>{latestMeasurements.chest_cm} cm</Text>
-                  </View>
-                )}
-                {latestMeasurements.hips_cm != null && (
-                  <View style={styles.measurePill}>
-                    <Text style={styles.measurePillLabel}>Hips</Text>
-                    <Text style={styles.measurePillValue}>{latestMeasurements.hips_cm} cm</Text>
-                  </View>
-                )}
-                {latestMeasurements.thigh_cm != null && (
-                  <View style={styles.measurePill}>
-                    <Text style={styles.measurePillLabel}>Thigh</Text>
-                    <Text style={styles.measurePillValue}>{latestMeasurements.thigh_cm} cm</Text>
-                  </View>
-                )}
-                {latestMeasurements.arm_cm != null && (
-                  <View style={styles.measurePill}>
-                    <Text style={styles.measurePillLabel}>Arm</Text>
-                    <Text style={styles.measurePillValue}>{latestMeasurements.arm_cm} cm</Text>
-                  </View>
-                )}
+                {MEASUREMENT_PILLS.map(({ field, label }) => {
+                  const entry = latestMeasurements[field];
+                  if (!entry) return null;
+                  return (
+                    <View key={field} style={styles.measurePill}>
+                      <Text style={styles.measurePillLabel}>{label}</Text>
+                      <Text style={styles.measurePillValue}>{entry.value} cm</Text>
+                      <Text style={styles.measurePillDate}>{entry.date}</Text>
+                    </View>
+                  );
+                })}
               </View>
             )}
           </Card>
@@ -1077,6 +1056,14 @@ export default function DashboardScreen() {
 // ─── Body Measurements Modal ──────────────────────────────────────────────────
 
 /** Valid cm range per measurement field (#325). */
+const MEASUREMENT_PILLS: { field: keyof LatestMeasurements; label: string }[] = [
+  { field: 'waist_cm', label: 'Waist' },
+  { field: 'chest_cm', label: 'Chest' },
+  { field: 'hips_cm', label: 'Hips' },
+  { field: 'thigh_cm', label: 'Thigh' },
+  { field: 'arm_cm', label: 'Arm' },
+];
+
 const MEASUREMENT_RANGES = {
   waist_cm: [40, 200],
   chest_cm: [40, 200],
@@ -1127,7 +1114,7 @@ function MeasurementsModal({
     thigh_cm?: number | null;
     arm_cm?: number | null;
   }) => Promise<void>;
-  latest: BodyMeasurement | null;
+  latest: LatestMeasurements | null;
 }) {
   // The parent now mounts this component only while `visible` (#325), so
   // this state is fresh on every open -- each field initialises once from
@@ -1135,11 +1122,11 @@ function MeasurementsModal({
   // `useEffect(…, [visible, latest])` that re-ran whenever `latest` changed
   // identity (e.g. on every loadToday() reload), clobbering in-progress
   // typing.
-  const [waist, setWaist] = useState(() => (latest?.waist_cm != null ? String(latest.waist_cm) : ''));
-  const [chest, setChest] = useState(() => (latest?.chest_cm != null ? String(latest.chest_cm) : ''));
-  const [hips, setHips] = useState(() => (latest?.hips_cm != null ? String(latest.hips_cm) : ''));
-  const [thigh, setThigh] = useState(() => (latest?.thigh_cm != null ? String(latest.thigh_cm) : ''));
-  const [arm, setArm] = useState(() => (latest?.arm_cm != null ? String(latest.arm_cm) : ''));
+  const [waist, setWaist] = useState(() => (latest?.waist_cm != null ? String(latest.waist_cm.value) : ''));
+  const [chest, setChest] = useState(() => (latest?.chest_cm != null ? String(latest.chest_cm.value) : ''));
+  const [hips, setHips] = useState(() => (latest?.hips_cm != null ? String(latest.hips_cm.value) : ''));
+  const [thigh, setThigh] = useState(() => (latest?.thigh_cm != null ? String(latest.thigh_cm.value) : ''));
+  const [arm, setArm] = useState(() => (latest?.arm_cm != null ? String(latest.arm_cm.value) : ''));
 
   const [initial] = useState(() => ({
     waist_cm: waist,
@@ -1768,6 +1755,12 @@ const styles = StyleSheet.create({
     fontFamily: Typography.title,
     fontSize: Typography.sizes.sm,
     color: Colors.textPrimary,
+    marginTop: 2,
+  },
+  measurePillDate: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs - 1,
+    color: Colors.textSecondary,
     marginTop: 2,
   },
 

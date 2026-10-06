@@ -40,15 +40,21 @@ function makeMeasurements(
     arm_cm: number | null;
   }> = {}
 ) {
-  return {
-    id: 1,
-    date: mockToday,
+  const values = {
     waist_cm: 80,
     chest_cm: 90,
     hips_cm: 95,
     thigh_cm: 55,
     arm_cm: 30,
     ...overrides,
+  };
+  const dated = (value: number | null) => (value === null ? null : { value, date: mockToday });
+  return {
+    waist_cm: dated(values.waist_cm),
+    chest_cm: dated(values.chest_cm),
+    hips_cm: dated(values.hips_cm),
+    thigh_cm: dated(values.thigh_cm),
+    arm_cm: dated(values.arm_cm),
   };
 }
 

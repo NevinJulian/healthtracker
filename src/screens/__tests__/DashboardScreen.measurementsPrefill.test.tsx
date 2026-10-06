@@ -81,9 +81,7 @@ describe('DashboardScreen measurements modal only submits edited fields', () => 
     mockLogBodyMeasurement.mockResolvedValue(undefined);
     mockGetLatestMeasurements.mockImplementation(() =>
       Promise.resolve({
-        id: 1,
-        date: '2026-09-10',
-        waist_cm: 80,
+        waist_cm: { value: 80, date: '2026-09-10' },
         chest_cm: null,
         hips_cm: null,
         thigh_cm: null,
