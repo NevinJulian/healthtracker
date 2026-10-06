@@ -138,7 +138,7 @@
     "F": {
       "branch": "sprint/lane-f-settings",
       "worktree": "C:/git/ht-lanes/lane-f",
-      "status": "in_progress",
+      "status": "merged",
       "order": [
         405,
         404,
@@ -153,7 +153,8 @@
         407
       ],
       "parked": [],
-      "cleanup": "704e0f6 line wrapping only in the focus-reload merge (SettingsScreen.tsx +30/-9). Cleanup agent returned an EMPTY report (placeholder); orchestrator verified the commit by reading the diff: formatting only, pushed, worktree clean, stash untouched."
+      "cleanup": "704e0f6 line wrapping only in the focus-reload merge (SettingsScreen.tsx +30/-9). Cleanup agent returned an EMPTY report (placeholder); orchestrator verified the commit by reading the diff: formatting only, pushed, worktree clean, stash untouched.",
+      "mergeSha": "b9e0d1e"
     },
     "G": {
       "branch": "sprint/lane-g-repo",
@@ -196,7 +197,7 @@
     },
     "397": {
       "lane": "F",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 1,
       "commits": [
         "1bc96c5",
@@ -212,7 +213,8 @@
       "workOrder": "C:/git/ht-lanes/wo/397.md",
       "deviceCheck": "none",
       "securityReview": "skipped: UI state hydration guards only; no db/api/backup code in the diff",
-      "regressionProof": "pickers 2/9 fail with 1bc96c5 SettingsScreen.tsx (stale values reach suggestGoals); toggles 4 fail with 23faef1; steppers 2 fail with 7b567cd; round 2: 2 fail with 40da49c; all pass at d61488d; 907/84 (tester reproduced)"
+      "regressionProof": "pickers 2/9 fail with 1bc96c5 SettingsScreen.tsx (stale values reach suggestGoals); toggles 4 fail with 23faef1; steppers 2 fail with 7b567cd; round 2: 2 fail with 40da49c; all pass at d61488d; 907/84 (tester reproduced)",
+      "mergeSha": "b9e0d1e"
     },
     "398": {
       "lane": "G",
@@ -251,16 +253,19 @@
     },
     "403": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "2caeb78",
+        "9c1374a"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/403.md",
       "deviceCheck": "Log Cooked Meal: 4 portions, double-tap Save fast -> +4 not +8. Assign: double-tap a recipe row -> one assignment, modal closes.",
       "notes": "WO ready; waits for #401"
     },
     "404": {
       "lane": "F",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "51ad899",
@@ -276,11 +281,12 @@
       "workOrder": "C:/git/ht-lanes/wo/404.md",
       "deviceCheck": "Fresh install: tap Skip; app opens to Dashboard.",
       "securityReview": "skipped: UI error surfacing only (try/catch + alert around existing writes); no db/api/backup code in the diff",
-      "regressionProof": "skip: 2 failure cases fail with 51ad899 OnboardingScreen.tsx; settings: 15/15 fail with f0ea442 SettingsScreen.tsx and flip per fix commit (5 at daef76e, 8 at 28689b9, 2 at 6ce3d58); 894/83 (tester reproduced)"
+      "regressionProof": "skip: 2 failure cases fail with 51ad899 OnboardingScreen.tsx; settings: 15/15 fail with f0ea442 SettingsScreen.tsx and flip per fix commit (5 at daef76e, 8 at 28689b9, 2 at 6ce3d58); 894/83 (tester reproduced)",
+      "mergeSha": "b9e0d1e"
     },
     "405": {
       "lane": "F",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "230f75e",
@@ -292,7 +298,8 @@
       "deviceCheck": "Fresh install. Step 1: height 1.8 -> Continue disabled, error shown. Enter 178,5 and age 30, continue. Step 3: weight 78,4, finish. Settings shows height 178.5 and age 30.",
       "notes": "tester APPROVE r0. HUMAN: weight bounds 20-400 are an analyst pick; Number() accepts 0x50 / 1e2 (same as Settings and Dashboard, owner-mandated expression); a prefilled latestWeight outside 20-400 now blocks Confirm until edited; no test for age comma-decimal alone.",
       "securityReview": "skipped: UI input validation of device-owner input only; no db/api/backup code in the diff",
-      "regressionProof": "9/15 fail with 2e1ac1e OnboardingScreen.tsx, 15/15 at e9842df (tester reproduced); smoke test file byte-identical"
+      "regressionProof": "9/15 fail with 2e1ac1e OnboardingScreen.tsx, 15/15 at e9842df (tester reproduced); smoke test file byte-identical",
+      "mergeSha": "b9e0d1e"
     },
     "406": {
       "lane": "A",
@@ -311,7 +318,7 @@
     },
     "407": {
       "lane": "F",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "e99af24",
@@ -321,7 +328,8 @@
       "workOrder": "C:/git/ht-lanes/wo/407.md",
       "deviceCheck": "none",
       "securityReview": "skipped: text formatting of the restore alert only; skipped table names are whitelisted against live tables and columns are strings by construction (tester read backup.ts/database.ts); same judgement as sprint 2 for #315-display",
-      "regressionProof": "4/11 fail with e99af24 SettingsScreen.tsx, 11/11 at c5b3e23 (tester reproduced); 913/84"
+      "regressionProof": "4/11 fail with e99af24 SettingsScreen.tsx, 11/11 at c5b3e23 (tester reproduced); 913/84",
+      "mergeSha": "b9e0d1e"
     },
     "408": {
       "lane": "D",
@@ -647,6 +655,10 @@
     {
       "at": "2026-10-06T17:32:01Z",
       "event": "#411 in_test (1030/89 per dev); lane F cleanup 704e0f6 verified by diff (agent report was empty)"
+    },
+    {
+      "at": "2026-10-06T17:32:45Z",
+      "event": "merged lane F into integration b9e0d1e; gates green: typecheck clean, 1051/90; #403 in_test (1014/88 per dev)"
     }
   ]
 }
