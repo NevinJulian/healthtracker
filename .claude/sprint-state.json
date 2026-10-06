@@ -94,7 +94,7 @@
         415,
         416
       ],
-      "current": 411,
+      "current": 415,
       "done": [
         410
       ],
@@ -385,7 +385,7 @@
     },
     "411": {
       "lane": "C",
-      "status": "in_test",
+      "status": "in_security",
       "roundTrips": 0,
       "commits": [
         "99b49b4",
@@ -399,7 +399,8 @@
       "workOrder": "C:/git/ht-lanes/wo/411.md",
       "decisionSource": "owner comment on #411 (Alert + Reset this day, corrupt text kept in app_state)",
       "deviceCheck": "Corrupt today additional_workouts; add a workout -> Alert; Reset this day -> empty list, adding works. Repeat for exercises -> template exercises return unchecked. Export a backup: corrupt text is in it under corrupt_json:...",
-      "notes": "WO ready; waits for #410. ORCHESTRATOR RULINGS: (1) resetCorruptDayColumn + CorruptJsonError count as lane-C writers in database.ts; (2) key collision -> suffix :2, :3 instead of overwriting (departs from the literal key only on collision; HUMAN to confirm). | dev: Alert title Cannot save: unreadable data; Reset this day (destructive) / Cancel; reset failure -> Reset failed. Existing Dashboard suites mock factories lack CorruptJsonError (instanceof undefined would throw if a writer rejects there) - sent to tester."
+      "notes": "WO ready; waits for #410. ORCHESTRATOR RULINGS: (1) resetCorruptDayColumn + CorruptJsonError count as lane-C writers in database.ts; (2) key collision -> suffix :2, :3 instead of overwriting (departs from the literal key only on collision; HUMAN to confirm). | dev: Alert title Cannot save: unreadable data; Reset this day (destructive) / Cancel; reset failure -> Reset failed. Existing Dashboard suites mock factories lack CorruptJsonError (instanceof undefined would throw if a writer rejects there) - sent to tester. | tester APPROVE r0. An array with null/non-object items is neither editable nor resettable (filed #434). Existing Dashboard suites lack the two mock-factory entries (no path reaches instanceof today). 041a198 carries a one-line test correction inside a feature commit (accepted by tester).",
+      "regressionProof": "writers: 4 fail with 6b795d6 database.ts; reset: 10 fail with 53a29a8 database.ts; screen: 8/9 fail with fb86fb9 DashboardScreen.tsx; all pass at e6bf37b; 1030/89 (tester reproduced). Probes: one corruption predicate shared by writers and reset (8 corrupt forms); kept text byte-identical (2 MB, unicode, CRLF); collisions :2/:3; atomic both directions; fresh exercises byte-identical to sync output for 5 offsets; backup->restore round trip keeps the kept row."
     },
     "412": {
       "lane": "A",
@@ -436,7 +437,7 @@
     },
     "415": {
       "lane": "C",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "workOrder": "C:/git/ht-lanes/wo/415.md",
@@ -506,7 +507,8 @@
     430,
     431,
     432,
-    433
+    433,
+    434
   ],
   "smallFindings": [
     "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
@@ -698,6 +700,10 @@
     {
       "at": "2026-10-06T17:39:27Z",
       "event": "merged lane D into integration 30ee844; gates green: typecheck clean, 1073/91"
+    },
+    {
+      "at": "2026-10-06T17:42:53Z",
+      "event": "#411 tester APPROVE r0 -> security (read-only, parallel); lane C -> #415 in_dev; filed #434 (wrong-shaped array items stuck)"
     }
   ]
 }
