@@ -219,6 +219,9 @@ export default function OnboardingScreen({ onComplete, latestWeight }: Props) {
     try {
       await setOnboardingComplete(true);
       onComplete();
+    } catch (error) {
+      console.error('Failed to skip onboarding', error);
+      Alert.alert('Error', 'Failed to save your profile. Please try again.');
     } finally {
       setSaving(false);
     }
