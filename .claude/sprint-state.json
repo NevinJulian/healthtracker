@@ -400,7 +400,11 @@
     426,
     427,
     428,
-    429
+    429,
+    430,
+    431,
+    432,
+    433
   ],
   "smallFindings": [
     "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
@@ -501,6 +505,10 @@
     {
       "at": "2026-10-06T17:21:42Z",
       "event": "worktrees c/d created at 62cc088 (npm ci ok); all 8 lane C/D work orders ready, none parked; #397 in_test (905/84 per dev); #410 and #417 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:22:13Z",
+      "event": "filed #430 (unguarded recipe JSON.parse), #431 (silent Dashboard/Analytics loads), #432 (data-layer follow-ups), #433 (Settings stale render-time state)"
     }
   ]
 }
