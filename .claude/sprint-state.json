@@ -853,7 +853,34 @@
     {
       "at": "2026-10-06T18:08:13Z",
       "event": "merged lane G into integration ca7c4ee; npm ci against the merged lockfile; final gates green: typecheck clean, 1118/93; schema.ts add-only vs main"
+    },
+    {
+      "at": "2026-10-06T18:09:58Z",
+      "event": "GitHub CI test check on integration 9025544 (all lanes merged): completed success"
+    },
+    {
+      "at": "2026-10-06T18:09:58Z",
+      "event": "sprint finished: all 20 issues merged, none parked; report written; PR NOT opened (awaits cold review + device checks)"
     }
   ],
-  "smallFindingsIssue": 437
+  "smallFindingsIssue": 437,
+  "status": "finished",
+  "finishedAt": "2026-10-06T18:09:58Z",
+  "final": {
+    "codeSha": "ca7c4ee",
+    "typecheck": "pass",
+    "tests": 1118,
+    "suites": 93,
+    "ci": "success on 9025544",
+    "merged": 20,
+    "parked": [],
+    "roundTrips": {
+      "397": 1,
+      "400": 1,
+      "416": 1
+    },
+    "unfinished": [
+      "#412: stale v37 comment inside MIGRATIONS left untouched (rule 6) although the owner decision asked for it"
+    ]
+  }
 }
