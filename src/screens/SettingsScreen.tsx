@@ -350,6 +350,21 @@ function reportWriteFailure(error: unknown) {
   Alert.alert('Error', 'Failed to save your setting. Please try again.');
 }
 
+interface WriteGuard {
+  seqRef: React.MutableRefObject<number>;
+  pendingRef: React.MutableRefObject<number>;
+}
+
+function useWriteGuard(): WriteGuard {
+  const seqRef = useRef(0);
+  const pendingRef = useRef(0);
+  return { seqRef, pendingRef };
+}
+
+function editedSince(guard: WriteGuard, seqAtStart: number): boolean {
+  return guard.seqRef.current !== seqAtStart || guard.pendingRef.current > 0;
+}
+
 const MAX_SKIPPED_TABLES_SHOWN = 5;
 
 function formatSkippedSummary(
@@ -427,6 +442,9 @@ export default function SettingsScreen() {
   const heightPendingWritesRef = useRef(0);
   const ageWriteSeqRef = useRef(0);
   const agePendingWritesRef = useRef(0);
+  const sexGuard = useWriteGuard();
+  const activityGuard = useWriteGuard();
+  const goalGuard = useWriteGuard();
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [recalcBusy, setRecalcBusy] = useState(false);
 
@@ -548,6 +566,9 @@ export default function SettingsScreen() {
       let active = true;
       const heightSeqAtStart = heightWriteSeqRef.current;
       const ageSeqAtStart = ageWriteSeqRef.current;
+      const sexSeqAtStart = sexGuard.seqRef.current;
+      const activitySeqAtStart = activityGuard.seqRef.current;
+      const goalSeqAtStart = goalGuard.seqRef.current;
       (async () => {
         const [
           workoutEnabled,
@@ -625,6 +646,11 @@ export default function SettingsScreen() {
             ...userProfile,
             heightCm: heightEditedSince ? prev.heightCm : userProfile.heightCm,
             age: ageEditedSince ? prev.age : userProfile.age,
+            sex: editedSince(sexGuard, sexSeqAtStart) ? prev.sex : userProfile.sex,
+            activityLevel: editedSince(activityGuard, activitySeqAtStart)
+              ? prev.activityLevel
+              : userProfile.activityLevel,
+            goalType: editedSince(goalGuard, goalSeqAtStart) ? prev.goalType : userProfile.goalType,
           }));
           // A field with an unsaved invalid edit, or a write that landed
           // after this load began, keeps its local text.
@@ -893,7 +919,7 @@ export default function SettingsScreen() {
 
   async function handleProfileSex(sex: Sex) {
     try {
-      await setProfileSex(sex);
+      await trackProfileWrite(sexGuard.seqRef, sexGuard.pendingRef, () => setProfileSex(sex));
       setProfile((prev) => ({ ...prev, sex }));
     } catch (error) {
       reportWriteFailure(error);
@@ -902,7 +928,7 @@ export default function SettingsScreen() {
 
   async function handleProfileActivity(level: ActivityLevel) {
     try {
-      await setProfileActivityLevel(level);
+      await trackProfileWrite(activityGuard.seqRef, activityGuard.pendingRef, () => setProfileActivityLevel(level));
       setProfile((prev) => ({ ...prev, activityLevel: level }));
     } catch (error) {
       reportWriteFailure(error);
@@ -911,7 +937,7 @@ export default function SettingsScreen() {
 
   async function handleProfileGoal(goal: GoalType) {
     try {
-      await setProfileGoalType(goal);
+      await trackProfileWrite(goalGuard.seqRef, goalGuard.pendingRef, () => setProfileGoalType(goal));
       setProfile((prev) => ({ ...prev, goalType: goal }));
     } catch (error) {
       reportWriteFailure(error);
