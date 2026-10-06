@@ -112,9 +112,10 @@
         403,
         408
       ],
-      "current": 401,
+      "current": 403,
       "done": [
-        417
+        417,
+        401
       ],
       "parked": [],
       "base": "62cc088"
@@ -214,7 +215,7 @@
     },
     "401": {
       "lane": "D",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "a10a41a",
@@ -224,11 +225,13 @@
       ],
       "workOrder": "C:/git/ht-lanes/wo/401.md",
       "deviceCheck": "Open MealPrep: loading then data, no banner. Switch tabs / leave and return: no banner, no blank flash. Empty inventory shows the normal empty state, not the error.",
-      "notes": "dev: loadError cleared at the start of each run; banner uses the clay palette (no warning token); wording verbatim from the WO (analyst pick, HUMAN)"
+      "notes": "tester APPROVE r0. Race orderings (cleared-at-start then superseded; late older run) were checked by reading the run-id guard, NOT by deferred-promise probes. HUMAN: wording is an analyst pick; banner uses the clay palette (no warning token).",
+      "securityReview": "skipped: UI load-error state only; no db/api/backup code in the diff",
+      "regressionProof": "5 tests fail with a10a41a MealPrepScreen.tsx; banner test fails with 71cee01; pass at 49b5ccd; 1010/88 (tester reproduced)"
     },
     "403": {
       "lane": "D",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "workOrder": "C:/git/ht-lanes/wo/403.md",
@@ -591,6 +594,10 @@
     {
       "at": "2026-10-06T17:30:35Z",
       "event": "#407 ready (APPROVE r0, security skipped); lane F out of issues (4 done) -> cleanup"
+    },
+    {
+      "at": "2026-10-06T17:30:51Z",
+      "event": "#401 ready (APPROVE r0, security skipped); lane D -> #403 in_dev"
     }
   ]
 }
