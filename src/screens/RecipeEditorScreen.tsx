@@ -74,8 +74,8 @@ const KNOWN_CATEGORIES = [
 ];
 
 const DEFAULT_SERVINGS = '4';
-const SAVE_RECOMPUTE_DEADLINE_MS = 10_000;
 const DEFAULT_PREP = '30';
+const SAVE_RECOMPUTE_DEADLINE_MS = 10_000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
