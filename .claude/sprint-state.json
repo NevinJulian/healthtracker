@@ -213,12 +213,17 @@
     },
     "401": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "a10a41a",
+        "353820b",
+        "71cee01",
+        "49b5ccd"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/401.md",
       "deviceCheck": "Open MealPrep: loading then data, no banner. Switch tabs / leave and return: no banner, no blank flash. Empty inventory shows the normal empty state, not the error.",
-      "notes": "WO ready; waits for #417. Error-view and banner wording are analyst picks (HUMAN)."
+      "notes": "dev: loadError cleared at the start of each run; banner uses the clay palette (no warning token); wording verbatim from the WO (analyst pick, HUMAN)"
     },
     "403": {
       "lane": "D",
@@ -567,6 +572,10 @@
     {
       "at": "2026-10-06T17:27:59Z",
       "event": "#397 ready (APPROVE r2 after 1 round trip, security skipped); lane F -> #407 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:29:07Z",
+      "event": "#401 in_test (1010/88 per dev)"
     }
   ]
 }
