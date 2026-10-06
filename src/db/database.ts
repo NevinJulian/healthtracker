@@ -2510,15 +2510,14 @@ export async function dumpTable(
  *     just-restored data, in order, inside the same transaction.
  *     RESTORE_SLOT_DEDUPE_SQL credits any consumed loser's batch, dedupes
  *     weekly_meal_plan per (date, meal_type), preferring a consumed row whose
- *     inventory pointer is live, and recreates its index. v37 renumbers
- *     workout_set_log densely per (date, exercise) by (created_at, id) and
- *     recreates its index — the SAME ordering requirement the migration
- *     itself relies on (the renumber must run before its own index is
- *     (re)created) holds here for the same reason: it runs after the
- *     index was dropped above, never while it exists. A clean,
- *     already-migrated backup is unaffected by either re-run: nothing
- *     matches the dedupe's credit/delete WHERE clauses, and v37's renumber
- *     reassigns every row the value it already has.
+ *     inventory pointer is live, and recreates its index.
+ *     RESTORE_SET_INDEX_SQL renumbers a workout_set_log (date, exercise)
+ *     partition densely by (set_index, created_at, id) only if two of its
+ *     rows share a set_index, then recreates its index. Both run after their
+ *     index was dropped above, never while it exists. A clean backup is
+ *     unaffected by either: nothing matches the dedupe's credit/delete WHERE
+ *     clauses, and collision-free partitions keep their set_index values,
+ *     gaps included.
  *
  * A row's own keys are NOT trusted as column identifiers: unlike values,
  * column names can't be parameterised, so a backup file (user-supplied,
@@ -2548,7 +2547,8 @@ export async function dumpTable(
  *
  *   - RESTORE_SLOT_DEDUPE_SQL: weekly_meal_plan (date, meal_type) dedupe +
  *     unique index, preferring a consumed row whose inventory pointer is live.
- *   - v37: workout_set_log set_index renumber + unique index.
+ *   - RESTORE_SET_INDEX_SQL: workout_set_log renumber of colliding
+ *     (date, exercise) partitions only + unique index.
  */
 const POST_RESTORE_STEPS: readonly ({ sql: string } | { version: number })[] = [
   { sql: RESTORE_SLOT_DEDUPE_SQL },
@@ -3150,7 +3150,7 @@ async function _logWorkoutSetImpl(
   );
 }
 
-// set_index is the display order: dense and unique per (date, exercise), and immune to clock changes.
+// set_index is the display order: unique per (date, exercise) and independent of created_at, so clock changes cannot reorder sets.
 export const WORKOUT_SETS_FOR_DAY_SQL = `SELECT * FROM workout_set_log WHERE date = ?
      ORDER BY exercise ASC, set_index ASC`;
 
