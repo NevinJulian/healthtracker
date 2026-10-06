@@ -292,12 +292,18 @@
     },
     "410": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "86459a2",
+        "4f463ea",
+        "d30e74c",
+        "3b42af2"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/410.md",
       "decisionSource": "owner comment on #410 2026-10-06 (fix in the database)",
-      "deviceCheck": "Dashboard with one extra workout: add a second and immediately tick the first; both show. Force-close and reopen: both still there, tick kept."
+      "deviceCheck": "Dashboard with one extra workout: add a second and immediately tick the first; both show. Force-close and reopen: both still there, tick kept.",
+      "notes": "dev removed the if(!entry) return guard from both handlers (sent to tester as an explicit question)"
     },
     "411": {
       "lane": "C",
@@ -509,6 +515,14 @@
     {
       "at": "2026-10-06T17:22:13Z",
       "event": "filed #430 (unguarded recipe JSON.parse), #431 (silent Dashboard/Analytics loads), #432 (data-layer follow-ups), #433 (Settings stale render-time state)"
+    },
+    {
+      "at": "2026-10-06T17:24:10Z",
+      "event": "GitHub CI test check on integration 80a84d3 (lanes B, E merged): completed success"
+    },
+    {
+      "at": "2026-10-06T17:24:10Z",
+      "event": "#410 in_test (1007/88 per dev)"
     }
   ]
 }
