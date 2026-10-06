@@ -15,7 +15,7 @@ const mockToday = '2026-09-19';
 
 const workoutA = { id: 'a', name: 'Curls', muscle_group: 'Arms', sets: '3', reps: '10', completed: false };
 const workoutB = { id: 'b', name: 'Run', muscle_group: 'Legs', sets: '1', reps: '1', completed: false };
-const squat = { id: 's', name: 'Squat', muscle_group: 'Legs', sets: '3', reps: '5', completed: false };
+const squat = { id: 's', name: 'Squat', muscle_group: 'Legs', sets: '3', reps: '5', completed: false, videoUrl: '' };
 
 const mockEntry = {
   date: mockToday,

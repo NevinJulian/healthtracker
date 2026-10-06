@@ -26,6 +26,8 @@ import {
   upsertBodyWeight,
   addAdditionalWorkout,
   toggleAdditionalWorkout,
+  CorruptJsonError,
+  resetCorruptDayColumn,
   syncRollingSchedule,
   toISODate,
   getTodaysMealsWithRecipe,
@@ -41,6 +43,7 @@ import {
   getWorkoutSetsForDay,
   deleteWorkoutSet,
   type WorkoutSet,
+  type CorruptJsonColumn,
 } from '../db/database';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import {
@@ -460,6 +463,33 @@ export default function DashboardScreen() {
     }
   };
 
+  const resetCorruptDay = async (date: string, column: CorruptJsonColumn) => {
+    try {
+      await resetCorruptDayColumn(date, column);
+    } catch (err) {
+      console.error('resetCorruptDayColumn error', err);
+      Alert.alert('Reset failed', 'This day could not be reset. Nothing was changed.');
+    }
+    loadToday();
+  };
+
+  const offerCorruptDayReset = (err: CorruptJsonError) => {
+    const what =
+      err.column === 'exercises'
+        ? 'The exercise list for this day is stored in a form the app cannot read, so your change was not saved. Reset this day replaces it with the exercises from your template, all unchecked.'
+        : 'The additional workouts for this day are stored in a form the app cannot read, so your change was not saved. Reset this day replaces them with an empty list.';
+    Alert.alert('Cannot save: unreadable data', `${what} The unreadable data is kept in your backups.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset this day',
+        style: 'destructive',
+        onPress: () => {
+          void resetCorruptDay(err.date, err.column);
+        },
+      },
+    ]);
+  };
+
   const handleExerciseToggle = async (exerciseId: string, value: boolean) => {
     if (!entry) return;
     setEntry((prev) => {
@@ -476,6 +506,7 @@ export default function DashboardScreen() {
     } catch (err) {
       console.error('upsertExerciseCompleted error', err);
       loadToday();
+      if (err instanceof CorruptJsonError) offerCorruptDayReset(err);
     }
   };
 
@@ -522,6 +553,7 @@ export default function DashboardScreen() {
     } catch (err) {
       console.error('addAdditionalWorkout error', err);
       loadToday();
+      if (err instanceof CorruptJsonError) offerCorruptDayReset(err);
     }
   };
 
@@ -541,6 +573,7 @@ export default function DashboardScreen() {
     } catch (err) {
       console.error('toggleAdditionalWorkout error', err);
       loadToday();
+      if (err instanceof CorruptJsonError) offerCorruptDayReset(err);
     }
   };
 
