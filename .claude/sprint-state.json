@@ -336,13 +336,17 @@
     },
     "408": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "5dd3c00",
+        "2a487ae",
+        "0712db9"
+      ],
       "workOrder": "C:/git/ht-lanes/wo/408.md",
       "decisionSource": "owner comment on #408 2026-10-06 (wire into MealPrep with a confirm)",
       "deviceCheck": "Lunch assigned and eaten: Remove -> eaten-meal confirm text; Cancel changes nothing; Remove -> slot shows Assign, inventory +1, meal gone from nutrition history. Unticked meal: simple confirm, inventory unchanged. Archived-recipe meal: same.",
-      "notes": "WO ready; waits for #403. Placement and wording are analyst picks. Confirm text says the portion returns even for legacy rows with a NULL inventory pointer (which credit nothing)."
+      "notes": "WO ready; waits for #403. Placement and wording are analyst picks. Confirm text says the portion returns even for legacy rows with a NULL inventory pointer (which credit nothing). | dev: Alert title Remove meal is a developer pick; control is an Ionicons close button left of the consume checkbox."
     },
     "409": {
       "lane": "G",
@@ -507,7 +511,8 @@
     "Restore alert: column names from a hand-edited backup containing newlines or commas render verbatim in the skipped summary (could fake an alert line; max 40 chars after #407) - #407 tester",
     "AppNavigator.tsx has stale emoji-icon comments - #398 analyst",
     "jest.config.js comment still says Jest 30 although jest is ~29.7 (owner said not to touch the jest config in #400) - #400 analyst",
-    "eslint-disable comments also sit in src/services/backup.ts and src/services/expoNotifications.ts (not test files, outside #409) - #409 analyst"
+    "eslint-disable comments also sit in src/services/backup.ts and src/services/expoNotifications.ts (not test files, outside #409) - #409 analyst",
+    "MealPrep handleToggleConsumed is not behind runGuarded: a double tap fires toggleMealConsumed twice (second is a no-op in the db; visual-feedback gap only) - #408 dev / #403 analyst"
   ],
   "log": [
     {
@@ -670,6 +675,10 @@
     {
       "at": "2026-10-06T17:33:54Z",
       "event": "#403 ready (APPROVE r0, security skipped); lane D -> #408 in_dev"
+    },
+    {
+      "at": "2026-10-06T17:36:21Z",
+      "event": "#408 in_test (1022/88 per dev)"
     }
   ]
 }
