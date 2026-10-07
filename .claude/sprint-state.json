@@ -55,10 +55,11 @@
         412,
         430
       ],
-      "current": 430,
+      "current": null,
       "done": [
         427,
-        412
+        412,
+        430
       ],
       "parked": []
     },
@@ -284,7 +285,7 @@
     },
     "430": {
       "lane": "A",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 1,
       "commits": [
         "b4667d7",
@@ -298,7 +299,7 @@
       "notes": "WO ready. Sibling spot included: getCookingTasks. | dev: private parseIngredients(raw, recipeId) at the four sites; warns with the recipe id, never the raw text. b4667d7 alone does not typecheck (fixed by 3ed52df). | tester REJECT r1: after 3ed52df removed the archived_at assertion, nothing proves the corrupt row was archived (getRecipesIncludingArchived selects every row), so 'archived corrupt row included' is only half tested. Fix itself sound. Sent back for one assertion (getRecipes() must not contain the archived id). Consumers traced by the tester: the editor blocks saving with no ingredients, so the corrupt text is only overwritten when the user re-enters ingredients; macros are separate columns (no 0 kcal); backup export reads raw rows (corrupt text exported intact). HUMAN: RecipeDetail 'add to shopping list' on a corrupt recipe adds zero items and still shows Added!.",
       "workOrder": "C:/git/ht-lanes/wo/430.md",
       "decisionSource": "owner comment on #430 (return the recipe with an empty ingredient list, and log it)",
-      "regressionProof": "round 1: 10/11 fail with b4667d7 database.ts; the cooking-task test fails with 821b8aa database.ts; 11/11 at 3ed52df; 1136/95 (tester reproduced). Probe of 14 stored values through all four readers: none throws, one warn per bad row with the id and no raw text, valid arrays unchanged.",
+      "regressionProof": "round 1: 10/11 fail with b4667d7 database.ts; the cooking-task test fails with 821b8aa database.ts; 11/11 at 3ed52df; 14-value probe through all four readers. Round 2 (f563c3e, test-only, +4 lines): the new not.toContain('bad-1') assertion goes red when the deleteRecipe call is removed; both cases pinned (corrupt+active returned with []; corrupt+archived null from getRecipeById, present in getRecipesIncludingArchived); 1136/95 (tester reproduced).",
       "securityReview": "APPROVE (88bcc98..3ed52df, source unchanged in round 2): no query text added; no path persists the substituted [] over the corrupt text unless the user types at least one ingredient (handleSave returns early on an empty list; createRecipe/updateRecipe have no other caller); macros are separate columns and never recomputed from an empty list; backup reads raw rows, so the corrupt text survives in a backup; warn logs a fixed string plus the id only. Notes: the editor gives no notice that ingredients were unreadable (blank row; retyping and saving replaces the corrupt text - as decided); restore does not validate the ingredients column (unchanged)."
     },
     "431": {
@@ -484,6 +485,10 @@
     {
       "at": "2026-10-07T20:38:09Z",
       "event": "#430 round 2 (f563c3e, test-only: 4 assertions pinning archived + still returned; 1136/95 per dev) in_test; security APPROVE on the source diff"
+    },
+    {
+      "at": "2026-10-07T20:39:33Z",
+      "event": "#430 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane A out of issues (3 done, 0 parked) -> cleanup"
     }
   ],
   "status": "running",
