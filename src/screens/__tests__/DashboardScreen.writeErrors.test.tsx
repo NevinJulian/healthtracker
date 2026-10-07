@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, TextInput } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 
 jest.mock('@react-navigation/native', () => ({
@@ -54,11 +54,13 @@ import {
   getLogByDate,
   getLatestMeasurements,
   logBodyMeasurement,
+  logWorkoutSet,
 } from '../../db/database';
 
 const mockGetLogByDate = jest.mocked(getLogByDate);
 const mockGetLatestMeasurements = jest.mocked(getLatestMeasurements);
 const mockLogBodyMeasurement = jest.mocked(logBodyMeasurement);
+const mockLogWorkoutSet = jest.mocked(logWorkoutSet);
 
 async function flushMicrotasks() {
   await act(async () => {
@@ -81,6 +83,7 @@ describe('DashboardScreen write failures', () => {
     mockGetLogByDate.mockResolvedValue({ ...mockEntry });
     mockLogBodyMeasurement.mockResolvedValue(undefined);
     mockGetLatestMeasurements.mockResolvedValue(null);
+    mockLogWorkoutSet.mockResolvedValue(undefined);
     alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -196,6 +199,46 @@ describe('DashboardScreen write failures', () => {
       await pressSave(utils);
 
       expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('set logger', () => {
+    async function openLogger() {
+      const utils = render(<DashboardScreen />);
+      await flushMicrotasks();
+      fireEvent.press(utils.getByLabelText('Log sets for Squat'));
+      const [reps, weight] = utils.UNSAFE_getAllByType(TextInput).slice(-2);
+      fireEvent.changeText(reps, '10');
+      fireEvent.changeText(weight, '60');
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Add set'));
+      });
+      return utils;
+    }
+
+    function inputs(utils: ReturnType<typeof render>) {
+      return utils.UNSAFE_getAllByType(TextInput).slice(-2);
+    }
+
+    it('alerts and keeps the typed reps and weight when the write rejects', async () => {
+      mockLogWorkoutSet.mockRejectedValue(new Error('disk full'));
+
+      const utils = await openLogger();
+
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy).toHaveBeenCalledWith('Error', 'Failed to save your set. Please try again.');
+      const [reps, weight] = inputs(utils);
+      expect(reps.props.value).toBe('10');
+      expect(weight.props.value).toBe('60');
+    });
+
+    it('clears reps without an alert when the write succeeds', async () => {
+      const utils = await openLogger();
+
+      expect(alertSpy).not.toHaveBeenCalled();
+      const [reps, weight] = inputs(utils);
+      expect(reps.props.value).toBe('');
+      expect(weight.props.value).toBe('60');
     });
   });
 });
