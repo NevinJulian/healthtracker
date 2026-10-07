@@ -22,6 +22,7 @@ import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from './src/
 import { installStress369 } from './src/db/devStress369';
 import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import AppErrorBoundary from './src/components/AppErrorBoundary';
 import RecoveryScreen, { formatErrorDetail } from './src/components/RecoveryScreen';
 import { clearRescueCopies } from './src/services/rescueExport';
 import { Colors, Typography } from './src/theme/tokens';
@@ -127,27 +128,29 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" backgroundColor={Colors.surface} />
-      <NavigationContainer
-        theme={{
-          dark: true,
-          colors: {
-            primary: Colors.accent,
-            background: Colors.background,
-            card: Colors.surface,
-            text: Colors.textPrimary,
-            border: Colors.border,
-            notification: Colors.accent,
-          },
-          fonts: {
-            regular: { fontFamily: Typography.body, fontWeight: '400' },
-            medium: { fontFamily: Typography.title, fontWeight: '500' },
-            bold: { fontFamily: Typography.title, fontWeight: '700' },
-            heavy: { fontFamily: Typography.label, fontWeight: '900' },
-          },
-        }}
-      >
-        <AppNavigator />
-      </NavigationContainer>
+      <AppErrorBoundary>
+        <NavigationContainer
+          theme={{
+            dark: true,
+            colors: {
+              primary: Colors.accent,
+              background: Colors.background,
+              card: Colors.surface,
+              text: Colors.textPrimary,
+              border: Colors.border,
+              notification: Colors.accent,
+            },
+            fonts: {
+              regular: { fontFamily: Typography.body, fontWeight: '400' },
+              medium: { fontFamily: Typography.title, fontWeight: '500' },
+              bold: { fontFamily: Typography.title, fontWeight: '700' },
+              heavy: { fontFamily: Typography.label, fontWeight: '900' },
+            },
+          }}
+        >
+          <AppNavigator />
+        </NavigationContainer>
+      </AppErrorBoundary>
     </SafeAreaProvider>
   );
 }
