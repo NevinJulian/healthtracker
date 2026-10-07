@@ -662,13 +662,18 @@ export default function DashboardScreen() {
     exerciseName: string,
     reps: number,
     weightKg: number
-  ) => {
+  ): Promise<boolean> => {
     try {
       // set_index is assigned atomically by logWorkoutSet itself (#317) —
       // no longer computed from the current in-memory array length, which
       // collided with a surviving set after deleting one mid-session.
       await logWorkoutSet(today, exerciseName, { reps, weightKg });
-      // Optimistically refresh from DB so IDs are correct
+    } catch (err) {
+      console.error('logWorkoutSet error', err);
+      Alert.alert('Error', 'Failed to save your set. Please try again.');
+      return false;
+    }
+    try {
       const updated = await getWorkoutSetsForDay(today);
       const grouped: Record<string, WorkoutSet[]> = {};
       for (const s of updated) {
@@ -677,8 +682,9 @@ export default function DashboardScreen() {
       }
       setWorkoutSets(grouped);
     } catch (err) {
-      console.error('logWorkoutSet error', err);
+      console.error('getWorkoutSetsForDay error', err);
     }
+    return true;
   };
 
   const handleDeleteSet = async (setId: number) => {
@@ -1270,7 +1276,7 @@ function SetLoggerModal({
   exerciseName: string;
   sets: WorkoutSet[];
   onClose: () => void;
-  onAddSet: (reps: number, weightKg: number) => Promise<void>;
+  onAddSet: (reps: number, weightKg: number) => Promise<boolean>;
   onDeleteSet: (id: number) => Promise<void>;
 }) {
   const lastSet = sets.length > 0 ? sets[sets.length - 1] : null;
@@ -1295,8 +1301,7 @@ function SetLoggerModal({
     }
     setSaving(true);
     try {
-      await onAddSet(reps, weight);
-      setRepsInput('');
+      if (await onAddSet(reps, weight)) setRepsInput('');
       // Keep weight for the next set (common UX pattern)
     } finally {
       setSaving(false);
