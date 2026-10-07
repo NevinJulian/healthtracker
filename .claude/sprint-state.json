@@ -207,7 +207,7 @@
     },
     "426": {
       "lane": "B",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "commits": [
         "b1b1e3d",
@@ -223,7 +223,8 @@
         "832c7f1",
         "17d6ca8",
         "c6cd714",
-        "1979589"
+        "1979589",
+        "83e352d"
       ],
       "deviceCheck": "1) Normal start: no error screen, startup not slowed. 2) Dev build that throws in initDatabase: Retry, Save data and the notice reachable by scrolling at the largest font size. 3) Save data: two-files sentence, then two share sheets; save both to Files. 4) Kill and relaunch without the forced failure: cache copies are gone.",
       "notes": "WO ready. Issue item 3 (closing the connection) is NOT done by this work order; the Save-waits-for-init rule covers the font-error case (analyst reading of the decision). | dev: 7 test/fix pairs. In-flight promise in a ref; clearRescueCopies().catch(() => {}) once in the mount effect; hasRescueWal from an effect when the failure screen shows. | tester APPROVE r0. COLD-CACHE RISK: `jest App.startFailure --no-cache` fails 3/3 at the first test (findByText default 1000 ms; first cold render took 2191 ms). Pre-existing (fails 2/2 at base e46e8ac, ~1.6 s) but this change adds ~500 ms. CI has no jest cache (test.yml caches npm only), so in CI it depends on which suites warmed the transform cache first. The dev's 'unmounted component' flake was never reproduced. ORCHESTRATOR: sent back for a test-only commit giving the first cold render an explicit timeout; counted as round trip 1 although the tester approved. HUMAN: if initDatabase never settles, Retry is a no-op and Save data spins forever (as decided: Save waits for init); only killing the app helps. hasRescueWal checks the LIVE wal once when the failure screen shows; export re-checks at save time, so the two-files sentence can be stale if the wal appears/disappears in between.",
@@ -436,6 +437,10 @@
     {
       "at": "2026-10-07T20:31:22Z",
       "event": "#412 ready (security APPROVE)"
+    },
+    {
+      "at": "2026-10-07T20:32:20Z",
+      "event": "#426 round 2 (83e352d, test-only: 5 s wait on each test's first findBy; 1129/93 per dev) in_test"
     }
   ],
   "status": "running",
