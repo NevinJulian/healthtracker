@@ -112,6 +112,21 @@ describe('openfoodfacts — search budget', () => {
     expect(fetchMock).toHaveBeenCalledTimes(10);
   });
 
+  it('sends again after the clock steps back, and still enforces the budget', async () => {
+    const { lookupNutrition: lookup } = load();
+    for (let i = 0; i < 10; i++) await lookup(`item${i}`);
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+
+    now -= 300_000;
+    expect(await lookup('after-step')).not.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(11);
+
+    for (let i = 0; i < 9; i++) await lookup(`more${i}`);
+    expect(fetchMock).toHaveBeenCalledTimes(20);
+    await lookup('over');
+    expect(fetchMock).toHaveBeenCalledTimes(20);
+  });
+
   it('does not spend budget on a cache hit', async () => {
     const hit = { kcal: 1, protein: 2, carbs: 3, fat: 4 };
     const { lookupNutrition: lookup } = load(() => ({ getFirstAsync: async () => hit }));
