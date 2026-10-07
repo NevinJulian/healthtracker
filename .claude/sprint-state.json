@@ -57,7 +57,8 @@
       ],
       "current": 430,
       "done": [
-        427
+        427,
+        412
       ],
       "parked": []
     },
@@ -142,7 +143,7 @@
     },
     "412": {
       "lane": "A",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "12e52d6",
@@ -154,7 +155,8 @@
       "notes": "WO ready. NOT comment-only: the refined decision was unimplemented. | dev: restoreFromPayload(payloadTables, backupSchemaVersion) - required param; <37 runs v37's precondition + sql looked up in MIGRATIONS (throws if missing); >=37 keeps RESTORE_SET_INDEX_SQL; all inside the restore transaction. 22 existing test calls got ', 38'; dev says no assertion changed. 12e52d6 alone does not typecheck (test-first artefact). backup.test.ts 'passes the backup file's schemaVersion' was added in the fix commit and never run red. validatePayload accepts negative/zero versions (they take the pre-v37 path). ORCHESTRATOR read the whole schema.ts diff (3 hunks): only // comment lines above v37 and the /** */ doc block above RESTORE_SET_INDEX_SQL (not a migration) changed; no version/sql/precondition line touched - NOT an abort condition. The proof grep in my brief was too narrow (it only exempted // lines).",
       "workOrder": "C:/git/ht-lanes/wo/412.md",
       "decisionSource": "owner comment 6026078786 on #412 (pass the backup schemaVersion into restoreFromPayload; pre-v37 backups get v37's renumber by (created_at,id); v37+ keeps the current rule; fix the stale // comment above v37)",
-      "regressionProof": "3 'version 36' tests fail with 12e52d6 database.ts+backup.ts, 17/17 at 88bcc98; MIGRATIONS proven unchanged mechanically: schema.ts at e46e8ac and 88bcc98 transpiled with removeComments are exactly equal (28497 chars); backup.test.ts schemaVersion test goes red under mutation (constant 38); 9 hostile pre-v37 payloads behave identically before and after, every throw rolls the whole restore back; index + next write checked after 36 / 37 / empty / absent table and back-to-back restores; 1125/94 (tester reproduced)"
+      "regressionProof": "3 'version 36' tests fail with 12e52d6 database.ts+backup.ts, 17/17 at 88bcc98; MIGRATIONS proven unchanged mechanically: schema.ts at e46e8ac and 88bcc98 transpiled with removeComments are exactly equal (28497 chars); backup.test.ts schemaVersion test goes red under mutation (constant 38); 9 hostile pre-v37 payloads behave identically before and after, every throw rolls the whole restore back; index + next write checked after 36 / 37 / empty / absent table and back-to-back restores; 1125/94 (tester reproduced)",
+      "securityReview": "APPROVE (0f4c1f2..88bcc98): backupSchemaVersion is used only in the comparison >= 37, never interpolated; validatePayload requires a finite integer not above the current version (0 and negatives pass and take the pre-v37 renumber, the conservative path); strict if/else, both arms create the unique index, so no value skips both repairs; v37 SQL is static, lookup failure throws, schema_version is not written outside runMigrations; everything inside the one restore transaction, no catch-and-continue; no guard removed. A backup that lies about its version only gets the wrong set order."
     },
     "422": {
       "lane": "E",
@@ -430,6 +432,10 @@
     {
       "at": "2026-10-07T20:31:01Z",
       "event": "#426 security APPROVE on 1979589 (source change); the test-only timeout follow-up is still in dev"
+    },
+    {
+      "at": "2026-10-07T20:31:22Z",
+      "event": "#412 ready (security APPROVE)"
     }
   ],
   "status": "running",
