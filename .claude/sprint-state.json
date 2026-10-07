@@ -8,11 +8,29 @@
     "testSuites": 93,
     "tests": 1118
   },
-  "frozenScope": [427, 412, 430, 426, 423, 434, 411, 435, 432, 431, 424, 428, 422, 433, 429, 425, 437],
+  "frozenScope": [
+    427,
+    412,
+    430,
+    426,
+    423,
+    434,
+    411,
+    435,
+    432,
+    431,
+    424,
+    428,
+    422,
+    433,
+    429,
+    425,
+    437
+  ],
   "excluded": {
-    "436": "done by hand before this sprint (PR #440)",
+    "392": "feature, runs outside the sprint",
     "396": "needs restore rework + cascade decision",
-    "392": "feature, runs outside the sprint"
+    "436": "done by hand before this sprint (PR #440)"
   },
   "budget": {
     "maxRoundTripsPerIssue": 3,
@@ -28,39 +46,246 @@
     "Work orders are saved verbatim at C:/git/ht-lanes/wo/<issue>.md (outside the repo) so a resumed session can re-dispatch without re-analysing."
   ],
   "lanes": {
-    "A": { "branch": "sprint/lane-a-db", "worktree": "C:/git/ht-lanes/lane-a", "status": "pending", "order": [427, 412, 430], "current": null, "done": [], "parked": [] },
-    "B": { "branch": "sprint/lane-b-start", "worktree": "C:/git/ht-lanes/lane-b", "status": "pending", "order": [426, 423], "current": null, "done": [], "parked": [] },
-    "C": { "branch": "sprint/lane-c-dashboard", "worktree": "C:/git/ht-lanes/lane-c", "status": "pending", "waitsFor": "lane A merged", "order": [434, 411, 435, 432, 431], "current": null, "done": [], "parked": [] },
-    "D": { "branch": "sprint/lane-d-api", "worktree": "C:/git/ht-lanes/lane-d", "status": "pending", "order": [424, 428], "current": null, "done": [], "parked": [] },
-    "E": { "branch": "sprint/lane-e-settings", "worktree": "C:/git/ht-lanes/lane-e", "status": "pending", "waitsFor": "lane A merged", "order": [422, 433, 429], "current": null, "done": [], "parked": [] },
-    "F": { "branch": "sprint/lane-f-repo", "worktree": "C:/git/ht-lanes/lane-f", "status": "pending", "waitsFor": "all other lanes merged", "order": [425, 437], "current": null, "done": [], "parked": [] }
+    "A": {
+      "branch": "sprint/lane-a-db",
+      "worktree": "C:/git/ht-lanes/lane-a",
+      "status": "in_progress",
+      "order": [
+        427,
+        412,
+        430
+      ],
+      "current": 427,
+      "done": [],
+      "parked": []
+    },
+    "B": {
+      "branch": "sprint/lane-b-start",
+      "worktree": "C:/git/ht-lanes/lane-b",
+      "status": "in_progress",
+      "order": [
+        426,
+        423
+      ],
+      "current": 426,
+      "done": [],
+      "parked": []
+    },
+    "C": {
+      "branch": "sprint/lane-c-dashboard",
+      "worktree": "C:/git/ht-lanes/lane-c",
+      "status": "pending",
+      "waitsFor": "lane A merged",
+      "order": [
+        434,
+        411,
+        435,
+        432,
+        431
+      ],
+      "current": null,
+      "done": [],
+      "parked": []
+    },
+    "D": {
+      "branch": "sprint/lane-d-api",
+      "worktree": "C:/git/ht-lanes/lane-d",
+      "status": "in_progress",
+      "order": [
+        424,
+        428
+      ],
+      "current": 424,
+      "done": [],
+      "parked": []
+    },
+    "E": {
+      "branch": "sprint/lane-e-settings",
+      "worktree": "C:/git/ht-lanes/lane-e",
+      "status": "pending",
+      "waitsFor": "lane A merged",
+      "order": [
+        422,
+        433,
+        429
+      ],
+      "current": null,
+      "done": [],
+      "parked": []
+    },
+    "F": {
+      "branch": "sprint/lane-f-repo",
+      "worktree": "C:/git/ht-lanes/lane-f",
+      "status": "pending",
+      "waitsFor": "all other lanes merged",
+      "order": [
+        425,
+        437
+      ],
+      "current": null,
+      "done": [],
+      "parked": []
+    }
   },
   "issues": {
-    "427": { "lane": "A", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "412": { "lane": "A", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "430": { "lane": "A", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "426": { "lane": "B", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "423": { "lane": "B", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "434": { "lane": "C", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "411": { "lane": "C", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "435": { "lane": "C", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "432": { "lane": "C", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "431": { "lane": "C", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "424": { "lane": "D", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "428": { "lane": "D", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "422": { "lane": "E", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "433": { "lane": "E", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "429": { "lane": "E", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "425": { "lane": "F", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" },
-    "437": { "lane": "F", "status": "pending", "roundTrips": 0, "commits": [], "deviceCheck": null, "notes": "" }
+    "411": {
+      "lane": "C",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "412": {
+      "lane": "A",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "422": {
+      "lane": "E",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "423": {
+      "lane": "B",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "424": {
+      "lane": "D",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "425": {
+      "lane": "F",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "426": {
+      "lane": "B",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "427": {
+      "lane": "A",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "428": {
+      "lane": "D",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "429": {
+      "lane": "E",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "430": {
+      "lane": "A",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "431": {
+      "lane": "C",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "432": {
+      "lane": "C",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "433": {
+      "lane": "E",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "434": {
+      "lane": "C",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "435": {
+      "lane": "C",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    },
+    "437": {
+      "lane": "F",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "deviceCheck": null,
+      "notes": ""
+    }
   },
   "foundDuringSprint": [],
   "smallFindings": [],
   "smallFindingsIssue": null,
   "log": [
-    { "at": "2026-10-07T20:11:02Z", "event": "preflight green on main bbfe649: tree clean, identity verified, typecheck pass, 1118 tests / 93 suites" },
-    { "at": "2026-10-07T20:20:00Z", "event": "created and pushed sprint/auto-fixes from main", "sha": "bbfe649" },
-    { "at": "2026-10-07T20:20:00Z", "event": "scope frozen: 17 open issues from SPRINT.md §3 (all listed issues are open)" }
+    {
+      "at": "2026-10-07T20:11:02Z",
+      "event": "preflight green on main bbfe649: tree clean, identity verified, typecheck pass, 1118 tests / 93 suites"
+    },
+    {
+      "at": "2026-10-07T20:20:00Z",
+      "event": "created and pushed sprint/auto-fixes from main",
+      "sha": "bbfe649"
+    },
+    {
+      "at": "2026-10-07T20:20:00Z",
+      "event": "scope frozen: 17 open issues from SPRINT.md §3 (all listed issues are open)"
+    },
+    {
+      "at": "2026-10-07T20:14:33Z",
+      "event": "worktrees a/b/d created at e46e8ac, npm ci running; analysts dispatched for #427 #426 #424 (current) and #412 #430 #423 #428 (ahead, read-only)"
+    }
   ],
   "status": "running"
 }
