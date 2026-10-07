@@ -164,7 +164,7 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutr
     return null;
   } catch (err) {
     if (err instanceof FetchJsonError && err.status === 429) {
-      pausedUntil = Date.now() + parseRetryAfterMs(err.retryAfter);
+      pausedUntil = Math.max(pausedUntil, Date.now() + parseRetryAfterMs(err.retryAfter));
     }
     return null;
   }
