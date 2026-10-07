@@ -138,11 +138,13 @@
     },
     "412": {
       "lane": "A",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "none (analyst: restore is a pure DB path covered by the sql.js suites)",
+      "notes": "WO ready; waits for #427. NOT comment-only: the refined decision is unimplemented (restoreFromPayload takes no version). Signature change touches ~40 test calls. MIGRATIONS sql/version/precondition must stay byte-identical; only // comment lines of schema.ts may change.",
+      "workOrder": "C:/git/ht-lanes/wo/412.md",
+      "decisionSource": "owner comment 6026078786 on #412 (pass the backup schemaVersion into restoreFromPayload; pre-v37 backups get v37's renumber by (created_at,id); v37+ keeps the current rule; fix the stale // comment above v37)"
     },
     "422": {
       "lane": "E",
@@ -154,7 +156,7 @@
     },
     "423": {
       "lane": "B",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": "Dev build in Expo Go: add throw new Error('device test') at the top of any screen render (uncommitted). Open that screen: Something went wrong screen with error text, Retry, Save data, no-reset notice. Retry: crash screen again. Remove the throw, reload: screen works. Throw again, Save data: share sheet.",
@@ -202,11 +204,13 @@
     },
     "428": {
       "lane": "D",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "Expo Go, editor: type 11+ distinct unusual ingredient names with quantities within one minute: a Not looked up line appears, not no data. Wait 60 s, tap Recompute: the line clears. Discover: import a recipe with 11+ unlisted ingredients: the Alert shows the not-looked-up sentence.",
+      "notes": "WO ready; waits for #424. Return type becomes OFFNutrition | null | 'not-looked-up'; user-facing wording is an analyst pick. A Retry-After cooldown refusal must also return 'not-looked-up'.",
+      "workOrder": "C:/git/ht-lanes/wo/428.md",
+      "decisionSource": "owner comment on #428 2026-10-06 (refused/cut-off lookup = 'not looked up', separate from 'no data'; save-deadline fallback keeps every lookup that already succeeded; future timestamps dropped)"
     },
     "429": {
       "lane": "E",
@@ -218,11 +222,13 @@
     },
     "430": {
       "lane": "A",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "none",
+      "notes": "WO ready; waits for #412. Sibling spot included: getCookingTasks (database.ts ~2019).",
+      "workOrder": "C:/git/ht-lanes/wo/430.md",
+      "decisionSource": "owner comment on #430 (return the recipe with an empty ingredient list, and log it)"
     },
     "431": {
       "lane": "C",
@@ -301,6 +307,10 @@
     {
       "at": "2026-10-07T20:15:46Z",
       "event": "#427 #426 #424 work orders ready, none parked -> in_dev (developers dispatched in worktrees a/b/d)"
+    },
+    {
+      "at": "2026-10-07T20:16:04Z",
+      "event": "all 7 lane A/B/D work orders ready, none parked; #427 #426 #424 in_dev"
     }
   ],
   "status": "running",
@@ -308,6 +318,9 @@
     "USER-HITTABLE (#423 analyst): OnboardingScreen branch in App.tsx is outside the error boundary the #423 decision asks for, so a render crash on first launch is still uncaught",
     "USER-HITTABLE/DATA-LOSS (#426 analyst): rescueExport offers the wal only after the db share resolves; if the first share is cancelled or fails the wal is never offered",
     "SMALL (#426 analyst): App.tsx hides Retry on any font error, with no way to re-attempt font loading",
-    "SMALL (#424 analyst): OFF_LOOKUP_CONCURRENCY lookups already past beforeAttempt still complete after a 429 (harmless)"
+    "SMALL (#424 analyst): OFF_LOOKUP_CONCURRENCY lookups already past beforeAttempt still complete after a 429 (harmless)",
+    "USER-HITTABLE/DATA-LOSS (#428 analyst): re-importing a Discover recipe says Already in library (DiscoverDetailScreen.tsx:112), so a recipe saved with 0-macro not-looked-up ingredients cannot be refreshed by importing again",
+    "SMALL (#430 analyst): getBioForceLibrary (database.ts:1234) maps JSON.parse(r.data) unguarded; one bad row throws the whole list (needs hand-corrupted data)",
+    "SMALL (#412 analyst): the v37 precondition error text (schema.ts:811) still says skip v37 if already applied; it is a string inside the migration, so it stays"
   ]
 }
