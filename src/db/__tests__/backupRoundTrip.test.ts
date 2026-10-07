@@ -131,9 +131,8 @@ describe('backup export → restore round trip reproduces the DB exactly (#336)'
     expect(planRow).not.toBeNull();
     await db.toggleMealConsumed(planRow!.id, true);
 
-    // 3. workout_set_log: logWorkoutSet, to exercise #317's v37 replay path
-    //    on restore (POST_RESTORE_STEPS includes v37 — a clean,
-    //    already-densely-numbered set_index must be a no-op re-run).
+    // 3. workout_set_log: a clean, densely-numbered set_index must survive
+    //    restore unchanged.
     await db.logWorkoutSet(pinnedDate, 'Bench Press', { reps: 8, weightKg: 60 });
     await db.logWorkoutSet(pinnedDate, 'Bench Press', { reps: 7, weightKg: 62.5 });
 

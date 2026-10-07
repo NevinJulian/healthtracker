@@ -24,13 +24,14 @@
  *     (date, exercise), ordered by (created_at, id), then adds
  *     `UNIQUE(date, exercise, set_index)` so the database itself rejects any
  *     future collision.
- *   - `restoreFromPayload` (database.ts) drops both unique indexes before the
- *     restore loop (so a legacy backup with colliding/gapped workout_set_log
- *     rows can be inserted at all) and runs `POST_RESTORE_STEPS` after the
- *     loop, inside the same transaction. Its set_index step is
- *     `RESTORE_SET_INDEX_SQL`, not v37: it renumbers only the (date, exercise)
- *     partitions that actually collide, ordered by (set_index, created_at,
- *     id), and then recreates the index.
+ *   - `restoreFromPayload(tables, backupSchemaVersion)` (database.ts) drops both
+ *     unique indexes before the restore loop (so a legacy backup with
+ *     colliding/gapped workout_set_log rows can be inserted at all) and
+ *     repairs set_index after it, inside the same transaction. A backup from
+ *     before v37 gets v37's own renumber by (created_at, id); a backup from
+ *     v37 on gets `RESTORE_SET_INDEX_SQL`, which renumbers only the
+ *     (date, exercise) partitions that actually collide, ordered by
+ *     (set_index, created_at, id). Both recreate the index.
  *
  * Uses the same sql.js-backed adapter and fresh-module-per-test pattern as
  * restoreLegacyDuplicates.test.ts / migrationAtomicity.test.ts.
