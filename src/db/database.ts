@@ -1160,7 +1160,7 @@ export function resetCorruptDayColumn(date: string, column: CorruptJsonColumn): 
 }
 
 async function _resetCorruptDayColumnImpl(date: string, column: CorruptJsonColumn): Promise<void> {
-  if (!(column in CORRUPT_JSON_SELECT)) {
+  if (!Object.hasOwn(CORRUPT_JSON_SELECT, column)) {
     throw new Error(`[DB] resetCorruptDayColumn: unsupported column "${column}"`);
   }
   if (!isValidDateKey(date)) {
