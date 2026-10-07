@@ -123,8 +123,10 @@
         433,
         429
       ],
-      "current": 422,
-      "done": [],
+      "current": 433,
+      "done": [
+        422
+      ],
       "parked": [],
       "base": "4dea4c6"
     },
@@ -171,7 +173,7 @@
     },
     "422": {
       "lane": "E",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "1963a62",
@@ -180,7 +182,9 @@
       "deviceCheck": "Settings: workout reminder on, set 08:00 to 08:02 with the steppers, leave and return, confirm a notification fires at 08:02 (or the next-trigger time in the OS list). Cold-start the app with the reminder on: still scheduled at the set time (reconcile path).",
       "notes": "WO ready. Regex duplicated from the private parseTimeSetting in database.ts (no cross-lane edit). | dev: parseTimeString only; 4 new cases fail on the old code ('8abc:30xyz', '8:30', '08:30:00', '08:3'). No fixture edits were needed (all test time strings already HH:MM). Drift between the two parsers is NOT pinned by a test (notifications.test.ts mocks the database module; parseTimeSetting is private).",
       "workOrder": "C:/git/ht-lanes/wo/422.md",
-      "decisionSource": "issue body (no comments); analyst chose the strict #414 regex in place, fallback {8,0} unchanged"
+      "decisionSource": "issue body (no comments); analyst chose the strict #414 regex in place, fallback {8,0} unchanged",
+      "regressionProof": "4 strict cases fail with 1963a62 notifications.ts, 21/21 at 9f78f2c; 24-string probe through the real db time getter and parseTimeString: 0 disagreements (incl. NBSP, BOM, zero-width space, full-width colon, 100 000-char input); no producer of a non-HH:MM time string in src/; no path hands raw stored text to parseTimeString; 1150/95 (tester reproduced)",
+      "securityReview": "skipped: parser tightening inside notifications.ts only; no db/api/backup/filesystem code in the diff, and the tester traced that the value only reaches it after the db reader's own strict validation"
     },
     "423": {
       "lane": "B",
@@ -346,7 +350,7 @@
     },
     "433": {
       "lane": "E",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": "Notifications allowed: enable the weekly backup reminder, tap the Sat chip, then Wed immediately; background the app. Then step a meal time right after toggling it. Both reminders show the final day/time in the system's scheduled list (or fire there).",
@@ -541,6 +545,10 @@
       "at": "2026-10-07T20:46:25Z",
       "event": "merged lane D into integration c757d60 (no conflicts); gates green: typecheck clean, 1164/97",
       "sha": "c757d60"
+    },
+    {
+      "at": "2026-10-07T20:47:51Z",
+      "event": "#422 ready (tester APPROVE r0, security skipped); lane E -> #433 in_dev"
     }
   ],
   "status": "running",
