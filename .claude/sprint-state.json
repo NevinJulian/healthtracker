@@ -194,11 +194,14 @@
     },
     "427": {
       "lane": "A",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "6ac1a39",
+        "0f4c1f2"
+      ],
       "deviceCheck": "From the integration branch, launch the app on the phone with existing data: it starts normally with all history intact (the schema check passes through). The failing path is proven by the test only.",
-      "notes": "WO ready. No cross-lane need: App.tsx already renders err.message with Retry and Save data.",
+      "notes": "WO ready. No cross-lane need: App.tsx already renders err.message with Retry and Save data. | dev: resetIfIncompatibleSchema replaced by assertCompatibleSchema (throws, no close/delete/reopen); header trim is inside the fix commit. Error text: Your saved data uses an old format that this version cannot read: the daily_log table has no date column. Nothing was changed or deleted. Tap Save data to export a copy of your data. Dev says the old code failed the test's FIRST assertion via a raw SQLite error further into migrations (deleteDatabaseAsync is a jest.fn in the harness) - tester to confirm the not-deleted assertion fails on its own too.",
       "workOrder": "C:/git/ht-lanes/wo/427.md",
       "decisionSource": "owner comment on #427 2026-10-06 (don't delete, fail: initDatabase throws a named error, the #419 start-failure screen takes over)"
     },
@@ -315,6 +318,10 @@
     {
       "at": "2026-10-07T20:17:40Z",
       "event": "analysts dispatched ahead (read-only) for lane C #434 #435 #432 #431 and lane E #422 #433 #429; #411 is analysed after #434 has landed on the lane branch; lanes C and E themselves still wait for lane A"
+    },
+    {
+      "at": "2026-10-07T20:18:13Z",
+      "event": "#427 in_test (1119/94 per dev)"
     }
   ],
   "status": "running",
@@ -325,6 +332,7 @@
     "SMALL (#424 analyst): OFF_LOOKUP_CONCURRENCY lookups already past beforeAttempt still complete after a 429 (harmless)",
     "USER-HITTABLE/DATA-LOSS (#428 analyst): re-importing a Discover recipe says Already in library (DiscoverDetailScreen.tsx:112), so a recipe saved with 0-macro not-looked-up ingredients cannot be refreshed by importing again",
     "SMALL (#430 analyst): getBioForceLibrary (database.ts:1234) maps JSON.parse(r.data) unguarded; one bad row throws the whole list (needs hand-corrupted data)",
-    "SMALL (#412 analyst): the v37 precondition error text (schema.ts:811) still says skip v37 if already applied; it is a string inside the migration, so it stays"
+    "SMALL (#412 analyst): the v37 precondition error text (schema.ts:811) still says skip v37 if already applied; it is a string inside the migration, so it stays",
+    "SMALL (#427 dev): database.ts header block (Fixes applied previously / Feature additions (issue #40)) carries issue numbers and history, against the comment rule"
   ]
 }
