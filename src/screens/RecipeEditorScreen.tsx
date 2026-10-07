@@ -38,7 +38,7 @@ import {
   updateRecipe,
 } from '../db/database';
 import { computeRecipeMacros, ComputeIngredient } from '../nutrition/computeMacros';
-import { lookupNutrition } from '../api/openfoodfacts';
+import { lookupNutrition, OFFNutrition } from '../api/openfoodfacts';
 import { normaliseIngredientName } from '../nutrition/units';
 import { NUTRITION_TABLE } from '../nutrition/nutritionTable';
 import { Card, Button, ScreenHeader } from '../components';
@@ -145,6 +145,7 @@ export default function RecipeEditorScreen() {
   const recomputeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lookupController = useRef<AbortController | null>(null);
   const latestRecompute = useRef<{ inputs: string; result: Promise<ComputedMacros | null> } | null>(null);
+  const resolvedLookups = useRef<Record<string, OFFNutrition>>({});
 
   useEffect(() => () => lookupController.current?.abort(), []);
 
@@ -250,8 +251,8 @@ export default function RecipeEditorScreen() {
 
     setMacroLoading(true);
     try {
-      // Build OFF overrides for ingredients not in local table
-      const offOverrides: Record<string, { kcal: number; protein: number; carbs: number; fat: number }> = {};
+      const offOverrides: Record<string, OFFNutrition> = {};
+      resolvedLookups.current = offOverrides;
       const needsOFF = validIngredients.filter((ing) => {
         const key = normaliseIngredientName(ing.name);
         return !NUTRITION_TABLE[key];
@@ -369,7 +370,11 @@ export default function RecipeEditorScreen() {
       if (settled === 'timeout') lookupController.current?.abort();
       const finalMacros =
         (settled === 'timeout' ? null : settled) ??
-        computeRecipeMacros(validIngredients, numServings).macros;
+        computeRecipeMacros(
+          validIngredients,
+          numServings,
+          Object.keys(resolvedLookups.current).length > 0 ? resolvedLookups.current : undefined,
+        ).macros;
 
       const recipe: Recipe = {
         id: isEdit ? recipeId : `custom-${Date.now()}`,
