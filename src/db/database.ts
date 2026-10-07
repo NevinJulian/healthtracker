@@ -237,33 +237,42 @@ export class CorruptJsonError extends Error {
   }
 }
 
+function _isStoredItem(item: unknown): boolean {
+  return (
+    typeof item === 'object' &&
+    item !== null &&
+    !Array.isArray(item) &&
+    typeof (item as { id?: unknown }).id === 'string'
+  );
+}
+
 /**
- * Strict counterpart to parseExercises(), used ONLY by the write path in
- * upsertExerciseCompleted() (#319). parseExercises() is the read path and
- * stays lenient on purpose (returns [] on malformed input — screens rely on
- * that). But upsertExerciseCompleted() reads, patches, and writes the array
- * back: if it used the lenient parse, malformed stored JSON would silently
- * become [] and then get persisted, permanently destroying whatever was
- * actually stored. This returns a discriminated result instead of throwing
- * so the caller decides how to fail (console.error + throw, see below).
+ * Strict parse for the write path: a stored array is valid only when every item
+ * is a non-array object with a string id. Anything else is refused rather than
+ * coerced to [] and persisted, which would destroy the stored text.
  */
-function _tryParseExercisesForWrite(
+function _parseStoredArray(
   raw: string | null | undefined
-): { ok: true; value: Exercise[] } | { ok: false } {
+): { ok: true; value: unknown[] } | { ok: false } {
   try {
-    const parsed = JSON.parse(raw ?? '[]');
-    return Array.isArray(parsed) ? { ok: true, value: parsed } : { ok: false };
+    const parsed: unknown = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) && parsed.every(_isStoredItem)
+      ? { ok: true, value: parsed }
+      : { ok: false };
   } catch {
     return { ok: false };
   }
 }
 
-function _isStoredJsonArray(raw: string | null | undefined): boolean {
-  try {
-    return Array.isArray(JSON.parse(raw ?? '[]'));
-  } catch {
-    return false;
-  }
+function _tryParseExercisesForWrite(
+  raw: string | null | undefined
+): { ok: true; value: Exercise[] } | { ok: false } {
+  const result = _parseStoredArray(raw);
+  return result.ok ? { ok: true, value: result.value as Exercise[] } : { ok: false };
+}
+
+function _isValidStoredArray(raw: string | null | undefined): boolean {
+  return _parseStoredArray(raw).ok;
 }
 
 function parseAdditionalWorkouts(raw: string | null | undefined): AdditionalWorkout[] {
@@ -1081,7 +1090,7 @@ async function _readAdditionalWorkoutsForWrite(
     'SELECT additional_workouts FROM daily_log WHERE date = ?',
     [date]
   );
-  if (!_isStoredJsonArray(row?.additional_workouts)) {
+  if (!_isValidStoredArray(row?.additional_workouts)) {
     console.error(
       `[DB] ${caller}: malformed additional_workouts JSON for date=${date} — refusing to write, stored value left unchanged`
     );
@@ -1159,7 +1168,7 @@ async function _resetCorruptDayColumnImpl(date: string, column: CorruptJsonColum
   }
   const db = getDatabase();
   const row = await db.getFirstAsync<{ raw: string | null }>(CORRUPT_JSON_SELECT[column], [date]);
-  if (!row || _isStoredJsonArray(row.raw)) {
+  if (!row || _isValidStoredArray(row.raw)) {
     throw new Error(`[DB] resetCorruptDayColumn: ${column} for date=${date} is not corrupt, nothing reset`);
   }
   const raw = row.raw as string;
