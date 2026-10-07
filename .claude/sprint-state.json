@@ -82,7 +82,7 @@
     "C": {
       "branch": "sprint/lane-c-dashboard",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "pending",
+      "status": "in_progress",
       "waitsFor": "lane A merged",
       "order": [
         434,
@@ -91,9 +91,10 @@
         432,
         431
       ],
-      "current": null,
+      "current": 434,
       "done": [],
-      "parked": []
+      "parked": [],
+      "base": "4dea4c6"
     },
     "D": {
       "branch": "sprint/lane-d-api",
@@ -112,16 +113,17 @@
     "E": {
       "branch": "sprint/lane-e-settings",
       "worktree": "C:/git/ht-lanes/lane-e",
-      "status": "pending",
+      "status": "in_progress",
       "waitsFor": "lane A merged",
       "order": [
         422,
         433,
         429
       ],
-      "current": null,
+      "current": 422,
       "done": [],
-      "parked": []
+      "parked": [],
+      "base": "4dea4c6"
     },
     "F": {
       "branch": "sprint/lane-f-repo",
@@ -166,7 +168,7 @@
     },
     "422": {
       "lane": "E",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": "Settings: workout reminder on, set 08:00 to 08:02 with the steppers, leave and return, confirm a notification fires at 08:02 (or the next-trigger time in the OS list). Cold-start the app with the reminder on: still scheduled at the set time (reconcile path).",
@@ -345,7 +347,7 @@
     },
     "434": {
       "lane": "C",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": "none (db-only; the reset flow UI is unchanged and covered by #411's check)",
@@ -505,6 +507,10 @@
       "at": "2026-10-07T20:42:06Z",
       "event": "merged lane A into integration b9c8d54 (no conflicts); gates green: typecheck clean, 1136/95. #428 tester APPROVE r0 -> security. #423 in_test (1136/94 per dev). Lanes C and E unblocked",
       "sha": "b9c8d54"
+    },
+    {
+      "at": "2026-10-07T20:43:30Z",
+      "event": "worktrees c/e created at 4dea4c6 (npm ci ok); lane C -> #434 in_dev, lane E -> #422 in_dev"
     }
   ],
   "status": "running",
