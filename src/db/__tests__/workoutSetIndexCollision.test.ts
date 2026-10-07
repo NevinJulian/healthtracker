@@ -413,7 +413,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
     // would succeed trivially WITHOUT renumbering — the assertions below on
     // the renumbered set_index values and the index's existence are what
     // catch that.
-    await expect(db.restoreFromPayload(payloadTables)).resolves.toBeDefined();
+    await expect(db.restoreFromPayload(payloadTables, 38)).resolves.toBeDefined();
 
     const raw = db.getDatabase();
 
@@ -444,7 +444,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
         { id: 32, date: '2024-09-01', exercise: 'Squat', set_index: 1, reps: 5, weight_kg: 80, created_at: '2024-09-01T10:10:00.000Z' },
         { id: 33, date: '2024-09-01', exercise: 'Squat', set_index: 2, reps: 5, weight_kg: 80, created_at: '2024-09-01T10:00:00.000Z' },
       ],
-    });
+    }, 38);
 
     const raw = db.getDatabase();
     const rows = await raw.getAllAsync<{ id: number; set_index: number }>(
@@ -471,7 +471,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
         { id: 42, date: '2024-09-02', exercise: 'Press', set_index: 5, reps: 5, weight_kg: 40, created_at: '2024-09-02T10:05:00.000Z' },
         { id: 43, date: '2024-09-02', exercise: 'Press', set_index: 9, reps: 5, weight_kg: 40, created_at: '2024-09-02T10:10:00.000Z' },
       ],
-    });
+    }, 38);
 
     const rows = await db.getDatabase().getAllAsync<{ id: number; set_index: number }>(
       "SELECT id, set_index FROM workout_set_log WHERE date = '2024-09-02' ORDER BY id ASC"
@@ -491,7 +491,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
         { id: 54, date: '2024-09-03', exercise: 'Dip', set_index: 2, reps: 10, weight_kg: 0, created_at: '2024-09-03T10:40:00.000Z' },
         { id: 55, date: '2024-09-03', exercise: 'Dip', set_index: 7, reps: 10, weight_kg: 0, created_at: '2024-09-03T10:20:00.000Z' },
       ],
-    });
+    }, 38);
 
     const raw = db.getDatabase();
     const curl = await raw.getAllAsync<{ id: number; set_index: number }>(
@@ -529,7 +529,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
       ],
     };
 
-    await expect(db.restoreFromPayload(payloadTables)).resolves.toBeDefined();
+    await expect(db.restoreFromPayload(payloadTables, 38)).resolves.toBeDefined();
 
     const raw = db.getDatabase();
 

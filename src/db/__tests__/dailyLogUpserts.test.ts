@@ -431,7 +431,7 @@ describe('a plain daily_log write cannot be swallowed by another unit\'s rollbac
     await expect(
       db.restoreFromPayload({
         daily_log: [{ date: null, walking_task: 'Walk' }], // NOT NULL date -> throws
-      })
+      }, 38)
     ).rejects.toBeDefined();
     (raw as unknown as { getAllAsync: typeof originalGetAll }).getAllAsync = originalGetAll;
 

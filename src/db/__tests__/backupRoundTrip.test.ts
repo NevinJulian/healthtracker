@@ -153,7 +153,7 @@ describe('backup export → restore round trip reproduces the DB exactly (#336)'
     }
 
     // ── Restore the snapshot back into the same live DB ──────────────────
-    await db.restoreFromPayload(before.tables);
+    await db.restoreFromPayload(before.tables, 38);
 
     // ── Re-dump and compare table by table ────────────────────────────────
     const after = await backup.buildBackupPayload();
