@@ -227,7 +227,8 @@
       "notes": "WO ready. Issue item 3 (closing the connection) is NOT done by this work order; the Save-waits-for-init rule covers the font-error case (analyst reading of the decision). | dev: 7 test/fix pairs. In-flight promise in a ref; clearRescueCopies().catch(() => {}) once in the mount effect; hasRescueWal from an effect when the failure screen shows. | tester APPROVE r0. COLD-CACHE RISK: `jest App.startFailure --no-cache` fails 3/3 at the first test (findByText default 1000 ms; first cold render took 2191 ms). Pre-existing (fails 2/2 at base e46e8ac, ~1.6 s) but this change adds ~500 ms. CI has no jest cache (test.yml caches npm only), so in CI it depends on which suites warmed the transform cache first. The dev's 'unmounted component' flake was never reproduced. ORCHESTRATOR: sent back for a test-only commit giving the first cold render an explicit timeout; counted as round trip 1 although the tester approved. HUMAN: if initDatabase never settles, Retry is a no-op and Save data spins forever (as decided: Save waits for init); only killing the app helps. hasRescueWal checks the LIVE wal once when the failure screen shows; export re-checks at save time, so the two-files sentence can be stale if the wal appears/disappears in between.",
       "workOrder": "C:/git/ht-lanes/wo/426.md",
       "decisionSource": "owner comment on #426 2026-10-06 (rescue copies deleted at the next app start; busy flag; Save data waits for init; scrolling screen; one WAL sentence; no full-storage special case)",
-      "regressionProof": "round 1: all 7 test/fix pairs proven (pre-fix source at each test commit fails, HEAD passes); the two never-red guards go red under mutation (deleteAsync added to export; .catch removed); warm suite 15/15, full suite twice 1129/93 (tester reproduced)."
+      "regressionProof": "round 1: all 7 test/fix pairs proven (pre-fix source at each test commit fails, HEAD passes); the two never-red guards go red under mutation (deleteAsync added to export; .catch removed); warm suite 15/15, full suite twice 1129/93 (tester reproduced).",
+      "securityReview": "APPROVE (e46e8ac..1979589): clearRescueCopies can only build the two cache URIs (no SQLite/ segment), so the live db is structurally unreachable, also with a null cacheDirectory; the mount-time delete cannot realistically overlap a user-tapped Save; Save now waits for migrations and seeds; no false success shown. Notes: HUMAN - #426 must ship together with #427 (until #427 lands, the old reset path is the one case where a deleted rescue copy could have been the only good copy; both are on this integration branch). Not determined: whether expo-sqlite checkpoints an idle open connection between the db copy and the wal copy (would lose recent transactions from the rescue pair, not corrupt it). The new two-files sentence raises an expectation the existing wal-after-db flow can break when the first share is cancelled (already a recorded finding)."
     },
     "427": {
       "lane": "A",
@@ -425,6 +426,10 @@
     {
       "at": "2026-10-07T20:30:38Z",
       "event": "#412 tester APPROVE r0 -> security (read-only, parallel); lane A -> #430 in_dev"
+    },
+    {
+      "at": "2026-10-07T20:31:01Z",
+      "event": "#426 security APPROVE on 1979589 (source change); the test-only timeout follow-up is still in dev"
     }
   ],
   "status": "running",
