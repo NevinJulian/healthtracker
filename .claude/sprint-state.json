@@ -148,7 +148,7 @@
     },
     "422": {
       "lane": "E",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": null,
@@ -214,7 +214,7 @@
     },
     "429": {
       "lane": "E",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": null,
@@ -232,7 +232,7 @@
     },
     "431": {
       "lane": "C",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": null,
@@ -240,7 +240,7 @@
     },
     "432": {
       "lane": "C",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": null,
@@ -248,7 +248,7 @@
     },
     "433": {
       "lane": "E",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": null,
@@ -256,7 +256,7 @@
     },
     "434": {
       "lane": "C",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": null,
@@ -264,7 +264,7 @@
     },
     "435": {
       "lane": "C",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": null,
@@ -311,6 +311,10 @@
     {
       "at": "2026-10-07T20:16:04Z",
       "event": "all 7 lane A/B/D work orders ready, none parked; #427 #426 #424 in_dev"
+    },
+    {
+      "at": "2026-10-07T20:17:40Z",
+      "event": "analysts dispatched ahead (read-only) for lane C #434 #435 #432 #431 and lane E #422 #433 #429; #411 is analysed after #434 has landed on the lane branch; lanes C and E themselves still wait for lane A"
     }
   ],
   "status": "running",
