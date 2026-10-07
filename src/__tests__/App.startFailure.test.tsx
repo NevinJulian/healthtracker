@@ -97,6 +97,19 @@ describe('App start failure screen', () => {
     expect(init).toHaveBeenCalledTimes(2);
   });
 
+  it('waits for a pending init before exporting on a font error', async () => {
+    (useFonts as jest.Mock).mockReturnValue([false, new Error('font failed')]);
+    let finishInit: () => void = () => {};
+    init.mockReturnValue(new Promise<void>((resolve) => { finishInit = resolve; }));
+    rescue.mockResolvedValue(undefined);
+    render(<App />);
+    fireEvent.press(await screen.findByRole('button', { name: 'Save data' }));
+    await act(async () => {});
+    expect(rescue).not.toHaveBeenCalled();
+    await act(async () => { finishInit(); });
+    await waitFor(() => expect(rescue).toHaveBeenCalledTimes(1));
+  });
+
   it('shows a message when Save data fails', async () => {
     init.mockRejectedValueOnce(new Error('disk exploded'));
     rescue.mockRejectedValueOnce(new Error('The database file was not found on this device.'));
