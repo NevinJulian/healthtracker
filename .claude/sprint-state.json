@@ -250,11 +250,13 @@
     },
     "425": {
       "lane": "F",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "none (test-only)",
+      "notes": "WO ready; lane F waits for lane C. Probe confirmed: jest-expo's preset setup.js:130 registers jest.mock('expo-file-system/legacy', factory), which wins over the moduleNameMapper target, so the repo file never executes (only jest.requireActual reaches it); the non-legacy expo-file-system mock is NOT shadowed. Work: delete the three directory constants from __mocks__/expo-file-system/legacy.js, pin the shadowing with one new test; jest.config.js untouched; inline-mock tests stay. The analyst corrected the orchestrator's suggested test (asserting defined strings would contradict the decision).",
+      "workOrder": "C:/git/ht-lanes/wo/425.md",
+      "decisionSource": "owner comment on #425 (remove the shadowed values from the global mock; leave the jest config as it is; tests that need those paths mock them inline)"
     },
     "426": {
       "lane": "B",
@@ -711,6 +713,10 @@
     {
       "at": "2026-10-07T21:27:57Z",
       "event": "analyst dispatched ahead for lane F #425 (read-only on the integration checkout; the mocks and jest config are not touched by lane C); #437 is analysed after lane C merges because its checklist names lane C files"
+    },
+    {
+      "at": "2026-10-07T21:28:55Z",
+      "event": "#425 work order ready (queued for lane F, which waits for lane C)"
     }
   ],
   "status": "running",
@@ -772,7 +778,10 @@
     "SMALL (lane E cleanup): setNutritionGoals inlines the app_state upsert instead of going through setSetting, so a future change to setSetting would not reach it",
     "SMALL (lane E cleanup): pre-existing (#313) and other (#NNN) history comments remain in SettingsScreen.tsx",
     "SMALL (#435 dev): SetLoggerModal.handleAdd disables Add through saving state, not a ref, so a same-tick double tap can log a set twice",
-    "SMALL (#435 dev): CLAUDE.md does not need a suite count, but any doc that quotes one is stale (96 suites on lane C)"
+    "SMALL (#435 dev): CLAUDE.md does not need a suite count, but any doc that quotes one is stale (96 suites on lane C)",
+    "SMALL (#425 analyst): all of __mocks__/expo-file-system/legacy.js is dead under jest (the preset factory wins): e.g. the repo mock's getInfoAsync exists:false is never seen, the preset's resolves exists:true. Deleting the file or overriding the preset properly needs an owner call",
+    "SMALL (#425 analyst): backup.ts cacheDirectory ?? '' hides in its tests that the directory is undefined under jest",
+    "SMALL (#425 analyst): CLAUDE.md Testing setup says moduleNameMapper stubs expo-file-system/legacy; for that module the jest-expo preset mock wins"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
