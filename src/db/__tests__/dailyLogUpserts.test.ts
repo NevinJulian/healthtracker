@@ -596,20 +596,20 @@ describe('addAdditionalWorkout and toggleAdditionalWorkout read-modify-write ins
     const toggled = addDays(FAR_PAST(), -1);
 
     await db.addAdditionalWorkout(added, A);
-    await db.toggleAdditionalWorkout(toggled, 'missing');
+    await expect(db.toggleAdditionalWorkout(toggled, 'missing')).rejects.toThrow('missing');
 
     expect(JSON.parse((await readRaw(db, added)) as string)).toEqual([A]);
     expect(await readRaw(db, toggled)).toBe('[]');
   });
 
-  it('toggle with an unknown id resolves and leaves the stored value unchanged', async () => {
+  it('toggle with an unknown id rejects and leaves the stored value unchanged', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
     const date = todayKey();
     const raw = '[ {"id":"b","name":"Run","completed":false} ]';
     await seedRaw(db, date, raw);
 
-    await expect(db.toggleAdditionalWorkout(date, 'nope')).resolves.toBeUndefined();
+    await expect(db.toggleAdditionalWorkout(date, 'nope')).rejects.toThrow('nope');
 
     expect(await readRaw(db, date)).toBe(raw);
   });
