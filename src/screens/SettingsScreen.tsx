@@ -524,7 +524,7 @@ export default function SettingsScreen() {
   const caloriesEditGuard = useWriteGuard();
   const proteinEditGuard = useWriteGuard();
   const hydrationEditGuard = useWriteGuard();
-  const [latestWeight, setLatestWeight] = useLatestState(latestRef, 'latestWeight');
+  const [, setLatestWeight] = useLatestState(latestRef, 'latestWeight');
   const [recalcBusy, setRecalcBusy] = useState(false);
 
   // ── Stepper debounce: dirty refs (#313) ────────────────────────────────
@@ -555,21 +555,21 @@ export default function SettingsScreen() {
   // ── Stepper debounce: debounced commits (#313) ─────────────────────────
   const flushWorkoutTime = useDebouncedCommit(reminder.time, workoutTimeDirtyRef, async (time) => {
     await setWorkoutReminderTime(time);
-    if (reminder.enabled) {
+    if (latestRef.current.reminder.enabled) {
       await reconcileScheduledNotifications();
     }
   });
 
   const flushCookDayTime = useDebouncedCommit(cooking.weeklyCookDayTime, cookDayTimeDirtyRef, async (time) => {
     await setWeeklyCookDayTime(time);
-    if (cooking.weeklyCookDayEnabled) {
+    if (latestRef.current.cooking.weeklyCookDayEnabled) {
       await reconcileScheduledNotifications();
     }
   });
 
   const flushBreakfastTime = useDebouncedCommit(mealReminders.breakfast.time, breakfastTimeDirtyRef, async (time) => {
     await setMealReminderTime('breakfast', time);
-    if (mealReminders.breakfast.enabled) {
+    if (latestRef.current.mealReminders.breakfast.enabled) {
       const { hour, minute } = parseTimeString(time);
       await scheduleMealReminder('breakfast', hour, minute);
     }
@@ -577,7 +577,7 @@ export default function SettingsScreen() {
 
   const flushLunchTime = useDebouncedCommit(mealReminders.lunch.time, lunchTimeDirtyRef, async (time) => {
     await setMealReminderTime('lunch', time);
-    if (mealReminders.lunch.enabled) {
+    if (latestRef.current.mealReminders.lunch.enabled) {
       const { hour, minute } = parseTimeString(time);
       await scheduleMealReminder('lunch', hour, minute);
     }
@@ -585,7 +585,7 @@ export default function SettingsScreen() {
 
   const flushDinnerTime = useDebouncedCommit(mealReminders.dinner.time, dinnerTimeDirtyRef, async (time) => {
     await setMealReminderTime('dinner', time);
-    if (mealReminders.dinner.enabled) {
+    if (latestRef.current.mealReminders.dinner.enabled) {
       const { hour, minute } = parseTimeString(time);
       await scheduleMealReminder('dinner', hour, minute);
     }
@@ -605,8 +605,9 @@ export default function SettingsScreen() {
 
   const flushBackupTime = useDebouncedCommit(backupReminder.time, backupTimeDirtyRef, async (time) => {
     await setBackupReminderTime(time);
-    if (backupReminder.enabled) {
-      await scheduleBackupReminder(backupReminder.day, time);
+    const { enabled, day } = latestRef.current.backupReminder;
+    if (enabled) {
+      await scheduleBackupReminder(day, time);
     }
   });
 
@@ -922,7 +923,7 @@ export default function SettingsScreen() {
     try {
       await trackProfileWrite(weeklyCookDayGuard.seqRef, weeklyCookDayGuard.pendingRef, () => setWeeklyCookDay(day));
       setCooking((prev) => ({ ...prev, weeklyCookDay: day }));
-      if (cooking.weeklyCookDayEnabled) {
+      if (latestRef.current.cooking.weeklyCookDayEnabled) {
         await reconcileScheduledNotifications();
       }
     } catch (error) {
@@ -961,7 +962,7 @@ export default function SettingsScreen() {
         [meal]: { ...prev[meal], enabled: value },
         permissionDenied: false,
       }));
-      const time = mealReminders[meal].time;
+      const time = latestRef.current.mealReminders[meal].time;
       const { hour, minute } = parseTimeString(time);
       if (value) {
         await scheduleMealReminder(meal, hour, minute);
@@ -1118,7 +1119,7 @@ export default function SettingsScreen() {
   // ── Profile: recalculate goals ────────────────────────────────────────
 
   async function handleRecalcGoals() {
-    const { heightCm, age, sex, activityLevel, goalType } = profile;
+    const { heightCm, age, sex, activityLevel, goalType } = latestRef.current.profile;
     if (
       heightCm == null || age == null || sex == null ||
       activityLevel == null || goalType == null
@@ -1129,7 +1130,7 @@ export default function SettingsScreen() {
       );
       return;
     }
-    const weightKg = latestWeight ?? 80; // fallback if no weight logged
+    const weightKg = latestRef.current.latestWeight ?? 80; // fallback if no weight logged
     const goals = suggestGoals({ sex, age, heightCm, activityLevel, goalType }, weightKg);
     setRecalcBusy(true);
     try {
@@ -1269,7 +1270,7 @@ export default function SettingsScreen() {
     try {
       await trackProfileWrite(backupDayGuard.seqRef, backupDayGuard.pendingRef, () => setBackupReminderDay(day));
       setBackupReminder((prev) => ({ ...prev, day }));
-      if (backupReminder.enabled) {
+      if (latestRef.current.backupReminder.enabled) {
         await reconcileScheduledNotifications();
       }
     } catch (error) {
