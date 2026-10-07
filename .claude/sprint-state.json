@@ -328,7 +328,8 @@
       "deviceCheck": "Smoke: in Settings tap Recalculate with a full profile: Goals updated shows, values persist after leaving and returning.",
       "notes": "WO ready. | dev: 9 commits. setNutritionGoals = one 13-line insertion hunk after setNutritionGoalProtein (_enqueueWrite + withTransactionAsync + two parameterised upserts; no validation, mirroring the single writers). Transaction-removal proof: without the transaction the failure test goes red (calories 2500, protein unchanged). Part 2: 15 cases, each red under a re-throw mutation (one global mutation, per-case results read from the JSON output). Part 3: shared scheduleAfterSave helper on 6 handlers AND (beyond the WO) on the 6 stepper flush callbacks, which have no dedicated test; Alert wording is the dev's: Reminder not scheduled / Your setting was saved, but the reminder could not be scheduled. Part 4: runCommit calls reportWriteFailure. EXISTING TEST EDITS: setNutritionGoals added to 8 Settings mock factories; Recalculate expectations in writeErrors and profileStaleReload (4 places) switched from the two single writers to the one call; writeErrors trigger helpers now return the fireEvent result. 5031c80 fails by missing export, not by assertion. Not done: a failed stepper write still leaves the stepper showing the new value.",
       "workOrder": "C:/git/ht-lanes/wo/429.md",
-      "decisionSource": "latest owner comment on #429 (one new database.ts function in one transaction; drop the unhandledRejection assertions and assert the handler's promise resolves; two messages; stepper writes get the same Alert)"
+      "decisionSource": "latest owner comment on #429 (one new database.ts function in one transaction; drop the unhandledRejection assertions and assert the handler's promise resolves; two messages; stepper writes get the same Alert)",
+      "securityReview": "APPROVE (code read at e366ee3): setNutritionGoals uses the same upsert text as setSetting, bound values, queue wrapper outside and withTransactionAsync inside, nothing enqueued from within; the first write cannot commit if the second fails; schema.ts untouched. Inputs from suggestGoals are clamped (finite, >= 1000 kcal / >= 50 g), and getNutritionGoals falls back to defaults for a non-finite stored value. scheduleAfterSave wraps only the scheduling call at all 12 call sites, so a write failure never enters it and is never reported as saved. Note: after a failed debounced stepper write the stepper shows the unsaved value until the next focus reload (the user is told it failed)."
     },
     "430": {
       "lane": "A",
@@ -638,6 +639,10 @@
     {
       "at": "2026-10-07T21:12:29Z",
       "event": "#411 work order ready -> in_dev; #429 in_test (1172/97 per dev)"
+    },
+    {
+      "at": "2026-10-07T21:13:45Z",
+      "event": "#429 security APPROVE on e366ee3 (ran in parallel with the tester, whose verdict is still pending)"
     }
   ],
   "status": "running",
