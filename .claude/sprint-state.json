@@ -357,11 +357,15 @@
     },
     "433": {
       "lane": "E",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "bb42bd8",
+        "0b52831",
+        "40c121b"
+      ],
       "deviceCheck": "Notifications allowed: enable the weekly backup reminder, tap the Sat chip, then Wed immediately; background the app. Then step a meal time right after toggling it. Both reminders show the final day/time in the system's scheduled list (or fire there).",
-      "notes": "WO ready; lane E waits for lane A. Wider than the issue: 8 handler groups read stale state. Tests hold a write with a deferred promise (the same-act shape cannot work: handlers await before calling setters). Recalculate write path stays with #429.",
+      "notes": "WO ready. Wider than the issue: 8 handler groups read stale state. | dev: module-level useLatestState(latestRef, key) wraps useState; the six setter names now refer to the wrappers (29 call sites incl. hydration); the ref is updated synchronously, never in render or an effect. 13 new tests, all red at bb42bd8. DEVIATION in P4: handleRecalcGoals has no await before it reads profile, so a press while the sex write is held cannot be stale; the test captures the Recalculate onPress from the older render and invokes it after the write is released - tester to judge whether that models a real press. Recalculate write path untouched (stays with #429).",
       "workOrder": "C:/git/ht-lanes/wo/433.md",
       "decisionSource": "issue body (no comments); analyst chose one mechanism: a latestRef updated by wrapped setters, read at call time"
     },
@@ -581,6 +585,10 @@
       "at": "2026-10-07T20:52:19Z",
       "event": "merged lane B into integration 2860282 (no conflicts); gates green: typecheck clean, 1182/98",
       "sha": "2860282"
+    },
+    {
+      "at": "2026-10-07T20:54:19Z",
+      "event": "#433 in_test (1162/96 per dev)"
     }
   ],
   "status": "running",
