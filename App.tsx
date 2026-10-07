@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  ScrollView,
   StatusBar,
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -112,7 +113,7 @@ export default function App() {
   if (error || fontError) {
     const displayError = error ?? fontError?.message ?? 'Unknown font loading error';
     return (
-      <View style={styles.splash}>
+      <ScrollView style={styles.failureScroll} contentContainerStyle={styles.failureContent}>
         <Text style={styles.errorText}>Failed to initialise app</Text>
         <Text style={styles.errorDetail} selectable>{displayError}</Text>
         {!fontError && <Button title="Retry" onPress={retry} style={styles.button} />}
@@ -125,7 +126,7 @@ export default function App() {
         />
         {saveError && <Text style={styles.errorText}>{saveError}</Text>}
         <Text style={styles.errorDetail}>{NO_RESET_NOTICE}</Text>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -187,6 +188,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
+  },
+  failureScroll: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  failureContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.lg,
+    paddingVertical: Spacing.xxl,
   },
   splashText: {
     color: Colors.textSecondary,
