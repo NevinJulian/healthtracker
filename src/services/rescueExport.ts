@@ -1,6 +1,7 @@
 import {
   cacheDirectory,
   copyAsync,
+  deleteAsync,
   documentDirectory,
   getInfoAsync,
 } from 'expo-file-system/legacy';
@@ -17,6 +18,14 @@ async function copyAndShare(name: string): Promise<void> {
     mimeType: MIME_TYPE,
     dialogTitle: `Save ${name}`,
   });
+}
+
+export async function clearRescueCopies(): Promise<void> {
+  await Promise.all(
+    [DB_FILE, WAL_FILE].map((name) =>
+      deleteAsync(`${cacheDirectory}${name}`, { idempotent: true }),
+    ),
+  );
 }
 
 export async function exportRawDatabase(): Promise<void> {
