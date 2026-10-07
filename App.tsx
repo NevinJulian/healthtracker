@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -50,29 +50,38 @@ export default function App() {
     PlusJakartaSans_700Bold,
   });
 
-  const runInit = useCallback(async () => {
-    try {
-      await initDatabase();
-      // Dev builds only: exposes globalThis.stress369().
-      installStress369();
-      await ensureAndroidChannel();
-      await reconcileScheduledNotifications();
-      const [onboardingComplete, weight] = await Promise.all([
-        getOnboardingComplete(),
-        getLatestBodyWeight(),
-      ]);
-      setLatestWeight(weight);
-      setOnboardingDone(onboardingComplete);
-      setDbReady(true);
-    } catch (err: any) {
-      console.error('[App] DB init failed:', err);
-      const stackLines = (err?.stack as string | undefined)
-        ?.split('\n')
-        .slice(0, 8)
-        .join('\n');
-      const detail = [err?.message, stackLines].filter(Boolean).join('\n\n');
-      setError(detail || 'Unknown error during database initialisation');
-    }
+  const initInFlight = useRef<Promise<void> | null>(null);
+
+  const runInit = useCallback((): Promise<void> => {
+    if (initInFlight.current) return initInFlight.current;
+    const attempt = (async () => {
+      try {
+        await initDatabase();
+        // Dev builds only: exposes globalThis.stress369().
+        installStress369();
+        await ensureAndroidChannel();
+        await reconcileScheduledNotifications();
+        const [onboardingComplete, weight] = await Promise.all([
+          getOnboardingComplete(),
+          getLatestBodyWeight(),
+        ]);
+        setLatestWeight(weight);
+        setOnboardingDone(onboardingComplete);
+        setDbReady(true);
+      } catch (err: any) {
+        console.error('[App] DB init failed:', err);
+        const stackLines = (err?.stack as string | undefined)
+          ?.split('\n')
+          .slice(0, 8)
+          .join('\n');
+        const detail = [err?.message, stackLines].filter(Boolean).join('\n\n');
+        setError(detail || 'Unknown error during database initialisation');
+      }
+    })().finally(() => {
+      initInFlight.current = null;
+    });
+    initInFlight.current = attempt;
+    return attempt;
   }, []);
 
   useEffect(() => {
@@ -81,6 +90,7 @@ export default function App() {
   }, [runInit]);
 
   const retry = () => {
+    if (initInFlight.current) return;
     setError(null);
     setSaveError(null);
     runInit();
