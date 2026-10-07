@@ -321,7 +321,7 @@
     },
     "429": {
       "lane": "E",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "commits": [
         "5031c80",
@@ -332,7 +332,8 @@
         "93b7d90",
         "10fee64",
         "7e43b76",
-        "e366ee3"
+        "e366ee3",
+        "88e3370"
       ],
       "deviceCheck": "Smoke: in Settings tap Recalculate with a full profile: Goals updated shows, values persist after leaving and returning.",
       "notes": "WO ready. | dev: 9 commits; setNutritionGoals one insertion hunk; shared scheduleAfterSave on 6 handlers and (beyond the WO) the 6 stepper flush callbacks; Alert wording by the dev: Reminder not scheduled / Your setting was saved, but the reminder could not be scheduled. | tester APPROVE r0. GAP: the scheduleAfterSave behaviour in the six stepper flush callbacks has no committed test (the tester's 12 scratch tests passed and were deleted). ORCHESTRATOR: new behaviour without a committed test - sent back for a table-driven test only; counted as round trip 1 although the tester approved. HUMAN: when a meal reminder is switched OFF and cancelMealReminder fails, the alert says the reminder could not be scheduled (wording off for a cancel). Not done: a failed stepper write leaves the stepper showing the unsaved value until the next focus reload.",
@@ -669,6 +670,10 @@
     {
       "at": "2026-10-07T21:20:59Z",
       "event": "#411 tester APPROVE r0 + security APPROVE, but orchestrator sent it back: the reset buttons must use the entry's date, not the render-time today (roundTrips=1) -> in_dev"
+    },
+    {
+      "at": "2026-10-07T21:21:13Z",
+      "event": "#429 round 2 (88e3370, test-only: describe.each over the six time stepper commits, 12 tests; 1184/97 per dev) in_test"
     }
   ],
   "status": "running",
