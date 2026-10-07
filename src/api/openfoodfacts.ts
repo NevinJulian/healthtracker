@@ -120,9 +120,9 @@ function takeSearchSlot(): void {
   if (now < pausedUntil) {
     throw new Error('Open Food Facts is rate limiting requests');
   }
-  while (attemptTimes.length > 0 && now - attemptTimes[0] >= OFF_BUDGET_WINDOW_MS) {
-    attemptTimes.shift();
-  }
+  const live = attemptTimes.filter((t) => t <= now && now - t < OFF_BUDGET_WINDOW_MS);
+  attemptTimes.length = 0;
+  attemptTimes.push(...live);
   if (attemptTimes.length >= OFF_BUDGET_MAX) {
     throw new Error('Open Food Facts search budget exhausted');
   }
