@@ -100,6 +100,7 @@ export default function App() {
     setSaving(true);
     setSaveError(null);
     try {
+      await initInFlight.current;
       await exportRawDatabase();
     } catch (err: any) {
       setSaveError(err?.message || 'Could not save your data.');
