@@ -117,6 +117,7 @@ export function parseRetryAfterMs(raw: string | null | undefined): number {
 
 function takeSearchSlot(): void {
   const now = Date.now();
+  pausedUntil = Math.min(pausedUntil, now + RETRY_AFTER_MAX_MS);
   if (now < pausedUntil) {
     throw new Error('Open Food Facts is rate limiting requests');
   }
@@ -164,7 +165,11 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutr
     return null;
   } catch (err) {
     if (err instanceof FetchJsonError && err.status === 429) {
-      pausedUntil = Math.max(pausedUntil, Date.now() + parseRetryAfterMs(err.retryAfter));
+      const now = Date.now();
+      pausedUntil = Math.max(
+        Math.min(pausedUntil, now + RETRY_AFTER_MAX_MS),
+        now + parseRetryAfterMs(err.retryAfter),
+      );
     }
     return null;
   }
