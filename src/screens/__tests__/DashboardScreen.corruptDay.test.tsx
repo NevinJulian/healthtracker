@@ -246,7 +246,7 @@ describe('DashboardScreen shows a notice with a reset button when a day loads un
     await flushMicrotasks();
 
     expect(q.queryByText(NOTICE)).toBeNull();
-    expect(q.queryByText('Reset this day')).toBeNull();
+    expect(q.queryByText('Reset this day', { includeHiddenElements: true })).toBeNull();
   });
 
   it.each([
@@ -258,7 +258,7 @@ describe('DashboardScreen shows a notice with a reset button when a day loads un
     await flushMicrotasks();
 
     expect(q.getAllByText(NOTICE)).toHaveLength(1);
-    expect(q.getAllByText('Reset this day')).toHaveLength(1);
+    expect(q.getAllByText('Reset this day', { includeHiddenElements: true })).toHaveLength(1);
     expect(q.getByLabelText(shown)).toBeTruthy();
     expect(q.queryByLabelText(hidden)).toBeNull();
     expect(alertSpy).not.toHaveBeenCalled();

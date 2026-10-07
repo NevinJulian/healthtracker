@@ -195,6 +195,26 @@ function ExerciseRow({
   );
 }
 
+function UnreadableNotice({
+  resetLabel,
+  onReset,
+}: {
+  resetLabel: string;
+  onReset: () => void;
+}) {
+  return (
+    <View>
+      <Text style={styles.noExercisesHint}>This day's data can't be read</Text>
+      <Button
+        title="Reset this day"
+        variant="ghost"
+        accessibilityLabel={resetLabel}
+        onPress={onReset}
+      />
+    </View>
+  );
+}
+
 // ─── Hammer Section ───────────────────────────────────────────────────────────
 
 function HammerSection({
@@ -203,12 +223,14 @@ function HammerSection({
   onExerciseToggle,
   onSessionToggle,
   onOpenLogger,
+  onResetUnreadable,
 }: {
   entry: DailyLogEntry;
   workoutSets: Record<string, WorkoutSet[]>;
   onExerciseToggle: (id: string, value: boolean) => void;
   onSessionToggle: () => void;
   onOpenLogger: (exerciseName: string) => void;
+  onResetUnreadable: () => void;
 }) {
   const doneCount = entry.exercises.filter((e) => e.completed).length;
   const total = entry.exercises.length;
@@ -246,7 +268,9 @@ function HammerSection({
       </Card>
 
       {/* Exercise list */}
-      {entry.exercises.length > 0 ? (
+      {entry.unreadable?.includes('exercises') ? (
+        <UnreadableNotice resetLabel="Reset this day's exercises" onReset={onResetUnreadable} />
+      ) : entry.exercises.length > 0 ? (
         <Card style={styles.exerciseListCard}>
           {entry.exercises.map((ex, idx) => (
             <React.Fragment key={ex.id}>
@@ -777,6 +801,7 @@ export default function DashboardScreen() {
           onExerciseToggle={handleExerciseToggle}
           onSessionToggle={() => handleToggle('hammer_completed')}
           onOpenLogger={(name) => setActiveSetLogger(name)}
+          onResetUnreadable={() => void resetCorruptDay(today, 'exercises')}
         />
 
         {/* ── Intermittent fasting ─────────────────────────────────────────── */}
@@ -985,6 +1010,13 @@ export default function DashboardScreen() {
         {/* ── Extra Workouts ───────────────────────────────────────────────── */}
         <View style={styles.section}>
           <Text style={styles.extraWorkoutsTitle}>Bonuses / Ad-hoc</Text>
+
+          {entry.unreadable?.includes('additional_workouts') && (
+            <UnreadableNotice
+              resetLabel="Reset this day's extra workouts"
+              onReset={() => void resetCorruptDay(today, 'additional_workouts')}
+            />
+          )}
 
           {(entry.additional_workouts || []).map((aw) => (
             <Row
