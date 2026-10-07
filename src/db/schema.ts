@@ -764,11 +764,11 @@ export const MIGRATIONS: Migration[] = [
   // atomically via INSERT…SELECT MAX(set_index)+1 instead of trusting a
   // caller-supplied value — but that fix does nothing for rows already on
   // disk. This migration renumbers every existing row densely (0, 1, 2, …)
-  // per (date, exercise), ordered by (created_at, id) — the same order
-  // getWorkoutSetsForDay/getWorkoutHistory now read by (set_index is no
-  // longer an ORDER BY column) — then adds a UNIQUE index on
-  // (date, exercise, set_index) so the database itself rejects any future
-  // collision, not just logWorkoutSet's new INSERT…SELECT.
+  // per (date, exercise), ordered by (created_at, id), then adds a UNIQUE
+  // index on (date, exercise, set_index) so the database itself rejects any
+  // future collision, not just logWorkoutSet's new INSERT…SELECT. From then
+  // on set_index is the display order (getWorkoutSetsForDay and the history
+  // reads order by it).
   //
   // Idempotent: the renumber UPDATE recomputes new_index from (created_at,
   // id) order every time, and that order doesn't change between runs, so
@@ -793,10 +793,11 @@ export const MIGRATIONS: Migration[] = [
   //     finishes.
   //   - Restore (restoreFromPayload, database.ts): DROPs the index before
   //     its restore loop (so a legacy backup's colliding/gapped
-  //     workout_set_log rows can be inserted at all) and only re-runs this
-  //     migration's SQL — looked up at runtime via
-  //     POST_RESTORE_MIGRATION_VERSIONS, never copied or reimplemented,
-  //     same pattern as v35/#303 — after every table has been restored.
+  //     workout_set_log rows can be inserted at all). For a backup from
+  //     before v37 it then runs this migration's precondition and SQL,
+  //     looked up in MIGRATIONS at runtime and never copied, after every
+  //     table has been restored. A backup from v37 on uses
+  //     RESTORE_SET_INDEX_SQL instead, which keeps collision-free set order.
   {
     version: 37,
     precondition: async (db) => {
@@ -892,9 +893,9 @@ export const RESTORE_SLOT_DEDUPE_SQL = `
 `;
 
 /**
- * Restore-only replacement for v37's renumber. Not a migration: it runs only
- * inside restoreFromPayload's transaction, after the unique index is dropped.
- * A (date, exercise) partition is renumbered densely from 0 only if two of its
+ * Restore-only set_index repair for backups from v37 on (older backups get
+ * v37 itself). Not a migration: it runs only inside restoreFromPayload's
+ * transaction, after the unique index is dropped. A (date, exercise) partition is renumbered densely from 0 only if two of its
  * rows share a set_index, ordered by set_index, created_at, id. Collision-free
  * partitions keep their set_index values, gaps included. The new indexes are
  * staged in a temp table so the ordering never reads values it has already
