@@ -49,7 +49,7 @@
     "A": {
       "branch": "sprint/lane-a-db",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "in_progress",
+      "status": "merged",
       "order": [
         427,
         412,
@@ -61,7 +61,9 @@
         412,
         430
       ],
-      "parked": []
+      "parked": [],
+      "mergeSha": "b9c8d54",
+      "cleanup": "0547089: removed (#412) from a describe title the lane added; re-wrapped the RESTORE_SET_INDEX_SQL doc line; corrected the precondition doc on the Migration type. schema.ts proven comment-only again (transpiled without comments: EQUAL to base, checked by the cleanup agent and by the orchestrator before the merge). No dead code found."
     },
     "B": {
       "branch": "sprint/lane-b-start",
@@ -146,7 +148,7 @@
     },
     "412": {
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "12e52d6",
@@ -159,7 +161,8 @@
       "workOrder": "C:/git/ht-lanes/wo/412.md",
       "decisionSource": "owner comment 6026078786 on #412 (pass the backup schemaVersion into restoreFromPayload; pre-v37 backups get v37's renumber by (created_at,id); v37+ keeps the current rule; fix the stale // comment above v37)",
       "regressionProof": "3 'version 36' tests fail with 12e52d6 database.ts+backup.ts, 17/17 at 88bcc98; MIGRATIONS proven unchanged mechanically: schema.ts at e46e8ac and 88bcc98 transpiled with removeComments are exactly equal (28497 chars); backup.test.ts schemaVersion test goes red under mutation (constant 38); 9 hostile pre-v37 payloads behave identically before and after, every throw rolls the whole restore back; index + next write checked after 36 / 37 / empty / absent table and back-to-back restores; 1125/94 (tester reproduced)",
-      "securityReview": "APPROVE (0f4c1f2..88bcc98): backupSchemaVersion is used only in the comparison >= 37, never interpolated; validatePayload requires a finite integer not above the current version (0 and negatives pass and take the pre-v37 renumber, the conservative path); strict if/else, both arms create the unique index, so no value skips both repairs; v37 SQL is static, lookup failure throws, schema_version is not written outside runMigrations; everything inside the one restore transaction, no catch-and-continue; no guard removed. A backup that lies about its version only gets the wrong set order."
+      "securityReview": "APPROVE (0f4c1f2..88bcc98): backupSchemaVersion is used only in the comparison >= 37, never interpolated; validatePayload requires a finite integer not above the current version (0 and negatives pass and take the pre-v37 renumber, the conservative path); strict if/else, both arms create the unique index, so no value skips both repairs; v37 SQL is static, lookup failure throws, schema_version is not written outside runMigrations; everything inside the one restore transaction, no catch-and-continue; no guard removed. A backup that lies about its version only gets the wrong set order.",
+      "mergeSha": "b9c8d54"
     },
     "422": {
       "lane": "E",
@@ -173,9 +176,14 @@
     },
     "423": {
       "lane": "B",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "8b4f52f",
+        "226d580",
+        "1bfae51",
+        "162009f"
+      ],
       "deviceCheck": "Dev build in Expo Go: add throw new Error('device test') at the top of any screen render (uncommitted). Open that screen: Something went wrong screen with error text, Retry, Save data, no-reset notice. Retry: crash screen again. Remove the throw, reload: screen works. Throw again, Save data: share sheet.",
       "notes": "WO ready; waits for #426. Boundary sits outside NavigationContainer; start-failure JSX is extracted into a shared RecoveryScreen (App.tsx startup screen refactored).",
       "workOrder": "C:/git/ht-lanes/wo/423.md",
@@ -238,7 +246,7 @@
     },
     "427": {
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "6ac1a39",
@@ -249,11 +257,12 @@
       "workOrder": "C:/git/ht-lanes/wo/427.md",
       "decisionSource": "owner comment on #427 2026-10-06 (don't delete, fail: initDatabase throws a named error, the #419 start-failure screen takes over)",
       "regressionProof": "incompatibleSchema test fails with 6ac1a39 database.ts (received 'no such column: date'), passes at 0f4c1f2; tester scratch test proved the deleteDatabaseAsync-not-called assertion fails on its own on the pre-fix code (0 expected, 1 received); schema.ts byte-identical to base; 1119/94 (tester reproduced)",
-      "securityReview": "APPROVE: no deleteDatabaseAsync left in non-test src; throw is inside the try, catch closes once and rethrows, _db stays null; check runs before migrations, seeds and app_state writes; message is a static string. Notes: (A) PRAGMA journal_mode = WAL runs before the check, so on a rollback-journal db the header is rewritten although the message says nothing was changed (cosmetic; swap the order to make it literally true). (B) HUMAN: a user who really has this schema is blocked for good - Save data works, but there is no in-app way to proceed (as decided: fail, don't delete). Whether expo-sqlite's native close always checkpoints the WAL was not determined (does not affect the rescue copy)."
+      "securityReview": "APPROVE: no deleteDatabaseAsync left in non-test src; throw is inside the try, catch closes once and rethrows, _db stays null; check runs before migrations, seeds and app_state writes; message is a static string. Notes: (A) PRAGMA journal_mode = WAL runs before the check, so on a rollback-journal db the header is rewritten although the message says nothing was changed (cosmetic; swap the order to make it literally true). (B) HUMAN: a user who really has this schema is blocked for good - Save data works, but there is no in-app way to proceed (as decided: fail, don't delete). Whether expo-sqlite's native close always checkpoints the WAL was not determined (does not affect the rescue copy).",
+      "mergeSha": "b9c8d54"
     },
     "428": {
       "lane": "D",
-      "status": "in_test",
+      "status": "in_security",
       "roundTrips": 0,
       "commits": [
         "cfcc2d7",
@@ -271,7 +280,8 @@
       "deviceCheck": "Expo Go, editor: type 11+ distinct unusual ingredient names with quantities within one minute: a Not looked up line appears, not no data. Wait 60 s, tap Recompute: the line clears. Discover: import a recipe with 11+ unlisted ingredients: the Alert shows the not-looked-up sentence.",
       "notes": "WO ready. Return type becomes OFFNutrition | null | 'not-looked-up'; user-facing wording is an analyst pick. | dev: 11 commits. Pause clamp = min(pausedUntil, now + 300 s) on read and in the 429 handler. 'not-looked-up' only when an attempt was refused and nothing was sent (budget or pause); a 5xx retry refused after the first request went out stays null. 4 truthiness checks on lookup results replaced by object checks (cache write, batch, importRecipe, editor). EXISTING ASSERTIONS CHANGED (dev: all pin the behaviour the decision replaces): 3x toBeNull -> toBe('not-looked-up') and one test title in openfoodfacts.budget.test.ts, 1x in openfoodfacts.retryAfter.test.ts, a type guard in computeWithOFF.test.ts - tester to judge each. Discover card suppresses the 'Macros computed from local data' line when only refused ingredients exist (not in the WO). Editor lookups are sequential, so one hanging ingredient leaves all later ones 'not looked up' at the deadline. Dev edited files with scripts and warns about CRLF/cp1252 - tester to check for mojibake.",
       "workOrder": "C:/git/ht-lanes/wo/428.md",
-      "decisionSource": "owner comment on #428 2026-10-06 (refused/cut-off lookup = 'not looked up', separate from 'no data'; save-deadline fallback keeps every lookup that already succeeded; future timestamps dropped)"
+      "decisionSource": "owner comment on #428 2026-10-06 (refused/cut-off lookup = 'not looked up', separate from 'no data'; save-deadline fallback keeps every lookup that already succeeded; future timestamps dropped)",
+      "regressionProof": "all five test/fix pairs proven (pre-fix source at each test commit fails, HEAD passes; 8d4e84a is what turns the 4-of-5 editor test green); scratch import of 14 unlisted ingredients on the real modules: 10 fetched, 4 refused, macros finite, putOFFCache called 10 times and never with the sentinel; 1146/95 locally and with TZ=UTC (tester reproduced)"
     },
     "429": {
       "lane": "E",
@@ -285,7 +295,7 @@
     },
     "430": {
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 1,
       "commits": [
         "b4667d7",
@@ -300,7 +310,8 @@
       "workOrder": "C:/git/ht-lanes/wo/430.md",
       "decisionSource": "owner comment on #430 (return the recipe with an empty ingredient list, and log it)",
       "regressionProof": "round 1: 10/11 fail with b4667d7 database.ts; the cooking-task test fails with 821b8aa database.ts; 11/11 at 3ed52df; 14-value probe through all four readers. Round 2 (f563c3e, test-only, +4 lines): the new not.toContain('bad-1') assertion goes red when the deleteRecipe call is removed; both cases pinned (corrupt+active returned with []; corrupt+archived null from getRecipeById, present in getRecipesIncludingArchived); 1136/95 (tester reproduced).",
-      "securityReview": "APPROVE (88bcc98..3ed52df, source unchanged in round 2): no query text added; no path persists the substituted [] over the corrupt text unless the user types at least one ingredient (handleSave returns early on an empty list; createRecipe/updateRecipe have no other caller); macros are separate columns and never recomputed from an empty list; backup reads raw rows, so the corrupt text survives in a backup; warn logs a fixed string plus the id only. Notes: the editor gives no notice that ingredients were unreadable (blank row; retyping and saving replaces the corrupt text - as decided); restore does not validate the ingredients column (unchanged)."
+      "securityReview": "APPROVE (88bcc98..3ed52df, source unchanged in round 2): no query text added; no path persists the substituted [] over the corrupt text unless the user types at least one ingredient (handleSave returns early on an empty list; createRecipe/updateRecipe have no other caller); macros are separate columns and never recomputed from an empty list; backup reads raw rows, so the corrupt text survives in a backup; warn logs a fixed string plus the id only. Notes: the editor gives no notice that ingredients were unreadable (blank row; retyping and saving replaces the corrupt text - as decided); restore does not validate the ingredients column (unchanged).",
+      "mergeSha": "b9c8d54"
     },
     "431": {
       "lane": "C",
@@ -489,6 +500,11 @@
     {
       "at": "2026-10-07T20:39:33Z",
       "event": "#430 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane A out of issues (3 done, 0 parked) -> cleanup"
+    },
+    {
+      "at": "2026-10-07T20:42:06Z",
+      "event": "merged lane A into integration b9c8d54 (no conflicts); gates green: typecheck clean, 1136/95. #428 tester APPROVE r0 -> security. #423 in_test (1136/94 per dev). Lanes C and E unblocked",
+      "sha": "b9c8d54"
     }
   ],
   "status": "running",
@@ -522,6 +538,11 @@
     "SMALL (#426 tester r2): cold first render of the App suites takes 1.9-3.1 s on this machine against a 5 s wait (margin 1.6x-2.5x); a slower CI runner or two App suites cold at once could eat it",
     "SMALL (#430 tester): RecipeDetail add-to-shopping-list on a recipe with unreadable ingredients adds zero shopping items and still shows the Added! alert (needs corrupt data)",
     "SMALL (#430 tester): a stored ingredients array with garbage items ([null], [1,\"a\"]) passes through the readers unfiltered; RecipeEditor ingredientsToRows and RecipeDetail ing.name would crash on a null item (pre-existing, needs corrupt data)",
-    "SMALL (#430 security): the recipe editor shows a blank ingredient row for a recipe whose ingredients were unreadable, with no notice; retyping and saving replaces the stored text (as decided; a banner would help)"
+    "SMALL (#430 security): the recipe editor shows a blank ingredient row for a recipe whose ingredients were unreadable, with no notice; retyping and saving replaces the stored text (as decided; a banner would help)",
+    "SMALL (lane A cleanup): the restoreFromPayload docblock in database.ts no longer sits directly above the function (it is above RENUMBER_MIGRATION_VERSION / runSetIndexRepair)",
+    "SMALL (lane A cleanup): src/db/testHelpers/sqljsExpoAdapter.ts line 35 doc comment still mentions deleteDatabaseAsync",
+    "SMALL (lane A cleanup): // Test-only tripwire (#369) and another (#369) remain in the restoreFromPayload body (old history comments)",
+    "SMALL (#428 tester): the OFF budget treats a device clock step as a free reset (20 requests with a 1 ms backward step); inherent to the owner's decision to drop future timestamps",
+    "SMALL (#428 tester): the Discover not-looked-up test only exercises count 2; the sentence is a literal ingredient(s) with no singular branch"
   ]
 }
