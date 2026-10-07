@@ -52,6 +52,7 @@ jest.mock('../../db/database', () => ({
   getNutritionGoals: jest.fn().mockResolvedValue({ calories: 1800, protein: 150 }),
   setNutritionGoalCalories: jest.fn().mockResolvedValue(undefined),
   setNutritionGoalProtein: jest.fn().mockResolvedValue(undefined),
+  setNutritionGoals: jest.fn().mockResolvedValue(undefined),
   getUserProfile: jest.fn().mockResolvedValue({
     heightCm: null,
     age: null,

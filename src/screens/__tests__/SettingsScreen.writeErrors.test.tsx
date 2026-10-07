@@ -35,6 +35,7 @@ jest.mock('../../db/database', () => ({
   getNutritionGoals: jest.fn().mockResolvedValue({ calories: 1800, protein: 150 }),
   setNutritionGoalCalories: jest.fn().mockResolvedValue(undefined),
   setNutritionGoalProtein: jest.fn().mockResolvedValue(undefined),
+  setNutritionGoals: jest.fn().mockResolvedValue(undefined),
   getUserProfile: jest.fn().mockResolvedValue({
     heightCm: null,
     age: null,
@@ -296,7 +297,7 @@ describe('SettingsScreen profile write failures', () => {
     },
     {
       name: 'recalculate goals',
-      write: jest.mocked(db.setNutritionGoalCalories),
+      write: jest.mocked(db.setNutritionGoals),
       hydrate: hydrateProfile(completeProfile),
       trigger: (u) => {
         fireEvent.press(u.getByLabelText('Recalculate nutrition goals from profile'));
@@ -328,4 +329,26 @@ describe('SettingsScreen backup reminder write failures', () => {
       assertUnsaved: (u) => expect(u.getByText(/Reminder every Sun at/)).toBeTruthy(),
     },
   ]);
+});
+
+describe('SettingsScreen recalculate goals', () => {
+  it('saves both goals through one call and never the single writers', async () => {
+    jest.clearAllMocks();
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    jest.mocked(db.getUserProfile).mockResolvedValueOnce(completeProfile);
+    const utils = render(<SettingsScreen />);
+    await flush();
+
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Recalculate nutrition goals from profile'));
+    });
+    await flush();
+
+    expect(db.setNutritionGoals).toHaveBeenCalledTimes(1);
+    expect(db.setNutritionGoals).toHaveBeenCalledWith(expect.any(Number), expect.any(Number));
+    expect(db.setNutritionGoalCalories).not.toHaveBeenCalled();
+    expect(db.setNutritionGoalProtein).not.toHaveBeenCalled();
+    expect(alertSpy.mock.calls[0][0]).toBe('Goals updated');
+    alertSpy.mockRestore();
+  });
 });

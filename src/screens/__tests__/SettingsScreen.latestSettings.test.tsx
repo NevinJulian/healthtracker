@@ -35,6 +35,7 @@ jest.mock('../../db/database', () => ({
   getNutritionGoals: jest.fn(),
   setNutritionGoalCalories: jest.fn(),
   setNutritionGoalProtein: jest.fn(),
+  setNutritionGoals: jest.fn(),
   getUserProfile: jest.fn(),
   setProfileHeightCm: jest.fn(),
   setProfileAge: jest.fn(),
@@ -177,6 +178,7 @@ beforeEach(() => {
   resetMock(db.getNutritionGoals, { calories: 1800, protein: 150 });
   resetMock(db.setNutritionGoalCalories, undefined);
   resetMock(db.setNutritionGoalProtein, undefined);
+  resetMock(db.setNutritionGoals, undefined);
   resetMock(db.getUserProfile, emptyProfile);
   resetMock(db.setProfileHeightCm, undefined);
   resetMock(db.setProfileAge, undefined);
