@@ -151,5 +151,51 @@ describe('DashboardScreen write failures', () => {
       expect(alertSpy).not.toHaveBeenCalled();
       expect(utils.queryByLabelText('Save')).toBeNull();
     });
+
+    it('ignores a second Save press while the first save is pending', async () => {
+      let resolveWrite: () => void = () => {};
+      mockLogBodyMeasurement.mockImplementation(
+        () => new Promise<void>((resolve) => { resolveWrite = resolve; })
+      );
+      const utils = await openModal();
+      fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '81');
+
+      await pressSave(utils);
+      await pressSave(utils);
+      expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(1);
+
+      await act(async () => { resolveWrite(); });
+      expect(utils.queryByLabelText('Save')).toBeNull();
+    });
+
+    it('retries with the same values after a failure and closes when the retry succeeds', async () => {
+      mockLogBodyMeasurement.mockRejectedValueOnce(new Error('disk full'));
+      const utils = await openModal();
+      fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '81');
+
+      await pressSave(utils);
+      expect(utils.getByLabelText('Save')).toBeTruthy();
+
+      await pressSave(utils);
+
+      expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(2);
+      expect(mockLogBodyMeasurement.mock.calls[1]).toEqual(mockLogBodyMeasurement.mock.calls[0]);
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(utils.queryByLabelText('Save')).toBeNull();
+    });
+
+    it('releases the guard when the refresh after a successful write rejects', async () => {
+      const utils = await openModal();
+      fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '81');
+      mockGetLatestMeasurements.mockRejectedValueOnce(new Error('read failed'));
+      await pressSave(utils);
+      expect(utils.queryByLabelText('Save')).toBeNull();
+
+      fireEvent.press(utils.getByLabelText('Log measurements'));
+      fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '82');
+      await pressSave(utils);
+
+      expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(2);
+    });
   });
 });
