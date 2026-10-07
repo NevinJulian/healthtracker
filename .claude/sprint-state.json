@@ -68,7 +68,7 @@
     "B": {
       "branch": "sprint/lane-b-start",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "in_progress",
+      "status": "merged",
       "order": [
         426,
         423
@@ -78,7 +78,9 @@
         426,
         423
       ],
-      "parked": []
+      "parked": [],
+      "mergeSha": "2860282",
+      "cleanup": "no changes needed (agent read all 8 files; left key={attempt}, the raw gap: 16 in styles.splash and the wal sharing order alone, as instructed)"
     },
     "C": {
       "branch": "sprint/lane-c-dashboard",
@@ -189,7 +191,7 @@
     },
     "423": {
       "lane": "B",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "8b4f52f",
@@ -202,7 +204,8 @@
       "workOrder": "C:/git/ht-lanes/wo/423.md",
       "decisionSource": "owner comment on #423 (boundary wraps the navigator, same recovery screen as a start failure, Retry remounts, no reset)",
       "regressionProof": "7 render-crash tests fail with 1bfae51 App.tsx (no boundary), pass at 162009f; extraction 8b4f52f read line by line against the old start-failure branch (behaviour-preserving); App.startFailure.test.tsx diff is only the wait-constant import swap, 14/14 unchanged; crash-loop scratch test: one Retry = 2 renders, no loop; cold --no-cache runs: renderCrash 3/3, startFailure 3/3, both together with 2 workers 2/2, slowest test 3.3 s against a 10 s wait; 1136/94 (tester reproduced)",
-      "securityReview": "APPROVE (83e352d..162009f): live data is never at risk - the export only reads and copies the live files, the only deletes are of cache copies; Retry on the boundary only remounts children and cannot re-run init, migrations or clearRescueCopies; the boundary is only rendered after init has fully completed, so no beforeSave is needed there; the error text can quote SQL text or a stored value (own device, note only). The risk is confined to the exported COPY: db and wal are copied at different times while the connection is open; after Retry, syncRollingSchedule can write while a share sheet is still up. Missing recent commits: possible but unlikely; unreadable pair: possible but very unlikely (needs a checkpoint between the two copies); live data unharmed in every case. Recorded on #441."
+      "securityReview": "APPROVE (83e352d..162009f): live data is never at risk - the export only reads and copies the live files, the only deletes are of cache copies; Retry on the boundary only remounts children and cannot re-run init, migrations or clearRescueCopies; the boundary is only rendered after init has fully completed, so no beforeSave is needed there; the error text can quote SQL text or a stored value (own device, note only). The risk is confined to the exported COPY: db and wal are copied at different times while the connection is open; after Retry, syncRollingSchedule can write while a share sheet is still up. Missing recent commits: possible but unlikely; unreadable pair: possible but very unlikely (needs a checkpoint between the two copies); live data unharmed in every case. Recorded on #441.",
+      "mergeSha": "2860282"
     },
     "424": {
       "lane": "D",
@@ -234,7 +237,7 @@
     },
     "426": {
       "lane": "B",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 1,
       "commits": [
         "b1b1e3d",
@@ -258,7 +261,8 @@
       "workOrder": "C:/git/ht-lanes/wo/426.md",
       "decisionSource": "owner comment on #426 2026-10-06 (rescue copies deleted at the next app start; busy flag; Save data waits for init; scrolling screen; one WAL sentence; no full-storage special case)",
       "regressionProof": "round 1: all 7 test/fix pairs proven (pre-fix source at each test commit fails, HEAD passes); the two never-red guards go red under mutation; warm 15/15; full suite twice 1129/93. Round 2 (83e352d, test-only): delta read line by line, matchers unchanged; a mutated matcher still fails (at 5044 ms); cold --no-cache 3/3 pass (first test 1943 / 3077 / 2136 ms), cold with two -t filters pass, warm 5/5; 1129/93 (tester reproduced).",
-      "securityReview": "APPROVE (e46e8ac..1979589): clearRescueCopies can only build the two cache URIs (no SQLite/ segment), so the live db is structurally unreachable, also with a null cacheDirectory; the mount-time delete cannot realistically overlap a user-tapped Save; Save now waits for migrations and seeds; no false success shown. Notes: HUMAN - #426 must ship together with #427 (until #427 lands, the old reset path is the one case where a deleted rescue copy could have been the only good copy; both are on this integration branch). Not determined: whether expo-sqlite checkpoints an idle open connection between the db copy and the wal copy (would lose recent transactions from the rescue pair, not corrupt it). The new two-files sentence raises an expectation the existing wal-after-db flow can break when the first share is cancelled (already a recorded finding)."
+      "securityReview": "APPROVE (e46e8ac..1979589): clearRescueCopies can only build the two cache URIs (no SQLite/ segment), so the live db is structurally unreachable, also with a null cacheDirectory; the mount-time delete cannot realistically overlap a user-tapped Save; Save now waits for migrations and seeds; no false success shown. Notes: HUMAN - #426 must ship together with #427 (until #427 lands, the old reset path is the one case where a deleted rescue copy could have been the only good copy; both are on this integration branch). Not determined: whether expo-sqlite checkpoints an idle open connection between the db copy and the wal copy (would lose recent transactions from the rescue pair, not corrupt it). The new two-files sentence raises an expectation the existing wal-after-db flow can break when the first share is cancelled (already a recorded finding).",
+      "mergeSha": "2860282"
     },
     "427": {
       "lane": "A",
@@ -572,6 +576,11 @@
     {
       "at": "2026-10-07T20:50:57Z",
       "event": "#423 ready (tester APPROVE r0, security APPROVE; export-copy skew on a live db recorded on #441); lane B out of issues (2 done, 0 parked) -> cleanup"
+    },
+    {
+      "at": "2026-10-07T20:52:19Z",
+      "event": "merged lane B into integration 2860282 (no conflicts); gates green: typecheck clean, 1182/98",
+      "sha": "2860282"
     }
   ],
   "status": "running",
@@ -618,7 +627,8 @@
     "SMALL (lane D cleanup): openfoodfacts.ts header says the network is hit once per unique ingredient name; failures are not cached, so that was already loose",
     "SMALL (#423 tester): key={attempt} bump in AppErrorBoundary is redundant (children are unmounted while the fallback shows); the mount-counter test passes without it",
     "SMALL (#423 tester): a thrown non-Error (string, null, object) shows only Unknown error while rendering the app; a thrown string's text is lost (same on the start path)",
-    "SMALL (#423 tester): a render crash inside RecoveryScreen while it is the boundary's own fallback propagates to the root and unmounts the app (no boundary above); the start-failure screen and the splash are not inside any boundary either"
+    "SMALL (#423 tester): a render crash inside RecoveryScreen while it is the boundary's own fallback propagates to the root and unmounts the app (no boundary above); the start-failure screen and the splash are not inside any boundary either",
+    "SMALL (lane B): styles.splash in App.tsx still has a raw gap: 16 (predates the sprint; token rule)"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
