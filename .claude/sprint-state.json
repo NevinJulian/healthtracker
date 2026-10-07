@@ -97,8 +97,10 @@
         424,
         428
       ],
-      "current": 424,
-      "done": [],
+      "current": 428,
+      "done": [
+        424
+      ],
       "parked": []
     },
     "E": {
@@ -175,7 +177,7 @@
     },
     "424": {
       "lane": "D",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 1,
       "commits": [
         "8f7c1ec",
@@ -189,7 +191,7 @@
       "notes": "WO ready. Issue claim partly stale: a 429 is already not retried (fetchJson retries only >=500); what is missing is the pause. Clamp [1 s, 300 s] is an analyst pick. | dev: pausedUntil is its own early branch in takeSearchSlot; parseRetryAfterMs exported for tests. DEVIATION from the WO wording: only values containing a letter take the Date.parse path (bare Date.parse('-5') yields a valid year); ISO dates without a letter fall back to 60 s. | tester APPROVE r0 with two findings. (3) a later 429 from a lookup already in flight overwrites pausedUntil and can SHORTEN the pause (300 s then 1 s -> resumes after 1 s): contradicts the decision (exhausted until Retry-After has passed). ORCHESTRATOR: sent back to the developer for max() + a test; counted as round trip 1 although the tester approved. (4) a backward clock step stretches the pause by the step size (the WO's 'only up to the 300 s cap' was wrong): left to #428, whose work order already clamps the stored resume time on read.",
       "workOrder": "C:/git/ht-lanes/wo/424.md",
       "decisionSource": "owner comment on #424 (no immediate retry on 429; budget exhausted until Retry-After has passed, 60 s when missing or unreadable)",
-      "regressionProof": "round 1: fetchJson test fails with 8f7c1ec fetchJson.ts; openfoodfacts.retryAfter 16/16 fail with 8fbda56 openfoodfacts.ts; all pass at e8e4b33; 1135/94 (tester reproduced). Probe table of 35 Retry-After inputs: all within [1000, 300000], none throws.",
+      "regressionProof": "round 1: fetchJson test fails with 8f7c1ec fetchJson.ts; openfoodfacts.retryAfter 16/16 fail with 8fbda56 openfoodfacts.ts; pass at e8e4b33. Round 2: 'keeps the longer pause' fails with 90a0067 openfoodfacts.ts, passes at f541707; mirror test proven a real guard by mutation; 5 probes (order, 300/1/60, missing header, expiry, first-value mutation) pass; 1137/94 (tester reproduced). 35-input Retry-After probe table all within [1000, 300000].",
       "securityReview": "APPROVE (e46e8ac..f541707): parseRetryAfterMs can only return a value in [1000, 300000] and cannot throw; both regexes are linear; the raw header is read in exactly one place and never logged, rendered, persisted or used in SQL or a cache key; a paused/failed lookup is never cached; budget, abort handling, >=500 retry rule and User-Agent intact. True pause bound: 300 s after the last in-flight 429 arrives. Notes: backward clock step stretches the pause by the step (in-memory, acceptable interim, #428); a paused lookup looks like not found to the caller (#428)."
     },
     "425": {
@@ -242,7 +244,7 @@
     },
     "428": {
       "lane": "D",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": "Expo Go, editor: type 11+ distinct unusual ingredient names with quantities within one minute: a Not looked up line appears, not no data. Wait 60 s, tap Recompute: the line clears. Discover: import a recipe with 11+ unlisted ingredients: the Alert shows the not-looked-up sentence.",
@@ -409,6 +411,10 @@
     {
       "at": "2026-10-07T20:26:39Z",
       "event": "#424 security APPROVE on f541707 (ran in parallel with the round-2 tester, whose verdict is still pending)"
+    },
+    {
+      "at": "2026-10-07T20:28:06Z",
+      "event": "#424 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane D -> #428 in_dev"
     }
   ],
   "status": "running",
