@@ -87,6 +87,7 @@ describe('RecipeEditorScreen save deadline', () => {
     expect(signals[0]?.aborted).toBe(true);
     expect(utils.queryByLabelText('Saving…')).toBeNull();
   });
+
   it('keeps the lookups that resolved when one of five hangs past the deadline', async () => {
     const names = ['zzz one', 'zzz two', 'zzz three', 'zzz four', 'zzz five'];
     const nutrition = { kcal: 40, protein: 10, carbs: 0, fat: 0 };
@@ -135,6 +136,7 @@ describe('RecipeEditorScreen save deadline', () => {
       fat: expected.fat,
     });
   });
+
   async function fillIngredients(utils: ReturnType<typeof render>, names: string[]) {
     await act(async () => {
       await jest.advanceTimersByTimeAsync(0);
