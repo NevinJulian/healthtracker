@@ -94,8 +94,10 @@
         432,
         431
       ],
-      "current": 434,
-      "done": [],
+      "current": 411,
+      "done": [
+        434
+      ],
       "parked": [],
       "base": "4dea4c6"
     },
@@ -151,7 +153,7 @@
   "issues": {
     "411": {
       "lane": "C",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": null,
@@ -374,7 +376,7 @@
     },
     "434": {
       "lane": "C",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 1,
       "commits": [
         "a964ba2",
@@ -388,10 +390,10 @@
         "9454396"
       ],
       "deviceCheck": "On a Hermes release build (APK), run the corrupt-day Reset once (same steps as #411's check): it must complete. resetCorruptDayColumn now uses Object.hasOwn, which the tester could not confirm for this Hermes from the repo; if it were undefined every reset would throw.",
-      "notes": "WO ready. DEPARTURE from the issue text: the issue says the lenient reads stay as they are; round 1 made parseExercises/parseAdditionalWorkouts drop bad items. | tester APPROVE r0 with Risk A: getWeeklyTemplate also reads through parseExercises, so a weekday TEMPLATE holding an id-less item now loads without it and the template editor's next save persists the list without it - a NEW silent write-back (old code showed and kept the item). Needs a hand-edited backup. ORCHESTRATOR: by the rule I gave the tester this is a reject, and it is avoidable: sent back to move the item filter out of the shared parsers into mapLogRow (daily_log reads for the screens only), so parseExercises stays exactly as the issue asked and template reads are untouched. Counted as round trip 1 although the tester approved. Also from the tester: a valid item holding a 2000-deep nested object makes a write throw RangeError (text unchanged; not from this change).",
+      "notes": "WO ready. Final shape: strict predicate (every item an object with a string id) for writers and reset; parseExercises/parseAdditionalWorkouts unchanged from base (as the issue asks); mapLogRow drops bad items so the screens cannot crash on a null item (this is the remaining, narrowed departure from the issue's 'lenient reads stay as they are' - HUMAN to confirm). Tester APPROVE r0, sent back by the orchestrator (template write-back), APPROVE r2. KNOWN RESIDUAL (HUMAN): a weekday TEMPLATE holding an item without a string id (hand-edited backup) now produces days that refuse every write, and Reset this day rebuilds the same value from the same template, so those days stay stuck; before #434 such rows were writable. Not fixed: the fix sits in _buildDailyLogRowValues / getWeeklyTemplate (outside lane C) and needs a choice (drop the item, give it an id, or normalise on write).",
       "workOrder": "C:/git/ht-lanes/wo/434.md",
       "decisionSource": "issue body (no comments): item shape = object with a string id, in the shared predicate",
-      "regressionProof": "round 1: predicate 20/44 fail with a964ba2 database.ts, reads 6 fail with 9dfeeae, column guard 4 fail with dd9455e, all pass at 62eea8b; the sync pin goes red under mutation; 25-value probe table: writers, reset and reads agree on every value, refused text stays byte-identical, raw text kept byte-identical on reset; git history searched back to d62f627 (921 commits): no released version ever wrote a non-string id; 1194/95 (tester reproduced)",
+      "regressionProof": "round 1: predicate 20/44, reads 6, column guard 4 fail on the pre-fix source, pass at 62eea8b; sync pin red under mutation; 25-value probe table; history back to d62f627 shows only string ids. Round 2 (3a79e94 + 9454396): the template describe fails 2/2 on the round-1 source, passes at the tip; parseExercises/parseAdditionalWorkouts extracted and diffed: identical to the lane base; template editor add/edit/delete simulation keeps an id-less item, byte-identical to base; getLogByDate/getDailyLogsBetween still return only well-shaped items for 11 probe values; one _isStoredItem shared by mapLogRow and the writers; 1196/95 (tester reproduced)",
       "securityReview": "APPROVE (4dea4c6..9454396): reset SQL is static per key and Object.hasOwn also rejects __proto__/constructor; resetCorruptDayColumn re-reads the row and refuses valid data, so arbitrary column/date cannot overwrite anything; the raw text (good items included) is saved before the UPDATE in the same transaction; every writer of the two columns re-reads the stored text strictly, so a day with hidden items refuses every write; sync backfill never overwrites a wrong-item row; a null template item does not throw in the day builder (no startup loop). NOTE (HUMAN): a hand-edited template holding an item without a string id now makes every NEW day built from it corrupt by the new definition, and Reset rebuilds the same value from the same template - the alert repeats on every tick for those days; no data lost. Fix would sit in _buildDailyLogRowValues or getWeeklyTemplate (outside lane C)."
     },
     "435": {
@@ -616,6 +618,10 @@
     {
       "at": "2026-10-07T20:59:20Z",
       "event": "#434 security APPROVE on 9454396 (round-2 tester verdict still pending)"
+    },
+    {
+      "at": "2026-10-07T21:00:44Z",
+      "event": "#434 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane C -> #411 analysing (the analyst reads the lane branch with #434 on it)"
     }
   ],
   "status": "running",
@@ -666,7 +672,8 @@
     "SMALL (lane B): styles.splash in App.tsx still has a raw gap: 16 (predates the sprint; token rule)",
     "SMALL (#434 tester): a daily_log item holding a ~2000-deep nested object makes the writer throw RangeError (stack overflow; stored text unchanged; needs hand-edited data)",
     "SMALL (#434 tester): the sync pin test covers wrong-item rows inside the backfill window only, not outside it",
-    "SMALL (#434 orchestrator): a weekday template whose stored array holds null or id-less items produces daily_log rows that the new predicate calls corrupt, and Reset this day rebuilds from the same template (needs a hand-edited backup; pre-existing shape of the #411 reset)"
+    "SMALL (#434 orchestrator): a weekday template whose stored array holds null or id-less items produces daily_log rows that the new predicate calls corrupt, and Reset this day rebuilds from the same template (needs a hand-edited backup; pre-existing shape of the #411 reset)",
+    "SMALL but read it (#434 tester r2 + security): after #434 a weekday template holding an item without a string id makes every new day built from it un-editable, and Reset this day does not unstick it (the fresh row is rebuilt from the same template). Needs a hand-edited backup. Options: the day builder drops or gives ids to such items, or the template is normalised on write"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
