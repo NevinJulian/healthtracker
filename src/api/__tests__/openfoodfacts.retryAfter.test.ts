@@ -116,6 +116,21 @@ describe('openfoodfacts — 429 pause', () => {
     expect(await pauseLengthMs('0')).toBe(1_000);
   });
 
+  it('resumes within 300 s of a backward clock step during a pause', async () => {
+    const { lookupNutrition } = load('300');
+    await lookupNutrition('a');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    now -= 3_600_000;
+    const stepped = now;
+    expect(await lookupNutrition('b')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    now = stepped + 300_000;
+    expect(await lookupNutrition('c')).not.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   describe('429s from lookups already in flight', () => {
     type Resolve = (r: unknown) => void;
 
