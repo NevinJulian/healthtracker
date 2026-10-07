@@ -193,11 +193,26 @@
     },
     "426": {
       "lane": "B",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "b1b1e3d",
+        "7fd00a4",
+        "3c8aae1",
+        "a6a96c0",
+        "8725051",
+        "5c87c23",
+        "bb24e4f",
+        "7d7c14f",
+        "3d4f4ef",
+        "b852951",
+        "832c7f1",
+        "17d6ca8",
+        "c6cd714",
+        "1979589"
+      ],
       "deviceCheck": "1) Normal start: no error screen, startup not slowed. 2) Dev build that throws in initDatabase: Retry, Save data and the notice reachable by scrolling at the largest font size. 3) Save data: two-files sentence, then two share sheets; save both to Files. 4) Kill and relaunch without the forced failure: cache copies are gone.",
-      "notes": "WO ready. Issue item 3 (closing the connection) is NOT done by this work order; the Save-waits-for-init rule covers the font-error case (analyst reading of the decision).",
+      "notes": "WO ready. Issue item 3 (closing the connection) is NOT done by this work order; the Save-waits-for-init rule covers the font-error case (analyst reading of the decision). | dev: 7 test/fix pairs. In-flight promise in a ref; clearRescueCopies().catch(() => {}) once in the mount effect; hasRescueWal from an effect when the failure screen shows. Dev saw App.startFailure flake ONCE on a cold cache (Unable to find node on an unmounted component), not reproduced - tester to hammer it. Two tests are guards that never failed (export never deletes; survives clearRescueCopies rejecting).",
       "workOrder": "C:/git/ht-lanes/wo/426.md",
       "decisionSource": "owner comment on #426 2026-10-06 (rescue copies deleted at the next app start; busy flag; Save data waits for init; scrolling screen; one WAL sentence; no full-storage special case)"
     },
@@ -365,6 +380,10 @@
     {
       "at": "2026-10-07T20:21:29Z",
       "event": "#427 ready (security APPROVE)"
+    },
+    {
+      "at": "2026-10-07T20:22:17Z",
+      "event": "#426 in_test (1129/93 per dev)"
     }
   ],
   "status": "running",
