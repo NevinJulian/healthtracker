@@ -20,6 +20,11 @@ async function copyAndShare(name: string): Promise<void> {
   });
 }
 
+export async function hasRescueWal(): Promise<boolean> {
+  const wal = await getInfoAsync(`${documentDirectory}SQLite/${WAL_FILE}`);
+  return wal.exists;
+}
+
 export async function clearRescueCopies(): Promise<void> {
   await Promise.all(
     [DB_FILE, WAL_FILE].map((name) =>
