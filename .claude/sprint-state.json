@@ -169,11 +169,14 @@
     },
     "422": {
       "lane": "E",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "1963a62",
+        "9f78f2c"
+      ],
       "deviceCheck": "Settings: workout reminder on, set 08:00 to 08:02 with the steppers, leave and return, confirm a notification fires at 08:02 (or the next-trigger time in the OS list). Cold-start the app with the reminder on: still scheduled at the set time (reconcile path).",
-      "notes": "WO ready; lane E waits for lane A. Regex duplicated from the private parseTimeSetting in database.ts (no cross-lane edit). Non-HH:MM strings (8:30, 08:30:00) now fall back to 08:00; existing test fixtures using unpadded times may need fixing (tester to judge each edit).",
+      "notes": "WO ready. Regex duplicated from the private parseTimeSetting in database.ts (no cross-lane edit). | dev: parseTimeString only; 4 new cases fail on the old code ('8abc:30xyz', '8:30', '08:30:00', '08:3'). No fixture edits were needed (all test time strings already HH:MM). Drift between the two parsers is NOT pinned by a test (notifications.test.ts mocks the database module; parseTimeSetting is private).",
       "workOrder": "C:/git/ht-lanes/wo/422.md",
       "decisionSource": "issue body (no comments); analyst chose the strict #414 regex in place, fallback {8,0} unchanged"
     },
@@ -525,6 +528,10 @@
     {
       "at": "2026-10-07T20:45:10Z",
       "event": "filed #441 (rescue export wal after cancelled share), #442 (Discover re-import cannot refresh, misleading alert), #443 (editor save-deadline notice never seen); none worked. Remaining pendingFindings are SMALL and go into one collected issue at the end"
+    },
+    {
+      "at": "2026-10-07T20:45:34Z",
+      "event": "#422 in_test (1150/95 per dev)"
     }
   ],
   "status": "running",
@@ -565,7 +572,8 @@
     "SMALL (#428 tester): the OFF budget treats a device clock step as a free reset (20 requests with a 1 ms backward step); inherent to the owner's decision to drop future timestamps",
     "SMALL (#428 tester): the Discover not-looked-up test only exercises count 2; the sentence is a literal ingredient(s) with no singular branch",
     "USER-HITTABLE/DATA-LOSS (#428 security): RecipeEditor save-deadline fallback sets the Not looked up banner and then navigates away at once (goBack / replace RecipeDetail), so the notice is never seen; the recipe is saved with cut-off ingredients counted as 0. Same when the pending recompute resolves null after an abort by a newer run or an unmount. Needs a decision: Alert before navigating, or stay on the screen",
-    "USER-HITTABLE (#428 tester + security, extends the #428 analyst finding): the Discover import Alert says Try again in a minute, but importing again answers Already in your library (INSERT OR IGNORE), so the zero-macro recipe cannot be refreshed that way; the only fix today is Edit + Save in the editor"
+    "USER-HITTABLE (#428 tester + security, extends the #428 analyst finding): the Discover import Alert says Try again in a minute, but importing again answers Already in your library (INSERT OR IGNORE), so the zero-macro recipe cannot be refreshed that way; the only fix today is Edit + Save in the editor",
+    "SMALL (#422 dev): notifications.test.ts header comment still carries an issue number (#309)"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
