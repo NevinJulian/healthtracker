@@ -403,6 +403,14 @@ describe('importBackup — notification resync (#310)', () => {
     expect(cancelOrder).toBeLessThan(reconcileOrder);
   });
 
+  it("passes the backup file's schemaVersion to restoreFromPayload", async () => {
+    mockValidPickerFlow(makeValidPayload({ schemaVersion: 3, tables: { daily_log: [] } }));
+
+    await importBackup();
+
+    expect(db.restoreFromPayload).toHaveBeenCalledWith({ daily_log: [] }, 3);
+  });
+
   it('when restoreFromPayload throws, neither cancelAll nor reconcile is called and the error still propagates', async () => {
     const err = new Error('restore transaction failed');
     jest.mocked(db.restoreFromPayload).mockRejectedValue(err);

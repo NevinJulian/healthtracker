@@ -86,7 +86,7 @@ describe("v37's renumber-before-index invariant (#317)", () => {
         { id: 1, date: '2024-06-01', exercise: 'Squat', set_index: 0, reps: 5, weight_kg: 100, created_at: '2024-06-01T10:00:00.000Z' },
         { id: 2, date: '2024-06-01', exercise: 'Squat', set_index: 0, reps: 5, weight_kg: 102.5, created_at: '2024-06-01T10:05:00.000Z' },
       ],
-    });
+    }, 38);
 
     expect(result.rowsRestored).toBe(2);
 

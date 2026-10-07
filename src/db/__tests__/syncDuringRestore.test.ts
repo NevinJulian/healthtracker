@@ -89,7 +89,7 @@ async function restoreWithSyncFiredAt(
     return result;
   }) as typeof originalGetAll;
 
-  const restore = db.restoreFromPayload(payload).finally(() => {
+  const restore = db.restoreFromPayload(payload, 38).finally(() => {
     (raw as unknown as { getAllAsync: typeof originalGetAll }).getAllAsync = originalGetAll;
   });
   return { restore, sync: () => sync, countAtHook: () => countAtHook };
@@ -182,7 +182,7 @@ describe('syncRollingSchedule() coinciding with restoreFromPayload() (#369)', ()
       db.restoreFromPayload({
         // NOT NULL date -> the INSERT throws inside the transaction.
         daily_log: [{ date: null, walking_task: 'Walk' }],
-      })
+      }, 38)
     ).rejects.toBeDefined();
 
     // The failed restore rolled back as a whole, and the sync runs normally.

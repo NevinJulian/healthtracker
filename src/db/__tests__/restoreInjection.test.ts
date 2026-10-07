@@ -60,7 +60,7 @@ describe('restoreFromPayload() column whitelisting against injected/unknown keys
       ],
     };
 
-    await expect(db.restoreFromPayload(payloadTables)).resolves.toBeDefined();
+    await expect(db.restoreFromPayload(payloadTables, 38)).resolves.toBeDefined();
 
     const raw = db.getDatabase();
 
@@ -96,7 +96,7 @@ describe('restoreFromPayload() column whitelisting against injected/unknown keys
       ],
     };
 
-    const result = await db.restoreFromPayload(payloadTables);
+    const result = await db.restoreFromPayload(payloadTables, 38);
 
     const raw = db.getDatabase();
     const row = await raw.getFirstAsync<any>(
@@ -130,7 +130,7 @@ describe('restoreFromPayload() column whitelisting against injected/unknown keys
       ],
     };
 
-    const result = await db.restoreFromPayload(payloadTables);
+    const result = await db.restoreFromPayload(payloadTables, 38);
 
     const raw = db.getDatabase();
     const rows = await raw.getAllAsync<any>('SELECT * FROM daily_log');
@@ -156,7 +156,7 @@ describe('restoreFromPayload() column whitelisting against injected/unknown keys
       ],
     };
 
-    await db.restoreFromPayload(payloadTables);
+    await db.restoreFromPayload(payloadTables, 38);
 
     expect(warnSpy).toHaveBeenCalled();
     const warned = warnSpy.mock.calls.some((call) =>

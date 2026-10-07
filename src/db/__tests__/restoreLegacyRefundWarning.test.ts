@@ -69,7 +69,7 @@ describe('restoreFromPayload() with a pre-v34 (v33-shaped) backup (#310)', () =>
         legacyPlanRow(11, 'lunch', 1),
         legacyPlanRow(12, 'dinner', 0),
       ],
-    });
+    }, 38);
 
     // Two consumed rows, one unconsumed — only the consumed ones matter.
     expect(result.consumedMealsWithoutRefund).toBe(2);
@@ -89,7 +89,7 @@ describe('restoreFromPayload() with a pre-v34 (v33-shaped) backup (#310)', () =>
         legacyPlanRow(12, 'breakfast', 1),
         legacyPlanRow(13, 'lunch', 1),
       ],
-    });
+    }, 38);
 
     const survivors = await db
       .getDatabase()
@@ -109,7 +109,7 @@ describe('restoreFromPayload() with a pre-v34 (v33-shaped) backup (#310)', () =>
         legacyPlanRow(10, 'breakfast', 1),
         legacyPlanRow(11, 'breakfast', 1),
       ],
-    });
+    }, 38);
 
     expect(result.consumedMealsWithoutRefund).toBe(1);
   });
@@ -123,7 +123,7 @@ describe('restoreFromPayload() with a pre-v34 (v33-shaped) backup (#310)', () =>
         { id: 1, recipe_id: RECIPE_ID, portions_available: 4, date_cooked: '2024-01-01' },
       ],
       weekly_meal_plan: [legacyPlanRow(10, 'breakfast', 1)],
-    });
+    }, 38);
 
     const raw = db.getDatabase();
     const restored = await raw.getFirstAsync<{ consumed_from_inventory_id: number | null }>(
@@ -157,7 +157,7 @@ describe('restoreFromPayload() with a pre-v34 (v33-shaped) backup (#310)', () =>
           consumed_from_inventory_id: 1,
         },
       ],
-    });
+    }, 38);
 
     expect(result.consumedMealsWithoutRefund).toBeUndefined();
   });
@@ -168,7 +168,7 @@ describe('restoreFromPayload() with a pre-v34 (v33-shaped) backup (#310)', () =>
 
     const result = await db.restoreFromPayload({
       weekly_meal_plan: [legacyPlanRow(10, 'breakfast', 0), legacyPlanRow(11, 'lunch', 0)],
-    });
+    }, 38);
 
     expect(result.consumedMealsWithoutRefund).toBeUndefined();
   });

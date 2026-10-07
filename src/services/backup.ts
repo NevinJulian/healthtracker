@@ -357,7 +357,7 @@ export async function importBackup(
 
   let restored: Awaited<ReturnType<typeof restoreFromPayload>>;
   try {
-    restored = await restoreFromPayload(payload.tables);
+    restored = await restoreFromPayload(payload.tables, payload.schemaVersion);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     throw new Error(

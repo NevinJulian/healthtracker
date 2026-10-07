@@ -8,13 +8,12 @@
  *   - #37  SELECT moved outside withTransactionAsync
  *   - #38  _db reset to null on failure
  *   - #39  Versioned migration runner using schema_version table
- *   - Old-schema reset: detects incompatible daily_log and wipes DB
+ *   - Old-schema check: refuses to start on an incompatible daily_log
  *
  * Feature additions (issue #40):
  *   - Exercise[] JSON column on weekly_template and daily_log
  *   - upsertExerciseCompleted() — toggles a single exercise in the JSON array
  *   - updateTemplateExercises() — replaces the full exercise list for a weekday
- *   - resetIfIncompatibleSchema now also detects missing exercises column
  */
 
 import * as SQLite from 'expo-sqlite';
@@ -564,38 +563,22 @@ async function seedRecipeLibrary(db: SQLite.SQLiteDatabase): Promise<void> {
 }
 
 // ─────────────────────────────────────────────
-// Old-schema reset helper
+// Old-schema check
 // ─────────────────────────────────────────────
 
-/**
- * Detects incompatible schemas left by previous app versions:
- *   1. daily_log missing 'date' column (very old schema)
- *   2. (Compatible schema — no reset needed)
- *
- * Note: missing 'exercises' column is handled by migrations v11/v12 via
- * ALTER TABLE, so no reset is needed for that case.
- */
-async function resetIfIncompatibleSchema(
-  db: SQLite.SQLiteDatabase
-): Promise<SQLite.SQLiteDatabase> {
+async function assertCompatibleSchema(db: SQLite.SQLiteDatabase): Promise<void> {
   const columns = await db.getAllAsync<{ name: string }>(
     'PRAGMA table_info(daily_log)'
   );
 
-  if (columns.length === 0) return db; // Fresh install
-  const hasDateColumn = columns.some((c) => c.name === 'date');
-  if (hasDateColumn) return db; // Compatible
+  if (columns.length === 0) return;
+  if (columns.some((c) => c.name === 'date')) return;
 
-  console.warn(
-    '[DB] Incompatible daily_log schema detected (missing "date" column). ' +
-    'Deleting old database and starting fresh…'
+  throw new Error(
+    'Your saved data uses an old format that this version cannot read: ' +
+    'the daily_log table has no date column. Nothing was changed or deleted. ' +
+    'Tap Save data to export a copy of your data.'
   );
-  await db.closeAsync();
-  await SQLite.deleteDatabaseAsync(DB_NAME);
-  console.log('[DB] Old database deleted. Opening fresh database…');
-  const freshDb = await SQLite.openDatabaseAsync(DB_NAME);
-  await freshDb.execAsync('PRAGMA journal_mode = WAL;');
-  return freshDb;
 }
 
 // ─────────────────────────────────────────────
@@ -846,12 +829,12 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (_db) return _db;
 
   console.log('[DB] Opening database…');
-  let db = await SQLite.openDatabaseAsync(DB_NAME);
+  const db = await SQLite.openDatabaseAsync(DB_NAME);
 
   try {
     await db.execAsync('PRAGMA journal_mode = WAL;');
 
-    db = await resetIfIncompatibleSchema(db);
+    await assertCompatibleSchema(db);
     if (_isDev()) _trackDbActivity(db);
     // Test-only tripwire (#369): the sql.js test adapter exposes this hook
     // and then throws if withTransactionAsync is ever called while the
@@ -1353,6 +1336,15 @@ function mapLogRow(row: {
 // Recipes CRUD
 // ─────────────────────────────────────────────
 
+function parseIngredients(raw: unknown, recipeId: string): Recipe['ingredients'] {
+  try {
+    const parsed = JSON.parse(raw as string);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  console.warn('[DB] Unreadable ingredients for recipe, returning none:', recipeId);
+  return [];
+}
+
 export async function getRecipes(category?: string): Promise<Recipe[]> {
   const db = getDatabase();
   let rows: any[];
@@ -1367,7 +1359,7 @@ export async function getRecipes(category?: string): Promise<Recipe[]> {
 
   return rows.map((r) => ({
     ...r,
-    ingredients: JSON.parse(r.ingredients),
+    ingredients: parseIngredients(r.ingredients, r.id),
   }));
 }
 
@@ -1376,7 +1368,7 @@ export async function getRecipesIncludingArchived(): Promise<Recipe[]> {
   const rows = await db.getAllAsync<any>('SELECT * FROM recipe_library');
   return rows.map((r) => ({
     ...r,
-    ingredients: JSON.parse(r.ingredients),
+    ingredients: parseIngredients(r.ingredients, r.id),
   }));
 }
 
@@ -1389,7 +1381,7 @@ export async function getRecipeById(id: string): Promise<Recipe | null> {
   if (!row) return null;
   return {
     ...row,
-    ingredients: JSON.parse(row.ingredients),
+    ingredients: parseIngredients(row.ingredients, row.id),
   };
 }
 
@@ -2016,7 +2008,7 @@ export async function getCookingTasks(): Promise<CookingTaskWithRecipe[]> {
       fat: r.fat,
       prepTimeMinutes: r.prepTimeMinutes,
       defaultServings: r.defaultServings,
-      ingredients: JSON.parse(r.ingredients ?? '[]'),
+      ingredients: parseIngredients(r.ingredients ?? '[]', r.recipe_id),
       instructions: r.instructions,
       freezerTips: r.freezerTips ?? '',
     } as Recipe,
@@ -2629,19 +2621,20 @@ export async function dumpTable(
  *     by the time restore runs, so the second offending INSERT would throw
  *     — and since restore is one transaction, that would roll back every
  *     table, not just the offending one. So: drop both indexes before
- *     restoring, restore every table exactly as before, then re-run each
- *     affected repair step (POST_RESTORE_STEPS) against the
- *     just-restored data, in order, inside the same transaction.
+ *     restoring, restore every table exactly as before, then run the repair
+ *     steps against the just-restored data, in order, inside the same
+ *     transaction.
  *     RESTORE_SLOT_DEDUPE_SQL credits any consumed loser's batch, dedupes
  *     weekly_meal_plan per (date, meal_type), preferring a consumed row whose
  *     inventory pointer is live, and recreates its index.
- *     RESTORE_SET_INDEX_SQL renumbers a workout_set_log (date, exercise)
- *     partition densely by (set_index, created_at, id) only if two of its
- *     rows share a set_index, then recreates its index. Both run after their
- *     index was dropped above, never while it exists. A clean backup is
- *     unaffected by either: nothing matches the dedupe's credit/delete WHERE
- *     clauses, and collision-free partitions keep their set_index values,
- *     gaps included.
+ *     The set_index step depends on the backup's schema version. Before v37
+ *     set_index was computed by the caller and can collide or run against the
+ *     logged order, so v37's own precondition and SQL run: every partition is
+ *     renumbered by (created_at, id), as an in-place upgrade would. From v37
+ *     on, set_index is authoritative: RESTORE_SET_INDEX_SQL renumbers a
+ *     partition densely by (set_index, created_at, id) only if two of its rows
+ *     share a set_index. Both recreate the index and run after it was dropped
+ *     above. A clean v37+ backup keeps its set_index values, gaps included.
  *
  * A row's own keys are NOT trusted as column identifiers: unlike values,
  * column names can't be parameterised, so a backup file (user-supplied,
@@ -2657,25 +2650,27 @@ export async function dumpTable(
  * the optional `skipped` field on the return value.
  *
  * @param payloadTables  The `tables` object from the BackupPayload.
+ * @param backupSchemaVersion  The BackupPayload's schemaVersion.
  * @returns A summary of what was restored, plus optionally what was skipped.
  */
 
-/**
- * Data-repair steps re-applied, in this order, against freshly-restored data
- * every time restoreFromPayload() runs — because a backup taken before a
- * step shipped, or before it happened to run, can legitimately still need it.
- * Their unique indexes are dropped before the restore loop (see the
- * restoreFromPayload doc comment above) and recreated here.
- *
- *   - RESTORE_SLOT_DEDUPE_SQL: weekly_meal_plan (date, meal_type) dedupe +
- *     unique index, preferring a consumed row whose inventory pointer is live.
- *   - RESTORE_SET_INDEX_SQL: workout_set_log renumber of colliding
- *     (date, exercise) partitions only + unique index.
- */
-const POST_RESTORE_STEPS: readonly { sql: string }[] = [
-  { sql: RESTORE_SLOT_DEDUPE_SQL },
-  { sql: RESTORE_SET_INDEX_SQL },
-];
+const RENUMBER_MIGRATION_VERSION = 37;
+
+async function runSetIndexRepair(
+  db: ReturnType<typeof getDatabase>,
+  backupSchemaVersion: number
+): Promise<void> {
+  if (backupSchemaVersion >= RENUMBER_MIGRATION_VERSION) {
+    await db.execAsync(RESTORE_SET_INDEX_SQL);
+    return;
+  }
+  const renumber = MIGRATIONS.find((m) => m.version === RENUMBER_MIGRATION_VERSION);
+  if (!renumber) {
+    throw new Error(`Restore failed: migration v${RENUMBER_MIGRATION_VERSION} not found.`);
+  }
+  if (renumber.precondition) await renumber.precondition(db);
+  await db.execAsync(renumber.sql);
+}
 
 type RestoreFromPayloadResult = {
   tablesRestored: number;
@@ -2685,16 +2680,20 @@ type RestoreFromPayloadResult = {
 };
 
 export function restoreFromPayload(
-  payloadTables: Record<string, Record<string, unknown>[]>
+  payloadTables: Record<string, Record<string, unknown>[]>,
+  backupSchemaVersion: number
 ): Promise<RestoreFromPayloadResult> {
   // The whole restore, including listUserTables() before its transaction,
   // is one unit on the write queue (#369). Nothing can interleave with it:
   // a sync fired mid-restore waits and then syncs the restored data.
-  return _enqueueWrite('restoreFromPayload', () => _restoreFromPayload(payloadTables));
+  return _enqueueWrite('restoreFromPayload', () =>
+    _restoreFromPayload(payloadTables, backupSchemaVersion)
+  );
 }
 
 async function _restoreFromPayload(
-  payloadTables: Record<string, Record<string, unknown>[]>
+  payloadTables: Record<string, Record<string, unknown>[]>,
+  backupSchemaVersion: number
 ): Promise<RestoreFromPayloadResult> {
   const db = getDatabase();
   const liveTableNames = await listUserTables();
@@ -2712,7 +2711,7 @@ async function _restoreFromPayload(
   await db.withTransactionAsync(async () => {
     // Drop first so a legacy backup's duplicate weekly_meal_plan rows or
     // colliding/gapped workout_set_log rows (see above) can all be inserted
-    // below; both indexes are recreated by POST_RESTORE_STEPS after the
+    // below; both indexes are recreated by the repair steps after the
     // restore loop.
     await db.execAsync('DROP INDEX IF EXISTS idx_weekly_meal_plan_date_meal_type');
     await db.execAsync('DROP INDEX IF EXISTS idx_workout_set_log_date_exercise_set_index');
@@ -2789,9 +2788,8 @@ async function _restoreFromPayload(
     // Each step's index was dropped above, before this loop ran — never
     // while it existed — matching the ordering both the dedupe and the
     // renumber require.
-    for (const step of POST_RESTORE_STEPS) {
-      await db.execAsync(step.sql);
-    }
+    await db.execAsync(RESTORE_SLOT_DEDUPE_SQL);
+    await runSetIndexRepair(db, backupSchemaVersion);
 
     if (legacyPayload) {
       const consumed = await db.getFirstAsync<{ n: number }>(
