@@ -73,9 +73,10 @@
         426,
         423
       ],
-      "current": 423,
+      "current": null,
       "done": [
-        426
+        426,
+        423
       ],
       "parked": []
     },
@@ -188,7 +189,7 @@
     },
     "423": {
       "lane": "B",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "8b4f52f",
@@ -200,7 +201,8 @@
       "notes": "WO ready. Boundary sits outside NavigationContainer; start-failure JSX extracted into a shared RecoveryScreen. | dev: RecoveryScreen (owns saving/saveError/hasRescueWal/ScrollView/notices, optional beforeSave), AppErrorBoundary (class), shared formatErrorDetail, src/testUtils/coldRenderWait.ts (10 s, used by both App suites). | tester APPROVE r0. Findings: (A/D) the key bump on Retry is redundant - with it removed all 7 tests still pass, because the children are already unmounted while the fallback shows; behaviour correct, the mount-counter test does not prove the key. (B) DATA-LOSS RISK on the NEW path: Save data on the render-crash screen copies the db and, only after the first share sheet closes, the wal - while the database is OPEN and the app was live; the pair can be inconsistent (extends #441). Sent to security for a verdict. (C) a thrown non-Error shows only the generic text. Not covered by the boundary: onboarding branch, splash, the start-failure screen itself; a crash inside RecoveryScreen while it is the boundary's fallback unmounts the app (React semantics, not run). saveError is now cleared on every Retry press, including one the in-flight guard drops.",
       "workOrder": "C:/git/ht-lanes/wo/423.md",
       "decisionSource": "owner comment on #423 (boundary wraps the navigator, same recovery screen as a start failure, Retry remounts, no reset)",
-      "regressionProof": "7 render-crash tests fail with 1bfae51 App.tsx (no boundary), pass at 162009f; extraction 8b4f52f read line by line against the old start-failure branch (behaviour-preserving); App.startFailure.test.tsx diff is only the wait-constant import swap, 14/14 unchanged; crash-loop scratch test: one Retry = 2 renders, no loop; cold --no-cache runs: renderCrash 3/3, startFailure 3/3, both together with 2 workers 2/2, slowest test 3.3 s against a 10 s wait; 1136/94 (tester reproduced)"
+      "regressionProof": "7 render-crash tests fail with 1bfae51 App.tsx (no boundary), pass at 162009f; extraction 8b4f52f read line by line against the old start-failure branch (behaviour-preserving); App.startFailure.test.tsx diff is only the wait-constant import swap, 14/14 unchanged; crash-loop scratch test: one Retry = 2 renders, no loop; cold --no-cache runs: renderCrash 3/3, startFailure 3/3, both together with 2 workers 2/2, slowest test 3.3 s against a 10 s wait; 1136/94 (tester reproduced)",
+      "securityReview": "APPROVE (83e352d..162009f): live data is never at risk - the export only reads and copies the live files, the only deletes are of cache copies; Retry on the boundary only remounts children and cannot re-run init, migrations or clearRescueCopies; the boundary is only rendered after init has fully completed, so no beforeSave is needed there; the error text can quote SQL text or a stored value (own device, note only). The risk is confined to the exported COPY: db and wal are copied at different times while the connection is open; after Retry, syncRollingSchedule can write while a share sheet is still up. Missing recent commits: possible but unlikely; unreadable pair: possible but very unlikely (needs a checkpoint between the two copies); live data unharmed in every case. Recorded on #441."
     },
     "424": {
       "lane": "D",
@@ -566,6 +568,10 @@
     {
       "at": "2026-10-07T20:49:10Z",
       "event": "#434 in_test (1194/95 per dev)"
+    },
+    {
+      "at": "2026-10-07T20:50:57Z",
+      "event": "#423 ready (tester APPROVE r0, security APPROVE; export-copy skew on a live db recorded on #441); lane B out of issues (2 done, 0 parked) -> cleanup"
     }
   ],
   "status": "running",
