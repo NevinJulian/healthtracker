@@ -50,6 +50,7 @@ import {
   getNutritionGoals,
   setNutritionGoalCalories,
   setNutritionGoalProtein,
+  setNutritionGoals,
   getUserProfile,
   setProfileHeightCm,
   setProfileAge,
@@ -1134,8 +1135,7 @@ export default function SettingsScreen() {
     const goals = suggestGoals({ sex, age, heightCm, activityLevel, goalType }, weightKg);
     setRecalcBusy(true);
     try {
-      await setNutritionGoalCalories(goals.calories);
-      await setNutritionGoalProtein(goals.protein);
+      await setNutritionGoals(goals.calories, goals.protein);
       setGoalCalories(goals.calories);
       setGoalProtein(goals.protein);
       Alert.alert(
