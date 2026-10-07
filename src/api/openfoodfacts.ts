@@ -14,7 +14,7 @@
 
 import { getDatabase, putOFFCache } from '../db/database';
 import { expo } from '../../app.json';
-import { fetchJson } from './fetchJson';
+import { fetchJson, FetchJsonError } from './fetchJson';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -94,8 +94,32 @@ const OFF_BUDGET_MAX = 10;
 const OFF_BUDGET_WINDOW_MS = 60_000;
 const attemptTimes: number[] = [];
 
+const RETRY_AFTER_DEFAULT_MS = 60_000;
+const RETRY_AFTER_MIN_MS = 1_000;
+const RETRY_AFTER_MAX_MS = 300_000;
+let pausedUntil = 0;
+
+/** Milliseconds to stay off Open Food Facts after a 429. Never throws. */
+export function parseRetryAfterMs(raw: string | null | undefined): number {
+  let ms = RETRY_AFTER_DEFAULT_MS;
+  if (typeof raw === 'string') {
+    const value = raw.trim();
+    if (/^\d+$/.test(value)) {
+      ms = Number(value) * 1000;
+    } else if (/[A-Za-z]/.test(value)) {
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed)) ms = parsed - Date.now();
+    }
+  }
+  if (!Number.isFinite(ms)) ms = RETRY_AFTER_MAX_MS;
+  return Math.min(RETRY_AFTER_MAX_MS, Math.max(RETRY_AFTER_MIN_MS, ms));
+}
+
 function takeSearchSlot(): void {
   const now = Date.now();
+  if (now < pausedUntil) {
+    throw new Error('Open Food Facts is rate limiting requests');
+  }
   while (attemptTimes.length > 0 && now - attemptTimes[0] >= OFF_BUDGET_WINDOW_MS) {
     attemptTimes.shift();
   }
@@ -138,7 +162,10 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutr
       }
     }
     return null;
-  } catch {
+  } catch (err) {
+    if (err instanceof FetchJsonError && err.status === 429) {
+      pausedUntil = Date.now() + parseRetryAfterMs(err.retryAfter);
+    }
     return null;
   }
 }
