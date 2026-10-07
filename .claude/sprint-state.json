@@ -104,9 +104,10 @@
         424,
         428
       ],
-      "current": 428,
+      "current": null,
       "done": [
-        424
+        424,
+        428
       ],
       "parked": []
     },
@@ -264,7 +265,7 @@
     },
     "428": {
       "lane": "D",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "cfcc2d7",
@@ -283,7 +284,8 @@
       "notes": "WO ready. Return type becomes OFFNutrition | null | 'not-looked-up'; user-facing wording is an analyst pick. | dev: 11 commits. Pause clamp = min(pausedUntil, now + 300 s) on read and in the 429 handler. 'not-looked-up' only when an attempt was refused and nothing was sent (budget or pause); a 5xx retry refused after the first request went out stays null. 4 truthiness checks on lookup results replaced by object checks (cache write, batch, importRecipe, editor). EXISTING ASSERTIONS CHANGED (dev: all pin the behaviour the decision replaces): 3x toBeNull -> toBe('not-looked-up') and one test title in openfoodfacts.budget.test.ts, 1x in openfoodfacts.retryAfter.test.ts, a type guard in computeWithOFF.test.ts - tester to judge each. Discover card suppresses the 'Macros computed from local data' line when only refused ingredients exist (not in the WO). Editor lookups are sequential, so one hanging ingredient leaves all later ones 'not looked up' at the deadline. Dev edited files with scripts and warns about CRLF/cp1252 - tester to check for mojibake.",
       "workOrder": "C:/git/ht-lanes/wo/428.md",
       "decisionSource": "owner comment on #428 2026-10-06 (refused/cut-off lookup = 'not looked up', separate from 'no data'; save-deadline fallback keeps every lookup that already succeeded; future timestamps dropped)",
-      "regressionProof": "all five test/fix pairs proven (pre-fix source at each test commit fails, HEAD passes; 8d4e84a is what turns the 4-of-5 editor test green); scratch import of 14 unlisted ingredients on the real modules: 10 fetched, 4 refused, macros finite, putOFFCache called 10 times and never with the sentinel; 1146/95 locally and with TZ=UTC (tester reproduced)"
+      "regressionProof": "all five test/fix pairs proven (pre-fix source at each test commit fails, HEAD passes; 8d4e84a is what turns the 4-of-5 editor test green); scratch import of 14 unlisted ingredients on the real modules: 10 fetched, 4 refused, macros finite, putOFFCache called 10 times and never with the sentinel; 1146/95 locally and with TZ=UTC (tester reproduced)",
+      "securityReview": "APPROVE (f541707..d4cb2c6): the sentinel is excluded before every sink (cache write only for real objects; three consumers branch on the string first; offOverrides typed OFFNutrition); no NaN/undefined can reach computeRecipeMacros or the recipe writers; aborted/late results cannot enter the fallback, the cache or another recipe; no lookup loop without user action; nothing removed. NOTES FOR THE HUMAN: (1) on the save-deadline path the new Not looked up banner is set on a screen that goBack()/replace() dismisses immediately, so the user never sees it and the recipe is saved with the cut-off ingredients counted as 0 without a visible notice (equally silent before this diff; not a regression) - filed as a new issue; (2) the Discover Alert says Try again in a minute, but a retry hits Already in your library and the zero-macro recipe stays - filed as a new issue."
     },
     "429": {
       "lane": "E",
@@ -511,6 +513,10 @@
     {
       "at": "2026-10-07T20:43:30Z",
       "event": "worktrees c/e created at 4dea4c6 (npm ci ok); lane C -> #434 in_dev, lane E -> #422 in_dev"
+    },
+    {
+      "at": "2026-10-07T20:44:22Z",
+      "event": "GitHub CI test check on integration 4dea4c6 (lane A merged): completed success. #428 ready (tester APPROVE r0, security APPROVE with 2 follow-up findings); lane D out of issues (2 done, 0 parked) -> cleanup"
     }
   ],
   "status": "running",
@@ -549,6 +555,8 @@
     "SMALL (lane A cleanup): src/db/testHelpers/sqljsExpoAdapter.ts line 35 doc comment still mentions deleteDatabaseAsync",
     "SMALL (lane A cleanup): // Test-only tripwire (#369) and another (#369) remain in the restoreFromPayload body (old history comments)",
     "SMALL (#428 tester): the OFF budget treats a device clock step as a free reset (20 requests with a 1 ms backward step); inherent to the owner's decision to drop future timestamps",
-    "SMALL (#428 tester): the Discover not-looked-up test only exercises count 2; the sentence is a literal ingredient(s) with no singular branch"
+    "SMALL (#428 tester): the Discover not-looked-up test only exercises count 2; the sentence is a literal ingredient(s) with no singular branch",
+    "USER-HITTABLE/DATA-LOSS (#428 security): RecipeEditor save-deadline fallback sets the Not looked up banner and then navigates away at once (goBack / replace RecipeDetail), so the notice is never seen; the recipe is saved with cut-off ingredients counted as 0. Same when the pending recompute resolves null after an abort by a newer run or an unmount. Needs a decision: Alert before navigating, or stay on the screen",
+    "USER-HITTABLE (#428 tester + security, extends the #428 analyst finding): the Discover import Alert says Try again in a minute, but importing again answers Already in your library (INSERT OR IGNORE), so the zero-macro recipe cannot be refreshed that way; the only fix today is Edit + Save in the editor"
   ]
 }
