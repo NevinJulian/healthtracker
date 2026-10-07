@@ -115,6 +115,75 @@ describe('openfoodfacts — 429 pause', () => {
   it('clamps "0" to 1 s', async () => {
     expect(await pauseLengthMs('0')).toBe(1_000);
   });
+
+  describe('429s from lookups already in flight', () => {
+    type Resolve = (r: unknown) => void;
+
+    function loadDeferred() {
+      const resolvers: Resolve[] = [];
+      fetchMock = jest.fn().mockImplementation(
+        () => new Promise((resolve) => resolvers.push(resolve)),
+      );
+      global.fetch = fetchMock as unknown as typeof fetch;
+      jest.doMock('../../db/database', () => ({
+        getDatabase: () => {
+          throw new Error('not initialised');
+        },
+        putOFFCache: jest.fn().mockResolvedValue(undefined),
+      }));
+      const { lookupNutrition } = require('../openfoodfacts') as typeof import('../openfoodfacts');
+      return { lookupNutrition, resolvers };
+    }
+
+    const tooMany = (retryAfter: string) => ({
+      ok: false,
+      status: 429,
+      headers: { get: () => retryAfter },
+      json: async () => ({}),
+    });
+
+    async function sends(
+      lookup: (name: string) => Promise<unknown>,
+      name: string,
+    ): Promise<boolean> {
+      const before = fetchMock.mock.calls.length;
+      void lookup(name);
+      await new Promise((r) => setImmediate(r));
+      return fetchMock.mock.calls.length > before;
+    }
+
+    async function twoRateLimited(first: string, second: string) {
+      const { lookupNutrition, resolvers } = loadDeferred();
+      const inFlight = [lookupNutrition('a'), lookupNutrition('b'), lookupNutrition('c')];
+      await new Promise((r) => setImmediate(r));
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      resolvers[0](tooMany(first));
+      resolvers[1](tooMany(second));
+      resolvers[2]({ ok: true, status: 200, json: async () => body });
+      await Promise.all(inFlight);
+      return lookupNutrition;
+    }
+
+    it('keeps the longer pause when a later 429 asks for less', async () => {
+      const lookupNutrition = await twoRateLimited('300', '1');
+
+      now += 2_000;
+      expect(await sends(lookupNutrition, 'd')).toBe(false);
+
+      now += 298_000;
+      expect(await sends(lookupNutrition, 'e')).toBe(true);
+    });
+
+    it('extends the pause when a later 429 asks for more', async () => {
+      const lookupNutrition = await twoRateLimited('1', '300');
+
+      now += 2_000;
+      expect(await sends(lookupNutrition, 'd')).toBe(false);
+
+      now += 298_000;
+      expect(await sends(lookupNutrition, 'e')).toBe(true);
+    });
+  });
 });
 
 describe('parseRetryAfterMs', () => {
