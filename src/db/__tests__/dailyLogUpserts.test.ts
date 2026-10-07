@@ -613,6 +613,50 @@ describe('addAdditionalWorkout and toggleAdditionalWorkout read-modify-write ins
 
     expect(await readRaw(db, date)).toBe(raw);
   });
+
+  it('an unknown-id toggle rejects with a plain Error naming the date and the id', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await seedRaw(db, date, JSON.stringify([B]));
+
+    const error = await db.toggleAdditionalWorkout(date, 'nope').then(
+      () => undefined,
+      (e: unknown) => e
+    );
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(db.CorruptJsonError);
+    expect((error as Error).message).toContain(date);
+    expect((error as Error).message).toContain('nope');
+  });
+
+  it('a rejected toggle does not block the next queued toggle', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await seedRaw(db, date, JSON.stringify([B]));
+
+    const rejected = db.toggleAdditionalWorkout(date, 'nope');
+    const valid = db.toggleAdditionalWorkout(date, B.id);
+
+    await expect(rejected).rejects.toThrow('nope');
+    await expect(valid).resolves.toBeUndefined();
+    expect(JSON.parse((await readRaw(db, date)) as string)).toEqual([{ ...B, completed: true }]);
+  });
+
+  it('toggle of a known id flips completed in both directions', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await seedRaw(db, date, JSON.stringify([A, B]));
+
+    await db.toggleAdditionalWorkout(date, B.id);
+    expect(JSON.parse((await readRaw(db, date)) as string)).toEqual([A, { ...B, completed: true }]);
+
+    await db.toggleAdditionalWorkout(date, B.id);
+    expect(JSON.parse((await readRaw(db, date)) as string)).toEqual([A, B]);
+  });
 });
 
 describe('refused writes throw a typed CorruptJsonError naming the column and date', () => {
