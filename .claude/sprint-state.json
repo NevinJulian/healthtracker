@@ -189,7 +189,8 @@
       "notes": "WO ready. Issue claim partly stale: a 429 is already not retried (fetchJson retries only >=500); what is missing is the pause. Clamp [1 s, 300 s] is an analyst pick. | dev: pausedUntil is its own early branch in takeSearchSlot; parseRetryAfterMs exported for tests. DEVIATION from the WO wording: only values containing a letter take the Date.parse path (bare Date.parse('-5') yields a valid year); ISO dates without a letter fall back to 60 s. | tester APPROVE r0 with two findings. (3) a later 429 from a lookup already in flight overwrites pausedUntil and can SHORTEN the pause (300 s then 1 s -> resumes after 1 s): contradicts the decision (exhausted until Retry-After has passed). ORCHESTRATOR: sent back to the developer for max() + a test; counted as round trip 1 although the tester approved. (4) a backward clock step stretches the pause by the step size (the WO's 'only up to the 300 s cap' was wrong): left to #428, whose work order already clamps the stored resume time on read.",
       "workOrder": "C:/git/ht-lanes/wo/424.md",
       "decisionSource": "owner comment on #424 (no immediate retry on 429; budget exhausted until Retry-After has passed, 60 s when missing or unreadable)",
-      "regressionProof": "round 1: fetchJson test fails with 8f7c1ec fetchJson.ts; openfoodfacts.retryAfter 16/16 fail with 8fbda56 openfoodfacts.ts; all pass at e8e4b33; 1135/94 (tester reproduced). Probe table of 35 Retry-After inputs: all within [1000, 300000], none throws."
+      "regressionProof": "round 1: fetchJson test fails with 8f7c1ec fetchJson.ts; openfoodfacts.retryAfter 16/16 fail with 8fbda56 openfoodfacts.ts; all pass at e8e4b33; 1135/94 (tester reproduced). Probe table of 35 Retry-After inputs: all within [1000, 300000], none throws.",
+      "securityReview": "APPROVE (e46e8ac..f541707): parseRetryAfterMs can only return a value in [1000, 300000] and cannot throw; both regexes are linear; the raw header is read in exactly one place and never logged, rendered, persisted or used in SQL or a cache key; a paused/failed lookup is never cached; budget, abort handling, >=500 retry rule and User-Agent intact. True pause bound: 300 s after the last in-flight 429 arrives. Notes: backward clock step stretches the pause by the step (in-memory, acceptable interim, #428); a paused lookup looks like not found to the caller (#428)."
     },
     "425": {
       "lane": "F",
@@ -404,6 +405,10 @@
     {
       "at": "2026-10-07T20:26:30Z",
       "event": "#412 in_test (1125/94 per dev); orchestrator verified schema.ts diff is comment-only (no MIGRATIONS entry modified)"
+    },
+    {
+      "at": "2026-10-07T20:26:39Z",
+      "event": "#424 security APPROVE on f541707 (ran in parallel with the round-2 tester, whose verdict is still pending)"
     }
   ],
   "status": "running",
