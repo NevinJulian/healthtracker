@@ -199,10 +199,9 @@ function stepMinute(minute: number, delta: number): number {
 // only a stepper's onPress handler ever sets `dirtyRef.current = true`, so
 // hydration never schedules a write.
 //
-// `commit` is passed fresh (not memoized) on every render by callers, so by
-// the time it actually runs it always reflects the latest values of any
-// other state it closes over (e.g. whether the reminder is enabled) — never
-// a stale outer closure.
+// `commit` is passed fresh (not memoized) on every render by callers, but it
+// reads any other state it needs (e.g. whether the reminder is enabled) from
+// `latestRef`, not from the render it closes over.
 
 const STEPPER_DEBOUNCE_MS = 400;
 
