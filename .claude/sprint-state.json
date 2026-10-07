@@ -122,7 +122,7 @@
     "E": {
       "branch": "sprint/lane-e-settings",
       "worktree": "C:/git/ht-lanes/lane-e",
-      "status": "in_progress",
+      "status": "merged",
       "waitsFor": "lane A merged",
       "order": [
         422,
@@ -136,7 +136,9 @@
         429
       ],
       "parked": [],
-      "base": "4dea4c6"
+      "base": "4dea4c6",
+      "mergeSha": "1951c66",
+      "cleanup": "f4ca973: one comment block above useDebouncedCommit corrected (commits read other state from latestRef, not from the render closure); nothing dead found; database.ts not touched"
     },
     "F": {
       "branch": "sprint/lane-f-repo",
@@ -194,7 +196,7 @@
     },
     "422": {
       "lane": "E",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "1963a62",
@@ -205,7 +207,8 @@
       "workOrder": "C:/git/ht-lanes/wo/422.md",
       "decisionSource": "issue body (no comments); analyst chose the strict #414 regex in place, fallback {8,0} unchanged",
       "regressionProof": "4 strict cases fail with 1963a62 notifications.ts, 21/21 at 9f78f2c; 24-string probe through the real db time getter and parseTimeString: 0 disagreements (incl. NBSP, BOM, zero-width space, full-width colon, 100 000-char input); no producer of a non-HH:MM time string in src/; no path hands raw stored text to parseTimeString; 1150/95 (tester reproduced)",
-      "securityReview": "skipped: parser tightening inside notifications.ts only; no db/api/backup/filesystem code in the diff, and the tester traced that the value only reaches it after the db reader's own strict validation"
+      "securityReview": "skipped: parser tightening inside notifications.ts only; no db/api/backup/filesystem code in the diff, and the tester traced that the value only reaches it after the db reader's own strict validation",
+      "mergeSha": "1951c66"
     },
     "423": {
       "lane": "B",
@@ -325,7 +328,7 @@
     },
     "429": {
       "lane": "E",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 1,
       "commits": [
         "5031c80",
@@ -344,7 +347,8 @@
       "workOrder": "C:/git/ht-lanes/wo/429.md",
       "decisionSource": "latest owner comment on #429 (one new database.ts function in one transaction; drop the unhandledRejection assertions and assert the handler's promise resolves; two messages; stepper writes get the same Alert)",
       "securityReview": "APPROVE (code read at e366ee3): setNutritionGoals uses the same upsert text as setSetting, bound values, queue wrapper outside and withTransactionAsync inside, nothing enqueued from within; the first write cannot commit if the second fails; schema.ts untouched. Inputs from suggestGoals are clamped (finite, >= 1000 kcal / >= 50 g), and getNutritionGoals falls back to defaults for a non-finite stored value. scheduleAfterSave wraps only the scheduling call at all 12 call sites, so a write failure never enters it and is never reported as saved. Note: after a failed debounced stepper write the stepper shows the unsaved value until the next focus reload (the user is told it failed).",
-      "regressionProof": "round 1: four test/fix pairs proven; transaction removal red; real-engine attacks; one-hunk database.ts diff; mutation proof of the replaced assertions. Round 2 (88e3370, test-only, +161 lines): 12 tests over the six time-stepper commits; six single-line source mutations (bare scheduling call / swallowed write error for lunch, backup, cook-day) each turn exactly the targeted test red; fake timers restored; 1184/97 (tester reproduced)"
+      "regressionProof": "round 1: four test/fix pairs proven; transaction removal red; real-engine attacks; one-hunk database.ts diff; mutation proof of the replaced assertions. Round 2 (88e3370, test-only, +161 lines): 12 tests over the six time-stepper commits; six single-line source mutations (bare scheduling call / swallowed write error for lunch, backup, cook-day) each turn exactly the targeted test red; fake timers restored; 1184/97 (tester reproduced)",
+      "mergeSha": "1951c66"
     },
     "430": {
       "lane": "A",
@@ -388,7 +392,7 @@
     },
     "433": {
       "lane": "E",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "bb42bd8",
@@ -400,7 +404,8 @@
       "workOrder": "C:/git/ht-lanes/wo/433.md",
       "decisionSource": "issue body (no comments); analyst chose one mechanism: a latestRef updated by wrapped setters, read at call time",
       "regressionProof": "12/12 new tests fail with bb42bd8 SettingsScreen.tsx and still fail with the refactor-only 0b52831, pass at 40c121b; the 7 existing SettingsScreen suites (70 tests) byte-unchanged and green at 0b52831 and at the tip; scratch interleavings (two updates in one tick, toggle + focus reload with the old value, reload + debounced flush) leave ref and rendered state in agreement; 1162/96 (tester reproduced). The dev reported 13 tests; the file has 12.",
-      "securityReview": "skipped: UI handlers reading fresh state only; no db/api/backup/filesystem code in the diff"
+      "securityReview": "skipped: UI handlers reading fresh state only; no db/api/backup/filesystem code in the diff",
+      "mergeSha": "1951c66"
     },
     "434": {
       "lane": "C",
@@ -426,11 +431,18 @@
     },
     "435": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "a97580c",
+        "85f8d1b",
+        "009819e",
+        "2ae4770",
+        "c4efd09",
+        "7f944b2"
+      ],
       "deviceCheck": "Happy path only (a write failure cannot be forced on a phone): open Log measurements, enter waist 81, Save: modal closes, Waist pill shows 81 cm, no Alert. Force-close and reopen: value still there.",
-      "notes": "WO ready; lane C waits for lane A. ORCHESTRATOR RULING: sibling scope bounded to the two handlers where the UI behaves as if it saved (measurements modal, handleLogSet/SetLoggerModal). The 7 handlers that only log and snap back via reload (handleToggle, handleExerciseToggle, handleAddExtraWorkout, handleToggleExtraWorkout, handleToggleMeal, handleAddWater, handleDeleteSet) do not show a false success, so they are a different symptom and go to the findings list, not into this issue.",
+      "notes": "WO ready. ORCHESTRATOR RULING: scope = the two paths where the UI behaves as if it saved (measurements modal, set logger); the 7 snap-back handlers are a recorded finding. | dev: handleSaveMeasurements and handleLogSet return Promise<boolean> with the write and the refresh in separate try blocks; MeasurementsModal got a savingRef guard; SetLoggerModal clears reps only on success. BEYOND THE WO: a failed getWorkoutSetsForDay refresh after a successful set write is log-only and returns true (mirrors the measurements rule; avoids a duplicate set on retry). Four of the eight new tests were green on arrival (characterisation pins). No existing assertion edited.",
       "workOrder": "C:/git/ht-lanes/wo/435.md",
       "decisionSource": "SPRINT.md §3 known pattern (#435 follows #404: an Alert, and the modal stays open)"
     },
@@ -690,6 +702,11 @@
     {
       "at": "2026-10-07T21:24:07Z",
       "event": "#429 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane E out of issues (3 done, 0 parked) -> cleanup"
+    },
+    {
+      "at": "2026-10-07T21:27:24Z",
+      "event": "merged lane E into integration 1951c66 (no conflicts); gates green: typecheck clean, 1230/100. #435 in_test (1243/96 per dev)",
+      "sha": "1951c66"
     }
   ],
   "status": "running",
@@ -747,7 +764,11 @@
     "SMALL (#411 dev): the shared Button sets importantForAccessibility=no-hide-descendants on its title Text, so the visible label is hidden from assistive-tech text queries (tests must use includeHiddenElements or the accessibility label)",
     "SMALL (#429 tester): switching a meal reminder off with cancelMealReminder failing shows Your setting was saved, but the reminder could not be scheduled - wrong wording for a cancel",
     "SMALL (#411 tester/security): if the reload after a successful Reset this day fails, the old entry and its notice stay on screen; a second tap shows Reset failed although the reset happened (needs two failures in a row)",
-    "SMALL (#411 tester): the Reset this day notice button has no busy/disabled state, and a loadToday that never settles keeps the in-flight guard set until the screen remounts"
+    "SMALL (#411 tester): the Reset this day notice button has no busy/disabled state, and a loadToday that never settles keeps the in-flight guard set until the screen remounts",
+    "SMALL (lane E cleanup): setNutritionGoals inlines the app_state upsert instead of going through setSetting, so a future change to setSetting would not reach it",
+    "SMALL (lane E cleanup): pre-existing (#313) and other (#NNN) history comments remain in SettingsScreen.tsx",
+    "SMALL (#435 dev): SetLoggerModal.handleAdd disables Add through saving state, not a ref, so a same-tick double tap can log a set twice",
+    "SMALL (#435 dev): CLAUDE.md does not need a suite count, but any doc that quotes one is stale (96 suites on lane C)"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
