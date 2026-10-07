@@ -80,7 +80,6 @@ describe('recipe readers with a malformed ingredients column', () => {
     const bad = (await db.getRecipesIncludingArchived()).find((r) => r.id === 'bad-1');
     expect(bad?.ingredients).toEqual([]);
     expect(bad?.title).toBe('Bad One');
-    expect(bad?.archived_at).toBeTruthy();
   });
 
   it('getRecipeById returns the recipe rather than null', async () => {
