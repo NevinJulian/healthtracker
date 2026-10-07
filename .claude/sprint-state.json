@@ -245,11 +245,13 @@
     },
     "432": {
       "lane": "C",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "none (optional: Analytics measurements card N entries excludes blank entries, only visible if a device holds an all-NULL row)",
+      "notes": "WO ready; lane C waits for lane A. Two items kept (A getBodyMeasurements NULL filter, B toggleAdditionalWorkout rejects unknown id), both inside lane C's grant, no cross-lane need, no migration. Existing test dailyLogUpserts.test.ts:599/605 pins the old resolve-silently behaviour and is rewritten (authorised by the owner decision; own commit, flagged for human review).",
+      "workOrder": "C:/git/ht-lanes/wo/432.md",
+      "decisionSource": "latest owner comment on #432 (logCookedMeal: no change; getBodyMeasurements skips all-NULL rows, no migration; inventory inner join: no change; toggleAdditionalWorkout rejects when the workout isn't found)"
     },
     "433": {
       "lane": "E",
@@ -269,11 +271,13 @@
     },
     "435": {
       "lane": "C",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "Happy path only (a write failure cannot be forced on a phone): open Log measurements, enter waist 81, Save: modal closes, Waist pill shows 81 cm, no Alert. Force-close and reopen: value still there.",
+      "notes": "WO ready; lane C waits for lane A. ORCHESTRATOR RULING: sibling scope bounded to the two handlers where the UI behaves as if it saved (measurements modal, handleLogSet/SetLoggerModal). The 7 handlers that only log and snap back via reload (handleToggle, handleExerciseToggle, handleAddExtraWorkout, handleToggleExtraWorkout, handleToggleMeal, handleAddWater, handleDeleteSet) do not show a false success, so they are a different symptom and go to the findings list, not into this issue.",
+      "workOrder": "C:/git/ht-lanes/wo/435.md",
+      "decisionSource": "SPRINT.md §3 known pattern (#435 follows #404: an Alert, and the modal stays open)"
     },
     "437": {
       "lane": "F",
@@ -328,6 +332,10 @@
     {
       "at": "2026-10-07T20:18:28Z",
       "event": "#422 work order ready (lane E waits for lane A)"
+    },
+    {
+      "at": "2026-10-07T20:18:47Z",
+      "event": "#432 and #435 work orders ready (lane C waits for lane A); ruled #435 sibling scope: 2 handlers in, 7 snap-back handlers deferred to findings"
     }
   ],
   "status": "running",
@@ -340,6 +348,9 @@
     "SMALL (#430 analyst): getBioForceLibrary (database.ts:1234) maps JSON.parse(r.data) unguarded; one bad row throws the whole list (needs hand-corrupted data)",
     "SMALL (#412 analyst): the v37 precondition error text (schema.ts:811) still says skip v37 if already applied; it is a string inside the migration, so it stays",
     "SMALL (#427 dev): database.ts header block (Fixes applied previously / Feature additions (issue #40)) carries issue numbers and history, against the comment rule",
-    "SMALL (#422 analyst): parseDaySetting/parseTimeSetting in database.ts are private, so the time rule is duplicated in notifications.ts and can drift; a shared export would remove it"
+    "SMALL (#422 analyst): parseDaySetting/parseTimeSetting in database.ts are private, so the time rule is duplicated in notifications.ts and can drift; a shared export would remove it",
+    "SMALL (#435 analyst): 7 Dashboard handlers only log and reload on a write failure, with no message to the user: handleToggle :460, handleExerciseToggle :506, handleAddExtraWorkout :553, handleToggleExtraWorkout :573, handleToggleMeal :591, handleAddWater :603, handleDeleteSet :655 (suggested: shared reportSaveFailure helper + table-driven test)",
+    "SMALL (#435 analyst): MeasurementsModal.handleSave saves the valid fields even when another field is invalid, then stays open, so the user may re-save",
+    "SMALL (#432 analyst): toggleAdditionalWorkout still creates an empty daily_log row for the date before rejecting an unknown id (harmless: the Dashboard only toggles today's row)"
   ]
 }
