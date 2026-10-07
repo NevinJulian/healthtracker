@@ -2008,7 +2008,7 @@ export async function getCookingTasks(): Promise<CookingTaskWithRecipe[]> {
       fat: r.fat,
       prepTimeMinutes: r.prepTimeMinutes,
       defaultServings: r.defaultServings,
-      ingredients: JSON.parse(r.ingredients ?? '[]'),
+      ingredients: parseIngredients(r.ingredients ?? '[]', r.recipe_id),
       instructions: r.instructions,
       freezerTips: r.freezerTips ?? '',
     } as Recipe,
