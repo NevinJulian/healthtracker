@@ -8,7 +8,6 @@ jest.mock('@react-navigation/native', () => ({
   // MealPrepScreen's load-on-focus effect only needs to run once on mount
   // for these tests, so the focus effect is modeled as a plain mount effect.
   useFocusEffect: (callback: () => void | (() => void)) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useEffect } = require('react');
     useEffect(callback, []);
   },
@@ -20,7 +19,9 @@ jest.mock('../../db/database', () => ({
   logCookedMeal: jest.fn().mockResolvedValue(undefined),
   assignMealToPlan: jest.fn().mockResolvedValue(undefined),
   toggleMealConsumed: jest.fn().mockResolvedValue(undefined),
+  removeMealFromPlan: jest.fn().mockResolvedValue(undefined),
   getRecipes: jest.fn().mockResolvedValue([]),
+  getRecipesIncludingArchived: jest.fn().mockResolvedValue([]),
   toISODate: jest.fn(() => '2026-09-19'),
   resetCookEmptyNotified: jest.fn().mockResolvedValue(undefined),
 }));
@@ -32,11 +33,13 @@ jest.mock('../../services/notifications', () => ({
 import MealPrepScreen from '../MealPrepScreen';
 import {
   getRecipes,
+  getRecipesIncludingArchived,
   getMealInventory,
   getWeeklyMealPlan,
   logCookedMeal,
   assignMealToPlan,
   toggleMealConsumed,
+  removeMealFromPlan,
   resetCookEmptyNotified,
   Recipe,
   MealInventoryWithRecipe,
@@ -45,12 +48,14 @@ import {
 import { checkAndNotifyEmptyInventory } from '../../services/notifications';
 
 const mockGetRecipes = jest.mocked(getRecipes);
+const mockGetRecipesIncludingArchived = jest.mocked(getRecipesIncludingArchived);
 const mockGetMealInventory = jest.mocked(getMealInventory);
 const mockGetWeeklyMealPlan = jest.mocked(getWeeklyMealPlan);
 const mockLogCookedMeal = jest.mocked(logCookedMeal);
 const mockResetCookEmptyNotified = jest.mocked(resetCookEmptyNotified);
 const mockAssignMealToPlan = jest.mocked(assignMealToPlan);
 const mockToggleMealConsumed = jest.mocked(toggleMealConsumed);
+const mockRemoveMealFromPlan = jest.mocked(removeMealFromPlan);
 const mockCheckAndNotifyEmptyInventory = jest.mocked(checkAndNotifyEmptyInventory);
 
 function makeRecipe(overrides: Partial<Recipe> = {}): Recipe {
@@ -105,6 +110,7 @@ describe('MealPrepScreen log meal modal (#324)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetRecipes.mockResolvedValue(mockRecipes);
+    mockGetRecipesIncludingArchived.mockResolvedValue(mockRecipes);
     mockGetMealInventory.mockResolvedValue([]);
     mockGetWeeklyMealPlan.mockResolvedValue([]);
     mockLogCookedMeal.mockResolvedValue(undefined);
@@ -232,6 +238,7 @@ describe('MealPrepScreen write failure feedback', () => {
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockGetRecipes.mockResolvedValue(mockRecipes);
+    mockGetRecipesIncludingArchived.mockResolvedValue(mockRecipes);
     mockGetMealInventory.mockResolvedValue([]);
     mockGetWeeklyMealPlan.mockResolvedValue([]);
     mockLogCookedMeal.mockResolvedValue(undefined);
@@ -341,5 +348,410 @@ describe('MealPrepScreen write failure feedback', () => {
     expect(alertSpy).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalled();
     expect(mockGetWeeklyMealPlan).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MealPrepScreen planned meal of an archived recipe', () => {
+  const archivedRecipe = makeRecipe({
+    id: 'r-archived',
+    title: 'Archived Curry',
+    calories: 777,
+    protein: 55,
+  });
+  const archivedLunch: WeeklyMealPlanItem = {
+    id: 9,
+    date: '2026-09-19',
+    meal_type: 'Lunch',
+    recipe_id: 'r-archived',
+    is_consumed: true,
+    consumed_from_inventory_id: null,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetRecipes.mockResolvedValue([]);
+    mockGetRecipesIncludingArchived.mockResolvedValue([archivedRecipe]);
+    mockGetMealInventory.mockResolvedValue([]);
+    mockGetWeeklyMealPlan.mockResolvedValue([archivedLunch]);
+  });
+
+  it('shows the real title and counts its macros in the consumed total', async () => {
+    const { getByText, getAllByText, queryByText } = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    expect(getByText('Archived Curry')).toBeTruthy();
+    expect(queryByText('Unknown Recipe')).toBeNull();
+    expect(getByText('CONSUMED TODAY')).toBeTruthy();
+    expect(getAllByText('777 kcal · 55g protein')).toHaveLength(2);
+  });
+
+  it('keeps the archived recipe out of the Log Cooked Meal list', async () => {
+    mockGetRecipes.mockResolvedValue([mockRecipes[0]]);
+    const { getByText, queryByText } = await renderWithModalOpen();
+
+    expect(getByText('Chicken Bowl')).toBeTruthy();
+    expect(queryByText('Archived Curry')).toBeNull();
+  });
+});
+
+describe('MealPrepScreen first-load failure', () => {
+  let alertSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetRecipes.mockResolvedValue([]);
+    mockGetRecipesIncludingArchived.mockResolvedValue([]);
+    mockGetMealInventory.mockResolvedValue([]);
+    mockGetWeeklyMealPlan.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('shows an error view with Retry and keeps the tab switcher when the first load rejects', async () => {
+    mockGetMealInventory.mockRejectedValue(new Error('db down'));
+    const { getByText, getByLabelText, queryByText } = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    expect(getByText("Couldn't load your meals")).toBeTruthy();
+    expect(getByText('Your data is safe. Try again.')).toBeTruthy();
+    expect(getByLabelText('Retry')).toBeTruthy();
+    expect(getByLabelText('Weekly Plan')).toBeTruthy();
+    expect(getByLabelText('My Inventory')).toBeTruthy();
+    expect(queryByText('Your inventory is empty')).toBeNull();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['getWeeklyMealPlan', mockGetWeeklyMealPlan],
+    ['getRecipes', mockGetRecipes],
+    ['getRecipesIncludingArchived', mockGetRecipesIncludingArchived],
+  ])('shows the error view when %s rejects', async (_name, mock) => {
+    mock.mockRejectedValue(new Error('db down'));
+    const { getByText } = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    expect(getByText("Couldn't load your meals")).toBeTruthy();
+  });
+
+  it('Retry reloads and replaces the error view with the data', async () => {
+    mockGetMealInventory.mockRejectedValueOnce(new Error('db down'));
+    mockGetRecipesIncludingArchived.mockResolvedValue(mockRecipes);
+    mockGetWeeklyMealPlan.mockResolvedValue([
+      {
+        id: 3,
+        date: '2026-09-19',
+        meal_type: 'Lunch',
+        recipe_id: 'r1',
+        is_consumed: false,
+        consumed_from_inventory_id: null,
+      },
+    ]);
+    const { getByText, getByLabelText, queryByText } = render(<MealPrepScreen />);
+    await flushMicrotasks();
+    expect(getByText("Couldn't load your meals")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Retry'));
+    });
+    await flushMicrotasks();
+
+    expect(queryByText("Couldn't load your meals")).toBeNull();
+    expect(getByText('Chicken Bowl')).toBeTruthy();
+  });
+});
+
+describe('MealPrepScreen in-flight write guard', () => {
+  let alertSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+
+  const inventoryItem: MealInventoryWithRecipe = {
+    id: 1,
+    recipe_id: 'r1',
+    portions_available: 3,
+    date_cooked: '2026-09-18',
+    recipe: mockRecipes[0],
+  };
+
+  function deferred() {
+    let resolve!: () => void;
+    let reject!: (e: Error) => void;
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  async function renderWithAssignOpen() {
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+    fireEvent.press(utils.getAllByLabelText('Assign recipe to Lunch')[0]);
+    return utils;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetRecipes.mockResolvedValue(mockRecipes);
+    mockGetRecipesIncludingArchived.mockResolvedValue(mockRecipes);
+    mockGetMealInventory.mockResolvedValue([inventoryItem]);
+    mockGetWeeklyMealPlan.mockResolvedValue([]);
+    mockLogCookedMeal.mockResolvedValue(undefined);
+    mockAssignMealToPlan.mockResolvedValue(undefined);
+    mockResetCookEmptyNotified.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('calls logCookedMeal once for two Save presses in the same tick and disables Save while pending', async () => {
+    const d = deferred();
+    mockLogCookedMeal.mockReturnValue(d.promise);
+    mockGetMealInventory.mockResolvedValue([]);
+    const { getByText, getByLabelText } = await renderWithModalOpen();
+    fireEvent.press(getByText('Chicken Bowl'));
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Save'));
+      fireEvent.press(getByLabelText('Save'));
+    });
+
+    expect(mockLogCookedMeal).toHaveBeenCalledTimes(1);
+    expect(getByLabelText('Save').props.accessibilityState.disabled).toBe(true);
+
+    await act(async () => {
+      d.resolve();
+    });
+  });
+
+  it('clears the log guard after a rejected write so a retry calls again', async () => {
+    mockLogCookedMeal.mockRejectedValue(new Error('x'));
+    mockGetMealInventory.mockResolvedValue([]);
+    const { getByText, getByLabelText } = await renderWithModalOpen();
+    fireEvent.press(getByText('Chicken Bowl'));
+
+    await pressAndFlush(getByLabelText('Save'));
+    expect(getByLabelText('Save').props.accessibilityState.disabled).toBe(false);
+    await pressAndFlush(getByLabelText('Save'));
+
+    expect(mockLogCookedMeal).toHaveBeenCalledTimes(2);
+  });
+
+  it('calls assignMealToPlan once for two row presses in the same tick', async () => {
+    const d = deferred();
+    mockAssignMealToPlan.mockReturnValue(d.promise);
+    const utils = await renderWithAssignOpen();
+    const row = utils.getByText('Chicken Bowl');
+
+    await act(async () => {
+      fireEvent.press(row);
+      fireEvent.press(row);
+    });
+
+    expect(mockAssignMealToPlan).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      d.resolve();
+    });
+  });
+
+  it('clears the assign guard after a rejected write so a retry calls again', async () => {
+    mockAssignMealToPlan.mockRejectedValue(new Error('x'));
+    const utils = await renderWithAssignOpen();
+
+    await pressAndFlush(utils.getByText('Chicken Bowl'));
+    await pressAndFlush(utils.getByText('Chicken Bowl'));
+
+    expect(mockAssignMealToPlan).toHaveBeenCalledTimes(2);
+    expect(alertSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('MealPrepScreen remove planned meal', () => {
+  let alertSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+
+  const eatenLunch: WeeklyMealPlanItem = {
+    id: 7,
+    date: '2026-09-19',
+    meal_type: 'Lunch',
+    recipe_id: 'r1',
+    is_consumed: true,
+    consumed_from_inventory_id: 1,
+  };
+  const pendingLunch: WeeklyMealPlanItem = { ...eatenLunch, is_consumed: false };
+
+  const eatenMessage =
+    'This portion will go back to your inventory and the meal will be removed from your nutrition history.';
+  const pendingMessage = 'Remove this meal from your plan?';
+
+  /** The destructive "Remove" button of the most recent confirm. */
+  function confirmButton(name: string) {
+    const buttons = alertSpy.mock.calls[alertSpy.mock.calls.length - 1][2] as {
+      text: string;
+      style?: string;
+      onPress?: () => void;
+    }[];
+    const button = buttons.find((b) => b.text === name);
+    if (!button) throw new Error(`no ${name} button`);
+    return button;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetRecipes.mockResolvedValue(mockRecipes);
+    mockGetRecipesIncludingArchived.mockResolvedValue(mockRecipes);
+    mockGetMealInventory.mockResolvedValue([]);
+    mockGetWeeklyMealPlan.mockResolvedValue([eatenLunch]);
+    mockRemoveMealFromPlan.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('offers Remove on an eaten plan and only opens the confirm when pressed', async () => {
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(utils.getByLabelText('Remove Chicken Bowl from plan'));
+
+    expect(mockRemoveMealFromPlan).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][1]).toBe(eatenMessage);
+    expect(confirmButton('Remove').style).toBe('destructive');
+  });
+
+  it('shows the simple confirm for a plan that was not eaten', async () => {
+    mockGetWeeklyMealPlan.mockResolvedValue([pendingLunch]);
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(utils.getByLabelText('Remove Chicken Bowl from plan'));
+
+    expect(alertSpy.mock.calls[0][1]).toBe(pendingMessage);
+  });
+
+  it('removes the plan once on confirm, reloads, and the slot shows Assign again', async () => {
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+    const assignBefore = utils.getAllByLabelText('Assign recipe to Lunch').length;
+    mockGetWeeklyMealPlan.mockClear();
+    mockGetWeeklyMealPlan.mockResolvedValue([]);
+
+    fireEvent.press(utils.getByLabelText('Remove Chicken Bowl from plan'));
+    await act(async () => {
+      confirmButton('Remove').onPress?.();
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+    });
+
+    expect(mockRemoveMealFromPlan).toHaveBeenCalledTimes(1);
+    expect(mockRemoveMealFromPlan).toHaveBeenCalledWith(7);
+    expect(mockGetWeeklyMealPlan).toHaveBeenCalledTimes(1);
+    expect(utils.queryByLabelText('Remove Chicken Bowl from plan')).toBeNull();
+    expect(utils.getAllByLabelText('Assign recipe to Lunch')).toHaveLength(assignBefore + 1);
+  });
+
+  it('makes no db call when the confirm is cancelled', async () => {
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+    mockGetWeeklyMealPlan.mockClear();
+
+    fireEvent.press(utils.getByLabelText('Remove Chicken Bowl from plan'));
+    expect(confirmButton('Cancel').style).toBe('cancel');
+    await act(async () => {
+      confirmButton('Cancel').onPress?.();
+    });
+
+    expect(mockRemoveMealFromPlan).not.toHaveBeenCalled();
+    expect(mockGetWeeklyMealPlan).not.toHaveBeenCalled();
+  });
+
+  it('alerts and does not reload when removeMealFromPlan rejects', async () => {
+    mockRemoveMealFromPlan.mockRejectedValue(new Error('x'));
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+    mockGetWeeklyMealPlan.mockClear();
+
+    fireEvent.press(utils.getByLabelText('Remove Chicken Bowl from plan'));
+    await act(async () => {
+      confirmButton('Remove').onPress?.();
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+    });
+
+    expect(alertSpy).toHaveBeenLastCalledWith(
+      'Error',
+      'Failed to remove the meal. Please try again.'
+    );
+    expect(mockGetWeeklyMealPlan).not.toHaveBeenCalled();
+    expect(utils.getByLabelText('Remove Chicken Bowl from plan')).toBeTruthy();
+  });
+
+  it('removes a plan whose recipe is archived', async () => {
+    const archived = makeRecipe({ id: 'r-archived', title: 'Archived Curry' });
+    mockGetRecipes.mockResolvedValue([]);
+    mockGetRecipesIncludingArchived.mockResolvedValue([archived]);
+    mockGetWeeklyMealPlan.mockResolvedValue([{ ...eatenLunch, id: 9, recipe_id: 'r-archived' }]);
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(utils.getByLabelText('Remove Archived Curry from plan'));
+    await act(async () => {
+      confirmButton('Remove').onPress?.();
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+    });
+
+    expect(mockRemoveMealFromPlan).toHaveBeenCalledWith(9);
+  });
+
+  it('offers Remove when the recipe is missing entirely', async () => {
+    mockGetRecipesIncludingArchived.mockResolvedValue([]);
+    mockGetWeeklyMealPlan.mockResolvedValue([{ ...eatenLunch, id: 11, recipe_id: 'gone' }]);
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(utils.getByLabelText('Remove Lunch from plan'));
+    await act(async () => {
+      confirmButton('Remove').onPress?.();
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+    });
+
+    expect(mockRemoveMealFromPlan).toHaveBeenCalledWith(11);
+  });
+
+  it('calls removeMealFromPlan once when the confirm is accepted twice in one tick', async () => {
+    let resolve!: () => void;
+    mockRemoveMealFromPlan.mockReturnValue(
+      new Promise<void>((res) => {
+        resolve = res;
+      })
+    );
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(utils.getByLabelText('Remove Chicken Bowl from plan'));
+    const confirm = confirmButton('Remove');
+    await act(async () => {
+      confirm.onPress?.();
+      confirm.onPress?.();
+    });
+
+    expect(mockRemoveMealFromPlan).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolve();
+    });
   });
 });

@@ -19,7 +19,9 @@ import {
   logCookedMeal,
   assignMealToPlan,
   toggleMealConsumed,
+  removeMealFromPlan,
   getRecipes,
+  getRecipesIncludingArchived,
   Recipe,
   MealInventoryWithRecipe,
   WeeklyMealPlanItem,
@@ -80,12 +82,14 @@ export default function MealPrepScreen() {
   const [inventory, setInventory] = useState<MealInventoryWithRecipe[]>([]);
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyMealPlanItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<'initial' | 'refresh' | null>(null);
 
   const [logModalVisible, setLogModalVisible] = useState(false);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ date: string; meal_type: string } | null>(null);
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [planRecipes, setPlanRecipes] = useState<Recipe[]>([]);
 
   // Tracks whether the screen has completed its first load. Post-action
   // refreshes (handleLogCookedMeal, handleAssignMeal, handleToggleConsumed)
@@ -117,23 +121,27 @@ export default function MealPrepScreen() {
 
   const loadData = useCallback(async () => {
     const runId = ++runIdRef.current;
+    setLoadError(null);
     if (!hasLoadedOnceRef.current) {
       setLoading(true);
     }
     try {
-      const [inv, plan, allRecipes] = await Promise.all([
+      const [inv, plan, allRecipes, allPlanRecipes] = await Promise.all([
         getMealInventory(),
         getWeeklyMealPlan(),
         getRecipes(),
+        getRecipesIncludingArchived(),
       ]);
       if (!mountedRef.current || runIdRef.current !== runId) return;
       setInventory(inv);
       setWeeklyPlan(plan);
       setRecipes(allRecipes);
+      setPlanRecipes(allPlanRecipes);
       hasLoadedOnceRef.current = true;
     } catch (err) {
       if (!mountedRef.current || runIdRef.current !== runId) return;
       logDbError(err);
+      setLoadError(hasLoadedOnceRef.current ? 'refresh' : 'initial');
     } finally {
       if (mountedRef.current && runIdRef.current === runId) {
         setLoading(false);
@@ -156,36 +164,68 @@ export default function MealPrepScreen() {
 
   // ─── Actions ─────────────────────────────────────────────────
 
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+
+  const runGuarded = async (action: () => Promise<void>) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await action();
+    } finally {
+      savingRef.current = false;
+      if (mountedRef.current) setSaving(false);
+    }
+  };
+
   const handleLogCookedMeal = async (recipe_id: string, portions: number) => {
     // Backstop — the modal's own Save button is disabled for anything
     // outside this range, but never trust the caller alone (#324).
     if (!Number.isInteger(portions) || portions < 1 || portions > 50) return;
-    try {
-      await logCookedMeal(recipe_id, portions);
-    } catch (err) {
-      logDbError(err);
-      Alert.alert('Error', 'Failed to record your cooked meal. Please try again.');
-      return;
-    }
-    try {
-      await resetCookEmptyNotified();
-    } catch (err) {
-      console.warn('[MealPrepScreen] resetCookEmptyNotified failed:', err);
-    }
-    setLogModalVisible(false);
-    loadData();
+    await runGuarded(async () => {
+      try {
+        await logCookedMeal(recipe_id, portions);
+      } catch (err) {
+        logDbError(err);
+        Alert.alert('Error', 'Failed to record your cooked meal. Please try again.');
+        return;
+      }
+      try {
+        await resetCookEmptyNotified();
+      } catch (err) {
+        console.warn('[MealPrepScreen] resetCookEmptyNotified failed:', err);
+      }
+      setLogModalVisible(false);
+      loadData();
+    });
   };
 
   const handleAssignMeal = async (recipe_id: string) => {
     if (!assignTarget) return;
-    try {
-      await assignMealToPlan(assignTarget.date, assignTarget.meal_type, recipe_id);
-      setAssignModalVisible(false);
+    await runGuarded(async () => {
+      try {
+        await assignMealToPlan(assignTarget.date, assignTarget.meal_type, recipe_id);
+        setAssignModalVisible(false);
+        loadData();
+      } catch (err) {
+        logDbError(err);
+        Alert.alert('Error', 'Failed to assign the meal. Please try again.');
+      }
+    });
+  };
+
+  const handleRemoveMeal = async (planId: number) => {
+    await runGuarded(async () => {
+      try {
+        await removeMealFromPlan(planId);
+      } catch (err) {
+        logDbError(err);
+        Alert.alert('Error', 'Failed to remove the meal. Please try again.');
+        return;
+      }
       loadData();
-    } catch (err) {
-      logDbError(err);
-      Alert.alert('Error', 'Failed to assign the meal. Please try again.');
-    }
+    });
   };
 
   const handleToggleConsumed = async (planId: number, currentVal: boolean) => {
@@ -309,8 +349,8 @@ export default function MealPrepScreen() {
           const lunchPlan = weeklyPlan.find(p => p.date === dateStr && p.meal_type === 'Lunch');
           const dinnerPlan = weeklyPlan.find(p => p.date === dateStr && p.meal_type === 'Dinner');
 
-          const lunchRecipe = lunchPlan ? recipes.find(r => r.id === lunchPlan.recipe_id) : null;
-          const dinnerRecipe = dinnerPlan ? recipes.find(r => r.id === dinnerPlan.recipe_id) : null;
+          const lunchRecipe = lunchPlan ? planRecipes.find(r => r.id === lunchPlan.recipe_id) : null;
+          const dinnerRecipe = dinnerPlan ? planRecipes.find(r => r.id === dinnerPlan.recipe_id) : null;
 
           // Daily totals
           const consumed = [
@@ -351,6 +391,7 @@ export default function MealPrepScreen() {
                   plan={lunchPlan}
                   recipe={lunchRecipe ?? null}
                   onToggleConsumed={(id, val) => handleToggleConsumed(id, val)}
+                  onRemove={handleRemoveMeal}
                   onAssign={() => {
                     setAssignTarget({ date: dateStr, meal_type: 'Lunch' });
                     setAssignModalVisible(true);
@@ -362,6 +403,7 @@ export default function MealPrepScreen() {
                   plan={dinnerPlan}
                   recipe={dinnerRecipe ?? null}
                   onToggleConsumed={(id, val) => handleToggleConsumed(id, val)}
+                  onRemove={handleRemoveMeal}
                   onAssign={() => {
                     setAssignTarget({ date: dateStr, meal_type: 'Dinner' });
                     setAssignModalVisible(true);
@@ -403,7 +445,30 @@ export default function MealPrepScreen() {
         <View style={styles.loadingState}>
           <Text style={styles.loadingText}>Loading meals…</Text>
         </View>
-      ) : activeTab === 'weekly' ? renderWeeklyTab() : renderInventoryTab()}
+      ) : loadError === 'initial' ? (
+        <View style={styles.errorState}>
+          <Text style={styles.emptyTitle}>Couldn't load your meals</Text>
+          <Text style={styles.emptySub}>Your data is safe. Try again.</Text>
+          <Button title="Retry" onPress={loadData} style={styles.errorRetry} />
+        </View>
+      ) : (
+        <>
+          {loadError === 'refresh' && (
+            <View style={styles.refreshBanner}>
+              <Text style={styles.refreshBannerText}>
+                Couldn't refresh. Showing the last loaded data.
+              </Text>
+              <Button
+                title="Retry"
+                variant="ghost"
+                onPress={loadData}
+                style={styles.refreshBannerRetry}
+              />
+            </View>
+          )}
+          {activeTab === 'weekly' ? renderWeeklyTab() : renderInventoryTab()}
+        </>
+      )}
 
       {logModalVisible && (
         <LogMealModal
@@ -411,6 +476,7 @@ export default function MealPrepScreen() {
           onClose={() => setLogModalVisible(false)}
           recipes={recipes}
           onSave={handleLogCookedMeal}
+          saving={saving}
         />
       )}
 
@@ -419,6 +485,7 @@ export default function MealPrepScreen() {
         onClose={() => setAssignModalVisible(false)}
         inventory={inventory}
         onSave={handleAssignMeal}
+        saving={saving}
       />
     </View>
   );
@@ -431,14 +498,29 @@ function MealSlot({
   plan,
   recipe,
   onToggleConsumed,
+  onRemove,
   onAssign,
 }: {
   label: string;
   plan: WeeklyMealPlanItem | undefined;
   recipe: Recipe | null;
   onToggleConsumed: (id: number, current: boolean) => void;
+  onRemove: (id: number) => void;
   onAssign: () => void;
 }) {
+  const confirmRemove = (planId: number, eaten: boolean) => {
+    Alert.alert(
+      'Remove meal',
+      eaten
+        ? 'This portion will go back to your inventory and the meal will be removed from your nutrition history.'
+        : 'Remove this meal from your plan?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => onRemove(planId) },
+      ]
+    );
+  };
+
   const subtitle = recipe
     ? `${recipe.calories} kcal · ${recipe.protein}g protein`
     : undefined;
@@ -480,6 +562,15 @@ function MealSlot({
               </Text>
             )}
           </View>
+          <TouchableOpacity
+            style={styles.removeBtn}
+            onPress={() => confirmRemove(plan.id, plan.is_consumed)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${recipe?.title ?? label} from plan`}
+          >
+            <Ionicons name="close" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
           <CircleCheck
             checked={plan.is_consumed}
             onToggle={() => onToggleConsumed(plan.id, plan.is_consumed)}
@@ -516,11 +607,12 @@ function MacroChip({ label, value }: { label: string; value: string }) {
 
 // ─── Log Meal Modal ───────────────────────────────────────────
 
-function LogMealModal({ visible, onClose, recipes, onSave }: {
+function LogMealModal({ visible, onClose, recipes, onSave, saving }: {
   visible: boolean;
   onClose: () => void;
   recipes: Recipe[];
   onSave: (recipe_id: string, portions: number) => void;
+  saving: boolean;
 }) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [portions, setPortions] = useState('4');
@@ -595,7 +687,7 @@ function LogMealModal({ visible, onClose, recipes, onSave }: {
                   onSave(selectedRecipeId, parsedPortions);
                 }
               }}
-              disabled={!canSave}
+              disabled={!canSave || saving}
               style={styles.modalBtnHalf}
             />
           </View>
@@ -607,11 +699,12 @@ function LogMealModal({ visible, onClose, recipes, onSave }: {
 
 // ─── Assign Meal Modal ────────────────────────────────────────
 
-function AssignMealModal({ visible, onClose, inventory, onSave }: {
+function AssignMealModal({ visible, onClose, inventory, onSave, saving }: {
   visible: boolean;
   onClose: () => void;
   inventory: MealInventoryWithRecipe[];
   onSave: (recipe_id: string) => void;
+  saving: boolean;
 }) {
   if (!visible) return null;
 
@@ -637,6 +730,7 @@ function AssignMealModal({ visible, onClose, inventory, onSave }: {
                 <TouchableOpacity
                   style={styles.recipeOpt}
                   onPress={() => onSave(item.recipe_id)}
+                  disabled={saving}
                   activeOpacity={0.75}
                 >
                   <Text style={styles.recipeOptText}>{item.recipe.title}</Text>
@@ -793,6 +887,10 @@ const styles = StyleSheet.create({
   assignedText: {
     flex: 1,
   },
+  removeBtn: {
+    padding: Spacing.xs,
+    marginRight: Spacing.sm,
+  },
   assignedTitle: {
     fontFamily: Typography.title,
     fontSize: Typography.sizes.sm,
@@ -944,6 +1042,40 @@ const styles = StyleSheet.create({
     fontFamily: Typography.body,
     fontSize: Typography.sizes.sm,
     color: Colors.textMuted,
+  },
+
+  // ── Load error ─────────────────────────────────────────────
+  errorState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xxl,
+    gap: Spacing.sm,
+  },
+  errorRetry: {
+    marginTop: Spacing.md,
+  },
+
+  refreshBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    padding: Spacing.md,
+    backgroundColor: Colors.clayTint,
+    borderRadius: Radius.md,
+  },
+  refreshBannerText: {
+    flex: 1,
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.clayDeep,
+  },
+  refreshBannerRetry: {
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
   },
 
   // ── Empty states ───────────────────────────────────────────

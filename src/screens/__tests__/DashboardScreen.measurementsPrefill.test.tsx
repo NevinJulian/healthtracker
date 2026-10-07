@@ -3,7 +3,6 @@ import { render, fireEvent, act } from '@testing-library/react-native';
 
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useEffect } = require('react');
     useEffect(callback, []);
   },
@@ -31,6 +30,8 @@ jest.mock('../../db/database', () => ({
   upsertExerciseCompleted: jest.fn(() => Promise.resolve(undefined)),
   upsertBodyWeight: jest.fn(() => Promise.resolve(undefined)),
   upsertAdditionalWorkouts: jest.fn(() => Promise.resolve(undefined)),
+  addAdditionalWorkout: jest.fn(() => Promise.resolve(undefined)),
+  toggleAdditionalWorkout: jest.fn(() => Promise.resolve(undefined)),
   syncRollingSchedule: jest.fn(() => Promise.resolve(undefined)),
   toISODate: jest.fn(() => '2026-09-19'),
   getTodaysMealsWithRecipe: jest.fn(() => Promise.resolve([])),
@@ -79,9 +80,7 @@ describe('DashboardScreen measurements modal only submits edited fields', () => 
     mockLogBodyMeasurement.mockResolvedValue(undefined);
     mockGetLatestMeasurements.mockImplementation(() =>
       Promise.resolve({
-        id: 1,
-        date: '2026-09-10',
-        waist_cm: 80,
+        waist_cm: { value: 80, date: '2026-09-10' },
         chest_cm: null,
         hips_cm: null,
         thigh_cm: null,
@@ -90,9 +89,9 @@ describe('DashboardScreen measurements modal only submits edited fields', () => 
     );
   });
 
-  it('skips the untouched prefilled waist when only chest is edited', async () => {
+  it('skips the untouched waist when only chest is edited', async () => {
     const utils = await renderWithModalOpen();
-    expect(utils.getByTestId('measurement-waist-input').props.value).toBe('80');
+    expect(utils.getByTestId('measurement-waist-input').props.value).toBe('');
 
     fireEvent.changeText(utils.getByTestId('measurement-chest-input'), '90');
     await pressSave(utils);
@@ -103,17 +102,17 @@ describe('DashboardScreen measurements modal only submits edited fields', () => 
     expect(fields.chest_cm).toBe(90);
   });
 
-  it('sends null for a prefilled field the user blanked', async () => {
+  it('writes nothing when a field the user typed in is blanked again', async () => {
     const utils = await renderWithModalOpen();
 
+    fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '81');
     fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '');
     await pressSave(utils);
 
-    expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(1);
-    expect(mockLogBodyMeasurement.mock.calls[0][1].waist_cm).toBeNull();
+    expect(mockLogBodyMeasurement).not.toHaveBeenCalled();
   });
 
-  it('sends the parsed number for an edited prefilled field', async () => {
+  it('sends the parsed number for a typed field', async () => {
     const utils = await renderWithModalOpen();
 
     fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '78,5');
@@ -129,5 +128,67 @@ describe('DashboardScreen measurements modal only submits edited fields', () => 
     await pressSave(utils);
 
     expect(mockLogBodyMeasurement).not.toHaveBeenCalled();
+  });
+
+  it('opens with empty inputs and the latest value as each placeholder', async () => {
+    mockGetLatestMeasurements.mockImplementation(() =>
+      Promise.resolve({
+        waist_cm: { value: 80, date: '2026-09-10' },
+        chest_cm: { value: 90.5, date: '2026-09-11' },
+        hips_cm: { value: 95, date: '2026-09-12' },
+        thigh_cm: { value: 55, date: '2026-09-13' },
+        arm_cm: { value: 30, date: '2026-09-14' },
+      })
+    );
+    const utils = await renderWithModalOpen();
+
+    const expected = { waist: '80', chest: '90.5', hips: '95', thigh: '55', arm: '30' };
+    for (const [name, placeholder] of Object.entries(expected)) {
+      const input = utils.getByTestId(`measurement-${name}-input`);
+      expect(input.props.value).toBe('');
+      expect(input.props.placeholder).toBe(placeholder);
+    }
+  });
+
+  it('uses a dash placeholder for a field with no latest value', async () => {
+    const utils = await renderWithModalOpen();
+
+    expect(utils.getByTestId('measurement-waist-input').props.placeholder).toBe('80');
+    expect(utils.getByTestId('measurement-chest-input').props.placeholder).toBe('—');
+  });
+
+  it('shows the skip hint in the subtitle', async () => {
+    const utils = await renderWithModalOpen();
+
+    expect(utils.getByText('Enter values in cm — leave a field blank to skip it')).toBeTruthy();
+  });
+
+  it('does not call logBodyMeasurement when every field is blank or invalid', async () => {
+    const utils = await renderWithModalOpen();
+
+    for (const name of ['waist', 'chest', 'hips', 'thigh', 'arm']) {
+      fireEvent.changeText(utils.getByTestId(`measurement-${name}-input`), 'abc');
+    }
+    await pressSave(utils);
+
+    expect(mockLogBodyMeasurement).not.toHaveBeenCalled();
+    expect(utils.getAllByText(/Enter \d+–\d+ cm/)).toHaveLength(5);
+    expect(utils.getByLabelText('Save')).toBeTruthy();
+  });
+
+  it('sends only the typed chest value and no null', async () => {
+    const utils = await renderWithModalOpen();
+
+    fireEvent.changeText(utils.getByTestId('measurement-chest-input'), '91');
+    await pressSave(utils);
+
+    expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(1);
+    const fields = mockLogBodyMeasurement.mock.calls[0][1];
+    expect(fields.chest_cm).toBe(91);
+    expect(fields.waist_cm).toBeUndefined();
+    expect(fields.hips_cm).toBeUndefined();
+    expect(fields.thigh_cm).toBeUndefined();
+    expect(fields.arm_cm).toBeUndefined();
+    expect(Object.values(fields)).not.toContain(null);
   });
 });

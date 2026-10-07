@@ -90,10 +90,12 @@ async function mapWithConcurrency<T, R>(
  *
  * @param meal           - Full MealDetail from fetchMealById
  * @param defaultServings - Servings to assume (default 4; TheMealDB doesn't provide)
+ * @param signal         - Aborts in-flight lookups and stops new ones from starting
  */
 export async function buildImportResult(
   meal: MealDetail,
   defaultServings: number = DEFAULT_SERVINGS,
+  signal?: AbortSignal,
 ): Promise<ImportResult> {
   // ── 1. Parse free-text measure pairs ────────────────────────────────────────
   const parsed: ParsedIngredient[] = parseMealIngredients(meal.ingredients);
@@ -116,8 +118,9 @@ export async function buildImportResult(
     needsOFF,
     OFF_LOOKUP_CONCURRENCY,
     async (name): Promise<OFFNutrition | null> => {
+      if (signal?.aborted) return null;
       try {
-        return await lookupNutrition(name);
+        return await lookupNutrition(name, signal);
       } catch {
         return null;
       }

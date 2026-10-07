@@ -31,7 +31,6 @@ function loadFreshDatabaseModule(): DatabaseModule {
     deleteDatabaseAsync: async () => {},
     SQLiteDatabase: class {},
   }));
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require('../database') as DatabaseModule;
 }
 
@@ -77,6 +76,42 @@ describe('restoreFromPayload() with a pre-v34 (v33-shaped) backup (#310)', () =>
 
     // The restore itself still succeeded in full.
     expect(result.rowsRestored).toBe(4);
+  });
+
+  it('counts only consumed rows that survive the slot dedupe', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    const result = await db.restoreFromPayload({
+      weekly_meal_plan: [
+        legacyPlanRow(10, 'breakfast', 1),
+        legacyPlanRow(11, 'breakfast', 1),
+        legacyPlanRow(12, 'breakfast', 1),
+        legacyPlanRow(13, 'lunch', 1),
+      ],
+    });
+
+    const survivors = await db
+      .getDatabase()
+      .getFirstAsync<{ n: number }>(
+        'SELECT COUNT(*) AS n FROM weekly_meal_plan WHERE is_consumed = 1'
+      );
+    expect(survivors?.n).toBe(2);
+    expect(result.consumedMealsWithoutRefund).toBe(2);
+  });
+
+  it('reports 1, not 0, when every consumed row collapses into one slot', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    const result = await db.restoreFromPayload({
+      weekly_meal_plan: [
+        legacyPlanRow(10, 'breakfast', 1),
+        legacyPlanRow(11, 'breakfast', 1),
+      ],
+    });
+
+    expect(result.consumedMealsWithoutRefund).toBe(1);
   });
 
   it('restores those rows with a NULL pointer, so unticking really does not refund', async () => {

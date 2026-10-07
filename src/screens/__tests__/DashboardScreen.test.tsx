@@ -11,7 +11,6 @@ import { render, fireEvent, act } from '@testing-library/react-native';
 // mount effect (same pattern as MealPrepScreen.test.tsx / SettingsScreen.test.tsx).
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useEffect } = require('react');
     useEffect(callback, []);
   },
@@ -39,6 +38,8 @@ jest.mock('../../db/database', () => ({
   upsertExerciseCompleted: jest.fn().mockResolvedValue(undefined),
   upsertBodyWeight: jest.fn().mockResolvedValue(undefined),
   upsertAdditionalWorkouts: jest.fn().mockResolvedValue(undefined),
+  addAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
+  toggleAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   syncRollingSchedule: jest.fn().mockResolvedValue(undefined),
   toISODate: jest.fn(() => '2026-09-19'),
   getTodaysMealsWithRecipe: jest.fn().mockResolvedValue([]),

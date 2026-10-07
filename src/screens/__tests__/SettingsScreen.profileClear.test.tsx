@@ -27,7 +27,6 @@ jest.mock('@react-navigation/native', () => ({
   // these tests, so the focus effect is modeled as a plain mount effect —
   // same simplification as SettingsScreen.test.tsx.
   useFocusEffect: (callback: () => void | (() => void)) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useEffect } = require('react');
     useEffect(callback, []);
   },

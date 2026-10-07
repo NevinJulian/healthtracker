@@ -1,48 +1,40 @@
 {
-  "sprint": 2,
-  "startedAt": "2026-09-30T22:30:33Z",
+  "sprint": 3,
+  "startedAt": "2026-10-06T17:01:16Z",
   "integrationBranch": "sprint/auto-fixes",
-  "baseSha": "fdf5c68",
+  "baseSha": "58a7f3f",
   "baseline": {
     "typecheck": "pass",
-    "testSuites": 62,
-    "tests": 610,
-    "note": "npm test script is `cross-env TZ=UTC jest` - every npm test run is UTC regardless of shell TZ; the Zurich run was UTC too. Other TZs need `npx jest` directly."
+    "testSuites": 81,
+    "tests": 862
   },
   "frozenScope": [
-    314,
-    316,
-    315,
-    363,
-    378,
-    380,
-    368,
-    370,
-    371,
-    381,
-    379,
-    382,
-    383,
-    372,
-    373,
-    367,
-    362,
-    311,
-    361,
-    328,
-    375,
-    366,
-    365,
-    364,
+    414,
+    412,
+    406,
+    419,
+    410,
+    411,
+    415,
+    416,
+    417,
+    401,
+    403,
+    408,
     318,
-    374,
-    377
+    405,
+    404,
+    397,
+    407,
+    398,
+    400,
+    409
   ],
   "excluded": {
-    "334": "PR #393, landed by hand",
-    "360": "PR #394, landed by hand",
     "392": "feature, runs outside the sprint",
-    "396": "not in SPRINT.md §3 (follow-up to #316)"
+    "396": "needs restore rework + cascade decision",
+    "399": "PR #420, landed by hand",
+    "402": "PR #420, landed by hand"
   },
   "budget": {
     "maxRoundTripsPerIssue": 3,
@@ -50,21 +42,11 @@
   },
   "worktreeRoot": "C:/git/ht-lanes",
   "orchestratorDecisions": [
-    "Each lane runs in its own git worktree at C:/git/ht-lanes/lane-<x>, branched from sprint/auto-fixes at fdf5c68.",
-    "Agents must not use git stash: the stash stack is shared across all worktrees.",
-    "Test-file ownership: A = src/db/__tests__/** + src/services/__tests__/backup.test.ts; B = src/services/__tests__/notifications*; C = src/screens/__tests__/analyticsHelpers* + AnalyticsDashboardScreen*; D = src/screens/__tests__/{Settings,MealPrep,Dashboard,Onboarding}Screen* (and SetLoggerModal tests if #364 lands in a component, pending analyst); E = src/api/__tests__/**; G = src/db/testHelpers/**, jest.config.js, .github/workflows/test.yml.",
-    "Lane G (#377) starts only after every other lane has merged into sprint/auto-fixes.",
-    "Security review is required for every lane A issue, lane E, and any other issue whose diff reaches src/db, backup.ts, src/api or external input; skip decisions are recorded per issue.",
-    "#318: lane E granted DiscoverScreen.tsx, RecipeEditorScreen.tsx and DiscoverScreen.test.tsx (no sprint-2 owner). DiscoverDetailScreen.tsx and src/nutrition/importRecipe.ts NOT granted; the cancel affordance is excluded (product call). #318 stays partial -> Refs.",
-    "#311: analyst chose an in-lane variant of option 3 (signature map + OS identifier check inside _reconcile) instead of passing reminder kind from SettingsScreen; accepted.",
-    "#318: grant extended to a new file src/screens/__tests__/RecipeEditorScreen.abort.test.tsx (unowned) so the editor-unmount AC gets a test.",
-    "#315 split: lane A does the importBackup error wrapping (backup.ts); lane D gets a queued item 315-display (SettingsScreen restore alert lists result.skipped; skipped already returned on main so independent). app_start_date restore validation belongs to #363.",
+    "Each lane runs in its own git worktree at C:/git/ht-lanes/lane-<x>. A, B, E, F branch from sprint/auto-fixes at 58a7f3f; C and D branch after lane A merges; G after every other lane merges.",
+    "Agents must not use git stash: the stash stack is shared across worktrees (2 pre-sprint human stashes exist).",
+    "Security review required for every lane A issue, lane E, #419 (rescue export touches filesystem/db), and any issue whose diff reaches src/db, backup.ts, src/api or external input; skip decisions recorded per issue.",
     "After each integration push, read the real GitHub test check via the public REST check-runs endpoint (curl, read-only; gh CLI forbidden).",
-    "#380: overrode analyst design (append v39). Restore-only dedupe SQL constant outside MIGRATIONS replaces v35 in the restore replay; no migration runs on user devices for a restore-only bug. #380 lands partial -> Refs.",
-    "#380: authorized editing the existing restoreLegacyDuplicates test that pinned the v35 NULL-pointer survivor (it encodes the #380 bug). Own commit, flagged for human review.",
-    "#381: authorized editing workoutSetIndexCollision.test.ts read-order test that pinned #317 created_at order (the behaviour #381 reverses). Own commit, flagged for human review.",
-    "#373: authorized updating clearProfileFields.test.ts documentation test that asserted blank setting reads as 0 (the #373 bug). Own commit, flagged for human review.",
-    "#367: granted lane A DashboardScreen MeasurementsModal save path + a new test file to fix the copy-forward the read-side fix would widen (sprint-caused regression rule). Lane D is merged and idle."
+    "Work orders are saved verbatim at C:/git/ht-lanes/wo/<issue>.md (outside the repo) so a resumed session can re-dispatch without re-analysing."
   ],
   "lanes": {
     "A": {
@@ -72,101 +54,80 @@
       "worktree": "C:/git/ht-lanes/lane-a",
       "status": "merged",
       "order": [
-        314,
-        316,
-        315,
-        363,
-        378,
-        380,
-        368,
-        370,
-        371,
-        381,
-        379,
-        382,
-        383,
-        372,
-        373,
-        367,
-        362
+        414,
+        412,
+        406
       ],
       "current": null,
       "done": [
-        316,
-        315,
-        363,
-        378,
-        380,
-        368,
-        370,
-        371,
-        381,
-        382,
-        383,
-        372,
-        373,
-        367,
-        362
+        414,
+        412,
+        406
       ],
-      "parked": [
-        314,
-        379
-      ],
-      "cleanup": "f01c39b comment-only (5 files)",
-      "mergeSha": "6898c98"
+      "parked": [],
+      "mergeSha": "7a97abf",
+      "cleanup": "90b02eb comment corrections (3 spots) + b618b30 removed the dead {version} branch of POST_RESTORE_STEPS (type + loop only)"
     },
     "B": {
-      "branch": "sprint/lane-b-notify",
+      "branch": "sprint/lane-b-start",
       "worktree": "C:/git/ht-lanes/lane-b",
       "status": "merged",
       "order": [
-        311,
-        361
+        419
       ],
       "current": null,
       "done": [
-        311,
-        361
+        419
       ],
       "parked": [],
-      "cleanup": "0a1b7a8 log-string only",
-      "mergeSha": "23e1838"
+      "cleanup": "no changes needed",
+      "mergeSha": "0987514"
     },
     "C": {
-      "branch": "sprint/lane-c-analytics",
+      "branch": "sprint/lane-c-dashboard",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "out_of_work",
-      "order": [
-        328
-      ],
-      "current": null,
-      "done": [],
-      "parked": [
-        328
-      ]
-    },
-    "D": {
-      "branch": "sprint/lane-d-screens",
-      "worktree": "C:/git/ht-lanes/lane-d",
       "status": "merged",
+      "waitsFor": "lane A merged",
       "order": [
-        375,
-        366,
-        365,
-        364,
-        "315-display"
+        410,
+        411,
+        415,
+        416
       ],
       "current": null,
       "done": [
-        375,
-        366,
-        365,
-        364,
-        "315-display"
+        410,
+        411,
+        415,
+        416
       ],
       "parked": [],
-      "cleanup": "a6be28e comment-only (2 moved why-comments)",
-      "mergeSha": "34a3bf2"
+      "base": "62cc088",
+      "mergeSha": "04468f9",
+      "cleanup": "f47ae3d re-wrapped one docblock line (logBodyMeasurement)"
+    },
+    "D": {
+      "branch": "sprint/lane-d-mealprep",
+      "worktree": "C:/git/ht-lanes/lane-d",
+      "status": "merged",
+      "waitsFor": "lane A merged",
+      "order": [
+        417,
+        401,
+        403,
+        408
+      ],
+      "current": null,
+      "done": [
+        417,
+        401,
+        403,
+        408
+      ],
+      "parked": [],
+      "base": "62cc088",
+      "mergeSha": "30ee844",
+      "cleanup": "no changes needed"
     },
     "E": {
       "branch": "sprint/lane-e-api",
@@ -180,955 +141,746 @@
         318
       ],
       "parked": [],
-      "cleanup": "3aede93 docblocks + blank line",
-      "mergeSha": "6c42331"
+      "cleanup": "c296e5b constant order only",
+      "mergeSha": "976cd0e"
     },
     "F": {
-      "branch": "sprint/lane-f-repo",
+      "branch": "sprint/lane-f-settings",
       "worktree": "C:/git/ht-lanes/lane-f",
       "status": "merged",
       "order": [
-        374
+        405,
+        404,
+        397,
+        407
       ],
       "current": null,
       "done": [
-        374
+        405,
+        404,
+        397,
+        407
       ],
       "parked": [],
-      "cleanup": "no changes needed",
-      "mergeSha": "c3c9dbd"
+      "cleanup": "704e0f6 line wrapping only in the focus-reload merge (SettingsScreen.tsx +30/-9). Cleanup agent returned an EMPTY report (placeholder); orchestrator verified the commit by reading the diff: formatting only, pushed, worktree clean, stash untouched.",
+      "mergeSha": "b9e0d1e"
     },
     "G": {
-      "branch": "sprint/lane-g-tests",
+      "branch": "sprint/lane-g-repo",
       "worktree": "C:/git/ht-lanes/lane-g",
-      "status": "not_merged",
-      "order": [
-        377
-      ],
+      "status": "merged",
       "waitsFor": "all other lanes merged",
+      "order": [
+        398,
+        400,
+        409
+      ],
       "current": null,
-      "done": [],
-      "parked": [
-        377
-      ]
+      "done": [
+        398,
+        400,
+        409
+      ],
+      "parked": [],
+      "base": "85442f8",
+      "mergeSha": "ca7c4ee",
+      "cleanup": "no changes needed"
     }
   },
   "issues": {
-    "311": {
-      "roundTrips": 0,
-      "commits": [
-        "f7f9796",
-        "08177d8"
-      ],
-      "lane": "B",
-      "status": "merged",
-      "partial": true,
-      "securityReview": "skipped-notifications-only",
-      "deviceCheck": "Enable workout/cook-day/backup reminders 2 min ahead; change only cook-day time; each fires exactly once at the right time; toggle one meal reminder off/on and confirm it fires; restore a backup and confirm reminders still fire.",
-      "regressionProof": "3/5 new tests fail with f7f9796 notifications.ts (stub), all pass at 08177d8 (tester reproduced); 2 guards pass pre-fix by design",
-      "notes": "tester APPROVE r0. Content is static so signature w/o content is safe (breaks if content becomes dynamic). resetReconcileStateForTests exported test-only helper (small API smell). PARTIAL-> now all ACs covered? AC4 done; earlier ACs landed sprint 1 -> Closes #311.",
-      "mergeSha": "23e1838"
-    },
-    "314": {
-      "roundTrips": 0,
-      "commits": [],
-      "lane": "A",
-      "status": "parked",
-      "stalledAt": "analysis",
-      "parkReason": "Lane-A part already landed in sprint 1 (runner transactional per migration, database.ts:449-457; migrationAtomicity.test.ts covers throw/rollback, idempotent rerun, multi-statement). Only open AC is the App.tsx failure screen (dead end at App.tsx:86): not lane A, and a reset/recovery action destroys all health data -> owner decides retry vs reset vs export-first."
-    },
-    "315": {
-      "roundTrips": 0,
-      "commits": [
-        "74e874d",
-        "bbea6ef"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "partial": true,
-      "securityReview": "APPROVE: data-not-changed promise holds; error may echo own-file schema names into plain Alert (not a finding); optional: truncate detail",
-      "deviceCheck": "none (lane A part)",
-      "notes": "tester APPROVE r0; data-not-changed claim verified against single restore transaction",
-      "regressionProof": "new test fails with 74e874d backup.ts, passes bbea6ef (tester reproduced)",
-      "mergeSha": "6898c98"
-    },
-    "316": {
-      "roundTrips": 0,
-      "commits": [
-        "7728404",
-        "67bb382",
-        "b4b8732",
-        "3054a18",
-        "8fea2a6"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "migration": "v38",
-      "securityReview": "APPROVE: TEXT/TEXT affinity, seed runs after migrations but upgrading devices already seeded, fresh install has empty children; restore never runs v38; v38 atomic via runner",
-      "decisionSource": "owner comment on #316 2026-09-30 (archive, not delete; v38 orphan sweep approved)",
-      "deviceCheck": "Install over an existing build; delete a custom recipe; it leaves library and picker; cooked portions still show in inventory; re-import from Discover brings it back (migration on startup path).",
-      "regressionProof": "2 core tests fail with 7728404~1 database.ts+schema.ts, 5/5 pass at 8fea2a6 (tester reproduced). importRecipe-archived test is a guard (passes pre-fix since hard delete + reinsert).",
-      "notes": "tester APPROVE r0. Probe: pre/post-v38 backups restore correctly; v38 not replayed on restore -> orphans in old backups come back (hidden by inner joins). updateRecipe on archived id silently stays archived. deleteRecipe has no seeded guard (callers check).",
-      "mergeSha": "6898c98"
-    },
     "318": {
-      "roundTrips": 0,
-      "commits": [
-        "0083100",
-        "111f8fb",
-        "134efad",
-        "985ce33",
-        "aa3da5c",
-        "0e37408"
-      ],
       "lane": "E",
       "status": "merged",
-      "partial": true,
-      "securityReview": "APPROVE: no cache poisoning, aborted editor runs return before setMacros; flagged overlapping-recompute stale save (pre-existing) -> added to #402",
-      "grant": "DiscoverScreen.tsx, RecipeEditorScreen.tsx, src/screens/__tests__/DiscoverScreen.test.tsx (unowned in sprint 2)",
-      "excludedRemainder": "DiscoverDetailScreen/importRecipe signals + import-spinner cancel affordance -> PR says Refs #318",
-      "deviceCheck": "Discover: search chicken, immediately change to beef and search - only beef results show. Search then navigate away - no red-box/warning in Metro.",
-      "notes": "tester APPROVE r0. Only granted files changed; fetchJson untouched; existing callers unaffected.",
-      "regressionProof": "api 8 fail at 0083100 srcs; discover 4 fail at 134efad src; editor 1/1 fails at 985ce33 src; all pass HEAD (tester reproduced)",
-      "mergeSha": "6c42331"
-    },
-    "328": {
-      "roundTrips": 0,
-      "commits": [],
-      "lane": "C",
-      "status": "parked",
-      "stalledAt": "analysis",
-      "parkReason": "Unchanged since sprint-1 park; no human answer. (1) LiftingSectionCard progression chart is all-time; bounding truncates visible data - all-time vs windowed? (2) PRSummaryCard needs lifetime PRs; needs new getExercisePRs(): Promise<Record<string,PRRecord>> GROUP BY exercise in database.ts (lane A). Analyst-recommended design if all-time: aggregate PRs + lazy full history for active exercise only."
-    },
-    "361": {
       "roundTrips": 0,
       "commits": [
-        "576115c",
-        "f721c8d"
+        "9cbac95",
+        "8bac828",
+        "839ac34",
+        "7eb26f4",
+        "2aefe47",
+        "d65c497",
+        "34af795",
+        "d780c4c",
+        "c296e5b"
       ],
-      "lane": "B",
-      "status": "merged",
-      "securityReview": "skipped-notifications-only",
-      "deviceCheck": "none (optional: toggle workout reminder off/on in Settings, exactly one notification fires)",
-      "regressionProof": "25 fail with 576115c notifications.ts, 89/89 at f721c8d (tester reproduced)",
-      "notes": "tester APPROVE r0. Tester claimed committed blobs are CRLF - FALSE, orchestrator verified git ls-files --eol all i/lf and 0 CR in fdf5c68 blob (tester misread working copy); nothing filed.",
-      "mergeSha": "23e1838"
+      "workOrder": "C:/git/ht-lanes/wo/318.md",
+      "decisionSource": "owner comment on #318 2026-10-06 (4 items)",
+      "deviceCheck": "1) Import a Discover recipe with many unknown ingredients, tap Cancel mid-spinner: spinner stops, recipe absent from library. 2) Wi-Fi without internet: save a recipe containing dragonfruit; save completes in ~10 s with local-table macros.",
+      "notes": "tester APPROVE r0. HUMAN: Cancel pressed after dbImportRecipe has started is ignored - recipe saved, Imported! shown; ms-wide window but not strictly the owner wording (saves nothing); strict fix = hide/disable Cancel once the write starts. Budget is module-level, shared by editor recompute and imports; over-budget estimate is silent. Commit 2aefe47 alone does not typecheck (test-first artefact, breaks bisect at that commit).",
+      "regressionProof": "UA 4/5 fail at 9cbac95 srcs; budget 3/5 fail at 8bac828 srcs; cancel 5/7 fail at 7eb26f4 srcs; deadline 1/1 fails at d65c497 src; all pass at d780c4c (tester reproduced); 873/84",
+      "securityReview": "APPROVE: UA is a constant (no email/device id); over-budget/aborted/timed-out results never cached or persisted as real; late recompute cannot write after the deadline; dbImportRecipe single-table. Notes: backward clock step wedges the budget until the clock catches up; app.json import bundles projectId/owner/package (not secrets).",
+      "mergeSha": "976cd0e"
     },
-    "362": {
-      "roundTrips": 0,
-      "commits": [
-        "445b6b4",
-        "25cc481"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "securityReview": "skipped: read-side parsing only",
-      "deviceCheck": "none",
-      "regressionProof": "5/12 fail with 6666af2 database.ts, 12/12 at 25cc481 (tester)",
-      "notes": "tester APPROVE r0",
-      "mergeSha": "6898c98"
-    },
-    "363": {
-      "roundTrips": 0,
-      "commits": [
-        "a3aa9d0",
-        "a2ddf35",
-        "6ff8d0a",
-        "75c4fa8",
-        "898e04c",
-        "aefd465"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "decisionSource": "owner comment on #363 2026-09-30 (verified by orchestrator): garbled->today+write-back in sync txn; future->today, stored untouched; existing rows untouched; one helper for sync/_ensureDailyLogRow/getStartDate/getCycleForDate",
-      "coversIssue": 378,
-      "securityReview": "APPROVE: every historic writer of app_start_date emits YYYY-MM-DD so a real value cannot be misclassified; write-back parameterised, in-txn, errors propagate",
-      "deviceCheck": "none",
-      "notes": "tester APPROVE r0; #378 fully covered (tester explicit). Amend was pre-push only (reflog verified).",
-      "regressionProof": "effectiveStartDate.test 11/13 fail with bbea6ef database.ts, 13/13 at aefd465 (tester reproduced; also Kiritimati/Pago_Pago via npx jest). Weakness: 1-day-future case passes pre-fix on rest days.",
-      "mergeSha": "6898c98"
-    },
-    "364": {
-      "roundTrips": 0,
-      "commits": [
-        "5d6c99c",
-        "cb69eed"
-      ],
-      "lane": "D",
-      "status": "merged",
-      "securityReview": "skipped-device-owner-input-validation",
-      "deviceCheck": "Comma-decimal keyboard (fr-CH): log a set with 78,4 -> row reads @ 78.4 kg; reps 12abc -> alert, text stays.",
-      "notes": "tester APPROVE r0. HUMAN: bounds reps 1-100 / weight 0.5-500 are analyst picks; 1.000 (German thousands) accepted as 1; 1e2/0x10 accepted as numeric literals (judged not a defect). Test selects inputs via UNSAFE_getAllByType(TextInput).slice(-2) (brittle).",
-      "regressionProof": "11/13 fail with 49abc78 DashboardScreen.tsx (78,4 saved as 78), pass at cb69eed (tester)",
-      "mergeSha": "34a3bf2"
-    },
-    "365": {
-      "roundTrips": 1,
-      "commits": [
-        "b8a70f8",
-        "58bf54f",
-        "49abc78"
-      ],
-      "lane": "D",
-      "status": "merged",
-      "securityReview": "skipped-ui-error-surfacing",
-      "deviceCheck": "First-run onboarding on the phone still completes and lands on the dashboard (startup path).",
-      "notes": "tester REJECT r1 (file-level mock hollowed 9 smoke tests), APPROVE r2 (tests moved to OnboardingScreen.confirm.test.tsx, original file restored).",
-      "regressionProof": "confirm.test fails with b8a70f8 OnboardingScreen.tsx, passes HEAD; disabled-mid-save assertion proven by probe removing saving gate (tester)",
-      "mergeSha": "34a3bf2"
-    },
-    "366": {
-      "roundTrips": 1,
-      "commits": [
-        "1e87cb6",
-        "b7f935e",
-        "0addf31",
-        "dd873c3",
-        "8f7573d",
-        "2b774bc",
-        "070c787",
-        "f1d1ca2",
-        "1b929ed"
-      ],
-      "lane": "D",
-      "status": "merged",
-      "securityReview": "skipped: diff only surfaces previously swallowed errors via Alert; the two follow-ups now warn-only were already silent; tester audited all write paths",
-      "deviceCheck": "none (optional: happy path still closes the Log Cooked Meal modal)",
-      "notes": "tester REJECT r1 (fix commit too coarse), APPROVE r2 after revert + 3 per-handler commits (no history rewrite).",
-      "regressionProof": "5 tests fail with 07dc001 MealPrepScreen.tsx, pass at HEAD; final file byte-identical to dd873c3 (tester verified)",
-      "mergeSha": "34a3bf2"
-    },
-    "367": {
-      "roundTrips": 0,
-      "commits": [
-        "1096d90",
-        "2a80838",
-        "bd78d4f",
-        "6666af2"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "securityReview": "skipped: db change is a read query (static SQL); modal change only sends fewer fields",
-      "deviceCheck": "Log waist only one day, chest only the next: pills show both; open modal and save without edits - check whether waist gets written onto today (copy-forward risk)",
-      "notes": "tester APPROVE r0. HUMAN: blanking a field no longer clears it from latest (filed). Text compare: typing 80.0 over 80 writes 80 (explicit edit, benign).",
-      "grant": "DashboardScreen.tsx MeasurementsModal save path only + new DashboardScreen.measurementsPrefill.test.tsx",
-      "regressionProof": "db 3/4 fail with fe7b82a database.ts; modal 2/4 fail with fe7b82a DashboardScreen.tsx; all pass HEAD (tester). Dry-run merge with integration clean.",
-      "mergeSha": "6898c98"
-    },
-    "368": {
-      "roundTrips": 0,
-      "commits": [
-        "0805cf0",
-        "5b5c068"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "securityReview": "APPROVE: +1 only with non-NULL pointer set by a matching debit; same txn; errors propagate. Note: _creditPortion has no recipe_id check (restore-crafted pointer only)",
-      "deviceCheck": "none (removeMealFromPlan has no UI caller)",
-      "regressionProof": "2/6 fail with 453d985 database.ts, 6/6 at 5b5c068; atomicity proven by mutation removing txn wrapper (tester)",
-      "notes": "tester APPROVE r0; latent fix (no UI caller, #408)",
-      "mergeSha": "6898c98"
-    },
-    "370": {
-      "roundTrips": 0,
-      "commits": [
-        "a78575d",
-        "a81b7b6"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "securityReview": "APPROVE: no row content in error; raw text preserved; revert-without-explanation accepted as #319 parity (follow-up filed)",
-      "deviceCheck": "none",
-      "regressionProof": "4 fail with 5b5c068 database.ts, 20/20 at a81b7b6 (tester)",
-      "notes": "tester APPROVE r0",
-      "mergeSha": "6898c98"
-    },
-    "371": {
-      "roundTrips": 1,
-      "commits": [
-        "e7f71f9",
-        "b1a1b85",
-        "1d75da9",
-        "b4c86dd"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "securityReview": "APPROVE: no malformed row reaches the UPDATE; no new throw path; warn has date only",
-      "deviceCheck": "Startup path: cold-start, Dashboard lists today exercises; navigate away/back, no crash, nothing changed.",
-      "notes": "tester REJECT r1 (today-7 never visited), APPROVE r2",
-      "regressionProof": "6/7 fail with a81b7b6 database.ts, 7/7 at b4c86dd; today-7 row isolated by probe (tester)",
-      "mergeSha": "6898c98"
-    },
-    "372": {
-      "roundTrips": 0,
-      "commits": [
-        "86c59ff",
-        "131aada"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "securityReview": "skipped: read-shape change only",
-      "deviceCheck": "none",
-      "regressionProof": "orphan test fails with c24ba55 database.ts (object of nulls), 3/3 at 131aada (tester)",
-      "notes": "tester APPROVE r0",
-      "mergeSha": "6898c98"
-    },
-    "373": {
-      "roundTrips": 0,
-      "commits": [
-        "5f4a583",
-        "940c60d",
-        "fe7b82a"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "securityReview": "skipped: read-side parsing only",
-      "deviceCheck": "none",
-      "notes": "tester APPROVE r0. SPRINT-CAUSED REGRESSION (minor): Onboarding accepts height/age >0, getter now reads outside 50-250/10-120 as null; fix belongs in OnboardingScreen (lane D, merged) -> added to #405. Bounds are analyst picks.",
-      "regressionProof": "21 fail with 131aada database.ts, all pass at fe7b82a (tester)",
-      "mergeSha": "6898c98"
-    },
-    "374": {
-      "roundTrips": 1,
-      "commits": [
-        "b8a6b8d",
-        "97e92c6",
-        "a40aad3",
-        "157da1c"
-      ],
+    "397": {
       "lane": "F",
       "status": "merged",
-      "securityReview": "skipped-docs-only",
+      "roundTrips": 1,
+      "commits": [
+        "1bc96c5",
+        "35f1c89",
+        "23faef1",
+        "b8a14da",
+        "7b567cd",
+        "f3a6afd",
+        "40da49c",
+        "d61488d"
+      ],
+      "notes": "tester REJECT r1 (stepper edit flushed during a held reload was overwritten), APPROVE r2: tester probed all nine steppers at the tip (second step derives from the edited value) and read all nine guard pairings. Rejected-write tests are guards only. Long lines in the reload merge (cosmetic).",
+      "workOrder": "C:/git/ht-lanes/wo/397.md",
       "deviceCheck": "none",
-      "notes": "tester REJECT r1 (false app.json newArchEnabled pointer), APPROVE r2. r2 also corrected false no-remote-API claim on line 7.",
-      "regressionProof": "grep assertions fail on fdf5c68, pass at 157da1c (tester ran, incl. gates 610/62)",
-      "mergeSha": "c3c9dbd"
+      "securityReview": "skipped: UI state hydration guards only; no db/api/backup code in the diff",
+      "regressionProof": "pickers 2/9 fail with 1bc96c5 SettingsScreen.tsx (stale values reach suggestGoals); toggles 4 fail with 23faef1; steppers 2 fail with 7b567cd; round 2: 2 fail with 40da49c; all pass at d61488d; 907/84 (tester reproduced)",
+      "mergeSha": "b9e0d1e"
     },
-    "375": {
-      "roundTrips": 0,
-      "commits": [
-        "50bb9aa",
-        "07dc001"
-      ],
-      "lane": "D",
-      "status": "merged",
-      "securityReview": "skipped-ui-state-only",
-      "deviceCheck": "none (optional: save height, leave Settings, return, value persists)",
-      "regressionProof": "6/6 fail with 50bb9aa SettingsScreen.tsx, pass at 07dc001 (tester reproduced)",
-      "notes": "tester APPROVE r0. Committed tests assert input text, not profile state; tester verified profile freshness via throwaway probe (recalc used fresh height). Failed write keeps local text until next focus (same as before).",
-      "mergeSha": "34a3bf2"
-    },
-    "377": {
-      "roundTrips": 0,
-      "commits": [
-        "21c6f26",
-        "47a37fa"
-      ],
+    "398": {
       "lane": "G",
-      "status": "parked",
-      "securityReview": "skipped-test-infra",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "1b300e1"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
+      "deviceCheck": "Expo Go from the integration branch: open the drawer, visit every drawer screen, Recipes -> RecipeDetail and Discover -> DiscoverDetail and back; no red screen, no missing-module error.",
+      "notes": "WO ready; no jest regression test possible (grep + gates + build-check APK on the PR stand in) | dev: lockfile diff deletions only (bottom-tabs + sf-symbols-typescript blocks); expo install --check and expo-doctor identical before/after (4 pre-existing patch mismatches, app.json splash schema error -> filed #436). | tester APPROVE r0. RESIDUAL (only the PR build and the device can close): Android Gradle autolinking + Metro production bundle with the packages gone (build-check.yml runs on the PR because package.json changed); app launch + drawer/stack navigation on the device.",
+      "securityReview": "skipped: dependency removal only, no code path changed",
+      "regressionProof": "no jest regression test possible. Stand-ins run by the tester: diff is 29 deletions / 0 insertions in exactly 3 lockfile blocks; repo-wide greps for bottom-tabs / createBottomTabNavigator / sf-symbols / expo-router find nothing; no remaining package references either removed package; npm ci --dry-run exits 0; 1118/93; expo install --check shows the same 4 pre-existing mismatches.",
+      "mergeSha": "ca7c4ee"
+    },
+    "400": {
+      "lane": "G",
+      "status": "merged",
+      "roundTrips": 1,
+      "commits": [
+        "5749fbf",
+        "0d3d36e",
+        "5cd6477"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
       "deviceCheck": "none",
-      "notes": "issue comment posted with evidence table",
-      "grant": "new src/db/__tests__/sqljsAdapterCleanup.test.ts (lane A idle)",
-      "stalledAt": "dev (after Linux repro, roundTrips 0)",
-      "parkReason": "Reproduced on WSL Linux (5/10 crash at ~27 workers, 0/10 at 3). Not sql.js: control run with src/db excluded still crashes; adapter cleanup fix does not cure. Root cause unknown (worker-count related native crash). Work order: if fix does not cure, keeping cap is a human decision. Cap left at 2; lane G NOT merged (hygiene commits untested, not the cure)."
+      "decisionSource": "owner comment on #400 (fix CLAUDE.md jest wording, do not touch jest config)",
+      "notes": "WO ready; includes CLAUDE.md corrections limited to facts the code contradicts | orchestrator read the full CLAUDE.md diff (3 lines): descriptive facts only, no instruction added or removed. Dev could not verify that the dynamic-import block still happens on Jest 29 (wording now names no Jest version). | tester REJECT r1: new CLAUDE.md sentence stated the dynamic-import mechanism as current fact; tester found no import( in the installed expo/src/winter and one screen suite passes on Jest 29.7 without the mapping (single-suite probe). Also: Retry is hidden on a font error; DiscoverScreen.test mocks the api not the db; two Analytics suites render sub-cards only. Orchestrator wording: origin stated as history, need on 29.7 stated as unverified. CLAUDE.md will contain Jest 30 once in a historical clause (grep criterion superseded on that point). | APPROVE r2 (1 round trip). Remaining imprecision accepted by the tester: @expo/vector-icons is stubbed for native font loading, grouped under needs-native-modules. HUMAN: read the CLAUDE.md diff (it is the agent instruction file); descriptive only, no instruction changed (tester + orchestrator both read it).",
+      "securityReview": "skipped: comment + docs only",
+      "regressionProof": "no jest regression test (docs). Tester fact-checked every changed CLAUDE.md sentence against the code twice; babel config object unchanged; 1118/93.",
+      "mergeSha": "ca7c4ee"
     },
-    "378": {
-      "roundTrips": 0,
-      "commits": [
-        "a3aa9d0",
-        "a2ddf35",
-        "6ff8d0a",
-        "75c4fa8",
-        "898e04c",
-        "aefd465"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "notes": "tester confirmed #363 commits fully cover #378 criteria 1-3; close as done by #363 commit, not re-implemented",
-      "closedBy": 363,
-      "mergeSha": "6898c98"
-    },
-    "379": {
-      "roundTrips": 0,
-      "commits": [],
-      "lane": "A",
-      "status": "parked",
-      "stalledAt": "analysis",
-      "parkReason": "Product decision needed (issue says so, no owner comment): (1) upgrade marker in app_state capping the insert floor [recommended, db-only] vs (2) generated column v39 + analytics exclusion (lane C) vs (3) accept + note. Sub-decisions for (1): marker value on already-backfilled devices; delete already-invented rows?",
-      "notes": "issue comment posted"
-    },
-    "380": {
-      "roundTrips": 0,
-      "commits": [
-        "bf0e784",
-        "a424cb9",
-        "453d985"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "partial": true,
-      "securityReview": "APPROVE: static SQL, delete only non-survivors per (date,meal_type) group matching the index, credit bounded by backup rows, single txn",
-      "deviceCheck": "none",
-      "notes": "tester APPROVE r0. MIGRATIONS byte-identical. Stale comments (schema.ts:798 inside MIGRATIONS - frozen; test-file comments + database.ts doc ~2425 -> cleanup).",
-      "regressionProof": "2 tests fail with aefd465 database.ts+schema.ts, 4/4 pass at 453d985; probe vs v35 SQL identical except intended dangling/3+dup cases (tester)",
-      "mergeSha": "6898c98"
-    },
-    "381": {
-      "roundTrips": 0,
-      "commits": [
-        "d507942",
-        "be8bf91",
-        "7cf7260"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "securityReview": "skipped: read ORDER BY only, no write path",
-      "deviceCheck": "none",
-      "notes": "tester APPROVE r0. Stale v37 comment in schema.ts ~766 is inside MIGRATIONS array - left untouched deliberately. idx_workout_set_log_date now redundant (optional future migration).",
-      "regressionProof": "ordering + collision tests fail with b4c86dd database.ts, pass HEAD; 300-row probe shows set_index order == (created_at,id) order after v37 (tester)",
-      "mergeSha": "6898c98"
-    },
-    "382": {
-      "roundTrips": 0,
-      "commits": [
-        "7f0d915",
-        "a09da59"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "securityReview": "APPROVE: predicate covers all three write groups; note future write groups must extend it",
-      "deviceCheck": "none (optional launch smoke)",
-      "regressionProof": "2/6 fail with 7cf7260 database.ts, 6/6 at a09da59; mutation removing !startDateGarbled fails garbled test (tester)",
-      "notes": "tester APPROVE r0",
-      "mergeSha": "6898c98"
-    },
-    "383": {
-      "roundTrips": 0,
-      "commits": [
-        "d6b9f44",
-        "1a33cb0",
-        "c24ba55"
-      ],
-      "lane": "A",
-      "status": "merged",
-      "securityReview": "APPROVE: throws before any DB access; all real callers pass toISODate(); no live trigger",
-      "deviceCheck": "none",
-      "notes": "tester APPROVE r0. d6b9f44 also adds 3 DELETEs (needed: today+7 has a startup row) - commit message understates. Sync-parity test now in-window (inherent).",
-      "regressionProof": "30/74 fail with a09da59 database.ts (6 writers x 5 bad dates), 74/74 at c24ba55; d6b9f44 date-move green pre-fix (tester)",
-      "mergeSha": "6898c98"
-    },
-    "315-display": {
-      "roundTrips": 0,
-      "commits": [
-        "d866f2a",
-        "69ec2c8"
-      ],
+    "401": {
       "lane": "D",
       "status": "merged",
-      "parentIssue": 315,
-      "deviceCheck": "Restore a hand-edited backup with an extra column; alert names the dropped table/column.",
-      "notes": "Also fix the duplicated title: SettingsScreen Alert(\"Restore failed\", err.message) now that importBackup message starts with \"Restore failed —\".",
-      "securityReview": "skipped: only renders device-owner backup text in a plain Alert (judged non-issue by #315 security review)",
-      "regressionProof": "4/5 fail with cb69eed SettingsScreen.tsx, 5/5 at 69ec2c8 (tester)",
-      "mergeSha": "34a3bf2"
+      "roundTrips": 0,
+      "commits": [
+        "a10a41a",
+        "353820b",
+        "71cee01",
+        "49b5ccd"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/401.md",
+      "deviceCheck": "Open MealPrep: loading then data, no banner. Switch tabs / leave and return: no banner, no blank flash. Empty inventory shows the normal empty state, not the error.",
+      "notes": "tester APPROVE r0. Race orderings (cleared-at-start then superseded; late older run) were checked by reading the run-id guard, NOT by deferred-promise probes. HUMAN: wording is an analyst pick; banner uses the clay palette (no warning token).",
+      "securityReview": "skipped: UI load-error state only; no db/api/backup code in the diff",
+      "regressionProof": "5 tests fail with a10a41a MealPrepScreen.tsx; banner test fails with 71cee01; pass at 49b5ccd; 1010/88 (tester reproduced)",
+      "mergeSha": "30ee844"
+    },
+    "403": {
+      "lane": "D",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "2caeb78",
+        "9c1374a"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/403.md",
+      "deviceCheck": "Log Cooked Meal: 4 portions, double-tap Save fast -> +4 not +8. Assign: double-tap a recipe row -> one assignment, modal closes.",
+      "notes": "tester APPROVE r0. Assign-row disabled visual is untested (prop threaded). runGuarded does not catch: callers handle their own rejections. logCookedMeal still has no db-level idempotency (#432).",
+      "securityReview": "skipped: UI in-flight guard only; no db/api/backup code in the diff",
+      "regressionProof": "2 double-press tests fail with 2caeb78 MealPrepScreen.tsx (2 calls), pass at 9c1374a; 1014/88 (tester reproduced)",
+      "mergeSha": "30ee844"
+    },
+    "404": {
+      "lane": "F",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "51ad899",
+        "c4cca27",
+        "f0ea442",
+        "daef76e",
+        "bb436c5",
+        "28689b9",
+        "9a55908",
+        "6ce3d58"
+      ],
+      "notes": "tester APPROVE r0. Dev report was wrong on one point (harmlessly): state IS set before the notification follow-up, so write-ok + reconcile-fail leaves UI = DB plus an error alert. HUMAN: the expect(unhandled).toEqual([]) assertions are vacuous under jest (filed #429); recalc can save calories and fail protein (pre-existing, #429).",
+      "workOrder": "C:/git/ht-lanes/wo/404.md",
+      "deviceCheck": "Fresh install: tap Skip; app opens to Dashboard.",
+      "securityReview": "skipped: UI error surfacing only (try/catch + alert around existing writes); no db/api/backup code in the diff",
+      "regressionProof": "skip: 2 failure cases fail with 51ad899 OnboardingScreen.tsx; settings: 15/15 fail with f0ea442 SettingsScreen.tsx and flip per fix commit (5 at daef76e, 8 at 28689b9, 2 at 6ce3d58); 894/83 (tester reproduced)",
+      "mergeSha": "b9e0d1e"
+    },
+    "405": {
+      "lane": "F",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "230f75e",
+        "47bf4aa",
+        "e9842df"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/405.md",
+      "decisionSource": "owner comments on #405 2026-09-30 and 2026-10-05",
+      "deviceCheck": "Fresh install. Step 1: height 1.8 -> Continue disabled, error shown. Enter 178,5 and age 30, continue. Step 3: weight 78,4, finish. Settings shows height 178.5 and age 30.",
+      "notes": "tester APPROVE r0. HUMAN: weight bounds 20-400 are an analyst pick; Number() accepts 0x50 / 1e2 (same as Settings and Dashboard, owner-mandated expression); a prefilled latestWeight outside 20-400 now blocks Confirm until edited; no test for age comma-decimal alone.",
+      "securityReview": "skipped: UI input validation of device-owner input only; no db/api/backup code in the diff",
+      "regressionProof": "9/15 fail with 2e1ac1e OnboardingScreen.tsx, 15/15 at e9842df (tester reproduced); smoke test file byte-identical",
+      "mergeSha": "b9e0d1e"
+    },
+    "406": {
+      "lane": "A",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "7033d36",
+        "3f9cf8c"
+      ],
+      "notes": "tester APPROVE r0. Survivor of the dedupe prefers a consumed row, so the post-dedupe count = slots still showing a consumed meal; cannot under-report. Old code counted string 1 as 0; new counts the stored value.",
+      "workOrder": "C:/git/ht-lanes/wo/406.md",
+      "deviceCheck": "none",
+      "regressionProof": "2 new tests fail with 7033d36 database.ts (4 vs 2, 2 vs 1), 6/6 at 3f9cf8c (tester reproduced); 977/82",
+      "securityReview": "APPROVE: static read-only COUNT inside the restore transaction; count feeds only the informational alert; no swallowed error",
+      "mergeSha": "7a97abf"
+    },
+    "407": {
+      "lane": "F",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "e99af24",
+        "c5b3e23"
+      ],
+      "notes": "tester APPROVE r0. HUMAN: caps 5 columns / 40 chars are analyst picks; worst-case alert now ~1.5 KB. A column name from a hand-edited backup containing newline/comma still renders verbatim (pre-existing, now limited to 40 chars).",
+      "workOrder": "C:/git/ht-lanes/wo/407.md",
+      "deviceCheck": "none",
+      "securityReview": "skipped: text formatting of the restore alert only; skipped table names are whitelisted against live tables and columns are strings by construction (tester read backup.ts/database.ts); same judgement as sprint 2 for #315-display",
+      "regressionProof": "4/11 fail with e99af24 SettingsScreen.tsx, 11/11 at c5b3e23 (tester reproduced); 913/84",
+      "mergeSha": "b9e0d1e"
+    },
+    "408": {
+      "lane": "D",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "5dd3c00",
+        "2a487ae",
+        "0712db9"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/408.md",
+      "decisionSource": "owner comment on #408 2026-10-06 (wire into MealPrep with a confirm)",
+      "deviceCheck": "Lunch assigned and eaten: Remove -> eaten-meal confirm text; Cancel changes nothing; Remove -> slot shows Assign, inventory +1, meal gone from nutrition history. Unticked meal: simple confirm, inventory unchanged. Archived-recipe meal: same.",
+      "notes": "tester APPROVE r0. HUMAN: eaten legacy rows (NULL inventory pointer) are removed and credit nothing, while the confirm says the portion goes back; Remove hit area is ~26x26 px (below 44) - look at it on the device; Alert title Remove meal and placement are picks.",
+      "securityReview": "skipped: the diff is UI only (MealPrepScreen + its test) calling the existing removeMealFromPlan, whose transactional credit+delete was security-reviewed in sprint 2 (#368); tester ran it end to end against the real db function",
+      "regressionProof": "8 new tests fail with 2a487ae MealPrepScreen.tsx, 32/32 at 0712db9; 1022/88 (tester reproduced). Probes: each Remove button deletes its own slot id (4 slots, shared recipe); real-db credit goes to the right batch; plan ids are AUTOINCREMENT and not reused; stale id is a no-op.",
+      "mergeSha": "30ee844"
+    },
+    "409": {
+      "lane": "G",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "9c337cd"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/lane-g.md",
+      "deviceCheck": "none",
+      "notes": "WO ready; grep-driven, deletions only | dev: 53 lines in 47 test files, deletions only; typecheck exit code not captured by dev (tester to capture). | tester APPROVE r0. Dev misreported the per-folder split (actual: 39 in src/db/__tests__, 14 in src/screens/__tests__); total correct.",
+      "securityReview": "skipped: comment-line deletions in test files only",
+      "regressionProof": "no jest regression test. Stand-ins run by the tester: 53 removed lines, every one matches a standalone // eslint-disable comment, 0 insertions, 47 files all under __tests__, no line-ending churn, grep for eslint in test files empty, typecheck exit 0, 1118/93 unchanged.",
+      "mergeSha": "ca7c4ee"
+    },
+    "410": {
+      "lane": "C",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "86459a2",
+        "4f463ea",
+        "d30e74c",
+        "3b42af2",
+        "99b49b4"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/410.md",
+      "decisionSource": "owner comment on #410 2026-10-06 (fix in the database)",
+      "deviceCheck": "Dashboard with one extra workout: add a second and immediately tick the first; both show. Force-close and reopen: both still there, tick kept.",
+      "notes": "tester APPROVE r0. Out-of-region edit: mapLogRow row?.additional_workouts (harmless) -> revert ordered as first commit of #411. With entry null the optimistic update is a no-op but the db write still runs for today. Workout id is generated in the modal with Date.now() (same-ms duplicate ids possible; pre-existing). Handlers close over the render-time today (same as the exercise toggle).",
+      "regressionProof": "db 6/80 fail with 86459a2 database.ts (functions missing) + tester probe reproduced the data loss on the old whole-array path; screen 1/1 fails with d30e74c DashboardScreen.tsx; all pass at 3b42af2; 1007/88",
+      "securityReview": "APPROVE: parameterised single-row UPDATE; same date guard as existing writers via _ensureDailyLogRow; _assertWrote throws on 0 rows; queued (not transactional) unit is sufficient for one statement. Notes: toggle flips every entry sharing an id; a stored array containing null would throw TypeError (rejects loudly, no write).",
+      "mergeSha": "04468f9"
+    },
+    "411": {
+      "lane": "C",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "99b49b4",
+        "6b795d6",
+        "53a29a8",
+        "eb27325",
+        "041a198",
+        "fb86fb9",
+        "e6bf37b"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/411.md",
+      "decisionSource": "owner comment on #411 (Alert + Reset this day, corrupt text kept in app_state)",
+      "deviceCheck": "Corrupt today additional_workouts; add a workout -> Alert; Reset this day -> empty list, adding works. Repeat for exercises -> template exercises return unchecked. Export a backup: corrupt text is in it under corrupt_json:...",
+      "notes": "WO ready; waits for #410. ORCHESTRATOR RULINGS: (1) resetCorruptDayColumn + CorruptJsonError count as lane-C writers in database.ts; (2) key collision -> suffix :2, :3 instead of overwriting (departs from the literal key only on collision; HUMAN to confirm). | dev: Alert title Cannot save: unreadable data; Reset this day (destructive) / Cancel; reset failure -> Reset failed. Existing Dashboard suites mock factories lack CorruptJsonError (instanceof undefined would throw if a writer rejects there) - sent to tester. | tester APPROVE r0. An array with null/non-object items is neither editable nor resettable (filed #434). Existing Dashboard suites lack the two mock-factory entries (no path reaches instanceof today). 041a198 carries a one-line test correction inside a feature commit (accepted by tester).",
+      "regressionProof": "writers: 4 fail with 6b795d6 database.ts; reset: 10 fail with 53a29a8 database.ts; screen: 8/9 fail with fb86fb9 DashboardScreen.tsx; all pass at e6bf37b; 1030/89 (tester reproduced). Probes: one corruption predicate shared by writers and reset (8 corrupt forms); kept text byte-identical (2 MB, unicode, CRLF); collisions :2/:3; atomic both directions; fresh exercises byte-identical to sync output for 5 offsets; backup->restore round trip keeps the kept row.",
+      "securityReview": "APPROVE: SQL static or from fixed maps, all values bound; column/date come only from a CorruptJsonError built inside the db module; destructive step runs only after the raw text is saved, same transaction; every daily_log writer is queued. Notes: raw read is inside the queued unit but OUTSIDE the transaction (safe only while every daily_log writer goes through _enqueueWrite); a second reset after a successful one shows Reset failed although nothing is wrong; instanceof on an Error subclass must be confirmed on Hermes by the device check.",
+      "mergeSha": "04468f9"
+    },
+    "412": {
+      "lane": "A",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "8a66e85",
+        "2c86542",
+        "5f94a7c"
+      ],
+      "notes": "WO ready; waits for #414. ORCHESTRATOR RULING: MIGRATIONS stays byte-identical, so the stale v37 comment (schema.ts:766-771) is NOT fixed although the owner decision asks for it; explanation goes on RESTORE_SET_INDEX_SQL. HUMAN: fix that comment by hand or confirm. Whole colliding partition renumbered (analyst interpretation). | dev: RESTORE_SET_INDEX_SQL uses a TEMP staging table (not run on device); unused {version} branch of POST_RESTORE_STEPS left in place. | tester APPROVE r0. Dead {version} branch of POST_RESTORE_STEPS type/loop left (cleanup candidate).",
+      "workOrder": "C:/git/ht-lanes/wo/412.md",
+      "deviceCheck": "Orchestrator-added (TEMP table + multi-statement execAsync never ran on real expo-sqlite): restore any backup that has logged sets on the phone; restore completes, set order in a workout day is unchanged, logging one more set works.",
+      "decisionSource": "owner comment on #412 2026-10-06",
+      "regressionProof": "3 new tests fail with 8a66e85 database.ts+schema.ts (v37 re-sorts by created_at), pass at 5f94a7c; schema.ts diff add-only after MIGRATIONS (tester read the hunk); probes: ties, negatives, 300 rows, order-independence, 2 restores back to back, forced throw after TEMP creation rolls back clean; 975/82",
+      "securityReview": "APPROVE: static SQL, only set_index written, join key is the INTEGER PK, collision test/partition/unique index use the same comparison so CREATE UNIQUE INDEX cannot be failed by backup values; any throw rolls back the whole restore. Loses v37 runtime precondition (small defence-in-depth reduction). Residual: TEMP table never run on real expo-sqlite.",
+      "mergeSha": "7a97abf"
+    },
+    "414": {
+      "lane": "A",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "da71967",
+        "e85f913"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/414.md",
+      "deviceCheck": "none",
+      "decisionSource": "owner comment on #414: items 1-3, one strict parser, item 4 dropped",
+      "notes": "tester APPROVE r0. Setters throw RangeError; only callers are SettingsScreen pickers which cannot produce invalid values (tester traced). Stored 8:00-style values now read as default (intended).",
+      "regressionProof": "82/110 fail with da71967 database.ts, 110/110 at e85f913 (tester reproduced); 972/82",
+      "securityReview": "APPROVE: no new SQL, writes parameterised, restored app_state values now always canonical HH:MM / 0-6 before reaching the scheduler; RangeError thrown before any write and not swallowed; restore/startup/reconcile call no setter. Note: Settings debounced flush callbacks have no try/catch around the setters (unreachable today).",
+      "mergeSha": "7a97abf"
+    },
+    "415": {
+      "lane": "C",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "ab1eb9f",
+        "2c3cb5b",
+        "780df0d",
+        "4e1e264"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/415.md",
+      "decisionSource": "owner comment on #415 (a date per pill)",
+      "deviceCheck": "Waist today, chest on an earlier date: each pill shows its own date, no Last: header. Log one field: only that pill date becomes today. Fresh install: No measurements logged yet.",
+      "notes": "tester APPROVE r0. Edited existing assertions judged line by line: none weakened; removed .date/.id assertions pinned the shared-date shape the owner decision removed; toMatchObject became a stricter toEqual. HUMAN: review commit 2c3cb5b test edits. 2c3cb5b alone does not typecheck (revert together with 4e1e264). A value of 0 renders as 0 cm.",
+      "securityReview": "skipped: the db change is one static read-only SELECT (no parameters, no write path); the rest is UI",
+      "regressionProof": "db 3 new tests fail with ab1eb9f database.ts; screen pill test fails with 780df0d DashboardScreen.tsx; pass at 4e1e264; 1035/89 (tester reproduced)",
+      "mergeSha": "04468f9"
+    },
+    "416": {
+      "lane": "C",
+      "status": "merged",
+      "roundTrips": 1,
+      "commits": [
+        "c45058c",
+        "45363f6",
+        "e5a6f8f",
+        "118af59",
+        "329d70e",
+        "000a4eb",
+        "58dd654",
+        "fbaa342",
+        "0098d42"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/416.md",
+      "decisionSource": "owner comment on #416 (clearing not supported; placeholders; only typed fields saved; no all-NULL row)",
+      "deviceCheck": "Modal opens with empty inputs and old values as placeholders. Type chest only, save: chest pill today, waist keeps old date. Save with nothing typed: nothing changes. abc: error, nothing changes. Restart: values persist, Analytics card shows no empty entry.",
+      "notes": "WO ready; waits for #415. Authorized rewriting the existing prefill test that pins null-on-blank (own commit, flagged for human review). | dev: e5a6f8f rewrites 6 existing assertions (HUMAN review); existing db test returns-null-when-all-NULL no longer seeds real all-NULL rows (sent to tester). | tester REJECT r1: fix sound and e5a6f8f accepted line by line, but the existing all-NULL read test is now hollow (seeds via the writer, which writes nothing) and no other test seeds a legacy all-NULL row; also NaN/Infinity still insert an all-NULL row. Sent back: raw-SQL seeded tests, non-finite guard, dash-placeholder test. NOTE for human: mixed valid+invalid input saves the valid fields and keeps the modal open (pre-existing rule, still pinned). | APPROVE r2. The legacy returns-null-for-all-NULL-rows test did not fail under the tester mutation (it pins only the null result). Number.isFinite now also skips numeric strings (no real caller passes one).",
+      "regressionProof": "db 2 fail with c45058c database.ts; modal 5/8 fail with 118af59 DashboardScreen.tsx; NaN test fails with 58dd654 database.ts; all pass at 0098d42; 1045/89 (tester reproduced). Mutation of getLatestMeasurements (NULL filters removed) fails 6 tests incl. the new carry-forward-past-legacy-row test.",
+      "securityReview": "APPROVE: column identifiers only from a const tuple, values bound, on both insert and update branches; read-then-write inside one queued unit (date UNIQUE as backstop); restore never calls this function. Note: handleSaveMeasurements catches and only logs a write error, so the modal closes as if saved (pre-existing, filed #435).",
+      "mergeSha": "04468f9"
+    },
+    "417": {
+      "lane": "D",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "5662af0",
+        "d0e6e39",
+        "fa4a656",
+        "2de5f80",
+        "ef83ef1"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/417.md",
+      "decisionSource": "owner decision in #417 body (picker stays on getRecipes; plan lookup includes archived)",
+      "deviceCheck": "Cook a recipe, assign to today Lunch, tick consumed. Delete the recipe (archives it). Meal Plan weekly: slot shows title and kcal, day card shows CONSUMED TODAY with kcal. + Log Cooked Meal: deleted recipe not listed.",
+      "notes": "tester APPROVE r0. Only the Lunch slot is exercised by the new render test (Dinner symmetric by reading). 5662af0 alone does not typecheck. An archived recipe row with malformed ingredients now also breaks MealPrep load (#430).",
+      "regressionProof": "db test fails with 5662af0 database.ts; screen test fails with fa4a656 MealPrepScreen.tsx (Archived Curry not found); pass at ef83ef1; 1003/88 (tester reproduced)",
+      "securityReview": "APPROVE: static read-only SELECT; planRecipes feeds only the slot title Text and the kcal sums; no write path can pick an archived recipe id it could not before. Note: a malformed archived row now breaks the MealPrep load like an active one already did (#430).",
+      "mergeSha": "30ee844"
+    },
+    "419": {
+      "lane": "B",
+      "status": "merged",
+      "roundTrips": 0,
+      "commits": [
+        "93da3f8",
+        "402ccd6",
+        "afb133e",
+        "dd62bcd",
+        "fc607ec",
+        "45d91de"
+      ],
+      "workOrder": "C:/git/ht-lanes/wo/419.md",
+      "decisionSource": "owner decision in #419 body",
+      "deviceCheck": "Force a throw at top of init try in App.tsx (first attempt only, uncommitted). Launch: title, error, Retry, Save data, no-reset sentence, no other button. Save data: share sheet for db (non-zero size), second sheet for wal if present, both files arrive. Retry: normal app, data intact.",
+      "notes": "tester APPROVE r0. DB path verified against expo-sqlite defaultDatabaseDirectory (filesDir/SQLite). Inline fs/sharing mocks are necessary (global mock shadowed by jest-expo, filed #425). No in-flight guard on Retry in code: button unmounts on press, but 2 presses in one act() overlapped 2 initDatabase calls (sent to security). App test silences console.error globally. DB filename hard-coded in service + test.",
+      "regressionProof": "App.startFailure 7/7 fail with 2e1ac1e App.tsx, pass at 45d91de; rescueExport 5/5 at tip (tester reproduced); 874/83",
+      "securityReview": "APPROVE: live db is only ever a copy source; no SQL; errors surfaced. Overlapping initDatabase runs are serialised by the write queue (only the start-date check-then-insert is unguarded: cosmetic). Rescue pair is best-effort (wal copied after db). Copies stay in app-private cache. NOTE: Retry re-runs resetIfIncompatibleSchema, the one existing path that deletes the DB (pre-existing, filed #427).",
+      "mergeSha": "0987514"
     }
   },
   "foundDuringSprint": [
-    397,
-    398,
-    399,
-    400,
-    401,
-    402,
-    403,
-    404,
-    405,
-    406,
-    407,
-    408,
-    409,
-    410,
-    411,
-    412,
-    413,
-    414,
-    415,
-    416
+    422,
+    423,
+    424,
+    425,
+    426,
+    427,
+    428,
+    429,
+    430,
+    431,
+    432,
+    433,
+    434,
+    435,
+    436,
+    437
+  ],
+  "smallFindings": [
+    "RESTORE_SLOT_DEDUPE_SQL repeats the survivors CTE twice (schema.ts) - #406 analyst",
+    "Onboarding age field is number-pad (no decimal key) but accepts decimals via paste - #405 analyst",
+    "src/components Button.tsx has raw borderRadius: 13 and minHeight: 48 instead of tokens - #419 dev",
+    "RecipeEditorScreen: SAVE_RECOMPUTE_DEADLINE_MS is declared between DEFAULT_SERVINGS and DEFAULT_PREP, splitting two related constants - #318 tester (handed to lane E cleanup)",
+    "workoutSetIndexCollision.test.ts header comment (~lines 22-40) still says restore re-runs v37 - #412 tester (handed to lane A cleanup)",
+    "A payload row with is_consumed null makes the whole restore throw on NOT NULL (pre-existing; payload validation) - #406 tester",
+    "src/db/__tests__/backupRoundTrip.test.ts:137 comment still says POST_RESTORE_STEPS includes v37 (outside lane A diff) - lane A cleanup",
+    "restoreFromPayload docblock (~2500-2520) still carries pre-existing issue refs (#303, #317, #315) and v37 history - lane A cleanup",
+    "Restore alert: column names from a hand-edited backup containing newlines or commas render verbatim in the skipped summary (could fake an alert line; max 40 chars after #407) - #407 tester",
+    "AppNavigator.tsx has stale emoji-icon comments - #398 analyst",
+    "jest.config.js comment still says Jest 30 although jest is ~29.7 (owner said not to touch the jest config in #400) - #400 analyst",
+    "eslint-disable comments also sit in src/services/backup.ts and src/services/expoNotifications.ts (not test files, outside #409) - #409 analyst",
+    "MealPrep handleToggleConsumed is not behind runGuarded: a double tap fires toggleMealConsumed twice (second is a no-op in the db; visual-feedback gap only) - #408 dev / #403 analyst",
+    "MealPrepScreen.test.tsx has an issue number in a describe title (refresh failure banner (#401)) - lane D cleanup",
+    "MealPrepScreen.tsx: pre-existing comments carry issue refs (#324 backstop comment, hasLoadedOnceRef comment) - lane D cleanup",
+    "DashboardScreen.tsx: comment above the measurements modal state initialisers references #325 and tells history - #415 dev (handed to lane C cleanup if the lane touches those lines)",
+    "upsertAdditionalWorkouts has no non-test caller in src/ any more (orphaned export after #410) - lane C cleanup",
+    "_logBodyMeasurementImpl declares a local columns array duplicating the module-level MEASUREMENT_FIELDS const - lane C cleanup",
+    "DashboardScreen pills map: const entry shadows the component entry state - lane C cleanup",
+    "Stale Jest 30 comments remain in __mocks__/expo-winter.js, src/services/expoNotifications.ts, src/nutrition/__tests__/nutrition.test.ts, src/services/__tests__/notifications.test.ts (and jest.config.js); the expo/src/winter mapping may be removable on Jest 29.7 (one suite passed without it; not run across the suite) - #400 tester"
   ],
   "log": [
     {
-      "at": "2026-09-30T22:30:33Z",
-      "event": "preflight green on main fdf5c68: typecheck pass, 610 tests / 62 suites (Zurich and UTC)"
+      "at": "2026-10-06T17:01:16Z",
+      "event": "preflight green on main 58a7f3f: tree clean, identity verified, typecheck pass, 862 tests / 81 suites"
     },
     {
-      "at": "2026-09-30T22:30:33Z",
+      "at": "2026-10-06T17:01:16Z",
       "event": "created and pushed sprint/auto-fixes from main",
-      "sha": "fdf5c68"
+      "sha": "58a7f3f"
     },
     {
-      "at": "2026-09-30T22:30:33Z",
-      "event": "scope frozen: 27 open issues from SPRINT.md §3"
+      "at": "2026-10-06T17:01:16Z",
+      "event": "scope frozen: 20 open issues from SPRINT.md §3 (all listed issues are open)"
     },
     {
-      "at": "2026-09-30T22:30:33Z",
-      "event": "worktrees created at C:/git/ht-lanes/lane-{a..g}, lane branches pushed, npm ci running"
+      "at": "2026-10-06T17:02:49Z",
+      "event": "worktrees a/b/e/f created at 2e1ac1e, npm ci running; analysts dispatched for #414 #419 #318 #405 (current) and #412 #406 #404 #397 #407 (ahead, read-only)"
     },
     {
-      "at": "2026-09-30T22:30:33Z",
-      "event": "#314 parked at analysis; #328 parked at analysis (lane C out of work); #318 in_dev with screen grant; lane A -> #316"
+      "at": "2026-10-06T17:03:29Z",
+      "event": "#407 work order ready (queued last in lane F)"
     },
     {
-      "at": "2026-09-30T22:31:53Z",
-      "event": "#311/#375/#374/#318 in_dev; #316 analysing"
+      "at": "2026-10-06T17:06:09Z",
+      "event": "all 9 work orders ready, none parked; #414 #419 #318 #405 in_dev"
     },
     {
-      "at": "2026-09-30T22:32:57Z",
-      "event": "#316 decision verified in owner comment; in_dev (v38). #374 in_test. Filed #397 (settings stale reload sex/activity/goal), #398 (unused bottom-tabs), #399 (sequential import lookups). Commented #396 re createRecipe resetting archived_at."
+      "at": "2026-10-06T17:06:36Z",
+      "event": "filed #422 (parseTimeString parseInt), #423 (no error boundary in App.tsx), #424 (OFF Retry-After ignored); 2 cosmetic findings collected for the small-findings issue"
     },
     {
-      "at": "2026-09-30T22:34:00Z",
-      "event": "#311 in_test (615 tests per dev)"
+      "at": "2026-10-06T17:07:48Z",
+      "event": "#414 in_test (972/82 per dev)"
     },
     {
-      "at": "2026-09-30T22:34:24Z",
-      "event": "#374 REJECT r1 -> back to dev; #375 in_test (616 tests per dev)"
+      "at": "2026-10-06T17:08:08Z",
+      "event": "#405 in_test (875/81 per dev)"
     },
     {
-      "at": "2026-09-30T22:34:36Z",
-      "event": "filed #400 (stale babel.config.js comment)"
+      "at": "2026-10-06T17:09:16Z",
+      "event": "#405 ready (tester APPROVE r0, security skipped); lane F -> #404 in_dev"
     },
     {
-      "at": "2026-09-30T22:34:48Z",
-      "event": "#318 dev continuing for editor abort test"
+      "at": "2026-10-06T17:09:38Z",
+      "event": "#414 tester APPROVE r0 -> security (read-only, parallel); lane A -> #412 in_dev"
     },
     {
-      "at": "2026-09-30T22:34:58Z",
-      "event": "#374 round 2 (157da1c) in_test"
+      "at": "2026-10-06T17:10:21Z",
+      "event": "#318 in_test (873/84 per dev; dev report mislabelled 2 SHAs, corrected from git log)"
     },
     {
-      "at": "2026-09-30T22:35:24Z",
-      "event": "#311 ready (tester APPROVE r0, security skipped notifications-only); lane B -> #361 analysing"
+      "at": "2026-10-06T17:10:44Z",
+      "event": "#414 ready (security APPROVE); #419 in_test (874/83 per dev)"
     },
     {
-      "at": "2026-09-30T22:35:50Z",
-      "event": "#374 ready (APPROVE r2); lane F cleanup running"
+      "at": "2026-10-06T17:11:42Z",
+      "event": "#412 in_test (975/82 per dev)"
     },
     {
-      "at": "2026-09-30T22:36:13Z",
-      "event": "#316 in_test (615 per dev)"
+      "at": "2026-10-06T17:13:26Z",
+      "event": "#419 tester APPROVE r0 -> security; #318 tester APPROVE r0 -> security; filed #425 (shadowed expo-file-system mock)"
     },
     {
-      "at": "2026-09-30T22:36:52Z",
-      "event": "#375 ready (security skipped: UI state gating only, write calls unchanged); lane D -> #366 analysing; #318 in_test; #361 in_dev; lane F cleanup no-op, merging"
+      "at": "2026-10-06T17:13:53Z",
+      "event": "#412 tester APPROVE r0 -> security (read-only, parallel); lane A -> #406 in_dev"
     },
     {
-      "at": "2026-09-30T22:37:21Z",
-      "event": "merged lane F into integration c3c9dbd; gates green: typecheck clean, 610/62"
+      "at": "2026-10-06T17:15:17Z",
+      "event": "#419 ready (security APPROVE, cleanup no-op); #412 ready (security APPROVE); #318 ready (security APPROVE, cleanup running); #406 and #404 in_test; filed #426 #427 #428"
     },
     {
-      "at": "2026-09-30T22:37:56Z",
-      "event": "#366 in_dev; filed #401 (MealPrep loadData silent failure)"
+      "at": "2026-10-06T17:15:45Z",
+      "event": "merged lane B into integration 0987514; gates green: typecheck clean, 874/83. Lane E cleanup c296e5b"
     },
     {
-      "at": "2026-09-30T22:38:34Z",
-      "event": "#361 in_test (652 per dev)"
+      "at": "2026-10-06T17:16:12Z",
+      "event": "merged lane E into integration 976cd0e; gates green: typecheck clean, 885/86"
     },
     {
-      "at": "2026-09-30T22:38:52Z",
-      "event": "#316 tester APPROVE r0 -> security"
+      "at": "2026-10-06T17:17:11Z",
+      "event": "#404 ready (APPROVE r0, security skipped); lane F -> #397 in_dev; #406 tester APPROVE r0 -> security; lane A cleanup running in parallel; filed #429"
     },
     {
-      "at": "2026-09-30T22:39:12Z",
-      "event": "#318 tester APPROVE r0 -> security; filed #402 (editor overlapping recomputes)"
+      "at": "2026-10-06T17:18:53Z",
+      "event": "#406 ready (security APPROVE); lane A cleanup 90b02eb + b618b30; schema.ts verified add-only (0 removed lines, one hunk after MIGRATIONS); merged lane A into integration 7a97abf; gates green: typecheck clean, 1000/87"
     },
     {
-      "at": "2026-09-30T22:39:37Z",
-      "event": "#316 ready (security APPROVE); lane A -> #315 analysing"
+      "at": "2026-10-06T17:21:42Z",
+      "event": "worktrees c/d created at 62cc088 (npm ci ok); all 8 lane C/D work orders ready, none parked; #397 in_test (905/84 per dev); #410 and #417 in_dev"
     },
     {
-      "at": "2026-09-30T22:40:08Z",
-      "event": "#361 ready; #318 ready (security APPROVE); lanes B and E cleanup running"
+      "at": "2026-10-06T17:22:13Z",
+      "event": "filed #430 (unguarded recipe JSON.parse), #431 (silent Dashboard/Analytics loads), #432 (data-layer follow-ups), #433 (Settings stale render-time state)"
     },
     {
-      "at": "2026-09-30T22:40:24Z",
-      "event": "#366 in_test (621 per dev)"
+      "at": "2026-10-06T17:24:10Z",
+      "event": "GitHub CI test check on integration 80a84d3 (lanes B, E merged): completed success"
     },
     {
-      "at": "2026-09-30T22:40:44Z",
-      "event": "#315 in_dev (lane A part); 315-display queued at end of lane D"
+      "at": "2026-10-06T17:24:10Z",
+      "event": "#410 in_test (1007/88 per dev)"
     },
     {
-      "at": "2026-09-30T22:41:32Z",
-      "event": "merged lane B 23e1838 (gates green 652/62); merged lane E 6c42331 (gates green 667/64)"
+      "at": "2026-10-06T17:24:40Z",
+      "event": "#397 REJECT r1 (stepper guard gap) -> back to dev, roundTrips=1; #417 in_test (1003/88 per dev)"
     },
     {
-      "at": "2026-09-30T22:42:01Z",
-      "event": "#366 REJECT r1 (commit granularity) -> dev"
+      "at": "2026-10-06T17:26:02Z",
+      "event": "#397 round 2 (d61488d, 907/84 per dev) in_test"
     },
     {
-      "at": "2026-09-30T22:42:06Z",
-      "event": "filed #403 (MealPrep modal double-submit)"
+      "at": "2026-10-06T17:26:51Z",
+      "event": "#410 and #417 tester APPROVE r0 -> security (read-only, parallel); lane C -> #411 in_dev (first commit reverts the mapLogRow drive-by); lane D -> #401 in_dev"
     },
     {
-      "at": "2026-09-30T22:42:31Z",
-      "event": "#315 in_test (616 per dev)"
+      "at": "2026-10-06T17:27:18Z",
+      "event": "#417 ready (security APPROVE)"
     },
     {
-      "at": "2026-09-30T22:42:45Z",
-      "event": "#363 analysis started in parallel with #315 test (read-only)"
+      "at": "2026-10-06T17:27:29Z",
+      "event": "#410 ready (security APPROVE)"
     },
     {
-      "at": "2026-09-30T22:43:32Z",
-      "event": "#363 work order ready (owner decision verified; claims to fully cover #378); dev waits for #315 to clear (serial lane)"
+      "at": "2026-10-06T17:27:59Z",
+      "event": "#397 ready (APPROVE r2 after 1 round trip, security skipped); lane F -> #407 in_dev"
     },
     {
-      "at": "2026-09-30T22:43:52Z",
-      "event": "#366 round 2 (revert + 3 atomic fixes + test) in_test"
+      "at": "2026-10-06T17:29:07Z",
+      "event": "#401 in_test (1010/88 per dev)"
     },
     {
-      "at": "2026-09-30T22:44:06Z",
-      "event": "#315 tester APPROVE r0 -> security"
+      "at": "2026-10-06T17:29:21Z",
+      "event": "#407 in_test (913/84 per dev)"
     },
     {
-      "at": "2026-09-30T22:45:02Z",
-      "event": "#315 ready (security APPROVE); lane A -> #363 in_dev"
+      "at": "2026-10-06T17:30:35Z",
+      "event": "#407 ready (APPROVE r0, security skipped); lane F out of issues (4 done) -> cleanup"
     },
     {
-      "at": "2026-09-30T22:45:17Z",
-      "event": "#366 ready (APPROVE r2, security skipped); lane D -> #365 analysing"
+      "at": "2026-10-06T17:30:51Z",
+      "event": "#401 ready (APPROVE r0, security skipped); lane D -> #403 in_dev"
     },
     {
-      "at": "2026-09-30T22:45:58Z",
-      "event": "#365 in_dev"
+      "at": "2026-10-06T17:31:21Z",
+      "event": "lane G work orders ready (#398 #400 #409), none parked; waits for lanes C, D, F to merge"
     },
     {
-      "at": "2026-09-30T22:46:08Z",
-      "event": "filed #404 (Onboarding handleSkip no catch)"
+      "at": "2026-10-06T17:32:01Z",
+      "event": "#411 in_test (1030/89 per dev); lane F cleanup 704e0f6 verified by diff (agent report was empty)"
     },
     {
-      "at": "2026-09-30T22:47:28Z",
-      "event": "#365 in_test (623 per dev)"
+      "at": "2026-10-06T17:32:45Z",
+      "event": "merged lane F into integration b9e0d1e; gates green: typecheck clean, 1051/90; #403 in_test (1014/88 per dev)"
     },
     {
-      "at": "2026-09-30T22:47:51Z",
-      "event": "#363 in_test (629 per dev)"
+      "at": "2026-10-06T17:33:54Z",
+      "event": "GitHub CI test check on integration 62cc088 (lanes A, B, E merged): completed success"
     },
     {
-      "at": "2026-09-30T22:48:35Z",
-      "event": "#365 REJECT r1 (hollowed smoke tests) -> dev"
+      "at": "2026-10-06T17:33:54Z",
+      "event": "#403 ready (APPROVE r0, security skipped); lane D -> #408 in_dev"
     },
     {
-      "at": "2026-09-30T22:49:39Z",
-      "event": "#365 round 2 (49abc78) in_test"
+      "at": "2026-10-06T17:36:21Z",
+      "event": "#408 in_test (1022/88 per dev)"
     },
     {
-      "at": "2026-09-30T22:50:38Z",
-      "event": "#365 ready (APPROVE r2, security skipped UI error surfacing); lane D -> #364 analysing"
+      "at": "2026-10-06T17:38:39Z",
+      "event": "#408 ready (APPROVE r0, security skipped); lane D out of issues (4 done) -> cleanup"
     },
     {
-      "at": "2026-09-30T22:51:33Z",
-      "event": "#364 in_dev"
+      "at": "2026-10-06T17:39:27Z",
+      "event": "merged lane D into integration 30ee844; gates green: typecheck clean, 1073/91"
     },
     {
-      "at": "2026-09-30T22:51:57Z",
-      "event": "#363 tester APPROVE -> security; #378 covered by #363. Found: npm test forces TZ=UTC. Stash list has 2 June stashes (human, pre-sprint)."
+      "at": "2026-10-06T17:42:53Z",
+      "event": "#411 tester APPROVE r0 -> security (read-only, parallel); lane C -> #415 in_dev; filed #434 (wrong-shaped array items stuck)"
     },
     {
-      "at": "2026-09-30T22:52:21Z",
-      "event": "GitHub CI test check on integration 377a113 (lanes B,E,F merged): completed success"
+      "at": "2026-10-06T17:43:51Z",
+      "event": "#411 ready (security APPROVE)"
     },
     {
-      "at": "2026-09-30T22:52:37Z",
-      "event": "#363 ready (security APPROVE); #378 ready as done-by-#363; lane A -> #380 analysing"
+      "at": "2026-10-06T17:45:07Z",
+      "event": "#415 in_test (1035/89 per dev)"
     },
     {
-      "at": "2026-09-30T22:53:27Z",
-      "event": "#364 in_test (636 per dev)"
+      "at": "2026-10-06T17:46:48Z",
+      "event": "#415 ready (APPROVE r0, security skipped: read-only query); lane C -> #416 in_dev"
     },
     {
-      "at": "2026-09-30T22:53:56Z",
-      "event": "#380 in_dev with restore-only replay design"
+      "at": "2026-10-06T17:49:44Z",
+      "event": "#416 in_test (1041/89 per dev)"
     },
     {
-      "at": "2026-09-30T22:54:07Z",
-      "event": "filed #405 (Onboarding parseFloat) and #406 (restore refund count before dedupe)"
+      "at": "2026-10-06T17:51:36Z",
+      "event": "#416 REJECT r1 (hollow all-NULL read test; NaN inserts all-NULL row) -> back to dev, roundTrips=1"
     },
     {
-      "at": "2026-09-30T22:54:37Z",
-      "event": "#380 dev stopped on contradicting existing test; orchestrator authorized updating it (own commit)"
+      "at": "2026-10-06T17:52:52Z",
+      "event": "#416 round 2 (0098d42, 1045/89 per dev) in_test"
     },
     {
-      "at": "2026-09-30T22:54:56Z",
-      "event": "#364 ready; lane D -> 315-display in_dev (work order from #315 analyst)"
+      "at": "2026-10-06T17:54:06Z",
+      "event": "#416 tester APPROVE r2 (1 round trip) -> security; lane C cleanup running in parallel"
     },
     {
-      "at": "2026-09-30T22:56:08Z",
-      "event": "#380 in_test (630 per dev)"
+      "at": "2026-10-06T17:54:46Z",
+      "event": "#416 ready (security APPROVE); filed #435 (silent measurement-save failure); lane C out of issues (4 done), cleanup running"
     },
     {
-      "at": "2026-09-30T22:56:52Z",
-      "event": "315-display in_test (641 per dev); d866f2a alone does not typecheck (disclosed)"
+      "at": "2026-10-06T17:55:30Z",
+      "event": "merged lane C into integration 04468f9 (no conflicts); gates green: typecheck clean, 1118/93. All lanes A-F merged; lane G starts"
     },
     {
-      "at": "2026-09-30T22:58:07Z",
-      "event": "#380 tester APPROVE -> security"
+      "at": "2026-10-06T17:56:02Z",
+      "event": "worktree g created at 85442f8 (npm ci ok); lane G -> #398 in_dev"
     },
     {
-      "at": "2026-09-30T22:58:27Z",
-      "event": "315-display ready; lane D cleanup running; filed #407 (skipped-summary column cap)"
+      "at": "2026-10-06T17:57:55Z",
+      "event": "GitHub CI test check on integration 5b23394 (lanes A, B, D, E, F merged): completed success"
     },
     {
-      "at": "2026-09-30T22:59:00Z",
-      "event": "#380 ready (security APPROVE), partial comment posted; lane A -> #368 analysing"
+      "at": "2026-10-06T17:57:55Z",
+      "event": "#398 in_test (1118/93 per dev); filed #436 (expo patch mismatches, app.json splash)"
     },
     {
-      "at": "2026-09-30T22:59:40Z",
-      "event": "merged lane D 34a3bf2 (gates green 698/68); #368 in_dev"
+      "at": "2026-10-06T17:59:00Z",
+      "event": "#398 ready (APPROVE r0, security skipped); lane G -> #400 in_dev"
     },
     {
-      "at": "2026-09-30T22:59:58Z",
-      "event": "filed #408 (removeMealFromPlan no caller), #409 (inert eslint-disable comments)"
+      "at": "2026-10-06T18:00:36Z",
+      "event": "#400 in_test (1118/93 per dev); orchestrator read the CLAUDE.md diff"
     },
     {
-      "at": "2026-09-30T23:01:06Z",
-      "event": "#368 in_test; #370 analysis in parallel (read-only)"
+      "at": "2026-10-06T18:02:39Z",
+      "event": "#400 REJECT r1 (unsupported winter-runtime claim in CLAUDE.md + 2 imprecise sentences) -> back to dev, roundTrips=1"
     },
     {
-      "at": "2026-09-30T23:01:16Z",
-      "event": "GitHub CI test check on integration eec9ed9 (lanes B,D,E,F): completed success"
+      "at": "2026-10-06T18:03:32Z",
+      "event": "#400 round 2 (5cd6477) in_test"
     },
     {
-      "at": "2026-09-30T23:01:47Z",
-      "event": "#370 work order ready (waits for #368); filed #410 (additional-workouts stale-state race)"
+      "at": "2026-10-06T18:04:22Z",
+      "event": "#400 ready (APPROVE r2 after 1 round trip, security skipped); lane G -> #409 in_dev (last issue)"
     },
     {
-      "at": "2026-09-30T23:02:22Z",
-      "event": "#368 tester APPROVE -> security (parallel with #370 dev, low risk); #370 in_dev"
+      "at": "2026-10-06T18:05:37Z",
+      "event": "#409 in_test (1118/93 per dev)"
     },
     {
-      "at": "2026-09-30T23:02:47Z",
-      "event": "#368 ready (security APPROVE); lane A current #370 in_dev"
+      "at": "2026-10-06T18:06:03Z",
+      "event": "filed #437 (Sprint 3: small findings, one checkbox per finding)"
     },
     {
-      "at": "2026-09-30T23:02:59Z",
-      "event": "#371 analysis in parallel with #370 dev"
+      "at": "2026-10-06T18:06:38Z",
+      "event": "GitHub CI test check on integration 85442f8 (lanes A-F merged): completed success"
     },
     {
-      "at": "2026-09-30T23:03:26Z",
-      "event": "#370 in_test (641 per dev)"
+      "at": "2026-10-06T18:06:38Z",
+      "event": "#409 ready (APPROVE r0, security skipped); lane G out of issues (3 done) -> cleanup"
     },
     {
-      "at": "2026-09-30T23:03:36Z",
-      "event": "#371 work order ready (skip-not-throw); waits for #370"
+      "at": "2026-10-06T18:08:13Z",
+      "event": "merged lane G into integration ca7c4ee; npm ci against the merged lockfile; final gates green: typecheck clean, 1118/93; schema.ts add-only vs main"
     },
     {
-      "at": "2026-09-30T23:04:42Z",
-      "event": "#370 tester APPROVE -> security (parallel); #371 in_dev"
+      "at": "2026-10-06T18:09:58Z",
+      "event": "GitHub CI test check on integration 9025544 (all lanes merged): completed success"
     },
     {
-      "at": "2026-09-30T23:04:53Z",
-      "event": "#381 analysis in parallel"
-    },
-    {
-      "at": "2026-09-30T23:05:09Z",
-      "event": "#370 ready (security APPROVE); filed #411 (corrupt row blocks edits, no repair path)"
-    },
-    {
-      "at": "2026-09-30T23:05:41Z",
-      "event": "#381 work order ready (set_index display order); waits for #371"
-    },
-    {
-      "at": "2026-09-30T23:05:45Z",
-      "event": "filed #412 (restore v37 renumber discards set order)"
-    },
-    {
-      "at": "2026-09-30T23:07:01Z",
-      "event": "#371 in_test (648 per dev); today-7 case trivially true flagged to tester"
-    },
-    {
-      "at": "2026-09-30T23:07:13Z",
-      "event": "#379 analysis in parallel"
-    },
-    {
-      "at": "2026-09-30T23:07:55Z",
-      "event": "#379 parked at analysis (3 parked total)"
-    },
-    {
-      "at": "2026-09-30T23:08:06Z",
-      "event": "#382 analysis in parallel"
-    },
-    {
-      "at": "2026-09-30T23:08:29Z",
-      "event": "#371 REJECT r1 (test coverage gap) -> dev"
-    },
-    {
-      "at": "2026-09-30T23:08:43Z",
-      "event": "#382 work order ready (skip txn unless inserts/backfills/garbled write-back); queued after #371, #381"
-    },
-    {
-      "at": "2026-09-30T23:08:53Z",
-      "event": "#383 analysis in parallel"
-    },
-    {
-      "at": "2026-09-30T23:09:19Z",
-      "event": "#371 round 2 (b4c86dd) in_test"
-    },
-    {
-      "at": "2026-09-30T23:09:44Z",
-      "event": "#383 work order ready (throw on invalid or > today+7)"
-    },
-    {
-      "at": "2026-09-30T23:10:10Z",
-      "event": "analyses for #372 #373 #367 #362 dispatched in parallel (read-only)"
-    },
-    {
-      "at": "2026-09-30T23:10:30Z",
-      "event": "#371 APPROVE r2 -> security; #381 in_dev"
-    },
-    {
-      "at": "2026-09-30T23:10:54Z",
-      "event": "#367 work order ready (read-side per-column latest non-null); prefill copy-forward risk flagged"
-    },
-    {
-      "at": "2026-09-30T23:11:13Z",
-      "event": "#371 ready (security APPROVE); WOs ready for #372 #373 #362 (+#367 #382 #383 earlier)"
-    },
-    {
-      "at": "2026-09-30T23:11:20Z",
-      "event": "filed #413 (restore orphan sweep), #414 (reminder settings validation)"
-    },
-    {
-      "at": "2026-09-30T23:11:54Z",
-      "event": "#381: existing collision test pins old order; authorized update"
-    },
-    {
-      "at": "2026-09-30T23:12:50Z",
-      "event": "#381 in_test (650/650 per dev)"
-    },
-    {
-      "at": "2026-09-30T23:14:21Z",
-      "event": "#381 ready (security skipped: read order only); #382 in_dev"
-    },
-    {
-      "at": "2026-09-30T23:16:03Z",
-      "event": "#382 in_test (656 per dev)"
-    },
-    {
-      "at": "2026-09-30T23:17:36Z",
-      "event": "#382 APPROVE -> security (parallel); #383 in_dev"
-    },
-    {
-      "at": "2026-09-30T23:17:53Z",
-      "event": "#382 ready (security APPROVE)"
-    },
-    {
-      "at": "2026-09-30T23:20:07Z",
-      "event": "#383 in_test (710 per dev)"
-    },
-    {
-      "at": "2026-09-30T23:21:51Z",
-      "event": "#383 APPROVE -> security (parallel); #372 in_dev"
-    },
-    {
-      "at": "2026-09-30T23:22:17Z",
-      "event": "#383 ready (security APPROVE)"
-    },
-    {
-      "at": "2026-09-30T23:22:56Z",
-      "event": "#372 in_test (713 per dev)"
-    },
-    {
-      "at": "2026-09-30T23:24:10Z",
-      "event": "#372 ready (security skipped: read shape only); #373 in_dev"
-    },
-    {
-      "at": "2026-09-30T23:25:39Z",
-      "event": "#373: existing doc test pins blank=0; authorized update"
-    },
-    {
-      "at": "2026-09-30T23:26:25Z",
-      "event": "#373 in_test (748 per dev)"
-    },
-    {
-      "at": "2026-09-30T23:27:54Z",
-      "event": "#373 ready; sprint-caused onboarding-bounds regression recorded on #405; #367 in_dev"
-    },
-    {
-      "at": "2026-09-30T23:29:18Z",
-      "event": "#367: modal copy-forward regression confirmed; granted screen fix"
-    },
-    {
-      "at": "2026-09-30T23:29:29Z",
-      "event": "filed #415 (measurement Last-date label)"
-    },
-    {
-      "at": "2026-09-30T23:31:07Z",
-      "event": "#367 in_test (756 per dev)"
-    },
-    {
-      "at": "2026-09-30T23:33:03Z",
-      "event": "#367 ready; filed clearing issue; #362 in_dev (last lane A issue)"
-    },
-    {
-      "at": "2026-09-30T23:33:08Z",
-      "event": "filed #416 (measurement clearing after #367)"
-    },
-    {
-      "at": "2026-09-30T23:33:56Z",
-      "event": "#362 in_test (768 per dev)"
-    },
-    {
-      "at": "2026-09-30T23:35:07Z",
-      "event": "#362 ready; lane A out of issues (15 done, 2 parked) -> cleanup"
-    },
-    {
-      "at": "2026-09-30T23:35:21Z",
-      "event": "#377 analysis started (read-only) while lane A cleanup runs"
-    },
-    {
-      "at": "2026-09-30T23:36:06Z",
-      "event": "#377 work order ready; waits for lane A merge"
-    },
-    {
-      "at": "2026-09-30T23:37:02Z",
-      "event": "verified schema.ts diff vs fdf5c68 is pure append (73+/0-); merged lane A 6898c98; gates green 856/79"
-    },
-    {
-      "at": "2026-09-30T23:37:32Z",
-      "event": "lane G refreshed to 215b228 and pushed; #377 in_dev (Linux repro first)"
-    },
-    {
-      "at": "2026-09-30T23:39:50Z",
-      "event": "GitHub CI test check on 215b228 (all lanes except G merged; integration + lane-g pushes): 2x completed success"
-    },
-    {
-      "at": "2026-10-01T00:38:36Z",
-      "event": "#377 parked after Linux repro (not sql.js; worker-count native crash); lane G not merged"
-    },
-    {
-      "at": "2026-10-01T00:40:57Z",
-      "event": "sprint finished: report written; PR NOT opened (awaits cold review + device checks)"
+      "at": "2026-10-06T18:09:58Z",
+      "event": "sprint finished: all 20 issues merged, none parked; report written; PR NOT opened (awaits cold review + device checks)"
     }
   ],
+  "smallFindingsIssue": 437,
   "status": "finished",
-  "finishedAt": "2026-10-01T00:40:57Z",
+  "finishedAt": "2026-10-06T18:09:58Z",
   "final": {
-    "sha": "215b228",
+    "codeSha": "ca7c4ee",
     "typecheck": "pass",
-    "tests": 856,
-    "suites": 79,
-    "ci": "success on 215b228",
-    "merged": 23,
-    "parked": [
-      314,
-      328,
-      379,
-      377
-    ],
-    "partial": [
-      318,
-      380
+    "tests": 1118,
+    "suites": 93,
+    "ci": "success on 9025544",
+    "merged": 20,
+    "parked": [],
+    "roundTrips": {
+      "397": 1,
+      "400": 1,
+      "416": 1
+    },
+    "unfinished": [
+      "#412: stale v37 comment inside MIGRATIONS left untouched (rule 6) although the owner decision asked for it"
     ]
   }
 }

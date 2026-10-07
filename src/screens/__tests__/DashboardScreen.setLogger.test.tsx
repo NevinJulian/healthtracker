@@ -4,7 +4,6 @@ import { render, fireEvent, act } from '@testing-library/react-native';
 
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useEffect } = require('react');
     useEffect(callback, []);
   },
@@ -34,6 +33,8 @@ jest.mock('../../db/database', () => ({
   upsertExerciseCompleted: jest.fn(() => Promise.resolve(undefined)),
   upsertBodyWeight: jest.fn(() => Promise.resolve(undefined)),
   upsertAdditionalWorkouts: jest.fn(() => Promise.resolve(undefined)),
+  addAdditionalWorkout: jest.fn(() => Promise.resolve(undefined)),
+  toggleAdditionalWorkout: jest.fn(() => Promise.resolve(undefined)),
   syncRollingSchedule: jest.fn(() => Promise.resolve(undefined)),
   toISODate: jest.fn(() => '2026-09-19'),
   getTodaysMealsWithRecipe: jest.fn(() => Promise.resolve([])),

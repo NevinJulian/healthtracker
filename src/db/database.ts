@@ -18,7 +18,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, RESTORE_SLOT_DEDUPE_SQL, Exercise } from './schema';
+import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, RESTORE_SLOT_DEDUPE_SQL, RESTORE_SET_INDEX_SQL, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
 import { recipes } from '../data/recipes';
 import { NUTRITION_GOALS, NutritionGoals } from '../nutrition/goals';
@@ -221,6 +221,20 @@ function parseExercises(raw: string | null | undefined): Exercise[] {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+
+export type CorruptJsonColumn = 'exercises' | 'additional_workouts';
+
+export class CorruptJsonError extends Error {
+  readonly column: CorruptJsonColumn;
+  readonly date: string;
+
+  constructor(caller: string, column: CorruptJsonColumn, date: string) {
+    super(`[DB] ${caller}: malformed ${column} JSON for date=${date}`);
+    this.name = 'CorruptJsonError';
+    this.column = column;
+    this.date = date;
   }
 }
 
@@ -1041,7 +1055,7 @@ async function _upsertExerciseCompletedImpl(
     console.error(
       `[DB] upsertExerciseCompleted: malformed exercises JSON for date=${date} — refusing to write, stored value left unchanged`
     );
-    throw new Error(`[DB] upsertExerciseCompleted: malformed exercises JSON for date=${date}`);
+    throw new CorruptJsonError('upsertExerciseCompleted', 'exercises', date);
   }
   const updated = parsed.value.map((ex) =>
     ex.id === exerciseId ? { ...ex, completed: value } : ex
@@ -1074,11 +1088,11 @@ export function upsertAdditionalWorkouts(
   return _enqueueWrite('upsertAdditionalWorkouts', () => _upsertAdditionalWorkoutsImpl(date, workouts));
 }
 
-async function _upsertAdditionalWorkoutsImpl(
+async function _readAdditionalWorkoutsForWrite(
+  db: SQLite.SQLiteDatabase,
   date: string,
-  workouts: AdditionalWorkout[]
-): Promise<void> {
-  const db = getDatabase();
+  caller: string
+): Promise<AdditionalWorkout[]> {
   await _ensureDailyLogRow(db, date);
   const row = await db.getFirstAsync<{ additional_workouts: string }>(
     'SELECT additional_workouts FROM daily_log WHERE date = ?',
@@ -1086,15 +1100,116 @@ async function _upsertAdditionalWorkoutsImpl(
   );
   if (!_isStoredJsonArray(row?.additional_workouts)) {
     console.error(
-      `[DB] upsertAdditionalWorkouts: malformed additional_workouts JSON for date=${date} — refusing to write, stored value left unchanged`
+      `[DB] ${caller}: malformed additional_workouts JSON for date=${date} — refusing to write, stored value left unchanged`
     );
-    throw new Error(`[DB] upsertAdditionalWorkouts: malformed additional_workouts JSON for date=${date}`);
+    throw new CorruptJsonError(caller, 'additional_workouts', date);
   }
+  return parseAdditionalWorkouts(row?.additional_workouts);
+}
+
+async function _writeAdditionalWorkouts(
+  db: SQLite.SQLiteDatabase,
+  date: string,
+  workouts: AdditionalWorkout[],
+  caller: string
+): Promise<void> {
   const result = await db.runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [
     JSON.stringify(workouts),
     date,
   ]);
-  _assertWrote(result, 'upsertAdditionalWorkouts', date);
+  _assertWrote(result, caller, date);
+}
+
+async function _upsertAdditionalWorkoutsImpl(
+  date: string,
+  workouts: AdditionalWorkout[]
+): Promise<void> {
+  const db = getDatabase();
+  await _readAdditionalWorkoutsForWrite(db, date, 'upsertAdditionalWorkouts');
+  await _writeAdditionalWorkouts(db, date, workouts, 'upsertAdditionalWorkouts');
+}
+
+export function addAdditionalWorkout(date: string, workout: AdditionalWorkout): Promise<void> {
+  return _enqueueWrite('addAdditionalWorkout', async () => {
+    const db = getDatabase();
+    const current = await _readAdditionalWorkoutsForWrite(db, date, 'addAdditionalWorkout');
+    await _writeAdditionalWorkouts(db, date, [...current, workout], 'addAdditionalWorkout');
+  });
+}
+
+export function toggleAdditionalWorkout(date: string, id: string): Promise<void> {
+  return _enqueueWrite('toggleAdditionalWorkout', async () => {
+    const db = getDatabase();
+    const current = await _readAdditionalWorkoutsForWrite(db, date, 'toggleAdditionalWorkout');
+    if (!current.some((w) => w.id === id)) return;
+    const updated = current.map((w) => (w.id === id ? { ...w, completed: !w.completed } : w));
+    await _writeAdditionalWorkouts(db, date, updated, 'toggleAdditionalWorkout');
+  });
+}
+
+const CORRUPT_JSON_SELECT: Record<CorruptJsonColumn, string> = {
+  exercises: 'SELECT exercises AS raw FROM daily_log WHERE date = ?',
+  additional_workouts: 'SELECT additional_workouts AS raw FROM daily_log WHERE date = ?',
+};
+
+const CORRUPT_JSON_UPDATE: Record<CorruptJsonColumn, string> = {
+  exercises: 'UPDATE daily_log SET exercises = ? WHERE date = ?',
+  additional_workouts: 'UPDATE daily_log SET additional_workouts = ? WHERE date = ?',
+};
+
+/**
+ * Replaces one unreadable JSON column of a day with a fresh value, after
+ * keeping the unreadable text in app_state under `corrupt_json:<column>:<date>`
+ * (`:2`, `:3`, … when that key already holds different text). Refuses when
+ * the stored JSON is readable. The kept text and the new value commit together.
+ */
+export function resetCorruptDayColumn(date: string, column: CorruptJsonColumn): Promise<void> {
+  return _enqueueWrite('resetCorruptDayColumn', () => _resetCorruptDayColumnImpl(date, column));
+}
+
+async function _resetCorruptDayColumnImpl(date: string, column: CorruptJsonColumn): Promise<void> {
+  if (!(column in CORRUPT_JSON_SELECT)) {
+    throw new Error(`[DB] resetCorruptDayColumn: unsupported column "${column}"`);
+  }
+  if (!isValidDateKey(date)) {
+    throw new Error(`Invalid date key: "${date}"`);
+  }
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ raw: string | null }>(CORRUPT_JSON_SELECT[column], [date]);
+  if (!row || _isStoredJsonArray(row.raw)) {
+    throw new Error(`[DB] resetCorruptDayColumn: ${column} for date=${date} is not corrupt, nothing reset`);
+  }
+  const raw = row.raw as string;
+
+  let fresh = '[]';
+  if (column === 'exercises') {
+    const { date: startDateISO } = await _readEffectiveStartDate(db);
+    const templateRows = await db.getAllAsync<WeeklyTemplateRow>('SELECT * FROM weekly_template');
+    const templateMap = new Map<number, WeeklyTemplateRow>(templateRows.map((r) => [r.day_of_week, r]));
+    const rowValues = _buildDailyLogRowValues(date, templateMap, startDateISO);
+    if (!rowValues) {
+      throw new Error(`[DB] resetCorruptDayColumn: no weekly_template row for date=${date}`);
+    }
+    fresh = rowValues.exercises;
+  }
+
+  const baseKey = `corrupt_json:${column}:${date}`;
+  await db.withTransactionAsync(async () => {
+    for (let n = 1; ; n++) {
+      const key = n === 1 ? baseKey : `${baseKey}:${n}`;
+      const existing = await db.getFirstAsync<{ value: string }>(
+        'SELECT value FROM app_state WHERE key = ?',
+        [key]
+      );
+      if (existing === null || existing === undefined) {
+        await db.runAsync('INSERT INTO app_state (key, value) VALUES (?, ?)', [key, raw]);
+        break;
+      }
+      if (existing.value === raw) break;
+    }
+    const result = await db.runAsync(CORRUPT_JSON_UPDATE[column], [fresh, date]);
+    _assertWrote(result, 'resetCorruptDayColumn', date);
+  });
 }
 
 export async function getWeightHistory(days: number): Promise<{ date: string; weight: number }[]> {
@@ -1250,6 +1365,15 @@ export async function getRecipes(category?: string): Promise<Recipe[]> {
     rows = await db.getAllAsync('SELECT * FROM recipe_library WHERE archived_at IS NULL');
   }
 
+  return rows.map((r) => ({
+    ...r,
+    ingredients: JSON.parse(r.ingredients),
+  }));
+}
+
+export async function getRecipesIncludingArchived(): Promise<Recipe[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<any>('SELECT * FROM recipe_library');
   return rows.map((r) => ({
     ...r,
     ingredients: JSON.parse(r.ingredients),
@@ -2276,6 +2400,30 @@ async function _deleteSettingImpl(key: string): Promise<void> {
 
 // ── Typed setting keys ────────────────────────
 
+function parseDaySetting(raw: string | null): number | null {
+  if (raw === null) return null;
+  const trimmed = raw.trim();
+  return /^[0-6]$/.test(trimmed) ? Number(trimmed) : null;
+}
+
+function parseTimeSetting(raw: string | null): string | null {
+  if (raw === null) return null;
+  const trimmed = raw.trim();
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed) ? trimmed : null;
+}
+
+function assertDay(day: number): void {
+  if (!Number.isInteger(day) || day < 0 || day > 6) {
+    throw new RangeError(`Invalid day setting: ${day}`);
+  }
+}
+
+function assertTime(time: string): void {
+  if (parseTimeSetting(time) !== time) {
+    throw new RangeError(`Invalid time setting: ${time}`);
+  }
+}
+
 const SETTING_WORKOUT_REMINDER_ENABLED = 'workoutReminderEnabled';
 const SETTING_WORKOUT_REMINDER_TIME = 'workoutReminderTime';
 const DEFAULT_WORKOUT_REMINDER_TIME = '08:00';
@@ -2290,11 +2438,11 @@ export async function setWorkoutReminderEnabled(enabled: boolean): Promise<void>
 }
 
 export async function getWorkoutReminderTime(): Promise<string> {
-  const raw = await getSetting(SETTING_WORKOUT_REMINDER_TIME);
-  return raw ?? DEFAULT_WORKOUT_REMINDER_TIME;
+  return parseTimeSetting(await getSetting(SETTING_WORKOUT_REMINDER_TIME)) ?? DEFAULT_WORKOUT_REMINDER_TIME;
 }
 
 export async function setWorkoutReminderTime(time: string): Promise<void> {
+  assertTime(time);
   await setSetting(SETTING_WORKOUT_REMINDER_TIME, time);
 }
 
@@ -2329,22 +2477,20 @@ export async function setWeeklyCookDayEnabled(enabled: boolean): Promise<void> {
 
 /** Returns the cook day as 0–6 (0 = Sunday). */
 export async function getWeeklyCookDay(): Promise<number> {
-  const raw = await getSetting(SETTING_WEEKLY_COOK_DAY);
-  if (raw === null) return DEFAULT_WEEKLY_COOK_DAY;
-  const trimmed = raw.trim();
-  return /^[0-6]$/.test(trimmed) ? Number(trimmed) : DEFAULT_WEEKLY_COOK_DAY;
+  return parseDaySetting(await getSetting(SETTING_WEEKLY_COOK_DAY)) ?? DEFAULT_WEEKLY_COOK_DAY;
 }
 
 export async function setWeeklyCookDay(day: number): Promise<void> {
+  assertDay(day);
   await setSetting(SETTING_WEEKLY_COOK_DAY, String(day));
 }
 
 export async function getWeeklyCookDayTime(): Promise<string> {
-  const raw = await getSetting(SETTING_WEEKLY_COOK_DAY_TIME);
-  return raw ?? DEFAULT_WEEKLY_COOK_DAY_TIME;
+  return parseTimeSetting(await getSetting(SETTING_WEEKLY_COOK_DAY_TIME)) ?? DEFAULT_WEEKLY_COOK_DAY_TIME;
 }
 
 export async function setWeeklyCookDayTime(time: string): Promise<void> {
+  assertTime(time);
   await setSetting(SETTING_WEEKLY_COOK_DAY_TIME, time);
 }
 
@@ -2408,11 +2554,11 @@ export async function setMealReminderEnabled(meal: MealType, enabled: boolean): 
 
 /** Returns the saved reminder time for the meal, or the default if not yet persisted. */
 export async function getMealReminderTime(meal: MealType): Promise<string> {
-  const raw = await getSetting(MEAL_REMINDER_TIME_KEYS[meal]);
-  return raw ?? MEAL_REMINDER_DEFAULT_TIMES[meal];
+  return parseTimeSetting(await getSetting(MEAL_REMINDER_TIME_KEYS[meal])) ?? MEAL_REMINDER_DEFAULT_TIMES[meal];
 }
 
 export async function setMealReminderTime(meal: MealType, time: string): Promise<void> {
+  assertTime(time);
   await setSetting(MEAL_REMINDER_TIME_KEYS[meal], time);
 }
 
@@ -2488,15 +2634,14 @@ export async function dumpTable(
  *     just-restored data, in order, inside the same transaction.
  *     RESTORE_SLOT_DEDUPE_SQL credits any consumed loser's batch, dedupes
  *     weekly_meal_plan per (date, meal_type), preferring a consumed row whose
- *     inventory pointer is live, and recreates its index. v37 renumbers
- *     workout_set_log densely per (date, exercise) by (created_at, id) and
- *     recreates its index — the SAME ordering requirement the migration
- *     itself relies on (the renumber must run before its own index is
- *     (re)created) holds here for the same reason: it runs after the
- *     index was dropped above, never while it exists. A clean,
- *     already-migrated backup is unaffected by either re-run: nothing
- *     matches the dedupe's credit/delete WHERE clauses, and v37's renumber
- *     reassigns every row the value it already has.
+ *     inventory pointer is live, and recreates its index.
+ *     RESTORE_SET_INDEX_SQL renumbers a workout_set_log (date, exercise)
+ *     partition densely by (set_index, created_at, id) only if two of its
+ *     rows share a set_index, then recreates its index. Both run after their
+ *     index was dropped above, never while it exists. A clean backup is
+ *     unaffected by either: nothing matches the dedupe's credit/delete WHERE
+ *     clauses, and collision-free partitions keep their set_index values,
+ *     gaps included.
  *
  * A row's own keys are NOT trusted as column identifiers: unlike values,
  * column names can't be parameterised, so a backup file (user-supplied,
@@ -2520,17 +2665,16 @@ export async function dumpTable(
  * every time restoreFromPayload() runs — because a backup taken before a
  * step shipped, or before it happened to run, can legitimately still need it.
  * Their unique indexes are dropped before the restore loop (see the
- * restoreFromPayload doc comment above) and recreated here. A `version` step
- * is looked up from MIGRATIONS at runtime so it can never drift from the
- * real migration.
+ * restoreFromPayload doc comment above) and recreated here.
  *
  *   - RESTORE_SLOT_DEDUPE_SQL: weekly_meal_plan (date, meal_type) dedupe +
  *     unique index, preferring a consumed row whose inventory pointer is live.
- *   - v37: workout_set_log set_index renumber + unique index.
+ *   - RESTORE_SET_INDEX_SQL: workout_set_log renumber of colliding
+ *     (date, exercise) partitions only + unique index.
  */
-const POST_RESTORE_STEPS: readonly ({ sql: string } | { version: number })[] = [
+const POST_RESTORE_STEPS: readonly { sql: string }[] = [
   { sql: RESTORE_SLOT_DEDUPE_SQL },
-  { version: 37 },
+  { sql: RESTORE_SET_INDEX_SQL },
 ];
 
 type RestoreFromPayloadResult = {
@@ -2559,19 +2703,17 @@ async function _restoreFromPayload(
   let tablesRestored = 0;
   let rowsRestored = 0;
   const skipped: { table: string; columns: string[]; rows: number }[] = [];
-  // Consumed weekly_meal_plan rows restored from a pre-v34 backup, i.e. one
-  // whose rows predate the consumed_from_inventory_id column (#302). They
-  // restore fine — the column just lands NULL — but _creditPortion() only
-  // credits a batch it can point at, so unticking one of these meals will
-  // silently return nothing to inventory. Counted here so the caller can
-  // say so instead of the user discovering it a portion at a time (#310).
+  // Consumed meals from a pre-v34 backup restore with a NULL
+  // consumed_from_inventory_id, so unticking them credits no batch. Counted
+  // after the dedupe replay so only surviving rows are reported.
+  let legacyPayload = false;
   let consumedMealsWithoutRefund = 0;
 
   await db.withTransactionAsync(async () => {
     // Drop first so a legacy backup's duplicate weekly_meal_plan rows or
     // colliding/gapped workout_set_log rows (see above) can all be inserted
-    // below; both are recreated by re-running their migrations' own SQL
-    // (POST_RESTORE_STEPS) after the restore loop.
+    // below; both indexes are recreated by POST_RESTORE_STEPS after the
+    // restore loop.
     await db.execAsync('DROP INDEX IF EXISTS idx_weekly_meal_plan_date_meal_type');
     await db.execAsync('DROP INDEX IF EXISTS idx_workout_set_log_date_exercise_set_index');
 
@@ -2582,17 +2724,12 @@ async function _restoreFromPayload(
       // A pre-v34 backup's weekly_meal_plan rows carry no
       // consumed_from_inventory_id key at all. Detect that on the payload
       // (not on the restored rows, where the column exists and is simply
-      // NULL) and count the consumed ones, which are the rows that can
-      // never refund.
+      // NULL).
       if (tableName === 'weekly_meal_plan' && rows.length > 0) {
         const payloadHasRefundPointer = rows.some(
           (row) => 'consumed_from_inventory_id' in row
         );
-        if (!payloadHasRefundPointer) {
-          consumedMealsWithoutRefund = rows.filter(
-            (row) => row.is_consumed === 1 || row.is_consumed === true
-          ).length;
-        }
+        if (!payloadHasRefundPointer) legacyPayload = true;
       }
 
       // Wipe existing rows
@@ -2653,21 +2790,14 @@ async function _restoreFromPayload(
     // while it existed — matching the ordering both the dedupe and the
     // renumber require.
     for (const step of POST_RESTORE_STEPS) {
-      if ('sql' in step) {
-        await db.execAsync(step.sql);
-        continue;
-      }
-      const migration = MIGRATIONS.find((m) => m.version === step.version);
-      if (!migration) {
-        throw new Error(
-          `restoreFromPayload: migration v${step.version} not found in MIGRATIONS — cannot rebuild its post-restore state.`
-        );
-      }
-      // Same contract as runMigrations: a migration's precondition runs
-      // immediately before its SQL, in the same transaction. Here it is
-      // also a live check that the DROP INDEX above really happened.
-      if (migration.precondition) await migration.precondition(db);
-      await db.execAsync(migration.sql);
+      await db.execAsync(step.sql);
+    }
+
+    if (legacyPayload) {
+      const consumed = await db.getFirstAsync<{ n: number }>(
+        'SELECT COUNT(*) AS n FROM weekly_meal_plan WHERE is_consumed = 1'
+      );
+      consumedMealsWithoutRefund = consumed?.n ?? 0;
     }
   });
 
@@ -2974,12 +3104,12 @@ type MeasurementInput = {
 /**
  * Upsert a body-measurement entry for `date`.
  *
- * If no row exists for that date, inserts a new one with only the provided
- * fields set (others stay NULL).  If a row already exists, updates only the
- * non-undefined fields so previous measurements are preserved.
+ * Only finite numeric fields are written (null, undefined, NaN and Infinity
+ * are ignored); existing values are never overwritten with NULL. If no field
+ * qualifies, nothing is written and no row is created.
  *
  * @param date   - YYYY-MM-DD date key.
- * @param fields - Partial measurement object; undefined fields are ignored.
+ * @param fields - Partial measurement object; non-finite fields are ignored.
  */
 export function logBodyMeasurement(
   date: string,
@@ -2993,39 +3123,26 @@ async function _logBodyMeasurementImpl(
   fields: MeasurementInput
 ): Promise<void> {
   const db = getDatabase();
+  const columns = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
+  const provided = columns.filter((c) => Number.isFinite(fields[c]));
+  if (provided.length === 0) return;
+
   const existing = await db.getFirstAsync<{ id: number }>(
     'SELECT id FROM body_measurements WHERE date = ?',
     [date]
   );
 
   if (!existing) {
-    // Insert — only supply provided fields; missing ones default to NULL
     await db.runAsync(
-      `INSERT INTO body_measurements (date, waist_cm, chest_cm, hips_cm, thigh_cm, arm_cm)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        date,
-        fields.waist_cm ?? null,
-        fields.chest_cm ?? null,
-        fields.hips_cm ?? null,
-        fields.thigh_cm ?? null,
-        fields.arm_cm ?? null,
-      ]
+      `INSERT INTO body_measurements (date, ${provided.join(', ')})
+       VALUES (?, ${provided.map(() => '?').join(', ')})`,
+      [date, ...provided.map((c) => fields[c] as number)]
     );
     return;
   }
 
-  // Update — only the explicitly provided (non-undefined) fields
-  const setClauses: string[] = [];
-  const values: (number | null)[] = [];
-
-  if (fields.waist_cm !== undefined) { setClauses.push('waist_cm = ?'); values.push(fields.waist_cm ?? null); }
-  if (fields.chest_cm !== undefined) { setClauses.push('chest_cm = ?'); values.push(fields.chest_cm ?? null); }
-  if (fields.hips_cm  !== undefined) { setClauses.push('hips_cm = ?');  values.push(fields.hips_cm  ?? null); }
-  if (fields.thigh_cm !== undefined) { setClauses.push('thigh_cm = ?'); values.push(fields.thigh_cm ?? null); }
-  if (fields.arm_cm   !== undefined) { setClauses.push('arm_cm = ?');   values.push(fields.arm_cm   ?? null); }
-
-  if (setClauses.length === 0) return; // Nothing to update
+  const setClauses = provided.map((c) => `${c} = ?`);
+  const values: number[] = provided.map((c) => fields[c] as number);
 
   await db.runAsync(
     `UPDATE body_measurements SET ${setClauses.join(', ')} WHERE id = ?`,
@@ -3057,23 +3174,50 @@ export async function getBodyMeasurements(
   return rows;
 }
 
+const MEASUREMENT_FIELDS = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
+
+export type MeasurementField = (typeof MEASUREMENT_FIELDS)[number];
+
+/** The newest non-NULL value of one measurement column and the date of the row it came from. */
+export type DatedMeasurement = { value: number; date: string };
+
+export type LatestMeasurements = Record<MeasurementField, DatedMeasurement | null>;
+
 /**
- * Return the current body measurements: `id` and `date` come from the newest
- * row, and each `*_cm` is that column's newest non-NULL value across all rows
- * (null if never logged). Returns null when no rows exist.
+ * Return each body measurement's newest non-NULL value together with the date
+ * of the row it came from (null per field if never logged). Returns null when
+ * no field has ever had a value.
  */
-export async function getLatestMeasurements(): Promise<BodyMeasurement | null> {
+export async function getLatestMeasurements(): Promise<LatestMeasurements | null> {
   const db = getDatabase();
-  const row = await db.getFirstAsync<BodyMeasurement>(
-    `SELECT id, date,
+  const row = await db.getFirstAsync<Record<string, number | string | null>>(
+    `SELECT
        (SELECT waist_cm FROM body_measurements WHERE waist_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS waist_cm,
+       (SELECT date FROM body_measurements WHERE waist_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS waist_date,
        (SELECT chest_cm FROM body_measurements WHERE chest_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS chest_cm,
+       (SELECT date FROM body_measurements WHERE chest_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS chest_date,
        (SELECT hips_cm FROM body_measurements WHERE hips_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS hips_cm,
+       (SELECT date FROM body_measurements WHERE hips_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS hips_date,
        (SELECT thigh_cm FROM body_measurements WHERE thigh_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS thigh_cm,
-       (SELECT arm_cm FROM body_measurements WHERE arm_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS arm_cm
-     FROM body_measurements ORDER BY date DESC LIMIT 1`
+       (SELECT date FROM body_measurements WHERE thigh_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS thigh_date,
+       (SELECT arm_cm FROM body_measurements WHERE arm_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS arm_cm,
+       (SELECT date FROM body_measurements WHERE arm_cm IS NOT NULL ORDER BY date DESC LIMIT 1) AS arm_date`
   );
-  return row ?? null;
+  if (!row) return null;
+
+  const result = {} as LatestMeasurements;
+  let any = false;
+  for (const field of MEASUREMENT_FIELDS) {
+    const value = row[field];
+    const date = row[field.replace('_cm', '_date')];
+    if (typeof value === 'number' && typeof date === 'string') {
+      result[field] = { value, date };
+      any = true;
+    } else {
+      result[field] = null;
+    }
+  }
+  return any ? result : null;
 }
 
 // ── Workout set log CRUD (workout_set_log table, migration v33) ───────────────
@@ -3128,7 +3272,7 @@ async function _logWorkoutSetImpl(
   );
 }
 
-// set_index is the display order: dense and unique per (date, exercise), and immune to clock changes.
+// set_index is the display order: unique per (date, exercise) and independent of created_at, so clock changes cannot reorder sets.
 export const WORKOUT_SETS_FOR_DAY_SQL = `SELECT * FROM workout_set_log WHERE date = ?
      ORDER BY exercise ASC, set_index ASC`;
 
@@ -3222,26 +3366,22 @@ export async function setBackupReminderEnabled(enabled: boolean): Promise<void> 
 
 /** Returns the saved weekday (0–6, 0 = Sunday) for the backup reminder. */
 export async function getBackupReminderDay(): Promise<number> {
-  const raw = await getSetting(SETTING_BACKUP_REMINDER_DAY);
-  if (raw === null) return DEFAULT_BACKUP_REMINDER_DAY;
-  const parsed = parseInt(raw, 10);
-  return isNaN(parsed) || parsed < 0 || parsed > 6
-    ? DEFAULT_BACKUP_REMINDER_DAY
-    : parsed;
+  return parseDaySetting(await getSetting(SETTING_BACKUP_REMINDER_DAY)) ?? DEFAULT_BACKUP_REMINDER_DAY;
 }
 
 /** Persist the weekday (0–6) for the backup reminder. */
 export async function setBackupReminderDay(day: number): Promise<void> {
+  assertDay(day);
   await setSetting(SETTING_BACKUP_REMINDER_DAY, String(day));
 }
 
 /** Returns the saved time ("HH:MM") for the backup reminder. Default: "18:00". */
 export async function getBackupReminderTime(): Promise<string> {
-  const raw = await getSetting(SETTING_BACKUP_REMINDER_TIME);
-  return raw ?? DEFAULT_BACKUP_REMINDER_TIME;
+  return parseTimeSetting(await getSetting(SETTING_BACKUP_REMINDER_TIME)) ?? DEFAULT_BACKUP_REMINDER_TIME;
 }
 
 /** Persist the time ("HH:MM") for the backup reminder. */
 export async function setBackupReminderTime(time: string): Promise<void> {
+  assertTime(time);
   await setSetting(SETTING_BACKUP_REMINDER_TIME, time);
 }
