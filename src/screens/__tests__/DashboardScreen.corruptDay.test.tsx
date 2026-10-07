@@ -303,6 +303,27 @@ describe('DashboardScreen shows a notice with a reset button when a day loads un
     expect(alertSpy).not.toHaveBeenCalled();
   });
 
+  it('two rapid presses call the reset once', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['exercises']));
+    let release: () => void = () => {};
+    jest.mocked(resetCorruptDayColumn).mockImplementationOnce(
+      () => new Promise<void>((resolve) => { release = resolve; })
+    );
+    const q = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.press(q.getByLabelText(exercisesLabel));
+      fireEvent.press(q.getByLabelText(exercisesLabel));
+    });
+    await act(async () => {
+      release();
+    });
+    await flushMicrotasks();
+
+    expect(resetCorruptDayColumn).toHaveBeenCalledTimes(1);
+  });
+
   it('a failed reset shows Reset failed and a later press works', async () => {
     jest.mocked(getLogByDate).mockResolvedValue(flagged(['exercises']));
     jest.mocked(resetCorruptDayColumn).mockRejectedValueOnce(new Error('disk full'));
