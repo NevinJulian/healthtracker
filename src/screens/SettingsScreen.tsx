@@ -270,6 +270,56 @@ function useDebouncedCommit<T>(
   return flush;
 }
 
+interface LatestSettings {
+  reminder: ReminderState;
+  cooking: CookingReminderState;
+  mealReminders: MealReminderState;
+  backupReminder: BackupReminderState;
+  profile: UserProfileData;
+  latestWeight: number | null;
+}
+
+const INITIAL_REMINDER: ReminderState = {
+  enabled: false,
+  time: '08:00',
+  permissionDenied: false,
+};
+
+const INITIAL_COOKING: CookingReminderState = {
+  cookWhenEmptyEnabled: false,
+  weeklyCookDayEnabled: false,
+  weeklyCookDay: 0,
+  weeklyCookDayTime: '10:00',
+  permissionDenied: false,
+};
+
+const INITIAL_PROFILE: UserProfileData = {
+  heightCm: null,
+  age: null,
+  sex: null,
+  activityLevel: null,
+  goalType: null,
+};
+
+// The setter updates `latestRef` synchronously, before React re-renders, so an
+// async handler reading the ref after an await sees every earlier update.
+function useLatestState<K extends keyof LatestSettings>(
+  latestRef: React.MutableRefObject<LatestSettings>,
+  key: K,
+): [LatestSettings[K], (update: React.SetStateAction<LatestSettings[K]>) => void] {
+  type T = LatestSettings[K];
+  const [value, setValue] = useState<T>(latestRef.current[key]);
+  const set = useCallback(
+    (update: React.SetStateAction<T>) => {
+      const next = update instanceof Function ? update(latestRef.current[key]) : update;
+      latestRef.current = { ...latestRef.current, [key]: next };
+      setValue(next);
+    },
+    [latestRef, key],
+  );
+  return [value, set];
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 interface StepperProps {
@@ -402,25 +452,24 @@ Skipped data this app version doesn't recognise: ${parts.join(', ')}${more}`;
 }
 
 export default function SettingsScreen() {
-  const [reminder, setReminder] = useState<ReminderState>({
-    enabled: false,
-    time: '08:00',
-    permissionDenied: false,
+  const latestRef = useRef<LatestSettings>({
+    reminder: INITIAL_REMINDER,
+    cooking: INITIAL_COOKING,
+    mealReminders: DEFAULT_MEAL_REMINDER_STATE,
+    backupReminder: DEFAULT_BACKUP_REMINDER_STATE,
+    profile: INITIAL_PROFILE,
+    latestWeight: null,
   });
 
-  const [cooking, setCooking] = useState<CookingReminderState>({
-    cookWhenEmptyEnabled: false,
-    weeklyCookDayEnabled: false,
-    weeklyCookDay: 0,
-    weeklyCookDayTime: '10:00',
-    permissionDenied: false,
-  });
+  const [reminder, setReminder] = useLatestState(latestRef, 'reminder');
+
+  const [cooking, setCooking] = useLatestState(latestRef, 'cooking');
 
   // Meal-time reminders (#287)
-  const [mealReminders, setMealReminders] = useState<MealReminderState>(DEFAULT_MEAL_REMINDER_STATE);
+  const [mealReminders, setMealReminders] = useLatestState(latestRef, 'mealReminders');
 
   // Backup reminder (#293)
-  const [backupReminder, setBackupReminder] = useState<BackupReminderState>(DEFAULT_BACKUP_REMINDER_STATE);
+  const [backupReminder, setBackupReminder] = useLatestState(latestRef, 'backupReminder');
 
   // Backup state
   const [backupBusy, setBackupBusy] = useState(false);
@@ -433,13 +482,7 @@ export default function SettingsScreen() {
   const [hydrationGoalMl, setHydrationGoalMl] = useState(2000);
 
   // User profile state (#281)
-  const [profile, setProfile] = useState<UserProfileData>({
-    heightCm: null,
-    age: null,
-    sex: null,
-    activityLevel: null,
-    goalType: null,
-  });
+  const [profile, setProfile] = useLatestState(latestRef, 'profile');
   // Editable text fields for the profile (strings so TextInput is controlled)
   const [profileHeightStr, setProfileHeightStr] = useState('');
   const [profileAgeStr, setProfileAgeStr] = useState('');
@@ -481,7 +524,7 @@ export default function SettingsScreen() {
   const caloriesEditGuard = useWriteGuard();
   const proteinEditGuard = useWriteGuard();
   const hydrationEditGuard = useWriteGuard();
-  const [latestWeight, setLatestWeight] = useState<number | null>(null);
+  const [latestWeight, setLatestWeight] = useLatestState(latestRef, 'latestWeight');
   const [recalcBusy, setRecalcBusy] = useState(false);
 
   // ── Stepper debounce: dirty refs (#313) ────────────────────────────────
