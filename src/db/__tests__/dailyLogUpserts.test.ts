@@ -1030,3 +1030,26 @@ describe('resetCorruptDayColumn only accepts the two known columns', () => {
     ).rejects.toThrow('unsupported column');
   });
 });
+
+describe('syncRollingSchedule leaves a row with an invalid exercises array untouched', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  it.each(['[null]', '[{"id":"a"},null]'])('%s inside the backfill window is not overwritten', async (raw) => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await db.getDatabase().runAsync('UPDATE daily_log SET exercises = ? WHERE date = ?', [raw, date]);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await db.syncRollingSchedule();
+
+    const row = await db
+      .getDatabase()
+      .getFirstAsync<{ exercises: string }>('SELECT exercises FROM daily_log WHERE date = ?', [date]);
+    expect(row?.exercises).toBe(raw);
+    warn.mockRestore();
+  });
+});
