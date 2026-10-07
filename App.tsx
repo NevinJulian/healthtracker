@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  ScrollView,
   StatusBar,
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -23,28 +22,21 @@ import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from './src/
 import { installStress369 } from './src/db/devStress369';
 import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
-import Button from './src/components/Button';
-import { clearRescueCopies, exportRawDatabase, hasRescueWal } from './src/services/rescueExport';
-import { Colors, Spacing, Typography } from './src/theme/tokens';
+import RecoveryScreen, { formatErrorDetail } from './src/components/RecoveryScreen';
+import { clearRescueCopies } from './src/services/rescueExport';
+import { Colors, Typography } from './src/theme/tokens';
 import {
   configureNotificationHandler,
   ensureAndroidChannel,
   reconcileScheduledNotifications,
 } from './src/services/notifications';
 
-const TWO_FILES_NOTICE = 'Saving shares two files. Keep both.';
-const NO_RESET_NOTICE =
-  "Clearing the app's storage in Android settings deletes all your data, so there is no reset button here.";
-
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // null = unknown (still loading), false = show onboarding, true = show navigator
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
-  const [hasWal, setHasWal] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
     Fraunces_600SemiBold,
@@ -73,11 +65,7 @@ export default function App() {
         setDbReady(true);
       } catch (err: any) {
         console.error('[App] DB init failed:', err);
-        const stackLines = (err?.stack as string | undefined)
-          ?.split('\n')
-          .slice(0, 8)
-          .join('\n');
-        const detail = [err?.message, stackLines].filter(Boolean).join('\n\n');
+        const detail = formatErrorDetail(err);
         setError(detail || 'Unknown error during database initialisation');
       }
     })().finally(() => {
@@ -95,56 +83,21 @@ export default function App() {
 
   const showFailure = Boolean(error || fontError);
 
-  useEffect(() => {
-    if (!showFailure) return;
-    let active = true;
-    hasRescueWal().then(
-      (found) => active && setHasWal(found),
-      () => active && setHasWal(false),
-    );
-    return () => {
-      active = false;
-    };
-  }, [showFailure]);
-
   const retry = () => {
     if (initInFlight.current) return;
     setError(null);
-    setSaveError(null);
     runInit();
-  };
-
-  const saveData = async () => {
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await initInFlight.current;
-      await exportRawDatabase();
-    } catch (err: any) {
-      setSaveError(err?.message || 'Could not save your data.');
-    } finally {
-      setSaving(false);
-    }
   };
 
   if (showFailure) {
     const displayError = error ?? fontError?.message ?? 'Unknown font loading error';
     return (
-      <ScrollView style={styles.failureScroll} contentContainerStyle={styles.failureContent}>
-        <Text style={styles.errorText}>Failed to initialise app</Text>
-        <Text style={styles.errorDetail} selectable>{displayError}</Text>
-        {!fontError && <Button title="Retry" onPress={retry} style={styles.button} />}
-        <Button
-          title="Save data"
-          variant="ghost"
-          onPress={saveData}
-          disabled={saving}
-          style={styles.button}
-        />
-        {saveError && <Text style={styles.errorText}>{saveError}</Text>}
-        {hasWal && <Text style={styles.errorDetail}>{TWO_FILES_NOTICE}</Text>}
-        <Text style={styles.errorDetail}>{NO_RESET_NOTICE}</Text>
-      </ScrollView>
+      <RecoveryScreen
+        title="Failed to initialise app"
+        detail={displayError}
+        onRetry={fontError ? undefined : retry}
+        beforeSave={() => initInFlight.current ?? Promise.resolve()}
+      />
     );
   }
 
@@ -207,34 +160,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 16,
   },
-  failureScroll: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  failureContent: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.lg,
-    paddingVertical: Spacing.xxl,
-  },
   splashText: {
     color: Colors.textSecondary,
     fontSize: Typography.sizes.md,
-  },
-  errorText: {
-    color: Colors.danger,
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  errorDetail: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.sm,
-    textAlign: 'center',
-    paddingHorizontal: Spacing.xxl,
-  },
-  button: {
-    alignSelf: 'stretch',
-    marginHorizontal: Spacing.xxl,
   },
 });
