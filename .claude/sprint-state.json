@@ -94,11 +94,12 @@
         432,
         431
       ],
-      "current": 432,
+      "current": 431,
       "done": [
         434,
         411,
-        435
+        435,
+        432
       ],
       "parked": [],
       "base": "4dea4c6"
@@ -375,7 +376,7 @@
     },
     "431": {
       "lane": "C",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": "Debug build, force a load failure (temporary throw in getLogByDate / getWaterHistory). Cold start: error view; Retry works once the throw is removed. Then with data on screen, throw and refocus: banner appears and the data remains.",
@@ -385,7 +386,7 @@
     },
     "432": {
       "lane": "C",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "70b708b",
@@ -399,7 +400,8 @@
       "notes": "WO ready. Two items kept by the owner decision. | dev: A - getBodyMeasurements adds an IS NOT NULL ... OR ... clause built from the existing MEASUREMENT_FIELDS const tuple (the const moved up above the function); B - toggleAdditionalWorkout throws a plain Error naming date and id after the strict read, inside the queued write. EXISTING TESTS REWRITTEN (HUMAN review): two in dailyLogUpserts.test.ts (own commit 2bfb01c: an unknown-id toggle now rejects; the 'row is created' and 'stored value unchanged' assertions kept) as authorised by the decision, and a THIRD the brief did not anticipate - bodyMeasurements.test.ts 'still returns a legacy all-NULL row from getBodyMeasurements' became 'skips a legacy all-NULL row ... and leaves it stored' inside the A test commit 70b708b. The Dashboard screen test passes without any source change (a pin: the catch already reloads on any error); its mock factory gained the real CorruptJsonError.",
       "workOrder": "C:/git/ht-lanes/wo/432.md",
       "decisionSource": "latest owner comment on #432 (logCookedMeal: no change; getBodyMeasurements skips all-NULL rows, no migration; inventory inner join: no change; toggleAdditionalWorkout rejects when the workout isn't found)",
-      "securityReview": "APPROVE (498da6c..1cf3d03, code read): the IS NOT NULL clause is built only from the module-level const tuple MEASUREMENT_FIELDS (five literals), sinceDateKey stays bound, the OR group is parenthesised next to the date filter; the measurement change is read-only (no migration, no DELETE) and no writer derives output from this reader; backup export reads raw rows; logBodyMeasurement finds its row by date and still updates a blank row in place. The toggle rejection reaches the caller, the queue chain continues, and only the complete INSERT OR IGNORE of the day row happens before the throw; the Dashboard catch reloads, so the tick reverts - one silent failure removed."
+      "securityReview": "APPROVE (498da6c..1cf3d03, code read): the IS NOT NULL clause is built only from the module-level const tuple MEASUREMENT_FIELDS (five literals), sinceDateKey stays bound, the OR group is parenthesised next to the date filter; the measurement change is read-only (no migration, no DELETE) and no writer derives output from this reader; backup export reads raw rows; logBodyMeasurement finds its row by date and still updates a blank row in place. The toggle rejection reaches the caller, the queue chain continues, and only the complete INSERT OR IGNORE of the day row happens before the throw; the Dashboard catch reloads, so the tick reverts - one silent failure removed.",
+      "regressionProof": "A: 2 tests fail with 70b708b database.ts; B: 4 tests fail with c74f347 database.ts; all pass at 1cf3d03; the Dashboard pin goes red under two source mutations (reset offered for any error; no reload); scratch test on the real engine: each of the five columns alone keeps a row visible, 0 / 0.0 / -5 are values, inclusive date bound, COUNT(*) unchanged, queue continues after a rejected toggle incl. a write to another table; every rewritten existing assertion read line by line and judged the behaviour the decision replaces; 1249/96 (tester reproduced)"
     },
     "433": {
       "lane": "E",
@@ -753,6 +755,10 @@
     {
       "at": "2026-10-07T21:38:39Z",
       "event": "#432 security APPROVE on 1cf3d03 (tester verdict still pending)"
+    },
+    {
+      "at": "2026-10-07T21:42:40Z",
+      "event": "#432 ready (tester APPROVE r0, security APPROVE); lane C -> #431 in_dev (last issue)"
     }
   ],
   "status": "running",
