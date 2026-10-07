@@ -40,10 +40,11 @@ jest.mock('../screens/OnboardingScreen', () => {
 
 import { useFonts } from 'expo-font';
 import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from '../db/database';
-import { clearRescueCopies, exportRawDatabase } from '../services/rescueExport';
+import { clearRescueCopies, exportRawDatabase, hasRescueWal } from '../services/rescueExport';
 import App from '../../App';
 
 const rescue = exportRawDatabase as jest.Mock;
+const walPresent = hasRescueWal as jest.Mock;
 const clearCopies = clearRescueCopies as jest.Mock;
 
 const init = initDatabase as jest.Mock;
@@ -53,6 +54,7 @@ beforeEach(() => {
   init.mockReset();
   jest.spyOn(console, 'error').mockImplementation(() => {});
   (useFonts as jest.Mock).mockReturnValue([true, null]);
+  walPresent.mockResolvedValue(false);
   (getOnboardingComplete as jest.Mock).mockResolvedValue(true);
   (getLatestBodyWeight as jest.Mock).mockResolvedValue(null);
 });
@@ -132,6 +134,21 @@ describe('App start failure screen', () => {
     init.mockResolvedValue(undefined);
     render(<App />);
     expect(await screen.findByText('NAVIGATOR')).toBeTruthy();
+  });
+
+  it('tells the user to keep both files when a wal exists', async () => {
+    walPresent.mockResolvedValue(true);
+    init.mockRejectedValueOnce(new Error('disk exploded'));
+    render(<App />);
+    expect(await screen.findByText('Saving shares two files. Keep both.')).toBeTruthy();
+  });
+
+  it('omits the two-files sentence when there is no wal', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded'));
+    render(<App />);
+    await screen.findByRole('button', { name: 'Retry' });
+    await waitFor(() => expect(walPresent).toHaveBeenCalled());
+    expect(screen.queryByText('Saving shares two files. Keep both.')).toBeNull();
   });
 
   it('shows a message when Save data fails', async () => {
