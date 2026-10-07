@@ -153,11 +153,13 @@
   "issues": {
     "411": {
       "lane": "C",
-      "status": "analysing",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "With a corrupt exercises value on today's row (debug build or restored backup), open the Dashboard: the notice and button show in the Hammer card, no Alert. Tap Reset: template exercises appear unchecked, notice gone. Repeat for extra workouts (empty list after reset).",
+      "notes": "WO ready (analysed against the lane branch with #434 on it). Remaining work: nothing detects corruption on load. mapLogRow sets an optional unreadable?: CorruptJsonColumn[] on DailyLogEntry using the existing _isValidStoredArray; the Dashboard shows the notice + button in the Hammer and Bonuses cards; resetCorruptDay gets an in-flight guard. The :2/:3 collision suffix stays (overwriting would destroy earlier kept text). ORCHESTRATOR RULING: DailyLogEntry (database.ts) is mapLogRow's return type and counts as lane C's for this one optional field.",
+      "workOrder": "C:/git/ht-lanes/wo/411.md",
+      "decisionSource": "owner comment 3 on #411 (sprint 4): when a day loads and exercises/additional_workouts can't be read, the matching card shows 'This day's data can't be read' with a Reset this day button that runs the same reset as the Alert; no Alert on load"
     },
     "412": {
       "lane": "A",
@@ -310,11 +312,21 @@
     },
     "429": {
       "lane": "E",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "5031c80",
+        "a6e0181",
+        "1832220",
+        "94bec62",
+        "ac2d93b",
+        "93b7d90",
+        "10fee64",
+        "7e43b76",
+        "e366ee3"
+      ],
       "deviceCheck": "Smoke: in Settings tap Recalculate with a full profile: Goals updated shows, values persist after leaving and returning.",
-      "notes": "WO ready; last in lane E. Four parts, four commits. Mutation proof is mandatory for the replaced assertions. Analyst did NOT enumerate the handlers for part 3 (write ok, notification call throws); the developer must find them.",
+      "notes": "WO ready. | dev: 9 commits. setNutritionGoals = one 13-line insertion hunk after setNutritionGoalProtein (_enqueueWrite + withTransactionAsync + two parameterised upserts; no validation, mirroring the single writers). Transaction-removal proof: without the transaction the failure test goes red (calories 2500, protein unchanged). Part 2: 15 cases, each red under a re-throw mutation (one global mutation, per-case results read from the JSON output). Part 3: shared scheduleAfterSave helper on 6 handlers AND (beyond the WO) on the 6 stepper flush callbacks, which have no dedicated test; Alert wording is the dev's: Reminder not scheduled / Your setting was saved, but the reminder could not be scheduled. Part 4: runCommit calls reportWriteFailure. EXISTING TEST EDITS: setNutritionGoals added to 8 Settings mock factories; Recalculate expectations in writeErrors and profileStaleReload (4 places) switched from the two single writers to the one call; writeErrors trigger helpers now return the fireEvent result. 5031c80 fails by missing export, not by assertion. Not done: a failed stepper write still leaves the stepper showing the new value.",
       "workOrder": "C:/git/ht-lanes/wo/429.md",
       "decisionSource": "latest owner comment on #429 (one new database.ts function in one transaction; drop the unhandledRejection assertions and assert the handler's promise resolves; two messages; stepper writes get the same Alert)"
     },
@@ -622,6 +634,10 @@
     {
       "at": "2026-10-07T21:00:44Z",
       "event": "#434 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane C -> #411 analysing (the analyst reads the lane branch with #434 on it)"
+    },
+    {
+      "at": "2026-10-07T21:12:29Z",
+      "event": "#411 work order ready -> in_dev; #429 in_test (1172/97 per dev)"
     }
   ],
   "status": "running",
@@ -673,7 +689,9 @@
     "SMALL (#434 tester): a daily_log item holding a ~2000-deep nested object makes the writer throw RangeError (stack overflow; stored text unchanged; needs hand-edited data)",
     "SMALL (#434 tester): the sync pin test covers wrong-item rows inside the backfill window only, not outside it",
     "SMALL (#434 orchestrator): a weekday template whose stored array holds null or id-less items produces daily_log rows that the new predicate calls corrupt, and Reset this day rebuilds from the same template (needs a hand-edited backup; pre-existing shape of the #411 reset)",
-    "SMALL but read it (#434 tester r2 + security): after #434 a weekday template holding an item without a string id makes every new day built from it un-editable, and Reset this day does not unstick it (the fresh row is rebuilt from the same template). Needs a hand-edited backup. Options: the day builder drops or gives ids to such items, or the template is normalised on write"
+    "SMALL but read it (#434 tester r2 + security): after #434 a weekday template holding an item without a string id makes every new day built from it un-editable, and Reset this day does not unstick it (the fresh row is rebuilt from the same template). Needs a hand-edited backup. Options: the day builder drops or gives ids to such items, or the template is normalised on write",
+    "SMALL (#411 analyst): a second Reset this day after a successful one can still show Reset failed across screens/races, because the db throws not corrupt; only a UI in-flight guard is added in #411",
+    "SMALL (#429 dev): a debounced stepper write that fails now alerts but the stepper keeps showing the unsaved value"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
