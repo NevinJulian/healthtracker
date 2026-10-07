@@ -67,6 +67,10 @@ jest.mock('../../services/notifications', () => ({
 
 import SettingsScreen from '../SettingsScreen';
 import * as db from '../../db/database';
+import {
+  reconcileScheduledNotifications,
+  scheduleMealReminder,
+} from '../../services/notifications';
 
 type Utils = ReturnType<typeof render>;
 
@@ -325,5 +329,97 @@ describe('SettingsScreen recalculate goals', () => {
     expect(db.setNutritionGoalProtein).not.toHaveBeenCalled();
     expect(alertSpy.mock.calls[0][0]).toBe('Goals updated');
     alertSpy.mockRestore();
+  });
+});
+
+describe('SettingsScreen saved but not scheduled', () => {
+  interface ScheduleCase {
+    name: string;
+    hydrate?: () => void;
+    schedule: jest.Mock;
+    trigger: (utils: Utils) => unknown;
+    assertSaved: (utils: Utils) => void;
+  }
+
+  const cases: ScheduleCase[] = [
+    {
+      name: 'workout reminder toggle',
+      schedule: jest.mocked(reconcileScheduledNotifications),
+      trigger: (u) => toggle(u, 'Enable daily workout reminder', true),
+      assertSaved: (u) =>
+        expect(u.getByLabelText('Enable daily workout reminder').props.value).toBe(true),
+    },
+    {
+      name: 'weekly cook-day toggle',
+      schedule: jest.mocked(reconcileScheduledNotifications),
+      trigger: (u) => toggle(u, 'Enable weekly cook-day reminder', true),
+      assertSaved: (u) =>
+        expect(u.getByLabelText('Enable weekly cook-day reminder').props.value).toBe(true),
+    },
+    {
+      name: 'weekday select',
+      schedule: jest.mocked(reconcileScheduledNotifications),
+      hydrate: () => jest.mocked(db.getWeeklyCookDayEnabled).mockResolvedValueOnce(true),
+      trigger: (u) => fireEvent.press(u.getByLabelText('Select Tue')),
+      assertSaved: (u) => expect(u.getByText(/Reminder every Tue at/)).toBeTruthy(),
+    },
+    {
+      name: 'meal reminder toggle',
+      schedule: jest.mocked(scheduleMealReminder),
+      trigger: (u) => toggle(u, 'Enable Lunch reminder', true),
+      assertSaved: (u) => expect(u.getByLabelText('Enable Lunch reminder').props.value).toBe(true),
+    },
+    {
+      name: 'backup reminder toggle',
+      schedule: jest.mocked(reconcileScheduledNotifications),
+      trigger: (u) => toggle(u, 'Enable weekly backup reminder', true),
+      assertSaved: (u) =>
+        expect(u.getByLabelText('Enable weekly backup reminder').props.value).toBe(true),
+    },
+    {
+      name: 'backup reminder day select',
+      schedule: jest.mocked(reconcileScheduledNotifications),
+      hydrate: () => jest.mocked(db.getBackupReminderEnabled).mockResolvedValueOnce(true),
+      trigger: (u) => fireEvent.press(u.getByLabelText('Select Tue')),
+      assertSaved: (u) => expect(u.getByText(/Reminder every Tue at/)).toBeTruthy(),
+    },
+  ];
+
+  describe.each(cases)('$name', (testCase) => {
+    let alertSpy: jest.SpyInstance;
+    let errorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      alertSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    it('shows the saved value and a reminder-specific alert when scheduling throws', async () => {
+      testCase.hydrate?.();
+      const utils = render(<SettingsScreen />);
+      await flush();
+
+      testCase.schedule.mockRejectedValueOnce(new Error('alarm denied'));
+      let result: unknown;
+      await act(async () => {
+        result = testCase.trigger(utils);
+      });
+      await flush();
+
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy.mock.calls[0][0]).toBe('Reminder not scheduled');
+      expect(alertSpy.mock.calls[0][1]).toBe(
+        'Your setting was saved, but the reminder could not be scheduled.'
+      );
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      testCase.assertSaved(utils);
+      await expect(result).resolves.toBeUndefined();
+    });
   });
 });
