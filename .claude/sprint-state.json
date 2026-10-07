@@ -153,7 +153,7 @@
   "issues": {
     "411": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "commits": [
         "380477c",
@@ -161,7 +161,9 @@
         "3bffb20",
         "15ce90a",
         "61493c6",
-        "1c88a00"
+        "1c88a00",
+        "204eaa1",
+        "e6acb7c"
       ],
       "deviceCheck": "With a corrupt exercises value on today's row (debug build or restored backup), open the Dashboard: the notice and button show in the Hammer card, no Alert. Tap Reset: template exercises appear unchecked, notice gone. Repeat for extra workouts (empty list after reset).",
       "notes": "WO ready. | dev: mapLogRow adds unreadable?: CorruptJsonColumn[] (absent when empty); UnreadableNotice in the Hammer and Extra Workouts cards; resetInFlightRef guard. No existing assertion edited. | tester APPROVE r0, security APPROVE. Both independently noted that the new buttons pass the render-time today instead of the entry's own date (the Alert path uses err.date): after midnight without a reload the one-tap reset targets the new day. ORCHESTRATOR: a destructive action aimed by the wrong variable, one-line fix - sent back; counted as round trip 1 although both approved. Still open for the HUMAN: one tap, no confirmation; no busy state on the button; a hung loadToday keeps the guard set until remount; stale notice if the reload after a successful reset fails.",
@@ -674,6 +676,10 @@
     {
       "at": "2026-10-07T21:21:13Z",
       "event": "#429 round 2 (88e3370, test-only: describe.each over the six time stepper commits, 12 tests; 1184/97 per dev) in_test"
+    },
+    {
+      "at": "2026-10-07T21:22:23Z",
+      "event": "#411 round 2 (e6acb7c: both notice buttons pass entry.date; new test failed with ('2026-09-20', column) instead of ('2026-09-19', column); 1235/95 per dev) in_test"
     }
   ],
   "status": "running",
