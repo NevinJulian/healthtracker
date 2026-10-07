@@ -981,3 +981,36 @@ describe('stored daily_log arrays are valid only when every item is an object wi
     }
   });
 });
+
+describe('reading daily_log drops items that are not objects with a string id', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const keep = { id: 'a', completed: true };
+  const cases: Array<[string, unknown[]]> = [
+    ['[null,{"id":"a","completed":true}]', [keep]],
+    ['[1]', []],
+    ['["a"]', []],
+    ['[{}]', []],
+    ['[[],{"id":"a","completed":true}]', [keep]],
+    ['[{"id":1}]', []],
+    ['{}', []],
+    ['{not json', []],
+  ];
+
+  it.each(cases)('%j reads as %j in both columns without throwing', async (raw, expected) => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await db
+      .getDatabase()
+      .runAsync('UPDATE daily_log SET exercises = ?, additional_workouts = ? WHERE date = ?', [raw, raw, date]);
+
+    const entry = await db.getLogByDate(date);
+
+    expect(entry?.exercises).toEqual(expected);
+    expect(entry?.additional_workouts).toEqual(expected);
+  });
+});
