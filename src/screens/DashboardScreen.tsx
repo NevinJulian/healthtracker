@@ -809,7 +809,7 @@ export default function DashboardScreen() {
           onExerciseToggle={handleExerciseToggle}
           onSessionToggle={() => handleToggle('hammer_completed')}
           onOpenLogger={(name) => setActiveSetLogger(name)}
-          onResetUnreadable={() => void resetCorruptDay(today, 'exercises')}
+          onResetUnreadable={() => void resetCorruptDay(entry.date, 'exercises')}
         />
 
         {/* ── Intermittent fasting ─────────────────────────────────────────── */}
@@ -1022,7 +1022,7 @@ export default function DashboardScreen() {
           {entry.unreadable?.includes('additional_workouts') && (
             <UnreadableNotice
               resetLabel="Reset this day's extra workouts"
-              onReset={() => void resetCorruptDay(today, 'additional_workouts')}
+              onReset={() => void resetCorruptDay(entry.date, 'additional_workouts')}
             />
           )}
 
