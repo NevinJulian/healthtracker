@@ -433,7 +433,7 @@
     },
     "435": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "commits": [
         "a97580c",
@@ -441,7 +441,8 @@
         "009819e",
         "2ae4770",
         "c4efd09",
-        "7f944b2"
+        "7f944b2",
+        "498da6c"
       ],
       "deviceCheck": "Happy path only (a write failure cannot be forced on a phone): open Log measurements, enter waist 81, Save: modal closes, Waist pill shows 81 cm, no Alert. Force-close and reopen: value still there.",
       "notes": "WO ready. ORCHESTRATOR RULING: scope = measurements modal + set logger; the 7 snap-back handlers are a recorded finding. | dev: handleSaveMeasurements / handleLogSet return Promise<boolean>; savingRef guard in MeasurementsModal; reps cleared only on success; a failed refresh after a successful write is log-only (also for the set logger, beyond the WO - judged correct by the tester: saying failed would invite a duplicate set). | tester APPROVE r0. One new test is VACUOUS: 'releases the guard when the refresh after a successful write rejects' still passes with the guard never released (the modal unmounts on close, so the second Save runs in a fresh modal). ORCHESTRATOR: this sprint's #429 exists because of vacuous assertions - sent back to make it able to fail or delete it; counted as round trip 1 although the tester approved. HUMAN: after write ok + refresh failure the pills / set list stay stale until the next load.",
@@ -727,6 +728,10 @@
     {
       "at": "2026-10-07T21:31:33Z",
       "event": "GitHub CI test check on integration a7a4c74 (lanes A, B, D, E merged): completed success"
+    },
+    {
+      "at": "2026-10-07T21:32:49Z",
+      "event": "#435 round 2 (498da6c, test-only: the guard-release test now keeps the same modal mounted and goes red when the release is removed; 1243/96 per dev) in_test"
     }
   ],
   "status": "running",
