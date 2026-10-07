@@ -14,7 +14,7 @@
 
 import { getDatabase, putOFFCache } from '../db/database';
 import { expo } from '../../app.json';
-import { fetchJson } from './fetchJson';
+import { fetchJson, FetchJsonError } from './fetchJson';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -24,6 +24,9 @@ export interface OFFNutrition {
   carbs: number;
   fat: number;
 }
+
+/** `'not-looked-up'`: refused before any request was sent. `null`: no data, failure or abort. */
+export type OFFLookup = OFFNutrition | null | 'not-looked-up';
 
 // ─── OFF search response shape (we only need nutriments) ─────────────────────
 
@@ -94,11 +97,36 @@ const OFF_BUDGET_MAX = 10;
 const OFF_BUDGET_WINDOW_MS = 60_000;
 const attemptTimes: number[] = [];
 
+const RETRY_AFTER_DEFAULT_MS = 60_000;
+const RETRY_AFTER_MIN_MS = 1_000;
+const RETRY_AFTER_MAX_MS = 300_000;
+let pausedUntil = 0;
+
+/** Milliseconds to stay off Open Food Facts after a 429. Never throws. */
+export function parseRetryAfterMs(raw: string | null | undefined): number {
+  let ms = RETRY_AFTER_DEFAULT_MS;
+  if (typeof raw === 'string') {
+    const value = raw.trim();
+    if (/^\d+$/.test(value)) {
+      ms = Number(value) * 1000;
+    } else if (/[A-Za-z]/.test(value)) {
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed)) ms = parsed - Date.now();
+    }
+  }
+  if (!Number.isFinite(ms)) ms = RETRY_AFTER_MAX_MS;
+  return Math.min(RETRY_AFTER_MAX_MS, Math.max(RETRY_AFTER_MIN_MS, ms));
+}
+
 function takeSearchSlot(): void {
   const now = Date.now();
-  while (attemptTimes.length > 0 && now - attemptTimes[0] >= OFF_BUDGET_WINDOW_MS) {
-    attemptTimes.shift();
+  pausedUntil = Math.min(pausedUntil, now + RETRY_AFTER_MAX_MS);
+  if (now < pausedUntil) {
+    throw new Error('Open Food Facts is rate limiting requests');
   }
+  const live = attemptTimes.filter((t) => t <= now && now - t < OFF_BUDGET_WINDOW_MS);
+  attemptTimes.length = 0;
+  attemptTimes.push(...live);
   if (attemptTimes.length >= OFF_BUDGET_MAX) {
     throw new Error('Open Food Facts search budget exhausted');
   }
@@ -107,16 +135,27 @@ function takeSearchSlot(): void {
 
 /**
  * Fetch per-100g nutrition data from Open Food Facts for the given search term.
- * Returns null when: no products found, fields are missing, or network fails.
- * Never throws.
+ * Returns `'not-looked-up'` when the local budget or a 429 pause refused every
+ * attempt before a request was sent, and null for no products, missing fields,
+ * network failure or abort. Never throws.
  */
-async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutrition | null> {
+async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFLookup> {
+  let refused = false;
+  let sent = false;
   try {
     const url = `${OFF_SEARCH_URL}&search_terms=${encodeURIComponent(term)}`;
     const data = await fetchJson<OFFResponse>(url, {
       signal,
       headers: OFF_HEADERS,
-      beforeAttempt: takeSearchSlot,
+      beforeAttempt: () => {
+        try {
+          takeSearchSlot();
+        } catch (err) {
+          refused = true;
+          throw err;
+        }
+        sent = true;
+      },
     });
     if (!data.products || data.products.length === 0) return null;
 
@@ -138,7 +177,15 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutr
       }
     }
     return null;
-  } catch {
+  } catch (err) {
+    if (refused && !sent) return 'not-looked-up';
+    if (err instanceof FetchJsonError && err.status === 429) {
+      const now = Date.now();
+      pausedUntil = Math.max(
+        Math.min(pausedUntil, now + RETRY_AFTER_MAX_MS),
+        now + parseRetryAfterMs(err.retryAfter),
+      );
+    }
     return null;
   }
 }
@@ -149,9 +196,9 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutr
  * Look up per-100g nutrition for the given ingredient name.
  *
  * Checks the SQLite cache first; falls back to an OFF network call when the
- * cache misses. Returns null when neither source has data (offline, not found).
- *
- * An aborted lookup resolves null and is never cached.
+ * cache misses. Returns null when a request was sent but found nothing, failed
+ * or was aborted, and `'not-looked-up'` when the budget or a 429 pause refused
+ * it before any request. Only real nutrition is cached.
  *
  * @param ingredientName - Ingredient name (will be normalised to lowercase for cache key)
  * @param signal - Optional abort signal
@@ -159,14 +206,14 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutr
 export async function lookupNutrition(
   ingredientName: string,
   signal?: AbortSignal,
-): Promise<OFFNutrition | null> {
+): Promise<OFFLookup> {
   if (signal?.aborted) return null;
   const cached = await getCached(ingredientName);
   if (cached) return cached;
 
   const result = await fetchFromOFF(ingredientName, signal);
   if (signal?.aborted) return null;
-  if (result) {
+  if (typeof result === 'object' && result !== null) {
     await putCache(ingredientName, result);
   }
   return result;
@@ -187,7 +234,7 @@ export async function batchLookupNutrition(
   for (const name of names) {
     if (signal?.aborted) break;
     const n = await lookupNutrition(name, signal);
-    if (n) {
+    if (typeof n === 'object' && n !== null) {
       result[name.toLowerCase()] = n;
     }
   }

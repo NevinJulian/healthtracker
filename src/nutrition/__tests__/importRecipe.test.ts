@@ -85,6 +85,35 @@ describe('buildImportResult nutrition lookups', () => {
   });
 });
 
+describe('buildImportResult refused lookups', () => {
+  beforeEach(() => {
+    mockLookup.mockReset();
+  });
+
+  it('reports refused lookups apart from ones with no data and counts them as 0', async () => {
+    const answers: Record<string, unknown> = {
+      'zzz unknown a': NUTRITION,
+      'zzz unknown b': null,
+      'zzz unknown c': 'not-looked-up',
+      'zzz unknown d': 'not-looked-up',
+    };
+    mockLookup.mockImplementation(async (name: string) => answers[name]);
+
+    const result = await buildImportResult(meal(NAMES.slice(0, 4)));
+
+    expect(result.offResolvedIngredients).toEqual(['zzz unknown a']);
+    expect(result.estimatedIngredients).toEqual(['zzz unknown b']);
+    expect(result.notLookedUpIngredients).toEqual(['zzz unknown c', 'zzz unknown d']);
+
+    mockLookup.mockImplementation(async (name: string) =>
+      name === 'zzz unknown a' ? NUTRITION : null,
+    );
+    const baseline = await buildImportResult(meal(NAMES.slice(0, 4)));
+    expect(result.recipe.calories).toBe(baseline.recipe.calories);
+    expect(baseline.notLookedUpIngredients).toEqual([]);
+  });
+});
+
 describe('buildImportResult abort signal', () => {
   beforeEach(() => {
     mockLookup.mockReset();
