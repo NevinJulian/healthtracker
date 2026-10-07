@@ -169,10 +169,10 @@ describe('RecipeEditorScreen save deadline', () => {
     mockLookup.mockImplementation((name: string) =>
       name === 'zzz hanging'
         ? new Promise(() => {})
-        : Promise.resolve({ kcal: 40, protein: 10, carbs: 0, fat: 0 }),
+        : Promise.resolve(name === 'zzz empty' ? null : { kcal: 40, protein: 10, carbs: 0, fat: 0 }),
     );
     const utils = render(<RecipeEditorScreen />);
-    await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
+    await fillIngredients(utils, ['zzz fine', 'zzz empty', 'zzz hanging']);
 
     await act(async () => {
       fireEvent.press(utils.getByLabelText('Create Recipe'));
@@ -180,6 +180,6 @@ describe('RecipeEditorScreen save deadline', () => {
     });
 
     expect(utils.getByText('Not looked up (try Recompute in a minute): zzz hanging')).toBeTruthy();
-    expect(utils.queryByText(/Estimated \(no data\)/)).toBeNull();
+    expect(utils.getByText('Estimated (no data): zzz empty')).toBeTruthy();
   });
 });
