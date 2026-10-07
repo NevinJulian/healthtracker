@@ -217,15 +217,10 @@ function useDebouncedCommit<T>(
   commitRef.current = commit;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Runs the commit and catches a rejected write so it never becomes an
-  // unhandled promise rejection — it's fired from a timer/AppState callback,
-  // not from an event handler React can attach its own error boundary to.
-  // `Promise.resolve(...)` also normalizes the `void | Promise<void>` return
-  // type of `commit` into something `.catch` can always be called on.
+  // Fired from a timer/AppState callback, so a rejected write must be caught
+  // here. `Promise.resolve` normalizes the `void | Promise<void>` return type.
   const runCommit = useCallback((committedValue: T) => {
-    Promise.resolve(commitRef.current(committedValue)).catch((err: unknown) => {
-      console.error('[SettingsScreen] debounced stepper write failed:', err);
-    });
+    Promise.resolve(commitRef.current(committedValue)).catch(reportWriteFailure);
   }, []);
 
   // Flush a still-pending write immediately (used on unmount/blur/
