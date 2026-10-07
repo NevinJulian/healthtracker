@@ -39,6 +39,7 @@ jest.mock('../../db/database', () => ({
   getNutritionGoals: jest.fn().mockResolvedValue({ calories: 1800, protein: 150 }),
   setNutritionGoalCalories: jest.fn().mockResolvedValue(undefined),
   setNutritionGoalProtein: jest.fn().mockResolvedValue(undefined),
+  setNutritionGoals: jest.fn().mockResolvedValue(undefined),
   getUserProfile: jest.fn().mockResolvedValue({
     heightCm: null,
     age: null,
@@ -75,8 +76,7 @@ import {
   clearProfileHeightCm,
   clearProfileAge,
   setProfileSex,
-  setNutritionGoalCalories,
-  setNutritionGoalProtein,
+  setNutritionGoals,
 } from '../../db/database';
 import { suggestGoals } from '../../nutrition/tdee';
 
@@ -88,8 +88,7 @@ const mockSetProfileAge = jest.mocked(setProfileAge);
 const mockClearProfileHeightCm = jest.mocked(clearProfileHeightCm);
 const mockClearProfileAge = jest.mocked(clearProfileAge);
 const mockSetProfileSex = jest.mocked(setProfileSex);
-const mockSetCalories = jest.mocked(setNutritionGoalCalories);
-const mockSetProtein = jest.mocked(setNutritionGoalProtein);
+const mockSetGoals = jest.mocked(setNutritionGoals);
 
 const baseProfile: Profile = { heightCm: 180, age: 30, sex: null, activityLevel: null, goalType: null };
 
@@ -255,8 +254,7 @@ describe('SettingsScreen profile pickers racing a reload', () => {
     const expected = suggestGoals({ ...input, sex: 'female', activityLevel: 'active', goalType: 'gain' }, 80);
     const staleGoals = suggestGoals({ ...input, sex: 'male', activityLevel: 'light', goalType: 'maintain' }, 80);
     expect(expected.calories).not.toBe(staleGoals.calories);
-    expect(mockSetCalories).toHaveBeenCalledWith(expected.calories);
-    expect(mockSetProtein).toHaveBeenCalledWith(expected.protein);
+    expect(mockSetGoals).toHaveBeenCalledWith(expected.calories, expected.protein);
   });
 
   it('keeps a sex whose write is still pending when the reload resolves', async () => {
@@ -278,7 +276,7 @@ describe('SettingsScreen profile pickers racing a reload', () => {
     await press(utils, 'Recalculate nutrition goals from profile');
 
     const expected = suggestGoals({ ...input, sex: 'female', activityLevel: 'active', goalType: 'gain' }, 80);
-    expect(mockSetCalories).toHaveBeenCalledWith(expected.calories);
+    expect(mockSetGoals).toHaveBeenCalledWith(expected.calories, expected.protein);
   });
 
   it('hydrates sex from a later reload after its write was rejected', async () => {
@@ -295,7 +293,7 @@ describe('SettingsScreen profile pickers racing a reload', () => {
     await press(utils, 'Female');
     await press(utils, 'Recalculate nutrition goals from profile');
     const savedGoals = suggestGoals({ ...input, sex: 'male', activityLevel: 'light', goalType: 'maintain' }, 80);
-    expect(mockSetCalories).toHaveBeenLastCalledWith(savedGoals.calories);
+    expect(mockSetGoals).toHaveBeenLastCalledWith(savedGoals.calories, savedGoals.protein);
 
     mockGetUserProfile.mockResolvedValueOnce({ ...stale, sex: 'female' });
     await act(async () => {
@@ -306,6 +304,6 @@ describe('SettingsScreen profile pickers racing a reload', () => {
 
     const reloaded = suggestGoals({ ...input, sex: 'female', activityLevel: 'light', goalType: 'maintain' }, 80);
     expect(reloaded.calories).not.toBe(savedGoals.calories);
-    expect(mockSetCalories).toHaveBeenLastCalledWith(reloaded.calories);
+    expect(mockSetGoals).toHaveBeenLastCalledWith(reloaded.calories, reloaded.protein);
   });
 });

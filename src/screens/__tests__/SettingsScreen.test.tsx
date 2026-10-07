@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppState } from 'react-native';
+import { Alert, AppState } from 'react-native';
 
 import { render, fireEvent, act } from '@testing-library/react-native';
 
@@ -40,6 +40,7 @@ jest.mock('../../db/database', () => ({
   getNutritionGoals: jest.fn().mockResolvedValue({ calories: 1800, protein: 150 }),
   setNutritionGoalCalories: jest.fn().mockResolvedValue(undefined),
   setNutritionGoalProtein: jest.fn().mockResolvedValue(undefined),
+  setNutritionGoals: jest.fn().mockResolvedValue(undefined),
   getUserProfile: jest.fn().mockResolvedValue({
     heightCm: null,
     age: null,
@@ -338,6 +339,27 @@ describe('SettingsScreen steppers (#313 — debounced writes)', () => {
     expect(mockSetNutritionGoalCalories).toHaveBeenCalledTimes(1);
     expect(consoleErrorSpy).toHaveBeenCalled();
 
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('alerts once when a debounced calorie commit rejects', async () => {
+    mockSetNutritionGoalCalories.mockRejectedValueOnce(new Error('boom'));
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    const { getByLabelText } = render(<SettingsScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(getByLabelText('Increase calorie goal'));
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    await flushMicrotasks();
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][0]).toBe('Error');
+
+    alertSpy.mockRestore();
     consoleErrorSpy.mockRestore();
   });
 });

@@ -2847,6 +2847,19 @@ export async function setNutritionGoalProtein(g: number): Promise<void> {
   await setSetting(SETTING_NUTRITION_GOAL_PROTEIN, String(g));
 }
 
+/** Persist both nutrition goals in one transaction: both commit or neither does. */
+export function setNutritionGoals(kcal: number, g: number): Promise<void> {
+  return _enqueueWrite('setNutritionGoals', async () => {
+    const db = getDatabase();
+    const upsert =
+      'INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value';
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(upsert, [SETTING_NUTRITION_GOAL_CALORIES, String(kcal)]);
+      await db.runAsync(upsert, [SETTING_NUTRITION_GOAL_PROTEIN, String(g)]);
+    });
+  });
+}
+
 // ── User profile settings (#281) ─────────────────────────────────────────────
 //
 // Profile fields are stored as simple string KV pairs in app_state.

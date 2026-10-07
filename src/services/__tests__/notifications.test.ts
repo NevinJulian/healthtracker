@@ -101,6 +101,30 @@ describe('parseTimeString', () => {
     expect(parseTimeString('25:00')).toEqual({ hour: 8, minute: 0 });
     expect(parseTimeString('12:99')).toEqual({ hour: 8, minute: 0 });
   });
+
+  it.each([
+    ['08:30', 8, 30],
+    ['00:00', 0, 0],
+    ['23:59', 23, 59],
+    [' 14:30 ', 14, 30],
+  ])('accepts %j', (input, hour, minute) => {
+    expect(parseTimeString(input)).toEqual({ hour, minute });
+  });
+
+  it.each([
+    '8abc:30xyz',
+    '8:30',
+    '08:30:00',
+    '08:60',
+    '24:00',
+    '08:3',
+    '-1:30',
+    '',
+    'abc',
+    '٠٨:٣٠',
+  ])('falls back to 08:00 for %j', (input) => {
+    expect(parseTimeString(input)).toEqual({ hour: 8, minute: 0 });
+  });
 });
 
 describe('formatTimeString', () => {
