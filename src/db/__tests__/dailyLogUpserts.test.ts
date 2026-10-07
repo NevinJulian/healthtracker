@@ -1053,3 +1053,41 @@ describe('syncRollingSchedule leaves a row with an invalid exercises array untou
     warn.mockRestore();
   });
 });
+
+describe('weekly template exercises are read as stored', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const stored = '[{"name":"X"},{"id":"a","name":"Y"}]';
+
+  it('getWeeklyTemplate returns items without an id unfiltered', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await db.getDatabase().runAsync('UPDATE weekly_template SET exercises = ? WHERE day_of_week = 3', [stored]);
+
+    const wednesday = (await db.getWeeklyTemplate()).find((d) => d.day_of_week === 3);
+
+    expect(wednesday?.exercises).toEqual(JSON.parse(stored));
+  });
+
+  it('a new daily_log row built from that template carries the items with completed reset', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const target = addDays(todayKey(), 5);
+    const dow = dateKeyToLocalDate(target).getDay();
+    await db.getDatabase().runAsync('UPDATE weekly_template SET exercises = ? WHERE day_of_week = ?', [stored, dow]);
+    await db.getDatabase().runAsync('DELETE FROM daily_log WHERE date = ?', [target]);
+
+    await db.syncRollingSchedule();
+
+    const row = await db
+      .getDatabase()
+      .getFirstAsync<{ exercises: string }>('SELECT exercises FROM daily_log WHERE date = ?', [target]);
+    expect(JSON.parse(row?.exercises ?? 'null')).toEqual([
+      { name: 'X', completed: false },
+      { id: 'a', name: 'Y', completed: false },
+    ]);
+  });
+});
