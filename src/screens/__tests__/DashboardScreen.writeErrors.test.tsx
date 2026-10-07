@@ -187,18 +187,23 @@ describe('DashboardScreen write failures', () => {
       expect(utils.queryByLabelText('Save')).toBeNull();
     });
 
-    it('releases the guard when the refresh after a successful write rejects', async () => {
+    it('accepts a second Save in the same open modal after a write whose refresh rejected', async () => {
       const utils = await openModal();
       fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '81');
+      fireEvent.changeText(utils.getByTestId('measurement-chest-input'), '5');
       mockGetLatestMeasurements.mockRejectedValueOnce(new Error('read failed'));
-      await pressSave(utils);
-      expect(utils.queryByLabelText('Save')).toBeNull();
 
-      fireEvent.press(utils.getByLabelText('Log measurements'));
-      fireEvent.changeText(utils.getByTestId('measurement-waist-input'), '82');
+      await pressSave(utils);
+
+      expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(1);
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(utils.getByLabelText('Save')).toBeTruthy();
+
+      fireEvent.changeText(utils.getByTestId('measurement-chest-input'), '95');
       await pressSave(utils);
 
       expect(mockLogBodyMeasurement).toHaveBeenCalledTimes(2);
+      expect(utils.queryByLabelText('Save')).toBeNull();
     });
   });
 
