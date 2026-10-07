@@ -361,11 +361,19 @@
     },
     "434": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "a964ba2",
+        "3f7e0ce",
+        "9dfeeae",
+        "cdb29fb",
+        "dd9455e",
+        "54ca6a5",
+        "62eea8b"
+      ],
       "deviceCheck": "none (db-only; the reset flow UI is unchanged and covered by #411's check)",
-      "notes": "WO ready; lane C waits for lane A. DEPARTURE from the issue text (HUMAN to confirm): the issue says the lenient reads stay as they are; the analyst makes parseExercises/parseAdditionalWorkouts also drop items that fail the item check, because [null] crashes both screens on render before the user can reach the Reset Alert. Orchestrator accepted it (lane C's helpers; [] on malformed input is preserved) and asks the tester to check (1) every producer of items writes a string id, (2) syncRollingSchedule never overwrites a wrong-item row without the raw text being kept.",
+      "notes": "WO ready. DEPARTURE from the issue text (HUMAN to confirm): the issue says the lenient reads stay as they are; parseExercises/parseAdditionalWorkouts now also drop items that fail the item check, because [null] crashes both screens on render before the user can reach the Reset Alert. The read change is its own commit pair (9dfeeae + cdb29fb), revertable alone. | dev: all current producers write string ids (seeds 'mon-01', TemplateEditor `ex-${Date.now()}`, BioForceModal `bio-...`); sync uses the strict write parser and skips wrong-item rows without overwriting them (pinned by 62eea8b). CAVEAT from the dev: getWeeklyTemplate also reads through parseExercises, so an id-less TEMPLATE item is now dropped on read and the template editor would persist the filtered list on its next save. NOT checked by the dev: whether older app versions ever wrote items with non-string ids (old rows on a real device would then be hidden and refuse edits) - tester to check git history.",
       "workOrder": "C:/git/ht-lanes/wo/434.md",
       "decisionSource": "issue body (no comments): item shape = object with a string id, in the shared predicate"
     },
@@ -554,6 +562,10 @@
     {
       "at": "2026-10-07T20:48:30Z",
       "event": "#423 tester APPROVE r0 -> security (orchestrator decision: not skipped, because Save data now runs against an open, live database on the render-crash screen)"
+    },
+    {
+      "at": "2026-10-07T20:49:10Z",
+      "event": "#434 in_test (1194/95 per dev)"
     }
   ],
   "status": "running",
