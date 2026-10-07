@@ -94,9 +94,10 @@
         432,
         431
       ],
-      "current": 411,
+      "current": 435,
       "done": [
-        434
+        434,
+        411
       ],
       "parked": [],
       "base": "4dea4c6"
@@ -153,7 +154,7 @@
   "issues": {
     "411": {
       "lane": "C",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 1,
       "commits": [
         "380477c",
@@ -170,7 +171,7 @@
       "workOrder": "C:/git/ht-lanes/wo/411.md",
       "decisionSource": "owner comment 3 on #411 (sprint 4): when a day loads and exercises/additional_workouts can't be read, the matching card shows 'This day's data can't be read' with a Reset this day button that runs the same reset as the Alert; no Alert on load",
       "securityReview": "APPROVE (9454396..1c88a00, code read): button and Alert both go through resetCorruptDay -> resetCorruptDayColumn, which re-reads inside the write queue and refuses a column that is not corrupt, so a wrong flag cannot overwrite healthy data; raw text still saved in the same transaction before the UPDATE; column passed from the JSX is a literal; guard released in finally; a failed reset is never shown as success. NOTES FOR THE HUMAN: (1) the new button resets on ONE tap with no confirmation (the sprint-3 Alert was itself the confirmation) and the kept text can only be read back from a backup export; on a mixed row the good items and their ticks are replaced. The decision's wording is satisfied literally; the owner should confirm that one tap is intended. (2) the buttons pass the render-time today, not entry.date: after a midnight rollover without a reload the tap targets the new day (refused if that day is healthy -> misleading Reset failed; resets the wrong day only if both days are corrupt). (3) if the reset succeeds and the following loadToday fails, the stale notice stays and a second tap shows Reset failed although the reset happened.",
-      "regressionProof": "round 1: db flag tests fail with 380477c database.ts; 8 of 18 screen tests fail with 3bffb20 DashboardScreen.tsx because the notice/button are missing (not because of the Button query); the double-press test fails with 61493c6 (2 calls); all pass at 1c88a00; tester probe on the real engine: for 15 values x 2 columns the flag equals the writers' refusal in getLogByDate, getDailyLogsBetween and getRollingWindow, and resetCorruptDayColumn refuses every value the writers accept without writing anything; 1233/95 (tester reproduced)"
+      "regressionProof": "round 1: db flag tests fail with 380477c database.ts; 8/18 screen tests fail with 3bffb20 DashboardScreen.tsx (notice missing); double-press fails with 61493c6; real-engine probe: flag equals writer refusal for 15 values x 2 columns in all three readers, and reset refuses every valid value. Round 2 (204eaa1 + e6acb7c): both rollover cases fail on the pre-fix source with ('2026-09-20', column) instead of ('2026-09-19', column), pass at the tip; delta is exactly the two call sites; 1235/95 (tester reproduced)"
     },
     "412": {
       "lane": "A",
@@ -424,7 +425,7 @@
     },
     "435": {
       "lane": "C",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": "Happy path only (a write failure cannot be forced on a phone): open Log measurements, enter waist 81, Save: modal closes, Waist pill shows 81 cm, no Alert. Force-close and reopen: value still there.",
@@ -680,6 +681,10 @@
     {
       "at": "2026-10-07T21:22:23Z",
       "event": "#411 round 2 (e6acb7c: both notice buttons pass entry.date; new test failed with ('2026-09-20', column) instead of ('2026-09-19', column); 1235/95 per dev) in_test"
+    },
+    {
+      "at": "2026-10-07T21:23:43Z",
+      "event": "#411 ready (tester APPROVE r2 after 1 round trip; security APPROVE on round 1, and the round-2 change is the one-line fix security itself suggested); lane C -> #435 in_dev"
     }
   ],
   "status": "running",
@@ -735,7 +740,9 @@
     "SMALL (#411 analyst): a second Reset this day after a successful one can still show Reset failed across screens/races, because the db throws not corrupt; only a UI in-flight guard is added in #411",
     "SMALL (#429 dev): a debounced stepper write that fails now alerts but the stepper keeps showing the unsaved value",
     "SMALL (#411 dev): the shared Button sets importantForAccessibility=no-hide-descendants on its title Text, so the visible label is hidden from assistive-tech text queries (tests must use includeHiddenElements or the accessibility label)",
-    "SMALL (#429 tester): switching a meal reminder off with cancelMealReminder failing shows Your setting was saved, but the reminder could not be scheduled - wrong wording for a cancel"
+    "SMALL (#429 tester): switching a meal reminder off with cancelMealReminder failing shows Your setting was saved, but the reminder could not be scheduled - wrong wording for a cancel",
+    "SMALL (#411 tester/security): if the reload after a successful Reset this day fails, the old entry and its notice stay on screen; a second tap shows Reset failed although the reset happened (needs two failures in a row)",
+    "SMALL (#411 tester): the Reset this day notice button has no busy/disabled state, and a loadToday that never settles keeps the in-flight guard set until the screen remounts"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
