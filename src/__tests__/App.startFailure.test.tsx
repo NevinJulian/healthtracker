@@ -42,14 +42,13 @@ import { useFonts } from 'expo-font';
 import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from '../db/database';
 import { clearRescueCopies, exportRawDatabase, hasRescueWal } from '../services/rescueExport';
 import App from '../../App';
+import { COLD_RENDER_WAIT } from '../testUtils/coldRenderWait';
 
 const rescue = exportRawDatabase as jest.Mock;
 const walPresent = hasRescueWal as jest.Mock;
 const clearCopies = clearRescueCopies as jest.Mock;
 
 const init = initDatabase as jest.Mock;
-
-const COLD_RENDER_WAIT = { timeout: 5000 };
 
 beforeEach(() => {
   jest.clearAllMocks();
