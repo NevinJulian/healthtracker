@@ -75,7 +75,7 @@ interface WriteErrorCase {
   write: jest.Mock;
   hydrate?: () => void;
   prepare?: (utils: Utils) => void;
-  trigger: (utils: Utils) => void;
+  trigger: (utils: Utils) => unknown;
   assertUnsaved: (utils: Utils) => void | Promise<void>;
 }
 
@@ -87,28 +87,21 @@ async function flush() {
 }
 
 function toggle(utils: Utils, label: string, value: boolean) {
-  fireEvent(utils.getByLabelText(label), 'valueChange', value);
+  return fireEvent(utils.getByLabelText(label), 'valueChange', value);
 }
 
 function runWriteErrorCases(cases: WriteErrorCase[]) {
   describe.each(cases)('$name', (testCase) => {
     let alertSpy: jest.SpyInstance;
     let errorSpy: jest.SpyInstance;
-    const unhandled: unknown[] = [];
-    const onUnhandled = (reason: unknown) => {
-      unhandled.push(reason);
-    };
 
     beforeEach(() => {
       jest.clearAllMocks();
-      unhandled.length = 0;
-      process.on('unhandledRejection', onUnhandled);
       alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
       errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
-      process.off('unhandledRejection', onUnhandled);
       alertSpy.mockRestore();
       errorSpy.mockRestore();
     });
@@ -130,8 +123,9 @@ function runWriteErrorCases(cases: WriteErrorCase[]) {
           rejectWrite = reject;
         })
       );
+      let result: unknown;
       await act(async () => {
-        testCase.trigger(utils);
+        result = testCase.trigger(utils);
       });
       expect(alertSpy).not.toHaveBeenCalled();
 
@@ -144,7 +138,8 @@ function runWriteErrorCases(cases: WriteErrorCase[]) {
       expect(alertSpy.mock.calls[0][0]).toBe('Error');
       expect(errorSpy).toHaveBeenCalledTimes(1);
       await testCase.assertUnsaved(utils);
-      expect(unhandled).toEqual([]);
+      expect(typeof (result as { then?: unknown } | undefined)?.then).toBe('function');
+      await expect(result).resolves.toBeUndefined();
     });
   });
 }
@@ -176,9 +171,7 @@ describe('SettingsScreen reminder write failures', () => {
       name: 'weekday select',
       write: jest.mocked(db.setWeeklyCookDay),
       hydrate: () => jest.mocked(db.getWeeklyCookDayEnabled).mockResolvedValueOnce(true),
-      trigger: (u) => {
-        fireEvent.press(u.getByLabelText('Select Tue'));
-      },
+      trigger: (u) => fireEvent.press(u.getByLabelText('Select Tue')),
       assertUnsaved: (u) => expect(u.getByText(/Reminder every Sun at/)).toBeTruthy(),
     },
     {
@@ -226,7 +219,7 @@ async function expectProfileStillComplete(utils: Utils) {
 }
 
 function blurField(utils: Utils, label: string) {
-  fireEvent(utils.getByLabelText(label), 'blur');
+  return fireEvent(utils.getByLabelText(label), 'blur');
 }
 
 describe('SettingsScreen profile write failures', () => {
@@ -236,9 +229,7 @@ describe('SettingsScreen profile write failures', () => {
       write: jest.mocked(db.setProfileHeightCm),
       hydrate: hydrateProfile({ ...completeProfile, heightCm: null }),
       prepare: (u) => fireEvent.changeText(u.getByLabelText('Height in centimetres'), '180'),
-      trigger: (u) => {
-        blurField(u, 'Height in centimetres');
-      },
+      trigger: (u) => blurField(u, 'Height in centimetres'),
       assertUnsaved: expectProfileStillIncomplete,
     },
     {
@@ -246,9 +237,7 @@ describe('SettingsScreen profile write failures', () => {
       write: jest.mocked(db.clearProfileHeightCm),
       hydrate: hydrateProfile(completeProfile),
       prepare: (u) => fireEvent.changeText(u.getByLabelText('Height in centimetres'), ''),
-      trigger: (u) => {
-        blurField(u, 'Height in centimetres');
-      },
+      trigger: (u) => blurField(u, 'Height in centimetres'),
       assertUnsaved: expectProfileStillComplete,
     },
     {
@@ -256,9 +245,7 @@ describe('SettingsScreen profile write failures', () => {
       write: jest.mocked(db.setProfileAge),
       hydrate: hydrateProfile({ ...completeProfile, age: null }),
       prepare: (u) => fireEvent.changeText(u.getByLabelText('Age in years'), '30'),
-      trigger: (u) => {
-        blurField(u, 'Age in years');
-      },
+      trigger: (u) => blurField(u, 'Age in years'),
       assertUnsaved: expectProfileStillIncomplete,
     },
     {
@@ -266,42 +253,32 @@ describe('SettingsScreen profile write failures', () => {
       write: jest.mocked(db.clearProfileAge),
       hydrate: hydrateProfile(completeProfile),
       prepare: (u) => fireEvent.changeText(u.getByLabelText('Age in years'), ''),
-      trigger: (u) => {
-        blurField(u, 'Age in years');
-      },
+      trigger: (u) => blurField(u, 'Age in years'),
       assertUnsaved: expectProfileStillComplete,
     },
     {
       name: 'sex chip',
       write: jest.mocked(db.setProfileSex),
-      trigger: (u) => {
-        fireEvent.press(u.getByLabelText('Female'));
-      },
+      trigger: (u) => fireEvent.press(u.getByLabelText('Female')),
       assertUnsaved: (u) => expect(chipBackground(u, 'Female')).toBe(chipBackground(u, 'Male')),
     },
     {
       name: 'activity chip',
       write: jest.mocked(db.setProfileActivityLevel),
-      trigger: (u) => {
-        fireEvent.press(u.getByLabelText('Active'));
-      },
+      trigger: (u) => fireEvent.press(u.getByLabelText('Active')),
       assertUnsaved: (u) => expect(chipBackground(u, 'Active')).toBe(chipBackground(u, 'Light')),
     },
     {
       name: 'goal chip',
       write: jest.mocked(db.setProfileGoalType),
-      trigger: (u) => {
-        fireEvent.press(u.getByLabelText('Build muscle'));
-      },
+      trigger: (u) => fireEvent.press(u.getByLabelText('Build muscle')),
       assertUnsaved: (u) => expect(chipBackground(u, 'Build muscle')).toBe(chipBackground(u, 'Maintain')),
     },
     {
       name: 'recalculate goals',
       write: jest.mocked(db.setNutritionGoals),
       hydrate: hydrateProfile(completeProfile),
-      trigger: (u) => {
-        fireEvent.press(u.getByLabelText('Recalculate nutrition goals from profile'));
-      },
+      trigger: (u) => fireEvent.press(u.getByLabelText('Recalculate nutrition goals from profile')),
       assertUnsaved: (u) => {
         expect(u.getByText('1800')).toBeTruthy();
         expect(u.getByLabelText('Recalculate nutrition goals from profile').props.accessibilityState?.disabled).toBeFalsy();
@@ -323,9 +300,7 @@ describe('SettingsScreen backup reminder write failures', () => {
       name: 'backup reminder day select',
       write: jest.mocked(db.setBackupReminderDay),
       hydrate: () => jest.mocked(db.getBackupReminderEnabled).mockResolvedValueOnce(true),
-      trigger: (u) => {
-        fireEvent.press(u.getByLabelText('Select Tue'));
-      },
+      trigger: (u) => fireEvent.press(u.getByLabelText('Select Tue')),
       assertUnsaved: (u) => expect(u.getByText(/Reminder every Sun at/)).toBeTruthy(),
     },
   ]);
