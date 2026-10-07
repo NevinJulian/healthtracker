@@ -40,10 +40,11 @@ jest.mock('../screens/OnboardingScreen', () => {
 
 import { useFonts } from 'expo-font';
 import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from '../db/database';
-import { exportRawDatabase } from '../services/rescueExport';
+import { clearRescueCopies, exportRawDatabase } from '../services/rescueExport';
 import App from '../../App';
 
 const rescue = exportRawDatabase as jest.Mock;
+const clearCopies = clearRescueCopies as jest.Mock;
 
 const init = initDatabase as jest.Mock;
 
@@ -116,6 +117,21 @@ describe('App start failure screen', () => {
     render(<App />);
     await screen.findByRole('button', { name: 'Retry' });
     expect(screen.UNSAFE_getByType(ScrollView)).toBeTruthy();
+  });
+
+  it('clears rescue copies once on mount and not again on Retry', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded')).mockResolvedValue(undefined);
+    render(<App />);
+    fireEvent.press(await screen.findByRole('button', { name: 'Retry' }));
+    await screen.findByText('NAVIGATOR');
+    expect(clearCopies).toHaveBeenCalledTimes(1);
+  });
+
+  it('survives clearRescueCopies rejecting', async () => {
+    clearCopies.mockRejectedValueOnce(new Error('cache gone'));
+    init.mockResolvedValue(undefined);
+    render(<App />);
+    expect(await screen.findByText('NAVIGATOR')).toBeTruthy();
   });
 
   it('shows a message when Save data fails', async () => {
