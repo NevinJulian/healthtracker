@@ -70,6 +70,7 @@ import * as db from '../../db/database';
 import {
   reconcileScheduledNotifications,
   scheduleMealReminder,
+  scheduleBackupReminder,
 } from '../../services/notifications';
 
 type Utils = ReturnType<typeof render>;
@@ -420,6 +421,166 @@ describe('SettingsScreen saved but not scheduled', () => {
       expect(errorSpy).toHaveBeenCalledTimes(1);
       testCase.assertSaved(utils);
       await expect(result).resolves.toBeUndefined();
+    });
+  });
+});
+
+describe('SettingsScreen debounced time commits', () => {
+  interface TimeCase {
+    name: string;
+    enable: () => void;
+    write: jest.Mock;
+    writeArgs: (time: string) => unknown[];
+    schedule: jest.Mock;
+    scheduleArgs: unknown[];
+    presses: number;
+    time: string;
+  }
+
+  const mealEnabled = (meal: string) => () =>
+    jest
+      .mocked(db.getMealReminderEnabled)
+      .mockImplementation((m: Parameters<typeof db.getMealReminderEnabled>[0]) =>
+        Promise.resolve(m === meal)
+      );
+
+  const cases: TimeCase[] = [
+    {
+      name: 'workout time',
+      enable: () => jest.mocked(db.getWorkoutReminderEnabled).mockResolvedValue(true),
+      write: jest.mocked(db.setWorkoutReminderTime),
+      writeArgs: (t) => [t],
+      schedule: jest.mocked(reconcileScheduledNotifications),
+      scheduleArgs: [],
+      presses: 3,
+      time: '12:15',
+    },
+    {
+      name: 'cook-day time',
+      enable: () => jest.mocked(db.getWeeklyCookDayEnabled).mockResolvedValue(true),
+      write: jest.mocked(db.setWeeklyCookDayTime),
+      writeArgs: (t) => [t],
+      schedule: jest.mocked(reconcileScheduledNotifications),
+      scheduleArgs: [],
+      presses: 1,
+      time: '11:00',
+    },
+    {
+      name: 'breakfast time',
+      enable: mealEnabled('breakfast'),
+      write: jest.mocked(db.setMealReminderTime),
+      writeArgs: (t) => ['breakfast', t],
+      schedule: jest.mocked(scheduleMealReminder),
+      scheduleArgs: ['breakfast', 9, 0],
+      presses: 1,
+      time: '09:00',
+    },
+    {
+      name: 'lunch time',
+      enable: mealEnabled('lunch'),
+      write: jest.mocked(db.setMealReminderTime),
+      writeArgs: (t) => ['lunch', t],
+      schedule: jest.mocked(scheduleMealReminder),
+      scheduleArgs: ['lunch', 9, 0],
+      presses: 1,
+      time: '09:00',
+    },
+    {
+      name: 'dinner time',
+      enable: mealEnabled('dinner'),
+      write: jest.mocked(db.setMealReminderTime),
+      writeArgs: (t) => ['dinner', t],
+      schedule: jest.mocked(scheduleMealReminder),
+      scheduleArgs: ['dinner', 9, 0],
+      presses: 1,
+      time: '09:00',
+    },
+    {
+      name: 'backup time',
+      enable: () => jest.mocked(db.getBackupReminderEnabled).mockResolvedValue(true),
+      write: jest.mocked(db.setBackupReminderTime),
+      writeArgs: (t) => [t],
+      schedule: jest.mocked(scheduleBackupReminder),
+      scheduleArgs: [0, '19:00'],
+      presses: 1,
+      time: '19:00',
+    },
+  ];
+
+  async function flushMicro() {
+    await act(async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+    });
+  }
+
+  async function stepAndCommit(utils: Utils, presses: number) {
+    for (let i = 0; i < presses; i++) {
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Increase Hour'));
+      });
+    }
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    await flushMicro();
+  }
+
+  describe.each(cases)('$name', (testCase) => {
+    let alertSpy: jest.SpyInstance;
+    let errorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.clearAllMocks();
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      testCase.enable();
+    });
+
+    afterEach(() => {
+      alertSpy.mockRestore();
+      errorSpy.mockRestore();
+      jest.mocked(db.getWorkoutReminderEnabled).mockResolvedValue(false);
+      jest.mocked(db.getWeeklyCookDayEnabled).mockResolvedValue(false);
+      jest.mocked(db.getBackupReminderEnabled).mockResolvedValue(false);
+      jest.mocked(db.getMealReminderEnabled).mockReset().mockResolvedValue(false);
+      jest.useRealTimers();
+    });
+
+    it('keeps the saved time and alerts that the reminder was not scheduled', async () => {
+      const utils = render(<SettingsScreen />);
+      await flushMicro();
+      testCase.schedule.mockClear();
+
+      testCase.schedule.mockRejectedValueOnce(new Error('alarm denied'));
+      await stepAndCommit(utils, testCase.presses);
+
+      expect(testCase.write).toHaveBeenCalledTimes(1);
+      expect(testCase.write).toHaveBeenCalledWith(...testCase.writeArgs(testCase.time));
+      expect(testCase.schedule).toHaveBeenCalledTimes(1);
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy.mock.calls[0][0]).toBe('Reminder not scheduled');
+      expect(alertSpy.mock.calls[0][1]).toBe(
+        'Your setting was saved, but the reminder could not be scheduled.'
+      );
+      expect(
+        utils.getAllByText(new RegExp(`(for|at) ${testCase.time}$`)).length
+      ).toBeGreaterThan(0);
+    });
+
+    it('alerts a failed save and does not schedule when the time write rejects', async () => {
+      const utils = render(<SettingsScreen />);
+      await flushMicro();
+      testCase.schedule.mockClear();
+
+      testCase.write.mockRejectedValueOnce(new Error('disk full'));
+      await stepAndCommit(utils, testCase.presses);
+
+      expect(testCase.write).toHaveBeenCalledTimes(1);
+      expect(testCase.schedule).not.toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy.mock.calls[0][0]).toBe('Error');
+      expect(alertSpy.mock.calls[0][1]).toBe('Failed to save your setting. Please try again.');
     });
   });
 });
