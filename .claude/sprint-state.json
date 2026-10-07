@@ -433,8 +433,8 @@
     },
     "435": {
       "lane": "C",
-      "status": "in_test",
-      "roundTrips": 0,
+      "status": "in_dev",
+      "roundTrips": 1,
       "commits": [
         "a97580c",
         "85f8d1b",
@@ -444,9 +444,11 @@
         "7f944b2"
       ],
       "deviceCheck": "Happy path only (a write failure cannot be forced on a phone): open Log measurements, enter waist 81, Save: modal closes, Waist pill shows 81 cm, no Alert. Force-close and reopen: value still there.",
-      "notes": "WO ready. ORCHESTRATOR RULING: scope = the two paths where the UI behaves as if it saved (measurements modal, set logger); the 7 snap-back handlers are a recorded finding. | dev: handleSaveMeasurements and handleLogSet return Promise<boolean> with the write and the refresh in separate try blocks; MeasurementsModal got a savingRef guard; SetLoggerModal clears reps only on success. BEYOND THE WO: a failed getWorkoutSetsForDay refresh after a successful set write is log-only and returns true (mirrors the measurements rule; avoids a duplicate set on retry). Four of the eight new tests were green on arrival (characterisation pins). No existing assertion edited.",
+      "notes": "WO ready. ORCHESTRATOR RULING: scope = measurements modal + set logger; the 7 snap-back handlers are a recorded finding. | dev: handleSaveMeasurements / handleLogSet return Promise<boolean>; savingRef guard in MeasurementsModal; reps cleared only on success; a failed refresh after a successful write is log-only (also for the set logger, beyond the WO - judged correct by the tester: saying failed would invite a duplicate set). | tester APPROVE r0. One new test is VACUOUS: 'releases the guard when the refresh after a successful write rejects' still passes with the guard never released (the modal unmounts on close, so the second Save runs in a fresh modal). ORCHESTRATOR: this sprint's #429 exists because of vacuous assertions - sent back to make it able to fail or delete it; counted as round trip 1 although the tester approved. HUMAN: after write ok + refresh failure the pills / set list stay stale until the next load.",
       "workOrder": "C:/git/ht-lanes/wo/435.md",
-      "decisionSource": "SPRINT.md §3 known pattern (#435 follows #404: an Alert, and the modal stays open)"
+      "decisionSource": "SPRINT.md §3 known pattern (#435 follows #404: an Alert, and the modal stays open)",
+      "securityReview": "skipped: Dashboard UI handlers only (Alert, modal stays open, in-flight ref); no db/api/backup/filesystem code in the diff",
+      "regressionProof": "round 1: 5/8 new tests fail with a97580c DashboardScreen.tsx, the double-Save test fails with 009819e, the set-logger test with c4efd09, 8/8 at 7f944b2; three of the four characterisation pins shown able to fail by mutation; 1243/96 locally and with TZ=UTC (tester reproduced)"
     },
     "437": {
       "lane": "F",
@@ -717,6 +719,10 @@
     {
       "at": "2026-10-07T21:28:55Z",
       "event": "#425 work order ready (queued for lane F, which waits for lane C)"
+    },
+    {
+      "at": "2026-10-07T21:31:22Z",
+      "event": "#435 tester APPROVE r0, but orchestrator sent it back: one of the new tests is vacuous (roundTrips=1) -> in_dev"
     }
   ],
   "status": "running",
@@ -781,7 +787,9 @@
     "SMALL (#435 dev): CLAUDE.md does not need a suite count, but any doc that quotes one is stale (96 suites on lane C)",
     "SMALL (#425 analyst): all of __mocks__/expo-file-system/legacy.js is dead under jest (the preset factory wins): e.g. the repo mock's getInfoAsync exists:false is never seen, the preset's resolves exists:true. Deleting the file or overriding the preset properly needs an owner call",
     "SMALL (#425 analyst): backup.ts cacheDirectory ?? '' hides in its tests that the directory is undefined under jest",
-    "SMALL (#425 analyst): CLAUDE.md Testing setup says moduleNameMapper stubs expo-file-system/legacy; for that module the jest-expo preset mock wins"
+    "SMALL (#425 analyst): CLAUDE.md Testing setup says moduleNameMapper stubs expo-file-system/legacy; for that module the jest-expo preset mock wins",
+    "SMALL (#435 tester): measurements modal race - save pending, Cancel, reopen and type, then the old save resolves: the old handleSave calls onClose and closes the NEW modal, losing the typed text (same shape as before this sprint)",
+    "SMALL (#435 tester): after a successful measurement or set write whose refresh read fails, the pills / set list show stale values until the next load (no message; data is saved)"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
