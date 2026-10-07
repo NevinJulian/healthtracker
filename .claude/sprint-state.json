@@ -374,7 +374,7 @@
     },
     "434": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "commits": [
         "a964ba2",
@@ -383,7 +383,9 @@
         "cdb29fb",
         "dd9455e",
         "54ca6a5",
-        "62eea8b"
+        "62eea8b",
+        "3a79e94",
+        "9454396"
       ],
       "deviceCheck": "On a Hermes release build (APK), run the corrupt-day Reset once (same steps as #411's check): it must complete. resetCorruptDayColumn now uses Object.hasOwn, which the tester could not confirm for this Hermes from the repo; if it were undefined every reset would throw.",
       "notes": "WO ready. DEPARTURE from the issue text: the issue says the lenient reads stay as they are; round 1 made parseExercises/parseAdditionalWorkouts drop bad items. | tester APPROVE r0 with Risk A: getWeeklyTemplate also reads through parseExercises, so a weekday TEMPLATE holding an id-less item now loads without it and the template editor's next save persists the list without it - a NEW silent write-back (old code showed and kept the item). Needs a hand-edited backup. ORCHESTRATOR: by the rule I gave the tester this is a reject, and it is avoidable: sent back to move the item filter out of the shared parsers into mapLogRow (daily_log reads for the screens only), so parseExercises stays exactly as the issue asked and template reads are untouched. Counted as round trip 1 although the tester approved. Also from the tester: a valid item holding a 2000-deep nested object makes a write throw RangeError (text unchanged; not from this change).",
@@ -601,6 +603,10 @@
     {
       "at": "2026-10-07T20:57:25Z",
       "event": "#433 ready (tester APPROVE r0, security skipped); lane E -> #429 in_dev (last issue)"
+    },
+    {
+      "at": "2026-10-07T20:58:07Z",
+      "event": "#434 round 2 (9454396: parsers back to base, item filter in mapLogRow only; 1196/95 per dev) in_test; security started in parallel on 4dea4c6..9454396 (read-only)"
     }
   ],
   "status": "running",
