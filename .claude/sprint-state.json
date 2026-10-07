@@ -168,11 +168,16 @@
     },
     "424": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "8f7c1ec",
+        "b4cc71a",
+        "8fbda56",
+        "e8e4b33"
+      ],
       "deviceCheck": "none",
-      "notes": "WO ready. Issue claim partly stale: a 429 is already not retried (fetchJson retries only >=500); what is missing is the pause. Clamp [1 s, 300 s] is an analyst pick.",
+      "notes": "WO ready. Issue claim partly stale: a 429 is already not retried (fetchJson retries only >=500); what is missing is the pause. Clamp [1 s, 300 s] is an analyst pick. | dev: pausedUntil is its own early branch in takeSearchSlot; parseRetryAfterMs exported for tests. DEVIATION from the WO wording: only values containing a letter take the Date.parse path (bare Date.parse('-5') yields a valid year). A paused lookup still resolves null (same as not found) until #428.",
       "workOrder": "C:/git/ht-lanes/wo/424.md",
       "decisionSource": "owner comment on #424 (no immediate retry on 429; budget exhausted until Retry-After has passed, 60 s when missing or unreadable)"
     },
@@ -219,11 +224,13 @@
     },
     "429": {
       "lane": "E",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "Smoke: in Settings tap Recalculate with a full profile: Goals updated shows, values persist after leaving and returning.",
+      "notes": "WO ready; last in lane E. Four parts, four commits. Mutation proof is mandatory for the replaced assertions. Analyst did NOT enumerate the handlers for part 3 (write ok, notification call throws); the developer must find them.",
+      "workOrder": "C:/git/ht-lanes/wo/429.md",
+      "decisionSource": "latest owner comment on #429 (one new database.ts function in one transaction; drop the unhandledRejection assertions and assert the handler's promise resolves; two messages; stepper writes get the same Alert)"
     },
     "430": {
       "lane": "A",
@@ -237,11 +244,13 @@
     },
     "431": {
       "lane": "C",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "Debug build, force a load failure (temporary throw in getLogByDate / getWaterHistory). Cold start: error view; Retry works once the throw is removed. Then with data on screen, throw and refocus: banner appears and the data remains.",
+      "notes": "WO ready; last in lane C. New src/components/LoadErrorView.tsx (variant screen|banner); imported directly, src/components/index.ts untouched to avoid a lane B conflict. Strings are analyst picks.",
+      "workOrder": "C:/git/ht-lanes/wo/431.md",
+      "decisionSource": "SPRINT.md §3 known pattern (#431 follows MealPrep's error view from #401, one shared component; MealPrep keeps its own)"
     },
     "432": {
       "lane": "C",
@@ -255,19 +264,23 @@
     },
     "433": {
       "lane": "E",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "Notifications allowed: enable the weekly backup reminder, tap the Sat chip, then Wed immediately; background the app. Then step a meal time right after toggling it. Both reminders show the final day/time in the system's scheduled list (or fire there).",
+      "notes": "WO ready; lane E waits for lane A. Wider than the issue: 8 handler groups read stale state. Tests hold a write with a deferred promise (the same-act shape cannot work: handlers await before calling setters). Recalculate write path stays with #429.",
+      "workOrder": "C:/git/ht-lanes/wo/433.md",
+      "decisionSource": "issue body (no comments); analyst chose one mechanism: a latestRef updated by wrapped setters, read at call time"
     },
     "434": {
       "lane": "C",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "none (db-only; the reset flow UI is unchanged and covered by #411's check)",
+      "notes": "WO ready; lane C waits for lane A. DEPARTURE from the issue text (HUMAN to confirm): the issue says the lenient reads stay as they are; the analyst makes parseExercises/parseAdditionalWorkouts also drop items that fail the item check, because [null] crashes both screens on render before the user can reach the Reset Alert. Orchestrator accepted it (lane C's helpers; [] on malformed input is preserved) and asks the tester to check (1) every producer of items writes a string id, (2) syncRollingSchedule never overwrites a wrong-item row without the raw text being kept.",
+      "workOrder": "C:/git/ht-lanes/wo/434.md",
+      "decisionSource": "issue body (no comments): item shape = object with a string id, in the shared predicate"
     },
     "435": {
       "lane": "C",
@@ -336,6 +349,10 @@
     {
       "at": "2026-10-07T20:18:47Z",
       "event": "#432 and #435 work orders ready (lane C waits for lane A); ruled #435 sibling scope: 2 handlers in, 7 snap-back handlers deferred to findings"
+    },
+    {
+      "at": "2026-10-07T20:20:03Z",
+      "event": "#424 in_test (1135/94 per dev); work orders ready for #433 #434 #431 #429 - all 14 analysed so far, none parked (#411, #425, #437 still to analyse)"
     }
   ],
   "status": "running",
@@ -351,6 +368,12 @@
     "SMALL (#422 analyst): parseDaySetting/parseTimeSetting in database.ts are private, so the time rule is duplicated in notifications.ts and can drift; a shared export would remove it",
     "SMALL (#435 analyst): 7 Dashboard handlers only log and reload on a write failure, with no message to the user: handleToggle :460, handleExerciseToggle :506, handleAddExtraWorkout :553, handleToggleExtraWorkout :573, handleToggleMeal :591, handleAddWater :603, handleDeleteSet :655 (suggested: shared reportSaveFailure helper + table-driven test)",
     "SMALL (#435 analyst): MeasurementsModal.handleSave saves the valid fields even when another field is invalid, then stays open, so the user may re-save",
-    "SMALL (#432 analyst): toggleAdditionalWorkout still creates an empty daily_log row for the date before rejecting an unknown id (harmless: the Dashboard only toggles today's row)"
+    "SMALL (#432 analyst): toggleAdditionalWorkout still creates an empty daily_log row for the date before rejecting an unknown id (harmless: the Dashboard only toggles today's row)",
+    "SMALL (#431 analyst): Analytics loading starts false, so the first frame shows zeroed cards before the load begins",
+    "SMALL (#429 analyst): OnboardingScreen calls the two single goal writers, so it has the same partial-write exposure as Recalculate had",
+    "USER-HITTABLE (#429 analyst, from the issue body, not in the decision): Settings height and age text fields keep the typed value after a rejected write",
+    "SMALL (#433 analyst): trackProfileWrite name is misleading",
+    "SMALL (#424 dev): the comment above putCache in openfoodfacts.ts references #369 (comment rule)",
+    "SMALL (#434 analyst): lifting-history readers near database.ts:3249 were not checked for item-shape assumptions"
   ]
 }
