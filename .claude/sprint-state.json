@@ -166,7 +166,8 @@
       "deviceCheck": "With a corrupt exercises value on today's row (debug build or restored backup), open the Dashboard: the notice and button show in the Hammer card, no Alert. Tap Reset: template exercises appear unchecked, notice gone. Repeat for extra workouts (empty list after reset).",
       "notes": "WO ready (analysed against the lane branch with #434 on it). | dev: mapLogRow adds unreadable?: CorruptJsonColumn[] (absent when nothing is unreadable) from _isValidStoredArray on the raw text; db test asserts flag <=> writer refuses over #434's value table. Dashboard: module-level UnreadableNotice (existing hint style + ghost Button), first branch in HammerSection's list ternary, conditional notice in the Extra Workouts section, resetInFlightRef guard in resetCorruptDay (released in finally). No existing assertion edited. The feat commit 15ce90a also fixed a query in its own new tests (Button hides its title from default text queries: importantForAccessibility=no-hide-descendants), so two tests at 3bffb20 were red for the query as well as for the missing feature. The :2/:3 collision suffix stays.",
       "workOrder": "C:/git/ht-lanes/wo/411.md",
-      "decisionSource": "owner comment 3 on #411 (sprint 4): when a day loads and exercises/additional_workouts can't be read, the matching card shows 'This day's data can't be read' with a Reset this day button that runs the same reset as the Alert; no Alert on load"
+      "decisionSource": "owner comment 3 on #411 (sprint 4): when a day loads and exercises/additional_workouts can't be read, the matching card shows 'This day's data can't be read' with a Reset this day button that runs the same reset as the Alert; no Alert on load",
+      "securityReview": "APPROVE (9454396..1c88a00, code read): button and Alert both go through resetCorruptDay -> resetCorruptDayColumn, which re-reads inside the write queue and refuses a column that is not corrupt, so a wrong flag cannot overwrite healthy data; raw text still saved in the same transaction before the UPDATE; column passed from the JSX is a literal; guard released in finally; a failed reset is never shown as success. NOTES FOR THE HUMAN: (1) the new button resets on ONE tap with no confirmation (the sprint-3 Alert was itself the confirmation) and the kept text can only be read back from a backup export; on a mixed row the good items and their ticks are replaced. The decision's wording is satisfied literally; the owner should confirm that one tap is intended. (2) the buttons pass the render-time today, not entry.date: after a midnight rollover without a reload the tap targets the new day (refused if that day is healthy -> misleading Reset failed; resets the wrong day only if both days are corrupt). (3) if the reset succeeds and the following loadToday fails, the stale notice stays and a second tap shows Reset failed although the reset happened."
     },
     "412": {
       "lane": "A",
@@ -659,6 +660,10 @@
     {
       "at": "2026-10-07T21:18:33Z",
       "event": "#429 tester APPROVE r0 + security APPROVE, but orchestrator sent it back for committed tests of the six stepper flush callbacks (roundTrips=1) -> in_dev"
+    },
+    {
+      "at": "2026-10-07T21:18:48Z",
+      "event": "#411 security APPROVE on 1c88a00 (tester verdict still pending)"
     }
   ],
   "status": "running",
