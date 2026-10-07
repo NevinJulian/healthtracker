@@ -1014,3 +1014,19 @@ describe('reading daily_log drops items that are not objects with a string id', 
     expect(entry?.additional_workouts).toEqual(expected);
   });
 });
+
+describe('resetCorruptDayColumn only accepts the two known columns', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])('rejects %j as an unsupported column', async (column) => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await expect(
+      db.resetCorruptDayColumn(todayKey(), column as unknown as 'exercises')
+    ).rejects.toThrow('unsupported column');
+  });
+});
