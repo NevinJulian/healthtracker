@@ -157,6 +157,8 @@ export interface DailyLogEntry {
   exercises: Exercise[];
   body_weight: number | null;
   additional_workouts: AdditionalWorkout[];
+  /** Columns whose stored text the writers would refuse; absent when all are readable. */
+  unreadable?: CorruptJsonColumn[];
 }
 
 // ─────────────────────────────────────────────
@@ -1326,6 +1328,9 @@ function mapLogRow(row: {
   body_weight?: number | null;
   additional_workouts?: string;
 }): DailyLogEntry {
+  const unreadable: CorruptJsonColumn[] = [];
+  if (!_isValidStoredArray(row.exercises)) unreadable.push('exercises');
+  if (!_isValidStoredArray(row.additional_workouts)) unreadable.push('additional_workouts');
   return {
     date: row.date,
     walking_task: row.walking_task,
@@ -1338,6 +1343,7 @@ function mapLogRow(row: {
     exercises: parseExercises(row.exercises).filter(_isStoredItem),
     body_weight: row.body_weight ?? null,
     additional_workouts: parseAdditionalWorkouts(row.additional_workouts).filter(_isStoredItem),
+    ...(unreadable.length > 0 && { unreadable }),
   };
 }
 
