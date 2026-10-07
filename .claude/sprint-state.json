@@ -129,10 +129,11 @@
         433,
         429
       ],
-      "current": 429,
+      "current": null,
       "done": [
         422,
-        433
+        433,
+        429
       ],
       "parked": [],
       "base": "4dea4c6"
@@ -324,7 +325,7 @@
     },
     "429": {
       "lane": "E",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 1,
       "commits": [
         "5031c80",
@@ -343,7 +344,7 @@
       "workOrder": "C:/git/ht-lanes/wo/429.md",
       "decisionSource": "latest owner comment on #429 (one new database.ts function in one transaction; drop the unhandledRejection assertions and assert the handler's promise resolves; two messages; stepper writes get the same Alert)",
       "securityReview": "APPROVE (code read at e366ee3): setNutritionGoals uses the same upsert text as setSetting, bound values, queue wrapper outside and withTransactionAsync inside, nothing enqueued from within; the first write cannot commit if the second fails; schema.ts untouched. Inputs from suggestGoals are clamped (finite, >= 1000 kcal / >= 50 g), and getNutritionGoals falls back to defaults for a non-finite stored value. scheduleAfterSave wraps only the scheduling call at all 12 call sites, so a write failure never enters it and is never reported as saved. Note: after a failed debounced stepper write the stepper shows the unsaved value until the next focus reload (the user is told it failed).",
-      "regressionProof": "round 1: all four test/fix pairs proven on the pre-fix source; transaction removal makes the failure test red (calories 2500); scratch attacks on the real engine: first/second write failing, sync throw vs rejection, concurrent pairs and single writers serialised, queue never stuck, 8 odd inputs behave exactly like the single writers; database.ts diff is one 13-line insertion; part 2 mutation proven individually for 6 of 15 cases plus catch removal, and the thenable assertion fails on a handler that returns nothing; every edited existing assertion read and judged a consequence of the decision (one strengthened); 12 scratch tests for the six stepper flush callbacks pass; 1172/97 (tester reproduced, TZ=UTC is the npm test default)"
+      "regressionProof": "round 1: four test/fix pairs proven; transaction removal red; real-engine attacks; one-hunk database.ts diff; mutation proof of the replaced assertions. Round 2 (88e3370, test-only, +161 lines): 12 tests over the six time-stepper commits; six single-line source mutations (bare scheduling call / swallowed write error for lunch, backup, cook-day) each turn exactly the targeted test red; fake timers restored; 1184/97 (tester reproduced)"
     },
     "430": {
       "lane": "A",
@@ -685,6 +686,10 @@
     {
       "at": "2026-10-07T21:23:43Z",
       "event": "#411 ready (tester APPROVE r2 after 1 round trip; security APPROVE on round 1, and the round-2 change is the one-line fix security itself suggested); lane C -> #435 in_dev"
+    },
+    {
+      "at": "2026-10-07T21:24:07Z",
+      "event": "#429 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane E out of issues (3 done, 0 parked) -> cleanup"
     }
   ],
   "status": "running",
