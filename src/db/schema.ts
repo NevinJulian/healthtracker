@@ -430,8 +430,8 @@ export interface Migration {
    * propagate, so the migration and its schema_version row both roll back.
    *
    * Every caller that executes a migration's `sql` must run its
-   * `precondition` first — runMigrations() and restoreFromPayload()'s
-   * post-restore replay both do.
+   * `precondition` first — runMigrations() does, and so does
+   * restoreFromPayload() when it replays v37 for a pre-v37 backup.
    */
   precondition?: (db: MigrationPreconditionDb) => Promise<void>;
 }
@@ -895,8 +895,9 @@ export const RESTORE_SLOT_DEDUPE_SQL = `
 /**
  * Restore-only set_index repair for backups from v37 on (older backups get
  * v37 itself). Not a migration: it runs only inside restoreFromPayload's
- * transaction, after the unique index is dropped. A (date, exercise) partition is renumbered densely from 0 only if two of its
- * rows share a set_index, ordered by set_index, created_at, id. Collision-free
+ * transaction, after the unique index is dropped. A (date, exercise)
+ * partition is renumbered densely from 0 only if two of its rows share a
+ * set_index, ordered by set_index, created_at, id. Collision-free
  * partitions keep their set_index values, gaps included. The new indexes are
  * staged in a temp table so the ordering never reads values it has already
  * rewritten.

@@ -555,7 +555,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
   });
 });
 
-describe('restoreFromPayload() by backup schema version (#412)', () => {
+describe('restoreFromPayload() by backup schema version', () => {
   const INDEX_SQL =
     "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_workout_set_log_date_exercise_set_index'";
 
