@@ -1135,7 +1135,9 @@ export function toggleAdditionalWorkout(date: string, id: string): Promise<void>
   return _enqueueWrite('toggleAdditionalWorkout', async () => {
     const db = getDatabase();
     const current = await _readAdditionalWorkoutsForWrite(db, date, 'toggleAdditionalWorkout');
-    if (!current.some((w) => w.id === id)) return;
+    if (!current.some((w) => w.id === id)) {
+      throw new Error(`[DB] toggleAdditionalWorkout: no additional workout ${id} for date=${date}`);
+    }
     const updated = current.map((w) => (w.id === id ? { ...w, completed: !w.completed } : w));
     await _writeAdditionalWorkouts(db, date, updated, 'toggleAdditionalWorkout');
   });
