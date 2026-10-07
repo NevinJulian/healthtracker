@@ -170,13 +170,15 @@
     },
     "424": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "commits": [
         "8f7c1ec",
         "b4cc71a",
         "8fbda56",
-        "e8e4b33"
+        "e8e4b33",
+        "90a0067",
+        "f541707"
       ],
       "deviceCheck": "none",
       "notes": "WO ready. Issue claim partly stale: a 429 is already not retried (fetchJson retries only >=500); what is missing is the pause. Clamp [1 s, 300 s] is an analyst pick. | dev: pausedUntil is its own early branch in takeSearchSlot; parseRetryAfterMs exported for tests. DEVIATION from the WO wording: only values containing a letter take the Date.parse path (bare Date.parse('-5') yields a valid year); ISO dates without a letter fall back to 60 s. | tester APPROVE r0 with two findings. (3) a later 429 from a lookup already in flight overwrites pausedUntil and can SHORTEN the pause (300 s then 1 s -> resumes after 1 s): contradicts the decision (exhausted until Retry-After has passed). ORCHESTRATOR: sent back to the developer for max() + a test; counted as round trip 1 although the tester approved. (4) a backward clock step stretches the pause by the step size (the WO's 'only up to the 300 s cap' was wrong): left to #428, whose work order already clamps the stored resume time on read.",
@@ -389,6 +391,10 @@
     {
       "at": "2026-10-07T20:23:16Z",
       "event": "#424 tester APPROVE r0, but orchestrator sent it back: a second in-flight 429 can shorten the pause (roundTrips=1) -> in_dev"
+    },
+    {
+      "at": "2026-10-07T20:25:37Z",
+      "event": "#424 round 2 (f541707, 1137/94 per dev) in_test; security started in parallel on e46e8ac..f541707 (read-only)"
     }
   ],
   "status": "running",
