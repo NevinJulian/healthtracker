@@ -55,6 +55,21 @@ describe('fetchJson (#318)', () => {
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
   });
 
+  it('carries the raw Retry-After header on a 429 without retrying', async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: false,
+      status: 429,
+      headers: { get: (name: string) => (name === 'Retry-After' ? ' 30 ' : null) },
+      json: async () => ({}),
+    })) as unknown as typeof fetch;
+
+    await expect(fetchJson('https://example.com/rate-limited')).rejects.toMatchObject({
+      status: 429,
+      retryAfter: ' 30 ',
+    });
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
+  });
+
   it('retries a 5xx response exactly once', async () => {
     global.fetch = jest.fn(async () => ({
       ok: false,
