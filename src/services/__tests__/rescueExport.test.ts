@@ -9,7 +9,7 @@ jest.mock('expo-sharing', () => ({ shareAsync: jest.fn() }));
 
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { clearRescueCopies, exportRawDatabase } from '../rescueExport';
+import { clearRescueCopies, exportRawDatabase, hasRescueWal } from '../rescueExport';
 
 const getInfo = FileSystem.getInfoAsync as jest.Mock;
 const copy = FileSystem.copyAsync as jest.Mock;
@@ -82,5 +82,17 @@ describe('clearRescueCopies', () => {
     expect(del).toHaveBeenCalledTimes(2);
     expect(del).toHaveBeenCalledWith('file:///cache/healthtracker.db', { idempotent: true });
     expect(del).toHaveBeenCalledWith('file:///cache/healthtracker.db-wal', { idempotent: true });
+  });
+});
+
+describe('hasRescueWal', () => {
+  it('is true when the wal file exists', async () => {
+    present(DB, WAL);
+    expect(await hasRescueWal()).toBe(true);
+  });
+
+  it('is false when there is no wal file', async () => {
+    present(DB);
+    expect(await hasRescueWal()).toBe(false);
   });
 });
