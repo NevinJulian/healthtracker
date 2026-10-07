@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 jest.mock('react-native-gesture-handler', () => ({}));
 jest.mock('react-native-safe-area-context', () => ({
@@ -17,7 +17,11 @@ jest.mock('../db/database', () => ({
   getOnboardingComplete: jest.fn(),
   getLatestBodyWeight: jest.fn(),
 }));
-jest.mock('../services/rescueExport', () => ({ exportRawDatabase: jest.fn() }));
+jest.mock('../services/rescueExport', () => ({
+  exportRawDatabase: jest.fn(),
+  hasRescueWal: jest.fn(() => Promise.resolve(false)),
+  clearRescueCopies: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('../db/devStress369', () => ({ installStress369: jest.fn() }));
 jest.mock('../services/notifications', () => ({
   configureNotificationHandler: jest.fn(),
@@ -80,6 +84,17 @@ describe('App start failure screen', () => {
     render(<App />);
     fireEvent.press(await screen.findByRole('button', { name: 'Save data' }));
     await waitFor(() => expect(rescue).toHaveBeenCalledTimes(1));
+  });
+
+  it('starts one init for two Retry presses in the same tick', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded')).mockResolvedValue(undefined);
+    render(<App />);
+    const retryButton = await screen.findByRole('button', { name: 'Retry' });
+    await act(async () => {
+      fireEvent.press(retryButton);
+      fireEvent.press(retryButton);
+    });
+    expect(init).toHaveBeenCalledTimes(2);
   });
 
   it('shows a message when Save data fails', async () => {
