@@ -270,11 +270,17 @@
     },
     "430": {
       "lane": "A",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "b4667d7",
+        "8cc6940",
+        "821b8aa",
+        "42459fd",
+        "3ed52df"
+      ],
       "deviceCheck": "none",
-      "notes": "WO ready; waits for #412. Sibling spot included: getCookingTasks (database.ts ~2019).",
+      "notes": "WO ready. Sibling spot included: getCookingTasks. | dev: private parseIngredients(raw, recipeId) at the four sites; warns with the recipe id, never the raw text. 3ed52df REMOVES an assertion on archived_at from the new test because it did not typecheck (Recipe has no archived_at field) - tester to judge whether the archived-row coverage is still real. b4667d7 alone does not typecheck. JSON.parse inventory: only getBioForceLibrary remains unguarded in lane A's part (recorded finding).",
       "workOrder": "C:/git/ht-lanes/wo/430.md",
       "decisionSource": "owner comment on #430 (return the recipe with an empty ingredient list, and log it)"
     },
@@ -441,6 +447,10 @@
     {
       "at": "2026-10-07T20:32:20Z",
       "event": "#426 round 2 (83e352d, test-only: 5 s wait on each test's first findBy; 1129/93 per dev) in_test"
+    },
+    {
+      "at": "2026-10-07T20:33:05Z",
+      "event": "#430 in_test (1136/95 per dev)"
     }
   ],
   "status": "running",
