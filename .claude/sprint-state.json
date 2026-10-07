@@ -204,8 +204,8 @@
     },
     "426": {
       "lane": "B",
-      "status": "in_test",
-      "roundTrips": 0,
+      "status": "in_dev",
+      "roundTrips": 1,
       "commits": [
         "b1b1e3d",
         "7fd00a4",
@@ -223,9 +223,10 @@
         "1979589"
       ],
       "deviceCheck": "1) Normal start: no error screen, startup not slowed. 2) Dev build that throws in initDatabase: Retry, Save data and the notice reachable by scrolling at the largest font size. 3) Save data: two-files sentence, then two share sheets; save both to Files. 4) Kill and relaunch without the forced failure: cache copies are gone.",
-      "notes": "WO ready. Issue item 3 (closing the connection) is NOT done by this work order; the Save-waits-for-init rule covers the font-error case (analyst reading of the decision). | dev: 7 test/fix pairs. In-flight promise in a ref; clearRescueCopies().catch(() => {}) once in the mount effect; hasRescueWal from an effect when the failure screen shows. Dev saw App.startFailure flake ONCE on a cold cache (Unable to find node on an unmounted component), not reproduced - tester to hammer it. Two tests are guards that never failed (export never deletes; survives clearRescueCopies rejecting).",
+      "notes": "WO ready. Issue item 3 (closing the connection) is NOT done by this work order; the Save-waits-for-init rule covers the font-error case (analyst reading of the decision). | dev: 7 test/fix pairs. In-flight promise in a ref; clearRescueCopies().catch(() => {}) once in the mount effect; hasRescueWal from an effect when the failure screen shows. | tester APPROVE r0. COLD-CACHE RISK: `jest App.startFailure --no-cache` fails 3/3 at the first test (findByText default 1000 ms; first cold render took 2191 ms). Pre-existing (fails 2/2 at base e46e8ac, ~1.6 s) but this change adds ~500 ms. CI has no jest cache (test.yml caches npm only), so in CI it depends on which suites warmed the transform cache first. The dev's 'unmounted component' flake was never reproduced. ORCHESTRATOR: sent back for a test-only commit giving the first cold render an explicit timeout; counted as round trip 1 although the tester approved. HUMAN: if initDatabase never settles, Retry is a no-op and Save data spins forever (as decided: Save waits for init); only killing the app helps. hasRescueWal checks the LIVE wal once when the failure screen shows; export re-checks at save time, so the two-files sentence can be stale if the wal appears/disappears in between.",
       "workOrder": "C:/git/ht-lanes/wo/426.md",
-      "decisionSource": "owner comment on #426 2026-10-06 (rescue copies deleted at the next app start; busy flag; Save data waits for init; scrolling screen; one WAL sentence; no full-storage special case)"
+      "decisionSource": "owner comment on #426 2026-10-06 (rescue copies deleted at the next app start; busy flag; Save data waits for init; scrolling screen; one WAL sentence; no full-storage special case)",
+      "regressionProof": "round 1: all 7 test/fix pairs proven (pre-fix source at each test commit fails, HEAD passes); the two never-red guards go red under mutation (deleteAsync added to export; .catch removed); warm suite 15/15, full suite twice 1129/93 (tester reproduced)."
     },
     "427": {
       "lane": "A",
@@ -415,6 +416,10 @@
     {
       "at": "2026-10-07T20:28:06Z",
       "event": "#424 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane D -> #428 in_dev"
+    },
+    {
+      "at": "2026-10-07T20:29:57Z",
+      "event": "#426 tester APPROVE r0, but orchestrator sent it back for a cold-cache test timeout (roundTrips=1) -> in_dev; security started in parallel on e46e8ac..1979589 (read-only)"
     }
   ],
   "status": "running",
@@ -439,6 +444,7 @@
     "SMALL (#434 analyst): lifting-history readers near database.ts:3249 were not checked for item-shape assumptions",
     "SMALL (#427 tester): on the start-failure screen the error message likely appears twice on Hermes (App.tsx joins err.message with the first 8 stack lines, and the stack's first line repeats the message); not run on a device",
     "SMALL (#427 tester): database.ts file header still lists issue-number history (#37, #38, #39)",
-    "SMALL (#427 security): initDatabase runs PRAGMA journal_mode = WAL before assertCompatibleSchema, so an old rollback-journal database gets its header rewritten although the error message says nothing was changed; running the check before the pragma would make the sentence literally true"
+    "SMALL (#427 security): initDatabase runs PRAGMA journal_mode = WAL before assertCompatibleSchema, so an old rollback-journal database gets its header rewritten although the error message says nothing was changed; running the check before the pragma would make the sentence literally true",
+    "SMALL (#426 tester): if cacheDirectory is null, clearRescueCopies builds a 'null...' path (the delete is idempotent and the rejection swallowed)"
   ]
 }
