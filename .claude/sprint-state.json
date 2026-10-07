@@ -391,7 +391,8 @@
       "notes": "WO ready. DEPARTURE from the issue text: the issue says the lenient reads stay as they are; round 1 made parseExercises/parseAdditionalWorkouts drop bad items. | tester APPROVE r0 with Risk A: getWeeklyTemplate also reads through parseExercises, so a weekday TEMPLATE holding an id-less item now loads without it and the template editor's next save persists the list without it - a NEW silent write-back (old code showed and kept the item). Needs a hand-edited backup. ORCHESTRATOR: by the rule I gave the tester this is a reject, and it is avoidable: sent back to move the item filter out of the shared parsers into mapLogRow (daily_log reads for the screens only), so parseExercises stays exactly as the issue asked and template reads are untouched. Counted as round trip 1 although the tester approved. Also from the tester: a valid item holding a 2000-deep nested object makes a write throw RangeError (text unchanged; not from this change).",
       "workOrder": "C:/git/ht-lanes/wo/434.md",
       "decisionSource": "issue body (no comments): item shape = object with a string id, in the shared predicate",
-      "regressionProof": "round 1: predicate 20/44 fail with a964ba2 database.ts, reads 6 fail with 9dfeeae, column guard 4 fail with dd9455e, all pass at 62eea8b; the sync pin goes red under mutation; 25-value probe table: writers, reset and reads agree on every value, refused text stays byte-identical, raw text kept byte-identical on reset; git history searched back to d62f627 (921 commits): no released version ever wrote a non-string id; 1194/95 (tester reproduced)"
+      "regressionProof": "round 1: predicate 20/44 fail with a964ba2 database.ts, reads 6 fail with 9dfeeae, column guard 4 fail with dd9455e, all pass at 62eea8b; the sync pin goes red under mutation; 25-value probe table: writers, reset and reads agree on every value, refused text stays byte-identical, raw text kept byte-identical on reset; git history searched back to d62f627 (921 commits): no released version ever wrote a non-string id; 1194/95 (tester reproduced)",
+      "securityReview": "APPROVE (4dea4c6..9454396): reset SQL is static per key and Object.hasOwn also rejects __proto__/constructor; resetCorruptDayColumn re-reads the row and refuses valid data, so arbitrary column/date cannot overwrite anything; the raw text (good items included) is saved before the UPDATE in the same transaction; every writer of the two columns re-reads the stored text strictly, so a day with hidden items refuses every write; sync backfill never overwrites a wrong-item row; a null template item does not throw in the day builder (no startup loop). NOTE (HUMAN): a hand-edited template holding an item without a string id now makes every NEW day built from it corrupt by the new definition, and Reset rebuilds the same value from the same template - the alert repeats on every tick for those days; no data lost. Fix would sit in _buildDailyLogRowValues or getWeeklyTemplate (outside lane C)."
     },
     "435": {
       "lane": "C",
@@ -611,6 +612,10 @@
     {
       "at": "2026-10-07T20:58:18Z",
       "event": "GitHub CI test check on integration fee2c49 (lanes A, D merged) and 1f6167f (lanes A, B, D merged): both completed success - the App render suites pass on CI's cold jest cache"
+    },
+    {
+      "at": "2026-10-07T20:59:20Z",
+      "event": "#434 security APPROVE on 9454396 (round-2 tester verdict still pending)"
     }
   ],
   "status": "running",
