@@ -215,14 +215,9 @@ async function _readEffectiveStartDate(
 
 /** Safely parse a JSON string as Exercise[]; returns [] on any error. */
 function parseExercises(raw: string | null | undefined): Exercise[] {
-  return _parseLenientArray(raw) as Exercise[];
-}
-
-/** Lenient read: [] for unparseable or non-array input, and items that are not objects with a string id are dropped. */
-function _parseLenientArray(raw: string | null | undefined): unknown[] {
   try {
-    const parsed: unknown = JSON.parse(raw ?? '[]');
-    return Array.isArray(parsed) ? parsed.filter(_isStoredItem) : [];
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -281,7 +276,12 @@ function _isValidStoredArray(raw: string | null | undefined): boolean {
 }
 
 function parseAdditionalWorkouts(raw: string | null | undefined): AdditionalWorkout[] {
-  return _parseLenientArray(raw) as AdditionalWorkout[];
+  try {
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -1335,9 +1335,9 @@ function mapLogRow(row: {
     fasting_completed: row.fasting_completed === 1,
     is_rest_day: row.is_rest_day === 1,
     is_meal_prep_day: row.is_meal_prep_day === 1,
-    exercises: parseExercises(row.exercises),
+    exercises: parseExercises(row.exercises).filter(_isStoredItem),
     body_weight: row.body_weight ?? null,
-    additional_workouts: parseAdditionalWorkouts(row.additional_workouts),
+    additional_workouts: parseAdditionalWorkouts(row.additional_workouts).filter(_isStoredItem),
   };
 }
 
