@@ -157,8 +157,10 @@
       "status": "analysing",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "Dev build in Expo Go: add throw new Error('device test') at the top of any screen render (uncommitted). Open that screen: Something went wrong screen with error text, Retry, Save data, no-reset notice. Retry: crash screen again. Remove the throw, reload: screen works. Throw again, Save data: share sheet.",
+      "notes": "WO ready; waits for #426. Boundary sits outside NavigationContainer; start-failure JSX is extracted into a shared RecoveryScreen (App.tsx startup screen refactored).",
+      "workOrder": "C:/git/ht-lanes/wo/423.md",
+      "decisionSource": "owner comment on #423 (boundary wraps the navigator, same recovery screen as a start failure, Retry remounts, no reset)"
     },
     "424": {
       "lane": "D",
@@ -285,7 +287,14 @@
     {
       "at": "2026-10-07T20:14:33Z",
       "event": "worktrees a/b/d created at e46e8ac, npm ci running; analysts dispatched for #427 #426 #424 (current) and #412 #430 #423 #428 (ahead, read-only)"
+    },
+    {
+      "at": "2026-10-07T20:14:57Z",
+      "event": "npm ci ok in worktrees a/b/d; #423 work order ready (queued behind #426)"
     }
   ],
-  "status": "running"
+  "status": "running",
+  "pendingFindings": [
+    "USER-HITTABLE (#423 analyst): OnboardingScreen branch in App.tsx is outside the error boundary the #423 decision asks for, so a render crash on first launch is still uncaught"
+  ]
 }
