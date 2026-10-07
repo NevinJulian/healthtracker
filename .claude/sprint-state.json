@@ -188,7 +188,7 @@
     },
     "423": {
       "lane": "B",
-      "status": "in_test",
+      "status": "in_security",
       "roundTrips": 0,
       "commits": [
         "8b4f52f",
@@ -197,9 +197,10 @@
         "162009f"
       ],
       "deviceCheck": "Dev build in Expo Go: add throw new Error('device test') at the top of any screen render (uncommitted). Open that screen: Something went wrong screen with error text, Retry, Save data, no-reset notice. Retry: crash screen again. Remove the throw, reload: screen works. Throw again, Save data: share sheet.",
-      "notes": "WO ready; waits for #426. Boundary sits outside NavigationContainer; start-failure JSX is extracted into a shared RecoveryScreen (App.tsx startup screen refactored).",
+      "notes": "WO ready. Boundary sits outside NavigationContainer; start-failure JSX extracted into a shared RecoveryScreen. | dev: RecoveryScreen (owns saving/saveError/hasRescueWal/ScrollView/notices, optional beforeSave), AppErrorBoundary (class), shared formatErrorDetail, src/testUtils/coldRenderWait.ts (10 s, used by both App suites). | tester APPROVE r0. Findings: (A/D) the key bump on Retry is redundant - with it removed all 7 tests still pass, because the children are already unmounted while the fallback shows; behaviour correct, the mount-counter test does not prove the key. (B) DATA-LOSS RISK on the NEW path: Save data on the render-crash screen copies the db and, only after the first share sheet closes, the wal - while the database is OPEN and the app was live; the pair can be inconsistent (extends #441). Sent to security for a verdict. (C) a thrown non-Error shows only the generic text. Not covered by the boundary: onboarding branch, splash, the start-failure screen itself; a crash inside RecoveryScreen while it is the boundary's fallback unmounts the app (React semantics, not run). saveError is now cleared on every Retry press, including one the in-flight guard drops.",
       "workOrder": "C:/git/ht-lanes/wo/423.md",
-      "decisionSource": "owner comment on #423 (boundary wraps the navigator, same recovery screen as a start failure, Retry remounts, no reset)"
+      "decisionSource": "owner comment on #423 (boundary wraps the navigator, same recovery screen as a start failure, Retry remounts, no reset)",
+      "regressionProof": "7 render-crash tests fail with 1bfae51 App.tsx (no boundary), pass at 162009f; extraction 8b4f52f read line by line against the old start-failure branch (behaviour-preserving); App.startFailure.test.tsx diff is only the wait-constant import swap, 14/14 unchanged; crash-loop scratch test: one Retry = 2 renders, no loop; cold --no-cache runs: renderCrash 3/3, startFailure 3/3, both together with 2 workers 2/2, slowest test 3.3 s against a 10 s wait; 1136/94 (tester reproduced)"
     },
     "424": {
       "lane": "D",
@@ -549,6 +550,10 @@
     {
       "at": "2026-10-07T20:47:51Z",
       "event": "#422 ready (tester APPROVE r0, security skipped); lane E -> #433 in_dev"
+    },
+    {
+      "at": "2026-10-07T20:48:30Z",
+      "event": "#423 tester APPROVE r0 -> security (orchestrator decision: not skipped, because Save data now runs against an open, live database on the render-crash screen)"
     }
   ],
   "status": "running",
@@ -592,7 +597,10 @@
     "USER-HITTABLE (#428 tester + security, extends the #428 analyst finding): the Discover import Alert says Try again in a minute, but importing again answers Already in your library (INSERT OR IGNORE), so the zero-macro recipe cannot be refreshed that way; the only fix today is Edit + Save in the editor",
     "SMALL (#422 dev): notifications.test.ts header comment still carries an issue number (#309)",
     "SMALL (lane D cleanup): in RecipeEditorScreen.saveDeadline.test.tsx the fillIngredients helper is declared mid-describe and the first new test duplicates its body inline",
-    "SMALL (lane D cleanup): openfoodfacts.ts header says the network is hit once per unique ingredient name; failures are not cached, so that was already loose"
+    "SMALL (lane D cleanup): openfoodfacts.ts header says the network is hit once per unique ingredient name; failures are not cached, so that was already loose",
+    "SMALL (#423 tester): key={attempt} bump in AppErrorBoundary is redundant (children are unmounted while the fallback shows); the mount-counter test passes without it",
+    "SMALL (#423 tester): a thrown non-Error (string, null, object) shows only Unknown error while rendering the app; a thrown string's text is lost (same on the start path)",
+    "SMALL (#423 tester): a render crash inside RecoveryScreen while it is the boundary's own fallback propagates to the root and unmounts the app (no boundary above); the start-failure screen and the splash are not inside any boundary either"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
