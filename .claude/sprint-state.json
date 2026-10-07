@@ -252,11 +252,23 @@
     },
     "428": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "cfcc2d7",
+        "1aa53ee",
+        "dbba380",
+        "fed105a",
+        "e5562a0",
+        "a670372",
+        "f19be0d",
+        "6dbd718",
+        "8d4e84a",
+        "dc84434",
+        "d4cb2c6"
+      ],
       "deviceCheck": "Expo Go, editor: type 11+ distinct unusual ingredient names with quantities within one minute: a Not looked up line appears, not no data. Wait 60 s, tap Recompute: the line clears. Discover: import a recipe with 11+ unlisted ingredients: the Alert shows the not-looked-up sentence.",
-      "notes": "WO ready; waits for #424. Return type becomes OFFNutrition | null | 'not-looked-up'; user-facing wording is an analyst pick. A Retry-After cooldown refusal must also return 'not-looked-up'.",
+      "notes": "WO ready. Return type becomes OFFNutrition | null | 'not-looked-up'; user-facing wording is an analyst pick. | dev: 11 commits. Pause clamp = min(pausedUntil, now + 300 s) on read and in the 429 handler. 'not-looked-up' only when an attempt was refused and nothing was sent (budget or pause); a 5xx retry refused after the first request went out stays null. 4 truthiness checks on lookup results replaced by object checks (cache write, batch, importRecipe, editor). EXISTING ASSERTIONS CHANGED (dev: all pin the behaviour the decision replaces): 3x toBeNull -> toBe('not-looked-up') and one test title in openfoodfacts.budget.test.ts, 1x in openfoodfacts.retryAfter.test.ts, a type guard in computeWithOFF.test.ts - tester to judge each. Discover card suppresses the 'Macros computed from local data' line when only refused ingredients exist (not in the WO). Editor lookups are sequential, so one hanging ingredient leaves all later ones 'not looked up' at the deadline. Dev edited files with scripts and warns about CRLF/cp1252 - tester to check for mojibake.",
       "workOrder": "C:/git/ht-lanes/wo/428.md",
       "decisionSource": "owner comment on #428 2026-10-06 (refused/cut-off lookup = 'not looked up', separate from 'no data'; save-deadline fallback keeps every lookup that already succeeded; future timestamps dropped)"
     },
@@ -462,6 +474,10 @@
     {
       "at": "2026-10-07T20:36:22Z",
       "event": "#430 REJECT r1 (archived-row case no longer pinned after the assertion was dropped) -> back to dev, roundTrips=1"
+    },
+    {
+      "at": "2026-10-07T20:37:50Z",
+      "event": "#428 in_test (1146/95 per dev)"
     }
   ],
   "status": "running",
