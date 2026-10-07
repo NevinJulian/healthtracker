@@ -487,14 +487,22 @@ export default function DashboardScreen() {
     }
   };
 
+  const resetInFlightRef = useRef(false);
+
   const resetCorruptDay = async (date: string, column: CorruptJsonColumn) => {
+    if (resetInFlightRef.current) return;
+    resetInFlightRef.current = true;
     try {
-      await resetCorruptDayColumn(date, column);
-    } catch (err) {
-      console.error('resetCorruptDayColumn error', err);
-      Alert.alert('Reset failed', 'This day could not be reset. Nothing was changed.');
+      try {
+        await resetCorruptDayColumn(date, column);
+      } catch (err) {
+        console.error('resetCorruptDayColumn error', err);
+        Alert.alert('Reset failed', 'This day could not be reset. Nothing was changed.');
+      }
+      await loadToday();
+    } finally {
+      resetInFlightRef.current = false;
     }
-    loadToday();
   };
 
   const offerCorruptDayReset = (err: CorruptJsonError) => {
