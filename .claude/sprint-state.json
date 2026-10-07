@@ -94,10 +94,11 @@
         432,
         431
       ],
-      "current": 435,
+      "current": 432,
       "done": [
         434,
-        411
+        411,
+        435
       ],
       "parked": [],
       "base": "4dea4c6"
@@ -384,7 +385,7 @@
     },
     "432": {
       "lane": "C",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": "none (optional: Analytics measurements card N entries excludes blank entries, only visible if a device holds an all-NULL row)",
@@ -433,7 +434,7 @@
     },
     "435": {
       "lane": "C",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 1,
       "commits": [
         "a97580c",
@@ -449,7 +450,7 @@
       "workOrder": "C:/git/ht-lanes/wo/435.md",
       "decisionSource": "SPRINT.md §3 known pattern (#435 follows #404: an Alert, and the modal stays open)",
       "securityReview": "skipped: Dashboard UI handlers only (Alert, modal stays open, in-flight ref); no db/api/backup/filesystem code in the diff",
-      "regressionProof": "round 1: 5/8 new tests fail with a97580c DashboardScreen.tsx, the double-Save test fails with 009819e, the set-logger test with c4efd09, 8/8 at 7f944b2; three of the four characterisation pins shown able to fail by mutation; 1243/96 locally and with TZ=UTC (tester reproduced)"
+      "regressionProof": "round 1: 5/8 new tests fail on the pre-fix source, double-Save and set-logger tests fail at their test commits, 8/8 at 7f944b2; pins shown able to fail by mutation. Round 2 (498da6c, test-only, +9/-4): with the guard release removed the file shows 2 failed / 6 passed (the tester did not capture the names; the dev names the new test and the retry test), 8/8 restored; same mounted modal across both saves; 1243/96 (tester reproduced)"
     },
     "437": {
       "lane": "F",
@@ -732,6 +733,10 @@
     {
       "at": "2026-10-07T21:32:49Z",
       "event": "#435 round 2 (498da6c, test-only: the guard-release test now keeps the same modal mounted and goes red when the release is removed; 1243/96 per dev) in_test"
+    },
+    {
+      "at": "2026-10-07T21:34:04Z",
+      "event": "#435 ready (tester APPROVE r2 after 1 round trip, security skipped); lane C -> #432 in_dev"
     }
   ],
   "status": "running",
@@ -798,7 +803,8 @@
     "SMALL (#425 analyst): backup.ts cacheDirectory ?? '' hides in its tests that the directory is undefined under jest",
     "SMALL (#425 analyst): CLAUDE.md Testing setup says moduleNameMapper stubs expo-file-system/legacy; for that module the jest-expo preset mock wins",
     "SMALL (#435 tester): measurements modal race - save pending, Cancel, reopen and type, then the old save resolves: the old handleSave calls onClose and closes the NEW modal, losing the typed text (same shape as before this sprint)",
-    "SMALL (#435 tester): after a successful measurement or set write whose refresh read fails, the pills / set list show stale values until the next load (no message; data is saved)"
+    "SMALL (#435 tester): after a successful measurement or set write whose refresh read fails, the pills / set list show stale values until the next load (no message; data is saved)",
+    "SMALL (#435 tester r2): MeasurementsModal.handleSave sends all five fields on every Save, so after a partial failure (one invalid field) the valid field is written twice (idempotent upsert; existing behaviour)"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
