@@ -148,11 +148,13 @@
     },
     "422": {
       "lane": "E",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "Settings: workout reminder on, set 08:00 to 08:02 with the steppers, leave and return, confirm a notification fires at 08:02 (or the next-trigger time in the OS list). Cold-start the app with the reminder on: still scheduled at the set time (reconcile path).",
+      "notes": "WO ready; lane E waits for lane A. Regex duplicated from the private parseTimeSetting in database.ts (no cross-lane edit). Non-HH:MM strings (8:30, 08:30:00) now fall back to 08:00; existing test fixtures using unpadded times may need fixing (tester to judge each edit).",
+      "workOrder": "C:/git/ht-lanes/wo/422.md",
+      "decisionSource": "issue body (no comments); analyst chose the strict #414 regex in place, fallback {8,0} unchanged"
     },
     "423": {
       "lane": "B",
@@ -322,6 +324,10 @@
     {
       "at": "2026-10-07T20:18:13Z",
       "event": "#427 in_test (1119/94 per dev)"
+    },
+    {
+      "at": "2026-10-07T20:18:28Z",
+      "event": "#422 work order ready (lane E waits for lane A)"
     }
   ],
   "status": "running",
@@ -333,6 +339,7 @@
     "USER-HITTABLE/DATA-LOSS (#428 analyst): re-importing a Discover recipe says Already in library (DiscoverDetailScreen.tsx:112), so a recipe saved with 0-macro not-looked-up ingredients cannot be refreshed by importing again",
     "SMALL (#430 analyst): getBioForceLibrary (database.ts:1234) maps JSON.parse(r.data) unguarded; one bad row throws the whole list (needs hand-corrupted data)",
     "SMALL (#412 analyst): the v37 precondition error text (schema.ts:811) still says skip v37 if already applied; it is a string inside the migration, so it stays",
-    "SMALL (#427 dev): database.ts header block (Fixes applied previously / Feature additions (issue #40)) carries issue numbers and history, against the comment rule"
+    "SMALL (#427 dev): database.ts header block (Fixes applied previously / Feature additions (issue #40)) carries issue numbers and history, against the comment rule",
+    "SMALL (#422 analyst): parseDaySetting/parseTimeSetting in database.ts are private, so the time rule is duplicated in notifications.ts and can drift; a shared export would remove it"
   ]
 }
