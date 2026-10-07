@@ -401,6 +401,18 @@ function reportWriteFailure(error: unknown) {
   Alert.alert('Error', 'Failed to save your setting. Please try again.');
 }
 
+async function scheduleAfterSave(schedule: () => Promise<void>) {
+  try {
+    await schedule();
+  } catch (error) {
+    console.error('[SettingsScreen] failed to schedule reminder:', error);
+    Alert.alert(
+      'Reminder not scheduled',
+      'Your setting was saved, but the reminder could not be scheduled.'
+    );
+  }
+}
+
 interface WriteGuard {
   seqRef: React.MutableRefObject<number>;
   pendingRef: React.MutableRefObject<number>;
@@ -557,14 +569,14 @@ export default function SettingsScreen() {
   const flushWorkoutTime = useDebouncedCommit(reminder.time, workoutTimeDirtyRef, async (time) => {
     await setWorkoutReminderTime(time);
     if (latestRef.current.reminder.enabled) {
-      await reconcileScheduledNotifications();
+      await scheduleAfterSave(reconcileScheduledNotifications);
     }
   });
 
   const flushCookDayTime = useDebouncedCommit(cooking.weeklyCookDayTime, cookDayTimeDirtyRef, async (time) => {
     await setWeeklyCookDayTime(time);
     if (latestRef.current.cooking.weeklyCookDayEnabled) {
-      await reconcileScheduledNotifications();
+      await scheduleAfterSave(reconcileScheduledNotifications);
     }
   });
 
@@ -572,7 +584,7 @@ export default function SettingsScreen() {
     await setMealReminderTime('breakfast', time);
     if (latestRef.current.mealReminders.breakfast.enabled) {
       const { hour, minute } = parseTimeString(time);
-      await scheduleMealReminder('breakfast', hour, minute);
+      await scheduleAfterSave(() => scheduleMealReminder('breakfast', hour, minute));
     }
   });
 
@@ -580,7 +592,7 @@ export default function SettingsScreen() {
     await setMealReminderTime('lunch', time);
     if (latestRef.current.mealReminders.lunch.enabled) {
       const { hour, minute } = parseTimeString(time);
-      await scheduleMealReminder('lunch', hour, minute);
+      await scheduleAfterSave(() => scheduleMealReminder('lunch', hour, minute));
     }
   });
 
@@ -588,7 +600,7 @@ export default function SettingsScreen() {
     await setMealReminderTime('dinner', time);
     if (latestRef.current.mealReminders.dinner.enabled) {
       const { hour, minute } = parseTimeString(time);
-      await scheduleMealReminder('dinner', hour, minute);
+      await scheduleAfterSave(() => scheduleMealReminder('dinner', hour, minute));
     }
   });
 
@@ -608,7 +620,7 @@ export default function SettingsScreen() {
     await setBackupReminderTime(time);
     const { enabled, day } = latestRef.current.backupReminder;
     if (enabled) {
-      await scheduleBackupReminder(day, time);
+      await scheduleAfterSave(() => scheduleBackupReminder(day, time));
     }
   });
 
@@ -858,7 +870,7 @@ export default function SettingsScreen() {
         setWorkoutReminderEnabled(value)
       );
       setReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
-      await reconcileScheduledNotifications();
+      await scheduleAfterSave(reconcileScheduledNotifications);
     } catch (error) {
       reportWriteFailure(error);
     }
@@ -912,7 +924,7 @@ export default function SettingsScreen() {
         setWeeklyCookDayEnabled(value)
       );
       setCooking((prev) => ({ ...prev, weeklyCookDayEnabled: value, permissionDenied: false }));
-      await reconcileScheduledNotifications();
+      await scheduleAfterSave(reconcileScheduledNotifications);
     } catch (error) {
       reportWriteFailure(error);
     }
@@ -925,7 +937,7 @@ export default function SettingsScreen() {
       await trackProfileWrite(weeklyCookDayGuard.seqRef, weeklyCookDayGuard.pendingRef, () => setWeeklyCookDay(day));
       setCooking((prev) => ({ ...prev, weeklyCookDay: day }));
       if (latestRef.current.cooking.weeklyCookDayEnabled) {
-        await reconcileScheduledNotifications();
+        await scheduleAfterSave(reconcileScheduledNotifications);
       }
     } catch (error) {
       reportWriteFailure(error);
@@ -966,9 +978,9 @@ export default function SettingsScreen() {
       const time = latestRef.current.mealReminders[meal].time;
       const { hour, minute } = parseTimeString(time);
       if (value) {
-        await scheduleMealReminder(meal, hour, minute);
+        await scheduleAfterSave(() => scheduleMealReminder(meal, hour, minute));
       } else {
-        await cancelMealReminder(meal);
+        await scheduleAfterSave(() => cancelMealReminder(meal));
       }
     } catch (error) {
       reportWriteFailure(error);
@@ -1258,7 +1270,7 @@ export default function SettingsScreen() {
         setBackupReminderEnabled(value)
       );
       setBackupReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
-      await reconcileScheduledNotifications();
+      await scheduleAfterSave(reconcileScheduledNotifications);
     } catch (error) {
       reportWriteFailure(error);
     }
@@ -1271,7 +1283,7 @@ export default function SettingsScreen() {
       await trackProfileWrite(backupDayGuard.seqRef, backupDayGuard.pendingRef, () => setBackupReminderDay(day));
       setBackupReminder((prev) => ({ ...prev, day }));
       if (latestRef.current.backupReminder.enabled) {
-        await reconcileScheduledNotifications();
+        await scheduleAfterSave(reconcileScheduledNotifications);
       }
     } catch (error) {
       reportWriteFailure(error);
