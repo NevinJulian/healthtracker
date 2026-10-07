@@ -87,4 +87,52 @@ describe('RecipeEditorScreen save deadline', () => {
     expect(signals[0]?.aborted).toBe(true);
     expect(utils.queryByLabelText('Saving…')).toBeNull();
   });
+  it('keeps the lookups that resolved when one of five hangs past the deadline', async () => {
+    const names = ['zzz one', 'zzz two', 'zzz three', 'zzz four', 'zzz five'];
+    const nutrition = { kcal: 40, protein: 10, carbs: 0, fat: 0 };
+    mockLookup.mockImplementation((name: string) =>
+      name === 'zzz five' ? new Promise(() => {}) : Promise.resolve(nutrition),
+    );
+
+    const utils = render(<RecipeEditorScreen />);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.changeText(utils.getByPlaceholderText('Recipe name'), 'Mystery stew');
+    for (let i = 1; i < names.length; i++) {
+      fireEvent.press(utils.getByLabelText('Add ingredient'));
+    }
+    const nameInputs = utils.getAllByPlaceholderText('Ingredient name');
+    const qtyInputs = utils.getAllByPlaceholderText('Qty');
+    names.forEach((name, i) => {
+      fireEvent.changeText(nameInputs[i], name);
+      fireEvent.changeText(qtyInputs[i], '100');
+    });
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(700);
+    });
+    expect(mockLookup).toHaveBeenCalledTimes(5);
+
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Create Recipe'));
+      await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
+    });
+
+    const overrides: Record<string, typeof nutrition> = {};
+    for (const name of names.slice(0, 4)) overrides[name] = nutrition;
+    const expected = computeRecipeMacros(
+      names.map((name) => ({ name, baseQuantity: 100, unit: 'g' })),
+      4,
+      overrides,
+    ).macros;
+    expect(expected.calories).toBeGreaterThan(0);
+    expect(mockCreateRecipe).toHaveBeenCalledTimes(1);
+    expect(mockCreateRecipe.mock.calls[0][0]).toMatchObject({
+      calories: expected.calories,
+      protein: expected.protein,
+      carbs: expected.carbs,
+      fat: expected.fat,
+    });
+  });
 });

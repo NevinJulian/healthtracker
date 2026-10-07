@@ -83,6 +83,13 @@ describe('openfoodfacts — 429 pause', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("resolves 'not-looked-up' for a lookup refused by the pause", async () => {
+    const { lookupNutrition } = load('30');
+    expect(await lookupNutrition('a')).toBeNull();
+    expect(await lookupNutrition('b')).toBe('not-looked-up');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('spends no budget slot and writes no cache entry while paused', async () => {
     const { lookupNutrition } = load('30');
     await lookupNutrition('a');

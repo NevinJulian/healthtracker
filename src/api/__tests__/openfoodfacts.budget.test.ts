@@ -127,6 +127,25 @@ describe('openfoodfacts — search budget', () => {
     expect(fetchMock).toHaveBeenCalledTimes(20);
   });
 
+  it("resolves 'not-looked-up' for a refused search and null for an empty or failed one", async () => {
+    const { lookupNutrition: lookup } = load();
+    for (let i = 0; i < 10; i++) await lookup(`item${i}`);
+
+    expect(await lookup('over')).toBe('not-looked-up');
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+
+    now += 60_000;
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ products: [] }) });
+    expect(await lookup('empty')).toBeNull();
+    fetchMock.mockRejectedValueOnce(new Error('offline'));
+    fetchMock.mockRejectedValueOnce(new Error('offline'));
+    jest.useFakeTimers({ doNotFake: ['Date'] });
+    const failed = lookup('failed');
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(await failed).toBeNull();
+    jest.useRealTimers();
+  });
+
   it('does not spend budget on a cache hit', async () => {
     const hit = { kcal: 1, protein: 2, carbs: 3, fat: 4 };
     const { lookupNutrition: lookup } = load(() => ({ getFirstAsync: async () => hit }));
