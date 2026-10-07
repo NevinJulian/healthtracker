@@ -3,15 +3,17 @@ jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///cache/',
   getInfoAsync: jest.fn(),
   copyAsync: jest.fn(),
+  deleteAsync: jest.fn(),
 }));
 jest.mock('expo-sharing', () => ({ shareAsync: jest.fn() }));
 
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { exportRawDatabase } from '../rescueExport';
+import { clearRescueCopies, exportRawDatabase, hasRescueWal } from '../rescueExport';
 
 const getInfo = FileSystem.getInfoAsync as jest.Mock;
 const copy = FileSystem.copyAsync as jest.Mock;
+const del = FileSystem.deleteAsync as jest.Mock;
 const share = Sharing.shareAsync as jest.Mock;
 
 const DB = 'file:///document/SQLite/healthtracker.db';
@@ -27,6 +29,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   copy.mockResolvedValue(undefined);
   share.mockResolvedValue(undefined);
+  del.mockResolvedValue(undefined);
 });
 
 describe('exportRawDatabase', () => {
@@ -64,5 +67,32 @@ describe('exportRawDatabase', () => {
     present(DB, WAL);
     share.mockRejectedValueOnce(new Error('no share target'));
     await expect(exportRawDatabase()).rejects.toThrow('no share target');
+  });
+
+  it('never deletes the cache copies', async () => {
+    present(DB, WAL);
+    await exportRawDatabase();
+    expect(del).not.toHaveBeenCalled();
+  });
+});
+
+describe('clearRescueCopies', () => {
+  it('deletes both cache copies idempotently', async () => {
+    await clearRescueCopies();
+    expect(del).toHaveBeenCalledTimes(2);
+    expect(del).toHaveBeenCalledWith('file:///cache/healthtracker.db', { idempotent: true });
+    expect(del).toHaveBeenCalledWith('file:///cache/healthtracker.db-wal', { idempotent: true });
+  });
+});
+
+describe('hasRescueWal', () => {
+  it('is true when the wal file exists', async () => {
+    present(DB, WAL);
+    expect(await hasRescueWal()).toBe(true);
+  });
+
+  it('is false when there is no wal file', async () => {
+    present(DB);
+    expect(await hasRescueWal()).toBe(false);
   });
 });
