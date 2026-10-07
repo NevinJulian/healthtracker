@@ -153,11 +153,18 @@
   "issues": {
     "411": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "380477c",
+        "7d05822",
+        "3bffb20",
+        "15ce90a",
+        "61493c6",
+        "1c88a00"
+      ],
       "deviceCheck": "With a corrupt exercises value on today's row (debug build or restored backup), open the Dashboard: the notice and button show in the Hammer card, no Alert. Tap Reset: template exercises appear unchecked, notice gone. Repeat for extra workouts (empty list after reset).",
-      "notes": "WO ready (analysed against the lane branch with #434 on it). Remaining work: nothing detects corruption on load. mapLogRow sets an optional unreadable?: CorruptJsonColumn[] on DailyLogEntry using the existing _isValidStoredArray; the Dashboard shows the notice + button in the Hammer and Bonuses cards; resetCorruptDay gets an in-flight guard. The :2/:3 collision suffix stays (overwriting would destroy earlier kept text). ORCHESTRATOR RULING: DailyLogEntry (database.ts) is mapLogRow's return type and counts as lane C's for this one optional field.",
+      "notes": "WO ready (analysed against the lane branch with #434 on it). | dev: mapLogRow adds unreadable?: CorruptJsonColumn[] (absent when nothing is unreadable) from _isValidStoredArray on the raw text; db test asserts flag <=> writer refuses over #434's value table. Dashboard: module-level UnreadableNotice (existing hint style + ghost Button), first branch in HammerSection's list ternary, conditional notice in the Extra Workouts section, resetInFlightRef guard in resetCorruptDay (released in finally). No existing assertion edited. The feat commit 15ce90a also fixed a query in its own new tests (Button hides its title from default text queries: importantForAccessibility=no-hide-descendants), so two tests at 3bffb20 were red for the query as well as for the missing feature. The :2/:3 collision suffix stays.",
       "workOrder": "C:/git/ht-lanes/wo/411.md",
       "decisionSource": "owner comment 3 on #411 (sprint 4): when a day loads and exercises/additional_workouts can't be read, the matching card shows 'This day's data can't be read' with a Reset this day button that runs the same reset as the Alert; no Alert on load"
     },
@@ -643,6 +650,10 @@
     {
       "at": "2026-10-07T21:13:45Z",
       "event": "#429 security APPROVE on e366ee3 (ran in parallel with the tester, whose verdict is still pending)"
+    },
+    {
+      "at": "2026-10-07T21:17:23Z",
+      "event": "#411 in_test (1233/95 per dev); security started in parallel on 9454396..1c88a00 (read-only)"
     }
   ],
   "status": "running",
@@ -696,7 +707,8 @@
     "SMALL (#434 orchestrator): a weekday template whose stored array holds null or id-less items produces daily_log rows that the new predicate calls corrupt, and Reset this day rebuilds from the same template (needs a hand-edited backup; pre-existing shape of the #411 reset)",
     "SMALL but read it (#434 tester r2 + security): after #434 a weekday template holding an item without a string id makes every new day built from it un-editable, and Reset this day does not unstick it (the fresh row is rebuilt from the same template). Needs a hand-edited backup. Options: the day builder drops or gives ids to such items, or the template is normalised on write",
     "SMALL (#411 analyst): a second Reset this day after a successful one can still show Reset failed across screens/races, because the db throws not corrupt; only a UI in-flight guard is added in #411",
-    "SMALL (#429 dev): a debounced stepper write that fails now alerts but the stepper keeps showing the unsaved value"
+    "SMALL (#429 dev): a debounced stepper write that fails now alerts but the stepper keeps showing the unsaved value",
+    "SMALL (#411 dev): the shared Button sets importantForAccessibility=no-hide-descendants on its title Text, so the visible label is hidden from assistive-tech text queries (tests must use includeHiddenElements or the accessibility label)"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
