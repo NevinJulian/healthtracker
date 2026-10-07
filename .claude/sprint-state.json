@@ -126,9 +126,10 @@
         433,
         429
       ],
-      "current": 433,
+      "current": 429,
       "done": [
-        422
+        422,
+        433
       ],
       "parked": [],
       "base": "4dea4c6"
@@ -307,7 +308,7 @@
     },
     "429": {
       "lane": "E",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": "Smoke: in Settings tap Recalculate with a full profile: Goals updated shows, values persist after leaving and returning.",
@@ -357,7 +358,7 @@
     },
     "433": {
       "lane": "E",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "bb42bd8",
@@ -365,9 +366,11 @@
         "40c121b"
       ],
       "deviceCheck": "Notifications allowed: enable the weekly backup reminder, tap the Sat chip, then Wed immediately; background the app. Then step a meal time right after toggling it. Both reminders show the final day/time in the system's scheduled list (or fire there).",
-      "notes": "WO ready. Wider than the issue: 8 handler groups read stale state. | dev: module-level useLatestState(latestRef, key) wraps useState; the six setter names now refer to the wrappers (29 call sites incl. hydration); the ref is updated synchronously, never in render or an effect. 13 new tests, all red at bb42bd8. DEVIATION in P4: handleRecalcGoals has no await before it reads profile, so a press while the sex write is held cannot be stale; the test captures the Recalculate onPress from the older render and invokes it after the write is released - tester to judge whether that models a real press. Recalculate write path untouched (stays with #429).",
+      "notes": "WO ready. Wider than the issue: 8 handler groups read stale state. | dev: module-level useLatestState(latestRef, key); the six setter names now refer to the wrappers; ref updated synchronously in the setter only. | tester APPROVE r0. HUMAN: the Recalculate case (P4) is only weakly proven - a real press cannot be stale at the instant the setter is called; the only reachable gap is a press between a post-await setProfile and its commit, which the test manufactures by invoking a captured old onPress. The fix there is harmless. Updaters now run eagerly once at the call site instead of inside React's render (a throwing updater would throw at the call site; none can).",
       "workOrder": "C:/git/ht-lanes/wo/433.md",
-      "decisionSource": "issue body (no comments); analyst chose one mechanism: a latestRef updated by wrapped setters, read at call time"
+      "decisionSource": "issue body (no comments); analyst chose one mechanism: a latestRef updated by wrapped setters, read at call time",
+      "regressionProof": "12/12 new tests fail with bb42bd8 SettingsScreen.tsx and still fail with the refactor-only 0b52831, pass at 40c121b; the 7 existing SettingsScreen suites (70 tests) byte-unchanged and green at 0b52831 and at the tip; scratch interleavings (two updates in one tick, toggle + focus reload with the old value, reload + debounced flush) leave ref and rendered state in agreement; 1162/96 (tester reproduced). The dev reported 13 tests; the file has 12.",
+      "securityReview": "skipped: UI handlers reading fresh state only; no db/api/backup/filesystem code in the diff"
     },
     "434": {
       "lane": "C",
@@ -594,6 +597,10 @@
     {
       "at": "2026-10-07T20:55:51Z",
       "event": "#434 tester APPROVE r0, but orchestrator sent it back: the read filter in the shared parsers reaches the template editor and creates a new silent write-back (roundTrips=1) -> in_dev"
+    },
+    {
+      "at": "2026-10-07T20:57:25Z",
+      "event": "#433 ready (tester APPROVE r0, security skipped); lane E -> #429 in_dev (last issue)"
     }
   ],
   "status": "running",
