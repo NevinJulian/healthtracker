@@ -99,7 +99,7 @@
     "D": {
       "branch": "sprint/lane-d-api",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "in_progress",
+      "status": "merged",
       "order": [
         424,
         428
@@ -109,7 +109,9 @@
         424,
         428
       ],
-      "parked": []
+      "parked": [],
+      "mergeSha": "c757d60",
+      "cleanup": "1daa125: two blank lines in RecipeEditorScreen.saveDeadline.test.tsx; no dead code, no wrong comments found"
     },
     "E": {
       "branch": "sprint/lane-e-settings",
@@ -197,7 +199,7 @@
     },
     "424": {
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 1,
       "commits": [
         "8f7c1ec",
@@ -212,7 +214,8 @@
       "workOrder": "C:/git/ht-lanes/wo/424.md",
       "decisionSource": "owner comment on #424 (no immediate retry on 429; budget exhausted until Retry-After has passed, 60 s when missing or unreadable)",
       "regressionProof": "round 1: fetchJson test fails with 8f7c1ec fetchJson.ts; openfoodfacts.retryAfter 16/16 fail with 8fbda56 openfoodfacts.ts; pass at e8e4b33. Round 2: 'keeps the longer pause' fails with 90a0067 openfoodfacts.ts, passes at f541707; mirror test proven a real guard by mutation; 5 probes (order, 300/1/60, missing header, expiry, first-value mutation) pass; 1137/94 (tester reproduced). 35-input Retry-After probe table all within [1000, 300000].",
-      "securityReview": "APPROVE (e46e8ac..f541707): parseRetryAfterMs can only return a value in [1000, 300000] and cannot throw; both regexes are linear; the raw header is read in exactly one place and never logged, rendered, persisted or used in SQL or a cache key; a paused/failed lookup is never cached; budget, abort handling, >=500 retry rule and User-Agent intact. True pause bound: 300 s after the last in-flight 429 arrives. Notes: backward clock step stretches the pause by the step (in-memory, acceptable interim, #428); a paused lookup looks like not found to the caller (#428)."
+      "securityReview": "APPROVE (e46e8ac..f541707): parseRetryAfterMs can only return a value in [1000, 300000] and cannot throw; both regexes are linear; the raw header is read in exactly one place and never logged, rendered, persisted or used in SQL or a cache key; a paused/failed lookup is never cached; budget, abort handling, >=500 retry rule and User-Agent intact. True pause bound: 300 s after the last in-flight 429 arrives. Notes: backward clock step stretches the pause by the step (in-memory, acceptable interim, #428); a paused lookup looks like not found to the caller (#428).",
+      "mergeSha": "c757d60"
     },
     "425": {
       "lane": "F",
@@ -268,7 +271,7 @@
     },
     "428": {
       "lane": "D",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "cfcc2d7",
@@ -288,7 +291,8 @@
       "workOrder": "C:/git/ht-lanes/wo/428.md",
       "decisionSource": "owner comment on #428 2026-10-06 (refused/cut-off lookup = 'not looked up', separate from 'no data'; save-deadline fallback keeps every lookup that already succeeded; future timestamps dropped)",
       "regressionProof": "all five test/fix pairs proven (pre-fix source at each test commit fails, HEAD passes; 8d4e84a is what turns the 4-of-5 editor test green); scratch import of 14 unlisted ingredients on the real modules: 10 fetched, 4 refused, macros finite, putOFFCache called 10 times and never with the sentinel; 1146/95 locally and with TZ=UTC (tester reproduced)",
-      "securityReview": "APPROVE (f541707..d4cb2c6): the sentinel is excluded before every sink (cache write only for real objects; three consumers branch on the string first; offOverrides typed OFFNutrition); no NaN/undefined can reach computeRecipeMacros or the recipe writers; aborted/late results cannot enter the fallback, the cache or another recipe; no lookup loop without user action; nothing removed. NOTES FOR THE HUMAN: (1) on the save-deadline path the new Not looked up banner is set on a screen that goBack()/replace() dismisses immediately, so the user never sees it and the recipe is saved with the cut-off ingredients counted as 0 without a visible notice (equally silent before this diff; not a regression) - filed as a new issue; (2) the Discover Alert says Try again in a minute, but a retry hits Already in your library and the zero-macro recipe stays - filed as a new issue."
+      "securityReview": "APPROVE (f541707..d4cb2c6): the sentinel is excluded before every sink (cache write only for real objects; three consumers branch on the string first; offOverrides typed OFFNutrition); no NaN/undefined can reach computeRecipeMacros or the recipe writers; aborted/late results cannot enter the fallback, the cache or another recipe; no lookup loop without user action; nothing removed. NOTES FOR THE HUMAN: (1) on the save-deadline path the new Not looked up banner is set on a screen that goBack()/replace() dismisses immediately, so the user never sees it and the recipe is saved with the cut-off ingredients counted as 0 without a visible notice (equally silent before this diff; not a regression) - filed as a new issue; (2) the Discover Alert says Try again in a minute, but a retry hits Already in your library and the zero-macro recipe stays - filed as a new issue.",
+      "mergeSha": "c757d60"
     },
     "429": {
       "lane": "E",
@@ -532,6 +536,11 @@
     {
       "at": "2026-10-07T20:45:34Z",
       "event": "#422 in_test (1150/95 per dev)"
+    },
+    {
+      "at": "2026-10-07T20:46:25Z",
+      "event": "merged lane D into integration c757d60 (no conflicts); gates green: typecheck clean, 1164/97",
+      "sha": "c757d60"
     }
   ],
   "status": "running",
@@ -573,7 +582,9 @@
     "SMALL (#428 tester): the Discover not-looked-up test only exercises count 2; the sentence is a literal ingredient(s) with no singular branch",
     "USER-HITTABLE/DATA-LOSS (#428 security): RecipeEditor save-deadline fallback sets the Not looked up banner and then navigates away at once (goBack / replace RecipeDetail), so the notice is never seen; the recipe is saved with cut-off ingredients counted as 0. Same when the pending recompute resolves null after an abort by a newer run or an unmount. Needs a decision: Alert before navigating, or stay on the screen",
     "USER-HITTABLE (#428 tester + security, extends the #428 analyst finding): the Discover import Alert says Try again in a minute, but importing again answers Already in your library (INSERT OR IGNORE), so the zero-macro recipe cannot be refreshed that way; the only fix today is Edit + Save in the editor",
-    "SMALL (#422 dev): notifications.test.ts header comment still carries an issue number (#309)"
+    "SMALL (#422 dev): notifications.test.ts header comment still carries an issue number (#309)",
+    "SMALL (lane D cleanup): in RecipeEditorScreen.saveDeadline.test.tsx the fillIngredients helper is declared mid-describe and the first new test duplicates its body inline",
+    "SMALL (lane D cleanup): openfoodfacts.ts header says the network is hit once per unique ingredient name; failures are not cached, so that was already loose"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
