@@ -24,7 +24,7 @@ import { installStress369 } from './src/db/devStress369';
 import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import Button from './src/components/Button';
-import { exportRawDatabase } from './src/services/rescueExport';
+import { clearRescueCopies, exportRawDatabase } from './src/services/rescueExport';
 import { Colors, Spacing, Typography } from './src/theme/tokens';
 import {
   configureNotificationHandler,
@@ -87,6 +87,7 @@ export default function App() {
 
   useEffect(() => {
     configureNotificationHandler();
+    clearRescueCopies().catch(() => {});
     runInit();
   }, [runInit]);
 
