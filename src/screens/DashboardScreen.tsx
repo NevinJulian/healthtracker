@@ -1153,6 +1153,7 @@ function MeasurementsModal({
   const [hips, setHips] = useState('');
   const [thigh, setThigh] = useState('');
   const [arm, setArm] = useState('');
+  const savingRef = useRef(false);
 
   const waistResult = parseMeasurementField(waist, 'waist_cm');
   const chestResult = parseMeasurementField(chest, 'chest_cm');
@@ -1169,18 +1170,25 @@ function MeasurementsModal({
   };
 
   const handleSave = async () => {
+    if (savingRef.current) return;
     const keys = Object.keys(fieldResults) as MeasurementKey[];
     const hasError = keys.some((k) => fieldResults[k].isError);
     const hasValue = keys.some((k) => fieldResults[k].value !== undefined);
 
     if (hasValue) {
-      const saved = await onSave({
-        waist_cm: waistResult.value,
-        chest_cm: chestResult.value,
-        hips_cm: hipsResult.value,
-        thigh_cm: thighResult.value,
-        arm_cm: armResult.value,
-      });
+      savingRef.current = true;
+      let saved: boolean;
+      try {
+        saved = await onSave({
+          waist_cm: waistResult.value,
+          chest_cm: chestResult.value,
+          hips_cm: hipsResult.value,
+          thigh_cm: thighResult.value,
+          arm_cm: armResult.value,
+        });
+      } finally {
+        savingRef.current = false;
+      }
       if (!saved) return;
     }
 
