@@ -376,7 +376,11 @@
       "notes": ""
     }
   },
-  "foundDuringSprint": [],
+  "foundDuringSprint": [
+    441,
+    442,
+    443
+  ],
   "smallFindings": [],
   "smallFindingsIssue": null,
   "log": [
@@ -517,6 +521,10 @@
     {
       "at": "2026-10-07T20:44:22Z",
       "event": "GitHub CI test check on integration 4dea4c6 (lane A merged): completed success. #428 ready (tester APPROVE r0, security APPROVE with 2 follow-up findings); lane D out of issues (2 done, 0 parked) -> cleanup"
+    },
+    {
+      "at": "2026-10-07T20:45:10Z",
+      "event": "filed #441 (rescue export wal after cancelled share), #442 (Discover re-import cannot refresh, misleading alert), #443 (editor save-deadline notice never seen); none worked. Remaining pendingFindings are SMALL and go into one collected issue at the end"
     }
   ],
   "status": "running",
@@ -558,5 +566,10 @@
     "SMALL (#428 tester): the Discover not-looked-up test only exercises count 2; the sentence is a literal ingredient(s) with no singular branch",
     "USER-HITTABLE/DATA-LOSS (#428 security): RecipeEditor save-deadline fallback sets the Not looked up banner and then navigates away at once (goBack / replace RecipeDetail), so the notice is never seen; the recipe is saved with cut-off ingredients counted as 0. Same when the pending recompute resolves null after an abort by a newer run or an unmount. Needs a decision: Alert before navigating, or stay on the screen",
     "USER-HITTABLE (#428 tester + security, extends the #428 analyst finding): the Discover import Alert says Try again in a minute, but importing again answers Already in your library (INSERT OR IGNORE), so the zero-macro recipe cannot be refreshed that way; the only fix today is Edit + Save in the editor"
-  ]
+  ],
+  "findingsFiled": {
+    "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
+    "442": "Discover import: Already in library blocks a refresh, Alert says Try again in a minute (covers the #428 analyst + tester/security entries)",
+    "443": "Recipe editor: save-deadline Not looked up notice is set on a screen that closes at once (covers the #428 security entry)"
+  }
 }
