@@ -639,14 +639,21 @@ export default function DashboardScreen() {
 
   // ── Measurement handlers ──────────────────────────────────────────────────────
 
-  const handleSaveMeasurements = async (fields: MeasurementFields) => {
+  const handleSaveMeasurements = async (fields: MeasurementFields): Promise<boolean> => {
     try {
       await logBodyMeasurement(today, fields);
+    } catch (err) {
+      console.error('logBodyMeasurement error', err);
+      Alert.alert('Error', 'Failed to save your measurements. Please try again.');
+      return false;
+    }
+    try {
       const updated = await getLatestMeasurements();
       setLatestMeasurements(updated);
     } catch (err) {
-      console.error('logBodyMeasurement error', err);
+      console.error('getLatestMeasurements error', err);
     }
+    return true;
   };
 
   // ── Workout set logging handlers (#285) ──────────────────────────────────────
@@ -1138,7 +1145,7 @@ function MeasurementsModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  onSave: (fields: MeasurementFields) => Promise<void>;
+  onSave: (fields: MeasurementFields) => Promise<boolean>;
   latest: LatestMeasurements | null;
 }) {
   const [waist, setWaist] = useState('');
@@ -1167,13 +1174,14 @@ function MeasurementsModal({
     const hasValue = keys.some((k) => fieldResults[k].value !== undefined);
 
     if (hasValue) {
-      await onSave({
+      const saved = await onSave({
         waist_cm: waistResult.value,
         chest_cm: chestResult.value,
         hips_cm: hipsResult.value,
         thigh_cm: thighResult.value,
         arm_cm: armResult.value,
       });
+      if (!saved) return;
     }
 
     if (!hasError) {
