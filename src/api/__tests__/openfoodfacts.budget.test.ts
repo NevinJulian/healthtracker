@@ -67,14 +67,14 @@ describe('openfoodfacts — search budget', () => {
     return require('../openfoodfacts') as typeof import('../openfoodfacts');
   }
 
-  it('sends no request for the 11th search inside a minute and resolves null', async () => {
+  it('sends no request for the 11th search inside a minute and resolves not-looked-up', async () => {
     const { lookupNutrition: lookup } = load();
     for (let i = 0; i < 10; i++) {
       expect(await lookup(`item${i}`)).not.toBeNull();
     }
     expect(fetchMock).toHaveBeenCalledTimes(10);
 
-    expect(await lookup('item11')).toBeNull();
+    expect(await lookup('item11')).toBe('not-looked-up');
     expect(fetchMock).toHaveBeenCalledTimes(10);
   });
 
@@ -88,7 +88,7 @@ describe('openfoodfacts — search budget', () => {
     for (let i = 0; i < 10; i++) await lookup(`item${i}`);
     putOFFCache.mockClear();
 
-    expect(await lookup('over')).toBeNull();
+    expect(await lookup('over')).toBe('not-looked-up');
     expect(putOFFCache).not.toHaveBeenCalled();
 
     now += 60_000;
@@ -108,7 +108,7 @@ describe('openfoodfacts — search budget', () => {
     jest.useRealTimers();
     expect(fetchMock).toHaveBeenCalledTimes(10);
 
-    expect(await lookup('item5')).toBeNull();
+    expect(await lookup('item5')).toBe('not-looked-up');
     expect(fetchMock).toHaveBeenCalledTimes(10);
   });
 

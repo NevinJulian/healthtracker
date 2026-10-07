@@ -25,6 +25,9 @@ export interface OFFNutrition {
   fat: number;
 }
 
+/** `'not-looked-up'`: refused before any request was sent. `null`: no data, failure or abort. */
+export type OFFLookup = OFFNutrition | null | 'not-looked-up';
+
 // ─── OFF search response shape (we only need nutriments) ─────────────────────
 
 interface OFFProduct {
@@ -132,16 +135,27 @@ function takeSearchSlot(): void {
 
 /**
  * Fetch per-100g nutrition data from Open Food Facts for the given search term.
- * Returns null when: no products found, fields are missing, or network fails.
- * Never throws.
+ * Returns `'not-looked-up'` when the local budget or a 429 pause refused every
+ * attempt before a request was sent, and null for no products, missing fields,
+ * network failure or abort. Never throws.
  */
-async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutrition | null> {
+async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFLookup> {
+  let refused = false;
+  let sent = false;
   try {
     const url = `${OFF_SEARCH_URL}&search_terms=${encodeURIComponent(term)}`;
     const data = await fetchJson<OFFResponse>(url, {
       signal,
       headers: OFF_HEADERS,
-      beforeAttempt: takeSearchSlot,
+      beforeAttempt: () => {
+        try {
+          takeSearchSlot();
+        } catch (err) {
+          refused = true;
+          throw err;
+        }
+        sent = true;
+      },
     });
     if (!data.products || data.products.length === 0) return null;
 
@@ -164,6 +178,7 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutr
     }
     return null;
   } catch (err) {
+    if (refused && !sent) return 'not-looked-up';
     if (err instanceof FetchJsonError && err.status === 429) {
       const now = Date.now();
       pausedUntil = Math.max(
@@ -181,9 +196,9 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutr
  * Look up per-100g nutrition for the given ingredient name.
  *
  * Checks the SQLite cache first; falls back to an OFF network call when the
- * cache misses. Returns null when neither source has data (offline, not found).
- *
- * An aborted lookup resolves null and is never cached.
+ * cache misses. Returns null when a request was sent but found nothing, failed
+ * or was aborted, and `'not-looked-up'` when the budget or a 429 pause refused
+ * it before any request. Only real nutrition is cached.
  *
  * @param ingredientName - Ingredient name (will be normalised to lowercase for cache key)
  * @param signal - Optional abort signal
@@ -191,14 +206,14 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFNutr
 export async function lookupNutrition(
   ingredientName: string,
   signal?: AbortSignal,
-): Promise<OFFNutrition | null> {
+): Promise<OFFLookup> {
   if (signal?.aborted) return null;
   const cached = await getCached(ingredientName);
   if (cached) return cached;
 
   const result = await fetchFromOFF(ingredientName, signal);
   if (signal?.aborted) return null;
-  if (result) {
+  if (typeof result === 'object' && result !== null) {
     await putCache(ingredientName, result);
   }
   return result;
@@ -219,7 +234,7 @@ export async function batchLookupNutrition(
   for (const name of names) {
     if (signal?.aborted) break;
     const n = await lookupNutrition(name, signal);
-    if (n) {
+    if (typeof n === 'object' && n !== null) {
       result[name.toLowerCase()] = n;
     }
   }

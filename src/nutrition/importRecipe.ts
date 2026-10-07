@@ -9,13 +9,14 @@
  *   5. Build and return a Recipe ready to pass to database.importRecipe()
  *
  * The import is "best-effort": ingredients with no local or OFF match
- * contribute 0 macros and are flagged in `estimatedIngredients`.
+ * contribute 0 macros and are flagged in `estimatedIngredients`, or in
+ * `notLookedUpIngredients` when the lookup was refused before a request.
  *
  * This module is pure orchestration — no UI state, no navigation.
  */
 
 import { MealDetail } from '../api/mealdb';
-import { lookupNutrition, OFFNutrition } from '../api/openfoodfacts';
+import { lookupNutrition, OFFLookup } from '../api/openfoodfacts';
 import { Recipe, RecipeIngredient } from '../db/database';
 import { computeRecipeMacros, ComputeIngredient } from './computeMacros';
 import { NUTRITION_TABLE } from './nutritionTable';
@@ -28,6 +29,8 @@ export interface ImportResult {
   recipe: Recipe;
   /** Ingredient names for which neither local table nor OFF had data. */
   estimatedIngredients: string[];
+  /** Ingredient names whose lookup was refused before a request was sent. */
+  notLookedUpIngredients: string[];
   /** Ingredient names that were resolved via Open Food Facts. */
   offResolvedIngredients: string[];
   /** Whether any ingredient had vague/zero quantity (still shows in shopping list). */
@@ -113,11 +116,12 @@ export async function buildImportResult(
   // ── 3. Fetch OFF data for unmatched ingredients ──────────────────────────────
   const offOverrides: Record<string, { kcal: number; protein: number; carbs: number; fat: number }> = {};
   const offResolvedIngredients: string[] = [];
+  const notLookedUp = new Set<string>();
 
   const lookups = await mapWithConcurrency(
     needsOFF,
     OFF_LOOKUP_CONCURRENCY,
-    async (name): Promise<OFFNutrition | null> => {
+    async (name): Promise<OFFLookup> => {
       if (signal?.aborted) return null;
       try {
         return await lookupNutrition(name, signal);
@@ -129,7 +133,9 @@ export async function buildImportResult(
 
   needsOFF.forEach((name, i) => {
     const nutrition = lookups[i];
-    if (nutrition) {
+    if (nutrition === 'not-looked-up') {
+      notLookedUp.add(name);
+    } else if (nutrition !== null && typeof nutrition === 'object') {
       const key = normaliseIngredientName(name);
       offOverrides[key] = nutrition;
       offOverrides[name.toLowerCase()] = nutrition;
@@ -176,7 +182,8 @@ export async function buildImportResult(
 
   return {
     recipe,
-    estimatedIngredients: computeResult.unmatchedIngredients,
+    estimatedIngredients: computeResult.unmatchedIngredients.filter((n) => !notLookedUp.has(n)),
+    notLookedUpIngredients: computeResult.unmatchedIngredients.filter((n) => notLookedUp.has(n)),
     offResolvedIngredients,
     hasVagueIngredients: parsed.some((p) => p.isVague),
   };

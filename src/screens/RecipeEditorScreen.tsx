@@ -262,7 +262,7 @@ export default function RecipeEditorScreen() {
         try {
           const nutrition = await lookupNutrition(ing.name, signal);
           if (signal.aborted) return null;
-          if (nutrition) {
+          if (typeof nutrition === 'object' && nutrition !== null) {
             const key = normaliseIngredientName(ing.name);
             offOverrides[key] = nutrition;
             offOverrides[ing.name.toLowerCase()] = nutrition;

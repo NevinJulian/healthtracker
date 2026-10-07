@@ -75,7 +75,7 @@ describe('openfoodfacts — 429 pause', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     now += 29_000;
-    expect(await lookupNutrition('b')).toBeNull();
+    expect(await lookupNutrition('b')).toBe('not-looked-up');
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     now += 1_000;
@@ -130,7 +130,7 @@ describe('openfoodfacts — 429 pause', () => {
 
     now -= 3_600_000;
     const stepped = now;
-    expect(await lookupNutrition('b')).toBeNull();
+    expect(await lookupNutrition('b')).toBe('not-looked-up');
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     now = stepped + 300_000;
