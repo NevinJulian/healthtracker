@@ -1336,6 +1336,15 @@ function mapLogRow(row: {
 // Recipes CRUD
 // ─────────────────────────────────────────────
 
+function parseIngredients(raw: unknown, recipeId: string): Recipe['ingredients'] {
+  try {
+    const parsed = JSON.parse(raw as string);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  console.warn('[DB] Unreadable ingredients for recipe, returning none:', recipeId);
+  return [];
+}
+
 export async function getRecipes(category?: string): Promise<Recipe[]> {
   const db = getDatabase();
   let rows: any[];
@@ -1350,7 +1359,7 @@ export async function getRecipes(category?: string): Promise<Recipe[]> {
 
   return rows.map((r) => ({
     ...r,
-    ingredients: JSON.parse(r.ingredients),
+    ingredients: parseIngredients(r.ingredients, r.id),
   }));
 }
 
@@ -1359,7 +1368,7 @@ export async function getRecipesIncludingArchived(): Promise<Recipe[]> {
   const rows = await db.getAllAsync<any>('SELECT * FROM recipe_library');
   return rows.map((r) => ({
     ...r,
-    ingredients: JSON.parse(r.ingredients),
+    ingredients: parseIngredients(r.ingredients, r.id),
   }));
 }
 
@@ -1372,7 +1381,7 @@ export async function getRecipeById(id: string): Promise<Recipe | null> {
   if (!row) return null;
   return {
     ...row,
-    ingredients: JSON.parse(row.ingredients),
+    ingredients: parseIngredients(row.ingredients, row.id),
   };
 }
 
