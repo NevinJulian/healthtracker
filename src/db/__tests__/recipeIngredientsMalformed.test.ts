@@ -77,6 +77,10 @@ describe('recipe readers with a malformed ingredients column', () => {
   it('getRecipesIncludingArchived keeps an archived corrupt row', async () => {
     const db = await setup('{not json');
     await db.deleteRecipe('bad-1');
+    const active = (await db.getRecipes()).map((r) => r.id);
+    expect(active).not.toContain('bad-1');
+    expect(active).toContain('good-1');
+    expect(await db.getRecipeById('bad-1')).toBeNull();
     const bad = (await db.getRecipesIncludingArchived()).find((r) => r.id === 'bad-1');
     expect(bad?.ingredients).toEqual([]);
     expect(bad?.title).toBe('Bad One');
