@@ -907,3 +907,77 @@ describe('daily_log writers reject dates outside the valid range', () => {
     });
   });
 });
+
+describe('stored daily_log arrays are valid only when every item is an object with a string id', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const COLUMNS = ['exercises', 'additional_workouts'] as const;
+  const CORRUPT = ['', 'null', '{}', '"x"', '[null]', '[1]', '["a"]', '[{}]', '[{"id":"a"},null]', '{not json'];
+  const VALID = ['[]', '[{"id":"a"}]'];
+  const workout = { id: 'a', name: 'Curls', muscle_group: 'Arms', sets: '3', reps: '10', completed: false };
+
+  async function setup(column: string, raw: string): Promise<{ db: DatabaseModule; date: string }> {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await db.getDatabase().runAsync(`UPDATE daily_log SET ${column} = ? WHERE date = ?`, [raw, date]);
+    return { db, date };
+  }
+
+  async function stored(db: DatabaseModule, date: string, column: string): Promise<string> {
+    const row = await db
+      .getDatabase()
+      .getFirstAsync<Record<string, string>>(`SELECT ${column} AS raw FROM daily_log WHERE date = ?`, [date]);
+    return (row as Record<string, string>).raw;
+  }
+
+  function writers(db: DatabaseModule, date: string, column: (typeof COLUMNS)[number]): Array<() => Promise<void>> {
+    return column === 'exercises'
+      ? [() => db.upsertExerciseCompleted(date, 'a', true)]
+      : [
+          () => db.upsertAdditionalWorkouts(date, [workout]),
+          () => db.addAdditionalWorkout(date, workout),
+          () => db.toggleAdditionalWorkout(date, 'a'),
+        ];
+  }
+
+  const corruptCases = COLUMNS.flatMap((column) => CORRUPT.map((raw) => [column, raw] as const));
+  const validCases = COLUMNS.flatMap((column) => VALID.map((raw) => [column, raw] as const));
+
+  it.each(corruptCases)('%s = %j: writers throw CorruptJsonError and leave the text alone', async (column, raw) => {
+    const { db, date } = await setup(column, raw);
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    for (const write of writers(db, date, column)) {
+      const err = await write().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(db.CorruptJsonError);
+      expect(err).toMatchObject({ column, date });
+      expect(await stored(db, date, column)).toBe(raw);
+    }
+    spy.mockRestore();
+  });
+
+  it.each(corruptCases)('%s = %j: reset keeps the text and writes a fresh value', async (column, raw) => {
+    const { db, date } = await setup(column, raw);
+
+    await db.resetCorruptDayColumn(date, column);
+
+    const keptRow = await db
+      .getDatabase()
+      .getFirstAsync<{ value: string }>('SELECT value FROM app_state WHERE key = ?', [`corrupt_json:${column}:${date}`]);
+    expect(keptRow?.value).toBe(raw);
+    expect(Array.isArray(JSON.parse(await stored(db, date, column)))).toBe(true);
+  });
+
+  it.each(validCases)('%s = %j: writers succeed and reset refuses', async (column, raw) => {
+    const { db, date } = await setup(column, raw);
+
+    await expect(db.resetCorruptDayColumn(date, column)).rejects.toThrow('not corrupt');
+    for (const write of writers(db, date, column)) {
+      await expect(write()).resolves.toBeUndefined();
+    }
+  });
+});
