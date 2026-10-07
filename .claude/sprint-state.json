@@ -385,11 +385,18 @@
     },
     "432": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "70b708b",
+        "4d14ce6",
+        "2bfb01c",
+        "c74f347",
+        "0b66622",
+        "1cf3d03"
+      ],
       "deviceCheck": "none (optional: Analytics measurements card N entries excludes blank entries, only visible if a device holds an all-NULL row)",
-      "notes": "WO ready; lane C waits for lane A. Two items kept (A getBodyMeasurements NULL filter, B toggleAdditionalWorkout rejects unknown id), both inside lane C's grant, no cross-lane need, no migration. Existing test dailyLogUpserts.test.ts:599/605 pins the old resolve-silently behaviour and is rewritten (authorised by the owner decision; own commit, flagged for human review).",
+      "notes": "WO ready. Two items kept by the owner decision. | dev: A - getBodyMeasurements adds an IS NOT NULL ... OR ... clause built from the existing MEASUREMENT_FIELDS const tuple (the const moved up above the function); B - toggleAdditionalWorkout throws a plain Error naming date and id after the strict read, inside the queued write. EXISTING TESTS REWRITTEN (HUMAN review): two in dailyLogUpserts.test.ts (own commit 2bfb01c: an unknown-id toggle now rejects; the 'row is created' and 'stored value unchanged' assertions kept) as authorised by the decision, and a THIRD the brief did not anticipate - bodyMeasurements.test.ts 'still returns a legacy all-NULL row from getBodyMeasurements' became 'skips a legacy all-NULL row ... and leaves it stored' inside the A test commit 70b708b. The Dashboard screen test passes without any source change (a pin: the catch already reloads on any error); its mock factory gained the real CorruptJsonError.",
       "workOrder": "C:/git/ht-lanes/wo/432.md",
       "decisionSource": "latest owner comment on #432 (logCookedMeal: no change; getBodyMeasurements skips all-NULL rows, no migration; inventory inner join: no change; toggleAdditionalWorkout rejects when the workout isn't found)"
     },
@@ -737,6 +744,10 @@
     {
       "at": "2026-10-07T21:34:04Z",
       "event": "#435 ready (tester APPROVE r2 after 1 round trip, security skipped); lane C -> #432 in_dev"
+    },
+    {
+      "at": "2026-10-07T21:38:04Z",
+      "event": "#432 in_test (1249/96 per dev); security started in parallel on 498da6c..1cf3d03 (read-only)"
     }
   ],
   "status": "running",
