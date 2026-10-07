@@ -1,4 +1,5 @@
 import React from 'react';
+import { ScrollView } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 jest.mock('react-native-gesture-handler', () => ({}));
@@ -108,6 +109,13 @@ describe('App start failure screen', () => {
     expect(rescue).not.toHaveBeenCalled();
     await act(async () => { finishInit(); });
     await waitFor(() => expect(rescue).toHaveBeenCalledTimes(1));
+  });
+
+  it('renders the failure screen inside a ScrollView', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded'));
+    render(<App />);
+    await screen.findByRole('button', { name: 'Retry' });
+    expect(screen.UNSAFE_getByType(ScrollView)).toBeTruthy();
   });
 
   it('shows a message when Save data fails', async () => {
