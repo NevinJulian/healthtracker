@@ -3163,9 +3163,12 @@ async function _logBodyMeasurementImpl(
   );
 }
 
+const MEASUREMENT_FIELDS = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
+
 /**
- * Return all body-measurement rows since `sinceDateKey` (inclusive), ordered
- * ascending by date.  Returns all rows when `sinceDateKey` is omitted.
+ * Return body-measurement rows since `sinceDateKey` (inclusive), ordered
+ * ascending by date. Returns all rows when `sinceDateKey` is omitted. Rows
+ * with no value in any measurement column are skipped.
  *
  * @param sinceDateKey - Optional earliest date (YYYY-MM-DD) to include.
  */
@@ -3173,21 +3176,17 @@ export async function getBodyMeasurements(
   sinceDateKey?: string
 ): Promise<BodyMeasurement[]> {
   const db = getDatabase();
-  let rows: BodyMeasurement[];
+  const hasValue = MEASUREMENT_FIELDS.map((c) => `${c} IS NOT NULL`).join(' OR ');
   if (sinceDateKey) {
-    rows = await db.getAllAsync<BodyMeasurement>(
-      'SELECT * FROM body_measurements WHERE date >= ? ORDER BY date ASC',
+    return db.getAllAsync<BodyMeasurement>(
+      `SELECT * FROM body_measurements WHERE date >= ? AND (${hasValue}) ORDER BY date ASC`,
       [sinceDateKey]
     );
-  } else {
-    rows = await db.getAllAsync<BodyMeasurement>(
-      'SELECT * FROM body_measurements ORDER BY date ASC'
-    );
   }
-  return rows;
+  return db.getAllAsync<BodyMeasurement>(
+    `SELECT * FROM body_measurements WHERE ${hasValue} ORDER BY date ASC`
+  );
 }
-
-const MEASUREMENT_FIELDS = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
 
 export type MeasurementField = (typeof MEASUREMENT_FIELDS)[number];
 
