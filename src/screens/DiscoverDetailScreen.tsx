@@ -52,6 +52,10 @@ function ErrorView({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+function notLookedUpSentence(count: number): string {
+  return `${count} ingredient(s) were not looked up (too many requests); their macros count as 0. Try again in a minute.`;
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function DiscoverDetailScreen() {
@@ -66,6 +70,7 @@ export default function DiscoverDetailScreen() {
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const [importEstimated, setImportEstimated] = useState<string[]>([]);
+  const [importNotLookedUp, setImportNotLookedUp] = useState<string[]>([]);
 
   const loadController = useRef<AbortController | null>(null);
   const importController = useRef<AbortController | null>(null);
@@ -118,15 +123,20 @@ export default function DiscoverDetailScreen() {
         return;
       }
       setImportEstimated(result.estimatedIngredients);
+      setImportNotLookedUp(result.notLookedUpIngredients);
       setImportDone(true);
       const macros = result.recipe;
       const estimatedNote =
         result.estimatedIngredients.length > 0
           ? `\n\nNote: macros are estimated — ${result.estimatedIngredients.length} ingredient(s) had no nutritional data.`
           : '';
+      const notLookedUpNote =
+        result.notLookedUpIngredients.length > 0
+          ? `${estimatedNote ? '\n' : '\n\n'}${notLookedUpSentence(result.notLookedUpIngredients.length)}`
+          : '';
       Alert.alert(
         'Imported!',
-        `"${meal.name}" has been added to your recipe library.\n\n${macros.calories} kcal · ${macros.protein}g protein · ${macros.carbs}g carbs · ${macros.fat}g fat (per serving)${estimatedNote}`,
+        `"${meal.name}" has been added to your recipe library.\n\n${macros.calories} kcal · ${macros.protein}g protein · ${macros.carbs}g carbs · ${macros.fat}g fat (per serving)${estimatedNote}${notLookedUpNote}`,
       );
     } catch {
       if (!controller.signal.aborted) {
@@ -267,9 +277,14 @@ export default function DiscoverDetailScreen() {
                       Macros estimated — {importEstimated.length} ingredient
                       {importEstimated.length === 1 ? '' : 's'} had no nutritional data
                     </Text>
-                  ) : (
+                  ) : importNotLookedUp.length === 0 ? (
                     <Text style={styles.importSubtitle}>Macros computed from local data</Text>
-                  )}
+                  ) : null}
+                  {importNotLookedUp.length > 0 ? (
+                    <Text style={styles.importSubtitle}>
+                      {notLookedUpSentence(importNotLookedUp.length)}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
             </Card>
