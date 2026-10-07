@@ -1091,3 +1091,68 @@ describe('weekly template exercises are read as stored', () => {
     ]);
   });
 });
+
+describe('read entries flag a column unreadable exactly when the writers refuse it', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const COLUMNS = ['exercises', 'additional_workouts'] as const;
+  const CORRUPT = ['', 'null', '{}', '"x"', '[null]', '[1]', '["a"]', '[{}]', '[{"id":"a"},null]', '{not json', '[{"name":"x"}]'];
+  const VALID = ['[]', '[{"id":"a"}]'];
+  const workout = { id: 'a', name: 'Curls', muscle_group: 'Arms', sets: '3', reps: '10', completed: false };
+  const cases = COLUMNS.flatMap((column) => [...CORRUPT, ...VALID].map((raw) => [column, raw] as const));
+
+  async function seeded(column: string, raw: string): Promise<{ db: DatabaseModule; date: string }> {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await db.getDatabase().runAsync(`UPDATE daily_log SET ${column} = ? WHERE date = ?`, [raw, date]);
+    return { db, date };
+  }
+
+  async function writerRefuses(db: DatabaseModule, date: string, column: (typeof COLUMNS)[number]): Promise<boolean> {
+    const write =
+      column === 'exercises'
+        ? () => db.upsertExerciseCompleted(date, 'a', true)
+        : () => db.upsertAdditionalWorkouts(date, [workout]);
+    const err = await write().then(
+      () => undefined,
+      (e: unknown) => e
+    );
+    return err instanceof db.CorruptJsonError;
+  }
+
+  it.each(cases)('%s = %j: getLogByDate flags it iff the writer refuses it', async (column, raw) => {
+    const { db, date } = await seeded(column, raw);
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const refuses = await writerRefuses(db, date, column);
+    spy.mockRestore();
+    await db.getDatabase().runAsync(`UPDATE daily_log SET ${column} = ? WHERE date = ?`, [raw, date]);
+
+    const entry = await db.getLogByDate(date);
+
+    expect(entry?.unreadable?.includes(column) ?? false).toBe(refuses);
+  });
+
+  it('a row with both columns corrupt flags both, a valid row flags none', async () => {
+    const { db, date } = await seeded('exercises', '{bad');
+    await db.getDatabase().runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', ['[1]', date]);
+
+    expect((await db.getLogByDate(date))?.unreadable).toEqual(['exercises', 'additional_workouts']);
+
+    await db.getDatabase().runAsync('UPDATE daily_log SET exercises = ?, additional_workouts = ? WHERE date = ?', ['[]', '[]', date]);
+    expect((await db.getLogByDate(date))?.unreadable ?? []).toEqual([]);
+  });
+
+  it('getDailyLogsBetween flags per row', async () => {
+    const { db, date } = await seeded('additional_workouts', '{bad');
+    const other = addDays(date, 1);
+
+    const rows = await db.getDailyLogsBetween(date, other);
+
+    expect(rows.find((r) => r.date === date)?.unreadable).toEqual(['additional_workouts']);
+    expect(rows.find((r) => r.date === other)?.unreadable ?? []).toEqual([]);
+  });
+});
