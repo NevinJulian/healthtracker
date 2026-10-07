@@ -164,11 +164,13 @@
     },
     "424": {
       "lane": "D",
-      "status": "analysing",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "none",
+      "notes": "WO ready. Issue claim partly stale: a 429 is already not retried (fetchJson retries only >=500); what is missing is the pause. Clamp [1 s, 300 s] is an analyst pick.",
+      "workOrder": "C:/git/ht-lanes/wo/424.md",
+      "decisionSource": "owner comment on #424 (no immediate retry on 429; budget exhausted until Retry-After has passed, 60 s when missing or unreadable)"
     },
     "425": {
       "lane": "F",
@@ -180,19 +182,23 @@
     },
     "426": {
       "lane": "B",
-      "status": "analysing",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "1) Normal start: no error screen, startup not slowed. 2) Dev build that throws in initDatabase: Retry, Save data and the notice reachable by scrolling at the largest font size. 3) Save data: two-files sentence, then two share sheets; save both to Files. 4) Kill and relaunch without the forced failure: cache copies are gone.",
+      "notes": "WO ready. Issue item 3 (closing the connection) is NOT done by this work order; the Save-waits-for-init rule covers the font-error case (analyst reading of the decision).",
+      "workOrder": "C:/git/ht-lanes/wo/426.md",
+      "decisionSource": "owner comment on #426 2026-10-06 (rescue copies deleted at the next app start; busy flag; Save data waits for init; scrolling screen; one WAL sentence; no full-storage special case)"
     },
     "427": {
       "lane": "A",
-      "status": "analysing",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
-      "deviceCheck": null,
-      "notes": ""
+      "deviceCheck": "From the integration branch, launch the app on the phone with existing data: it starts normally with all history intact (the schema check passes through). The failing path is proven by the test only.",
+      "notes": "WO ready. No cross-lane need: App.tsx already renders err.message with Retry and Save data.",
+      "workOrder": "C:/git/ht-lanes/wo/427.md",
+      "decisionSource": "owner comment on #427 2026-10-06 (don't delete, fail: initDatabase throws a named error, the #419 start-failure screen takes over)"
     },
     "428": {
       "lane": "D",
@@ -291,10 +297,17 @@
     {
       "at": "2026-10-07T20:14:57Z",
       "event": "npm ci ok in worktrees a/b/d; #423 work order ready (queued behind #426)"
+    },
+    {
+      "at": "2026-10-07T20:15:46Z",
+      "event": "#427 #426 #424 work orders ready, none parked -> in_dev (developers dispatched in worktrees a/b/d)"
     }
   ],
   "status": "running",
   "pendingFindings": [
-    "USER-HITTABLE (#423 analyst): OnboardingScreen branch in App.tsx is outside the error boundary the #423 decision asks for, so a render crash on first launch is still uncaught"
+    "USER-HITTABLE (#423 analyst): OnboardingScreen branch in App.tsx is outside the error boundary the #423 decision asks for, so a render crash on first launch is still uncaught",
+    "USER-HITTABLE/DATA-LOSS (#426 analyst): rescueExport offers the wal only after the db share resolves; if the first share is cancelled or fails the wal is never offered",
+    "SMALL (#426 analyst): App.tsx hides Retry on any font error, with no way to re-attempt font loading",
+    "SMALL (#424 analyst): OFF_LOOKUP_CONCURRENCY lookups already past beforeAttempt still complete after a 429 (harmless)"
   ]
 }
