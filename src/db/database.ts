@@ -8,13 +8,12 @@
  *   - #37  SELECT moved outside withTransactionAsync
  *   - #38  _db reset to null on failure
  *   - #39  Versioned migration runner using schema_version table
- *   - Old-schema reset: detects incompatible daily_log and wipes DB
+ *   - Old-schema check: refuses to start on an incompatible daily_log
  *
  * Feature additions (issue #40):
  *   - Exercise[] JSON column on weekly_template and daily_log
  *   - upsertExerciseCompleted() — toggles a single exercise in the JSON array
  *   - updateTemplateExercises() — replaces the full exercise list for a weekday
- *   - resetIfIncompatibleSchema now also detects missing exercises column
  */
 
 import * as SQLite from 'expo-sqlite';
@@ -564,38 +563,22 @@ async function seedRecipeLibrary(db: SQLite.SQLiteDatabase): Promise<void> {
 }
 
 // ─────────────────────────────────────────────
-// Old-schema reset helper
+// Old-schema check
 // ─────────────────────────────────────────────
 
-/**
- * Detects incompatible schemas left by previous app versions:
- *   1. daily_log missing 'date' column (very old schema)
- *   2. (Compatible schema — no reset needed)
- *
- * Note: missing 'exercises' column is handled by migrations v11/v12 via
- * ALTER TABLE, so no reset is needed for that case.
- */
-async function resetIfIncompatibleSchema(
-  db: SQLite.SQLiteDatabase
-): Promise<SQLite.SQLiteDatabase> {
+async function assertCompatibleSchema(db: SQLite.SQLiteDatabase): Promise<void> {
   const columns = await db.getAllAsync<{ name: string }>(
     'PRAGMA table_info(daily_log)'
   );
 
-  if (columns.length === 0) return db; // Fresh install
-  const hasDateColumn = columns.some((c) => c.name === 'date');
-  if (hasDateColumn) return db; // Compatible
+  if (columns.length === 0) return;
+  if (columns.some((c) => c.name === 'date')) return;
 
-  console.warn(
-    '[DB] Incompatible daily_log schema detected (missing "date" column). ' +
-    'Deleting old database and starting fresh…'
+  throw new Error(
+    'Your saved data uses an old format that this version cannot read: ' +
+    'the daily_log table has no date column. Nothing was changed or deleted. ' +
+    'Tap Save data to export a copy of your data.'
   );
-  await db.closeAsync();
-  await SQLite.deleteDatabaseAsync(DB_NAME);
-  console.log('[DB] Old database deleted. Opening fresh database…');
-  const freshDb = await SQLite.openDatabaseAsync(DB_NAME);
-  await freshDb.execAsync('PRAGMA journal_mode = WAL;');
-  return freshDb;
 }
 
 // ─────────────────────────────────────────────
@@ -846,12 +829,12 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (_db) return _db;
 
   console.log('[DB] Opening database…');
-  let db = await SQLite.openDatabaseAsync(DB_NAME);
+  const db = await SQLite.openDatabaseAsync(DB_NAME);
 
   try {
     await db.execAsync('PRAGMA journal_mode = WAL;');
 
-    db = await resetIfIncompatibleSchema(db);
+    await assertCompatibleSchema(db);
     if (_isDev()) _trackDbActivity(db);
     // Test-only tripwire (#369): the sql.js test adapter exposes this hook
     // and then throws if withTransactionAsync is ever called while the
