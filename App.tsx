@@ -24,7 +24,7 @@ import { installStress369 } from './src/db/devStress369';
 import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import Button from './src/components/Button';
-import { clearRescueCopies, exportRawDatabase } from './src/services/rescueExport';
+import { clearRescueCopies, exportRawDatabase, hasRescueWal } from './src/services/rescueExport';
 import { Colors, Spacing, Typography } from './src/theme/tokens';
 import {
   configureNotificationHandler,
@@ -32,6 +32,7 @@ import {
   reconcileScheduledNotifications,
 } from './src/services/notifications';
 
+const TWO_FILES_NOTICE = 'Saving shares two files. Keep both.';
 const NO_RESET_NOTICE =
   "Clearing the app's storage in Android settings deletes all your data, so there is no reset button here.";
 
@@ -43,6 +44,7 @@ export default function App() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
+  const [hasWal, setHasWal] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
     Fraunces_600SemiBold,
@@ -91,6 +93,20 @@ export default function App() {
     runInit();
   }, [runInit]);
 
+  const showFailure = Boolean(error || fontError);
+
+  useEffect(() => {
+    if (!showFailure) return;
+    let active = true;
+    hasRescueWal().then(
+      (found) => active && setHasWal(found),
+      () => active && setHasWal(false),
+    );
+    return () => {
+      active = false;
+    };
+  }, [showFailure]);
+
   const retry = () => {
     if (initInFlight.current) return;
     setError(null);
@@ -111,7 +127,7 @@ export default function App() {
     }
   };
 
-  if (error || fontError) {
+  if (showFailure) {
     const displayError = error ?? fontError?.message ?? 'Unknown font loading error';
     return (
       <ScrollView style={styles.failureScroll} contentContainerStyle={styles.failureContent}>
@@ -126,6 +142,7 @@ export default function App() {
           style={styles.button}
         />
         {saveError && <Text style={styles.errorText}>{saveError}</Text>}
+        {hasWal && <Text style={styles.errorDetail}>{TWO_FILES_NOTICE}</Text>}
         <Text style={styles.errorDetail}>{NO_RESET_NOTICE}</Text>
       </ScrollView>
     );
