@@ -135,4 +135,51 @@ describe('RecipeEditorScreen save deadline', () => {
       fat: expected.fat,
     });
   });
+  async function fillIngredients(utils: ReturnType<typeof render>, names: string[]) {
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.changeText(utils.getByPlaceholderText('Recipe name'), 'Mystery stew');
+    for (let i = 1; i < names.length; i++) {
+      fireEvent.press(utils.getByLabelText('Add ingredient'));
+    }
+    const nameInputs = utils.getAllByPlaceholderText('Ingredient name');
+    const qtyInputs = utils.getAllByPlaceholderText('Qty');
+    names.forEach((name, i) => {
+      fireEvent.changeText(nameInputs[i], name);
+      fireEvent.changeText(qtyInputs[i], '100');
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(700);
+    });
+  }
+
+  it('lists refused lookups apart from ones with no data', async () => {
+    mockLookup.mockImplementation(async (name: string) =>
+      name === 'zzz refused' ? 'not-looked-up' : null,
+    );
+    const utils = render(<RecipeEditorScreen />);
+    await fillIngredients(utils, ['zzz empty', 'zzz refused']);
+
+    expect(utils.getByText('Estimated (no data): zzz empty')).toBeTruthy();
+    expect(utils.getByText('Not looked up (try Recompute in a minute): zzz refused')).toBeTruthy();
+  });
+
+  it('shows the ingredient cut off by the save deadline as not looked up', async () => {
+    mockLookup.mockImplementation((name: string) =>
+      name === 'zzz hanging'
+        ? new Promise(() => {})
+        : Promise.resolve({ kcal: 40, protein: 10, carbs: 0, fat: 0 }),
+    );
+    const utils = render(<RecipeEditorScreen />);
+    await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
+
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Create Recipe'));
+      await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
+    });
+
+    expect(utils.getByText('Not looked up (try Recompute in a minute): zzz hanging')).toBeTruthy();
+    expect(utils.queryByText(/Estimated \(no data\)/)).toBeNull();
+  });
 });
