@@ -56,7 +56,9 @@
         430
       ],
       "current": 412,
-      "done": [],
+      "done": [
+        427
+      ],
       "parked": []
     },
     "B": {
@@ -201,7 +203,7 @@
     },
     "427": {
       "lane": "A",
-      "status": "in_security",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "6ac1a39",
@@ -211,7 +213,8 @@
       "notes": "WO ready. No cross-lane need: App.tsx already renders err.message with Retry and Save data. | dev: resetIfIncompatibleSchema replaced by assertCompatibleSchema (throws, no close/delete/reopen); header trim is inside the fix commit. Error text: Your saved data uses an old format that this version cannot read: the daily_log table has no date column. Nothing was changed or deleted. Tap Save data to export a copy of your data. Dev says the old code failed the test's FIRST assertion via a raw SQLite error further into migrations (deleteDatabaseAsync is a jest.fn in the harness) - tester to confirm the not-deleted assertion fails on its own too.",
       "workOrder": "C:/git/ht-lanes/wo/427.md",
       "decisionSource": "owner comment on #427 2026-10-06 (don't delete, fail: initDatabase throws a named error, the #419 start-failure screen takes over)",
-      "regressionProof": "incompatibleSchema test fails with 6ac1a39 database.ts (received 'no such column: date'), passes at 0f4c1f2; tester scratch test proved the deleteDatabaseAsync-not-called assertion fails on its own on the pre-fix code (0 expected, 1 received); schema.ts byte-identical to base; 1119/94 (tester reproduced)"
+      "regressionProof": "incompatibleSchema test fails with 6ac1a39 database.ts (received 'no such column: date'), passes at 0f4c1f2; tester scratch test proved the deleteDatabaseAsync-not-called assertion fails on its own on the pre-fix code (0 expected, 1 received); schema.ts byte-identical to base; 1119/94 (tester reproduced)",
+      "securityReview": "APPROVE: no deleteDatabaseAsync left in non-test src; throw is inside the try, catch closes once and rethrows, _db stays null; check runs before migrations, seeds and app_state writes; message is a static string. Notes: (A) PRAGMA journal_mode = WAL runs before the check, so on a rollback-journal db the header is rewritten although the message says nothing was changed (cosmetic; swap the order to make it literally true). (B) HUMAN: a user who really has this schema is blocked for good - Save data works, but there is no in-app way to proceed (as decided: fail, don't delete). Whether expo-sqlite's native close always checkpoints the WAL was not determined (does not affect the rescue copy)."
     },
     "428": {
       "lane": "D",
@@ -358,6 +361,10 @@
     {
       "at": "2026-10-07T20:20:48Z",
       "event": "#427 tester APPROVE r0 -> security (read-only, parallel); lane A -> #412 in_dev"
+    },
+    {
+      "at": "2026-10-07T20:21:29Z",
+      "event": "#427 ready (security APPROVE)"
     }
   ],
   "status": "running",
@@ -381,6 +388,7 @@
     "SMALL (#424 dev): the comment above putCache in openfoodfacts.ts references #369 (comment rule)",
     "SMALL (#434 analyst): lifting-history readers near database.ts:3249 were not checked for item-shape assumptions",
     "SMALL (#427 tester): on the start-failure screen the error message likely appears twice on Hermes (App.tsx joins err.message with the first 8 stack lines, and the stack's first line repeats the message); not run on a device",
-    "SMALL (#427 tester): database.ts file header still lists issue-number history (#37, #38, #39)"
+    "SMALL (#427 tester): database.ts file header still lists issue-number history (#37, #38, #39)",
+    "SMALL (#427 security): initDatabase runs PRAGMA journal_mode = WAL before assertCompatibleSchema, so an old rollback-journal database gets its header rewritten although the error message says nothing was changed; running the check before the pragma would make the sentence literally true"
   ]
 }
