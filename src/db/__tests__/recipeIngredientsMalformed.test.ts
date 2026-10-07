@@ -107,4 +107,23 @@ describe('recipe readers with a malformed ingredients column', () => {
     await db.getRecipeById('good-1');
     expect(warn).not.toHaveBeenCalled();
   });
+
+  it('getCookingTasks returns the task with empty ingredients', async () => {
+    const db = await setup('{not json');
+    await db
+      .getDatabase()
+      .runAsync('INSERT INTO cooking_tasks (recipe_id, servings_to_cook) VALUES (?, ?)', ['bad-1', 2]);
+    await db
+      .getDatabase()
+      .runAsync('INSERT INTO cooking_tasks (recipe_id, servings_to_cook) VALUES (?, ?)', ['good-1', 3]);
+    const tasks = await db.getCookingTasks();
+    expect(tasks).toHaveLength(2);
+    const bad = tasks.find((t) => t.recipe_id === 'bad-1');
+    expect(bad?.servings_to_cook).toBe(2);
+    expect(bad?.recipe.title).toBe('Bad One');
+    expect(bad?.recipe.ingredients).toEqual([]);
+    expect(tasks.find((t) => t.recipe_id === 'good-1')?.recipe.ingredients).toHaveLength(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]).toContain('bad-1');
+  });
 });
