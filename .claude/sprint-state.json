@@ -284,20 +284,22 @@
     },
     "430": {
       "lane": "A",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "commits": [
         "b4667d7",
         "8cc6940",
         "821b8aa",
         "42459fd",
-        "3ed52df"
+        "3ed52df",
+        "f563c3e"
       ],
       "deviceCheck": "none",
       "notes": "WO ready. Sibling spot included: getCookingTasks. | dev: private parseIngredients(raw, recipeId) at the four sites; warns with the recipe id, never the raw text. b4667d7 alone does not typecheck (fixed by 3ed52df). | tester REJECT r1: after 3ed52df removed the archived_at assertion, nothing proves the corrupt row was archived (getRecipesIncludingArchived selects every row), so 'archived corrupt row included' is only half tested. Fix itself sound. Sent back for one assertion (getRecipes() must not contain the archived id). Consumers traced by the tester: the editor blocks saving with no ingredients, so the corrupt text is only overwritten when the user re-enters ingredients; macros are separate columns (no 0 kcal); backup export reads raw rows (corrupt text exported intact). HUMAN: RecipeDetail 'add to shopping list' on a corrupt recipe adds zero items and still shows Added!.",
       "workOrder": "C:/git/ht-lanes/wo/430.md",
       "decisionSource": "owner comment on #430 (return the recipe with an empty ingredient list, and log it)",
-      "regressionProof": "round 1: 10/11 fail with b4667d7 database.ts; the cooking-task test fails with 821b8aa database.ts; 11/11 at 3ed52df; 1136/95 (tester reproduced). Probe of 14 stored values through all four readers: none throws, one warn per bad row with the id and no raw text, valid arrays unchanged."
+      "regressionProof": "round 1: 10/11 fail with b4667d7 database.ts; the cooking-task test fails with 821b8aa database.ts; 11/11 at 3ed52df; 1136/95 (tester reproduced). Probe of 14 stored values through all four readers: none throws, one warn per bad row with the id and no raw text, valid arrays unchanged.",
+      "securityReview": "APPROVE (88bcc98..3ed52df, source unchanged in round 2): no query text added; no path persists the substituted [] over the corrupt text unless the user types at least one ingredient (handleSave returns early on an empty list; createRecipe/updateRecipe have no other caller); macros are separate columns and never recomputed from an empty list; backup reads raw rows, so the corrupt text survives in a backup; warn logs a fixed string plus the id only. Notes: the editor gives no notice that ingredients were unreadable (blank row; retyping and saving replaces the corrupt text - as decided); restore does not validate the ingredients column (unchanged)."
     },
     "431": {
       "lane": "C",
@@ -478,6 +480,10 @@
     {
       "at": "2026-10-07T20:37:50Z",
       "event": "#428 in_test (1146/95 per dev)"
+    },
+    {
+      "at": "2026-10-07T20:38:09Z",
+      "event": "#430 round 2 (f563c3e, test-only: 4 assertions pinning archived + still returned; 1136/95 per dev) in_test; security APPROVE on the source diff"
     }
   ],
   "status": "running",
@@ -510,6 +516,7 @@
     "SMALL (#412 tester): no repo test pins MIGRATIONS version/sql against a known-good copy; the work order asked for a test or script and only a one-off script was run",
     "SMALL (#426 tester r2): cold first render of the App suites takes 1.9-3.1 s on this machine against a 5 s wait (margin 1.6x-2.5x); a slower CI runner or two App suites cold at once could eat it",
     "SMALL (#430 tester): RecipeDetail add-to-shopping-list on a recipe with unreadable ingredients adds zero shopping items and still shows the Added! alert (needs corrupt data)",
-    "SMALL (#430 tester): a stored ingredients array with garbage items ([null], [1,\"a\"]) passes through the readers unfiltered; RecipeEditor ingredientsToRows and RecipeDetail ing.name would crash on a null item (pre-existing, needs corrupt data)"
+    "SMALL (#430 tester): a stored ingredients array with garbage items ([null], [1,\"a\"]) passes through the readers unfiltered; RecipeEditor ingredientsToRows and RecipeDetail ing.name would crash on a null item (pre-existing, needs corrupt data)",
+    "SMALL (#430 security): the recipe editor shows a blank ingredient row for a recipe whose ingredients were unreadable, with no notice; retyping and saving replaces the stored text (as decided; a banner would help)"
   ]
 }
