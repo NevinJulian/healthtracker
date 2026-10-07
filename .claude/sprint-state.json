@@ -319,8 +319,8 @@
     },
     "429": {
       "lane": "E",
-      "status": "in_test",
-      "roundTrips": 0,
+      "status": "in_dev",
+      "roundTrips": 1,
       "commits": [
         "5031c80",
         "a6e0181",
@@ -333,10 +333,11 @@
         "e366ee3"
       ],
       "deviceCheck": "Smoke: in Settings tap Recalculate with a full profile: Goals updated shows, values persist after leaving and returning.",
-      "notes": "WO ready. | dev: 9 commits. setNutritionGoals = one 13-line insertion hunk after setNutritionGoalProtein (_enqueueWrite + withTransactionAsync + two parameterised upserts; no validation, mirroring the single writers). Transaction-removal proof: without the transaction the failure test goes red (calories 2500, protein unchanged). Part 2: 15 cases, each red under a re-throw mutation (one global mutation, per-case results read from the JSON output). Part 3: shared scheduleAfterSave helper on 6 handlers AND (beyond the WO) on the 6 stepper flush callbacks, which have no dedicated test; Alert wording is the dev's: Reminder not scheduled / Your setting was saved, but the reminder could not be scheduled. Part 4: runCommit calls reportWriteFailure. EXISTING TEST EDITS: setNutritionGoals added to 8 Settings mock factories; Recalculate expectations in writeErrors and profileStaleReload (4 places) switched from the two single writers to the one call; writeErrors trigger helpers now return the fireEvent result. 5031c80 fails by missing export, not by assertion. Not done: a failed stepper write still leaves the stepper showing the new value.",
+      "notes": "WO ready. | dev: 9 commits; setNutritionGoals one insertion hunk; shared scheduleAfterSave on 6 handlers and (beyond the WO) the 6 stepper flush callbacks; Alert wording by the dev: Reminder not scheduled / Your setting was saved, but the reminder could not be scheduled. | tester APPROVE r0. GAP: the scheduleAfterSave behaviour in the six stepper flush callbacks has no committed test (the tester's 12 scratch tests passed and were deleted). ORCHESTRATOR: new behaviour without a committed test - sent back for a table-driven test only; counted as round trip 1 although the tester approved. HUMAN: when a meal reminder is switched OFF and cancelMealReminder fails, the alert says the reminder could not be scheduled (wording off for a cancel). Not done: a failed stepper write leaves the stepper showing the unsaved value until the next focus reload.",
       "workOrder": "C:/git/ht-lanes/wo/429.md",
       "decisionSource": "latest owner comment on #429 (one new database.ts function in one transaction; drop the unhandledRejection assertions and assert the handler's promise resolves; two messages; stepper writes get the same Alert)",
-      "securityReview": "APPROVE (code read at e366ee3): setNutritionGoals uses the same upsert text as setSetting, bound values, queue wrapper outside and withTransactionAsync inside, nothing enqueued from within; the first write cannot commit if the second fails; schema.ts untouched. Inputs from suggestGoals are clamped (finite, >= 1000 kcal / >= 50 g), and getNutritionGoals falls back to defaults for a non-finite stored value. scheduleAfterSave wraps only the scheduling call at all 12 call sites, so a write failure never enters it and is never reported as saved. Note: after a failed debounced stepper write the stepper shows the unsaved value until the next focus reload (the user is told it failed)."
+      "securityReview": "APPROVE (code read at e366ee3): setNutritionGoals uses the same upsert text as setSetting, bound values, queue wrapper outside and withTransactionAsync inside, nothing enqueued from within; the first write cannot commit if the second fails; schema.ts untouched. Inputs from suggestGoals are clamped (finite, >= 1000 kcal / >= 50 g), and getNutritionGoals falls back to defaults for a non-finite stored value. scheduleAfterSave wraps only the scheduling call at all 12 call sites, so a write failure never enters it and is never reported as saved. Note: after a failed debounced stepper write the stepper shows the unsaved value until the next focus reload (the user is told it failed).",
+      "regressionProof": "round 1: all four test/fix pairs proven on the pre-fix source; transaction removal makes the failure test red (calories 2500); scratch attacks on the real engine: first/second write failing, sync throw vs rejection, concurrent pairs and single writers serialised, queue never stuck, 8 odd inputs behave exactly like the single writers; database.ts diff is one 13-line insertion; part 2 mutation proven individually for 6 of 15 cases plus catch removal, and the thenable assertion fails on a handler that returns nothing; every edited existing assertion read and judged a consequence of the decision (one strengthened); 12 scratch tests for the six stepper flush callbacks pass; 1172/97 (tester reproduced, TZ=UTC is the npm test default)"
     },
     "430": {
       "lane": "A",
@@ -654,6 +655,10 @@
     {
       "at": "2026-10-07T21:17:23Z",
       "event": "#411 in_test (1233/95 per dev); security started in parallel on 9454396..1c88a00 (read-only)"
+    },
+    {
+      "at": "2026-10-07T21:18:33Z",
+      "event": "#429 tester APPROVE r0 + security APPROVE, but orchestrator sent it back for committed tests of the six stepper flush callbacks (roundTrips=1) -> in_dev"
     }
   ],
   "status": "running",
@@ -708,7 +713,8 @@
     "SMALL but read it (#434 tester r2 + security): after #434 a weekday template holding an item without a string id makes every new day built from it un-editable, and Reset this day does not unstick it (the fresh row is rebuilt from the same template). Needs a hand-edited backup. Options: the day builder drops or gives ids to such items, or the template is normalised on write",
     "SMALL (#411 analyst): a second Reset this day after a successful one can still show Reset failed across screens/races, because the db throws not corrupt; only a UI in-flight guard is added in #411",
     "SMALL (#429 dev): a debounced stepper write that fails now alerts but the stepper keeps showing the unsaved value",
-    "SMALL (#411 dev): the shared Button sets importantForAccessibility=no-hide-descendants on its title Text, so the visible label is hidden from assistive-tech text queries (tests must use includeHiddenElements or the accessibility label)"
+    "SMALL (#411 dev): the shared Button sets importantForAccessibility=no-hide-descendants on its title Text, so the visible label is hidden from assistive-tech text queries (tests must use includeHiddenElements or the accessibility label)",
+    "SMALL (#429 tester): switching a meal reminder off with cancelMealReminder failing shows Your setting was saved, but the reminder could not be scheduled - wrong wording for a cancel"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
