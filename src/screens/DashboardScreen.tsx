@@ -737,7 +737,7 @@ export default function DashboardScreen() {
     );
   }
 
-  if (loadError === 'initial') {
+  if (loadError && !entry) {
     return (
       <View style={styles.centred}>
         <LoadErrorView variant="screen" title="Couldn't load today" onRetry={loadToday} />
