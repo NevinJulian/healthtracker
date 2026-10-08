@@ -55,7 +55,7 @@ describe('restoreFromPayload() with an odd weekly_meal_plan.is_consumed', () => 
       db.restoreFromPayload(
         {
           weekly_meal_plan: [planRow(null)],
-          daily_log: [{ date: '2024-06-01', exercises: '[]' }],
+          daily_log: [{ date: '2024-06-01', walking_task: 'Walk', hammer_task: 'Hammer' }],
         },
         SCHEMA_VERSION
       )
