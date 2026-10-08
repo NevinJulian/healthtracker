@@ -376,11 +376,18 @@
     },
     "431": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "e618a53",
+        "4b54e32",
+        "794b62b",
+        "ac7a9b1",
+        "5f004d8",
+        "efc21bf"
+      ],
       "deviceCheck": "Debug build, force a load failure (temporary throw in getLogByDate / getWaterHistory). Cold start: error view; Retry works once the throw is removed. Then with data on screen, throw and refocus: banner appears and the data remains.",
-      "notes": "WO ready; last in lane C. New src/components/LoadErrorView.tsx (variant screen|banner); imported directly, src/components/index.ts untouched to avoid a lane B conflict. Strings are analyst picks.",
+      "notes": "WO ready; last in lane C. New src/components/LoadErrorView.tsx (variant screen|banner); imported directly, src/components/index.ts untouched to avoid a lane B conflict. Strings are analyst picks. | dev (two runs: the first was cut off by the session ending after e618a53/4b54e32/794b62b; the second verified and committed the left-over Dashboard change unchanged as ac7a9b1, then did Analytics): six files only, +596 lines, no existing test touched. Dashboard 5 of 8 new tests fail without the fix, Analytics 5 of 8; in each file the empty-load test and the two race tests pass before the fix (tester to show they can fail). Dev says the banner disappears at every load start and comes back on failure (the WO clears loadError at load start) and did NOT compare with MealPrep's view. Analytics initial error view has no pull-to-refresh, Retry only.",
       "workOrder": "C:/git/ht-lanes/wo/431.md",
       "decisionSource": "SPRINT.md §3 known pattern (#431 follows MealPrep's error view from #401, one shared component; MealPrep keeps its own)"
     },
@@ -763,6 +770,10 @@
     {
       "at": "2026-10-08T06:40:00Z",
       "event": "RESUMED by a fresh session after a 9 h gap (the previous session ended around 21:44Z while the #431 developer was running). Reconciled: all 17 frozen issues still open on GitHub; integration 29f5afa is 9 state-only commits ahead of origin; lane C worktree at 794b62b holds 3 unpushed #431 commits (e618a53 LoadErrorView tests, 4b54e32 LoadErrorView, 794b62b failing Dashboard tests) plus an UNCOMMITTED 14-line Dashboard fix in src/screens/DashboardScreen.tsx (copied to C:/git/ht-lanes/wo/431_DashboardScreen.wip.tsx); the Analytics half is not started. Identity verified. #431 stays in_dev with roundTrips 0: a new developer continues from the interrupted work (an interruption is not a tester rejection)"
+    },
+    {
+      "at": "2026-10-08T06:47:00Z",
+      "event": "#431 in_test (efc21bf, 1267/99 per dev; lane C pushed). Security SKIPPED for #431 by orchestrator decision: the diff is two screens, one presentational component and tests; nothing reaches src/db, backup, src/api, the filesystem or external input"
     }
   ],
   "status": "running",
