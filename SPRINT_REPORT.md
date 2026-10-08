@@ -2,7 +2,7 @@
 
 Autonomous sprint, started 2026-10-07 20:11 UTC from `main` `bbfe649`. Frozen scope: the 17 open issues in `.claude/SPRINT.md` §3. The orchestrator only dispatched work, judged it, merged lanes and recorded state. Developer agents wrote every line of code, and tester agents checked every change adversarially. Security agents reviewed every change that reached `src/db`, the backup and restore path, `src/api`, or the raw database file; skips are recorded per issue in §2.
 
-The run took two sessions. The first ended around 21:44 UTC with lanes A, B, D and E merged and lane C on its last issue. A fresh session resumed from the state file on 2026-10-08 at 06:38 UTC and finished at about 08:20 UTC.
+The run took two sessions. The first ended around 21:44 UTC with lanes A, B, D and E merged and lane C on its last issue. A fresh session resumed from the state file on 2026-10-08 at 06:38 UTC and finished at about 08:15 UTC.
 
 **Nothing has been merged to `main`, and no PR has been opened.** The PR waits for the cold review and the device checks in §7.
 
