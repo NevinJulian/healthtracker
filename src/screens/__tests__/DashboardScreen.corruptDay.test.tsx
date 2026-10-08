@@ -152,10 +152,10 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
 
   it.each(cases)('$name: shows the Alert with Cancel and Reset this day', async ({ arrange, act: press, entry, noticeShown }) => {
     jest.mocked(getLogByDate).mockResolvedValue(entry);
-    arrange();
     const q = render(<DashboardScreen />);
     await flushMicrotasks();
     expect(q.queryByText(NOTICE) !== null).toBe(noticeShown);
+    arrange();
 
     await act(async () => {
       press(q);
@@ -170,10 +170,10 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
 
   it.each(cases)('$name: Reset this day calls the reset with the refused date and column, then reloads', async ({ arrange, act: press, column, entry, noticeShown }) => {
     jest.mocked(getLogByDate).mockResolvedValue(entry);
-    arrange();
     const q = render(<DashboardScreen />);
     await flushMicrotasks();
     expect(q.queryByText(NOTICE) !== null).toBe(noticeShown);
+    arrange();
     await act(async () => {
       press(q);
     });
