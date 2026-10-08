@@ -213,4 +213,30 @@ describe('AnalyticsDashboardScreen load errors', () => {
     expect(getByLabelText('View progression for newer')).toBeTruthy();
     expect(queryByLabelText('View progression for older')).toBeNull();
   });
+
+  it('a superseded run finishing does not make a later failure a refresh failure', async () => {
+    const runA = deferred<never[]>();
+    const runB = deferred<never[]>();
+    mockLogs.mockReturnValueOnce(runA.promise).mockReturnValueOnce(runB.promise);
+
+    const { getByText, getByLabelText, queryByLabelText, queryByText } = render(
+      <AnalyticsDashboardScreen />
+    );
+    await triggerFocus();
+    await triggerFocus();
+
+    await act(async () => {
+      runA.resolve([]);
+    });
+    await flush();
+    await act(async () => {
+      runB.reject(new Error('boom'));
+    });
+    await flush();
+
+    expect(getByText(TITLE)).toBeTruthy();
+    expect(getByLabelText('Retry')).toBeTruthy();
+    expect(queryByText(BANNER)).toBeNull();
+    expect(queryByLabelText(BENCH)).toBeNull();
+  });
 });
