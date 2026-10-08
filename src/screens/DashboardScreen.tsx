@@ -56,6 +56,7 @@ import {
   BioForceModal,
 } from '../components';
 import { iconChipIconColor } from '../components/IconChip';
+import LoadErrorView from '../components/LoadErrorView';
 
 // ─── Verdure circle checkbox ──────────────────────────────────────────────────
 // Replaces old square Checkbox: 24px circle, empty = line2 ring, done = sage fill
@@ -308,6 +309,7 @@ export default function DashboardScreen() {
   const [entry, setEntry] = useState<DailyLogEntry | null>(null);
   const [todaysMeals, setTodaysMeals] = useState<MealPlanWithRecipe[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<'initial' | 'refresh' | null>(null);
 
   // Mirrors `todaysMeals` synchronously (#330). handleToggleMeal reads this
   // instead of a render-closure value: React applies setState updates on its
@@ -391,6 +393,7 @@ export default function DashboardScreen() {
     // tests deliberately don't model that, and correctness shouldn't lean
     // on it either).
     const date = toISODate();
+    setLoadError(null);
     if (!hasLoadedOnceRef.current) {
       setLoading(true);
     }
@@ -426,6 +429,7 @@ export default function DashboardScreen() {
     } catch (err) {
       if (!mountedRef.current || runIdRef.current !== runId) return;
       console.error('DashboardScreen: loadToday error', err);
+      setLoadError(hasLoadedOnceRef.current ? 'refresh' : 'initial');
     } finally {
       if (mountedRef.current && runIdRef.current === runId) {
         setLoading(false);
@@ -733,6 +737,14 @@ export default function DashboardScreen() {
     );
   }
 
+  if (loadError === 'initial') {
+    return (
+      <View style={styles.centred}>
+        <LoadErrorView variant="screen" title="Couldn't load today" onRetry={loadToday} />
+      </View>
+    );
+  }
+
   if (!entry) {
     return (
       <View style={styles.centred}>
@@ -788,6 +800,8 @@ export default function DashboardScreen() {
           </Text>
         </View>
       )}
+
+      {loadError === 'refresh' && <LoadErrorView variant="banner" onRetry={loadToday} />}
 
       <ScrollView
         style={styles.scroll}
