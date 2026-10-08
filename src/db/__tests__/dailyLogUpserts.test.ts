@@ -783,10 +783,22 @@ describe('daily_log writers reject dates outside the valid range', () => {
     jest.useRealTimers();
   });
 
+  const extraWorkout = { id: 'w1', name: 'Run', muscle_group: 'Legs', sets: '1', reps: '1', completed: false };
+
   const writers: [string, (db: DatabaseModule, date: string) => Promise<void>][] = [
     ['upsertLogField', (db, d) => db.upsertLogField(d, 'walk_completed', true)],
     ['upsertExerciseCompleted', (db, d) => db.upsertExerciseCompleted(d, 'some-exercise-id', true)],
     ['upsertBodyWeight', (db, d) => db.upsertBodyWeight(d, 70)],
+    ['addAdditionalWorkout', (db, d) => db.addAdditionalWorkout(d, extraWorkout)],
+    [
+      'toggleAdditionalWorkout',
+      (db, d) =>
+        db.toggleAdditionalWorkout(d, extraWorkout.id).catch((e: unknown) => {
+          // An unknown id is rejected only after the date check and row creation.
+          if (e instanceof Error && /no additional workout/.test(e.message)) return;
+          throw e;
+        }),
+    ],
     ['addWater', (db, d) => db.addWater(d, 250)],
     ['setWaterForDay', (db, d) => db.setWaterForDay(d, 1000)],
   ];
