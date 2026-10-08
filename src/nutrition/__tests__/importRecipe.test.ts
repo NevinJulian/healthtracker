@@ -138,6 +138,6 @@ describe('buildImportResult abort signal', () => {
 
     await buildImportResult(meal(NAMES), 4, controller.signal);
 
-    expect(mockLookup.mock.calls.length).toBeLessThanOrEqual(3);
+    expect(mockLookup).toHaveBeenCalledTimes(1);
   });
 });
