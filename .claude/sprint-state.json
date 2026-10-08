@@ -148,15 +148,16 @@
     "F": {
       "branch": "sprint/lane-f-repo",
       "worktree": "C:/git/ht-lanes/lane-f",
-      "status": "pending",
+      "status": "in_progress",
       "waitsFor": "all other lanes merged",
       "order": [
         425,
         437
       ],
-      "current": null,
+      "current": 425,
       "done": [],
-      "parked": []
+      "parked": [],
+      "base": "71e0259"
     }
   },
   "issues": {
@@ -256,11 +257,11 @@
     },
     "425": {
       "lane": "F",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": "none (test-only)",
-      "notes": "WO ready; lane F waits for lane C. Probe confirmed: jest-expo's preset setup.js:130 registers jest.mock('expo-file-system/legacy', factory), which wins over the moduleNameMapper target, so the repo file never executes (only jest.requireActual reaches it); the non-legacy expo-file-system mock is NOT shadowed. Work: delete the three directory constants from __mocks__/expo-file-system/legacy.js, pin the shadowing with one new test; jest.config.js untouched; inline-mock tests stay. The analyst corrected the orchestrator's suggested test (asserting defined strings would contradict the decision).",
+      "notes": "WO ready; lane F waits for lane C. Probe confirmed: jest-expo's preset setup.js:130 registers jest.mock('expo-file-system/legacy', factory), which wins over the moduleNameMapper target, so the repo file never executes (only jest.requireActual reaches it); the non-legacy expo-file-system mock is NOT shadowed. Work: delete the three directory constants from __mocks__/expo-file-system/legacy.js, pin the shadowing with one new test; jest.config.js untouched; inline-mock tests stay. The analyst corrected the orchestrator's suggested test (asserting defined strings would contradict the decision). | Baseline for the developer is now 1365/104 (the work order still says 1230/100: lane C merged after it was written).",
       "workOrder": "C:/git/ht-lanes/wo/425.md",
       "decisionSource": "owner comment on #425 (remove the shadowed values from the global mock; leave the jest config as it is; tests that need those paths mock them inline)"
     },
@@ -484,11 +485,12 @@
     },
     "437": {
       "lane": "F",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "commits": [],
       "deviceCheck": null,
-      "notes": ""
+      "notes": "",
+      "decisionSource": "latest owner comment on #437 (6026263652): do the comments, docs and tidy-ups incl. the cold-review ones; upsertAdditionalWorkouts goes with its tests; the v37 comment is part of #412; of the behaviour notes only is_consumed NULL -> 0 on restore; the other four stay; the expo/src/winter mapping is not investigated"
     }
   },
   "foundDuringSprint": [
@@ -808,6 +810,10 @@
       "at": "2026-10-08T07:36:00Z",
       "event": "merged lane C into integration 802fa10 (no conflicts; database.ts auto-merged with lane E's setNutritionGoals); gates green: typecheck clean, 1365/104 (1230/100 before; lane C adds 135 tests / 4 suites, as on the lane). schema.ts untouched by lane C. Every lane except F is merged -> lane F unblocked",
       "sha": "802fa10"
+    },
+    {
+      "at": "2026-10-08T07:41:00Z",
+      "event": "integration pushed at 71e0259; worktree f created at 71e0259 (npm ci ok); lane F -> #425 in_dev (work order from yesterday, new baseline 1365/104); analyst dispatched for #437 (read-only on the integration checkout, which now holds every other lane)"
     }
   ],
   "status": "running",
