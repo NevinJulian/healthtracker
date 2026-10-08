@@ -95,13 +95,12 @@ export default function MealPrepScreen() {
   // refreshes (handleLogCookedMeal, handleAssignMeal, handleToggleConsumed)
   // and every re-focus call loadData() again — only the very first load
   // should show the full-screen "Loading meals…" state; a background
-  // reload must update the list in place instead of blanking it out (#329,
-  // same pattern as DashboardScreen's hasLoadedOnceRef from #325).
+  // reload must update the list in place instead of blanking it out.
   const hasLoadedOnceRef = useRef(false);
 
   // mountedRef reflects the component's real lifetime; it is cleared only
   // on true unmount below — NOT on blur, which also runs the focus
-  // effect's cleanup (the #312 lesson: don't conflate the two).
+  // effect's cleanup, so the two must not be conflated.
   const mountedRef = useRef(true);
   useEffect(() => {
     return () => {
@@ -109,7 +108,7 @@ export default function MealPrepScreen() {
     };
   }, []);
 
-  // runIdRef guards against overlapping loads (the #312 pattern): it is
+  // runIdRef guards against overlapping loads: it is
   // bumped at the start of every loadData() call, and again when the focus
   // effect's cleanup runs (i.e. on blur). A load only commits its results
   // if it is still the current run when it resolves, so a stale in-flight
@@ -181,7 +180,7 @@ export default function MealPrepScreen() {
 
   const handleLogCookedMeal = async (recipe_id: string, portions: number) => {
     // Backstop — the modal's own Save button is disabled for anything
-    // outside this range, but never trust the caller alone (#324).
+    // outside this range, but never trust the caller alone.
     if (!Number.isInteger(portions) || portions < 1 || portions > 50) return;
     await runGuarded(async () => {
       try {
@@ -618,7 +617,7 @@ function LogMealModal({ visible, onClose, recipes, onSave, saving }: {
   const [portions, setPortions] = useState('4');
 
   // Portions are whole meals: "2.5"/"2,5" don't make sense here, so only
-  // integers 1–50 are valid (#324). The parent now mounts this component
+  // integers 1–50 are valid. The parent mounts this component
   // only while `visible`, so this state is fresh on every open — no reset
   // effect needed.
   const trimmedPortions = portions.trim();
