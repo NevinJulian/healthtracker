@@ -61,7 +61,6 @@ jest.mock('../../db/database', () => ({
   upsertLogField: jest.fn().mockResolvedValue(undefined),
   upsertExerciseCompleted: jest.fn().mockResolvedValue(undefined),
   upsertBodyWeight: jest.fn().mockResolvedValue(undefined),
-  upsertAdditionalWorkouts: jest.fn().mockResolvedValue(undefined),
   addAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   toggleAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   syncRollingSchedule: jest.fn().mockResolvedValue(undefined),
@@ -83,7 +82,6 @@ import {
   getLogByDate,
   addAdditionalWorkout,
   toggleAdditionalWorkout,
-  upsertAdditionalWorkouts,
 } from '../../db/database';
 
 async function flushMicrotasks() {
@@ -119,7 +117,6 @@ describe('DashboardScreen additional workouts pass only the change to the databa
 
     expect(addAdditionalWorkout).toHaveBeenCalledWith(mockToday, workoutA);
     expect(toggleAdditionalWorkout).toHaveBeenCalledWith(mockToday, workoutB.id);
-    expect(upsertAdditionalWorkouts).not.toHaveBeenCalled();
 
     await act(async () => {
       releaseAdd();

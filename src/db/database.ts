@@ -1075,13 +1075,6 @@ async function _upsertBodyWeightImpl(date: string, weight: number): Promise<void
   _assertWrote(result, 'upsertBodyWeight', date);
 }
 
-export function upsertAdditionalWorkouts(
-  date: string,
-  workouts: AdditionalWorkout[]
-): Promise<void> {
-  return _enqueueWrite('upsertAdditionalWorkouts', () => _upsertAdditionalWorkoutsImpl(date, workouts));
-}
-
 async function _readAdditionalWorkoutsForWrite(
   db: SQLite.SQLiteDatabase,
   date: string,
@@ -1112,15 +1105,6 @@ async function _writeAdditionalWorkouts(
     date,
   ]);
   _assertWrote(result, caller, date);
-}
-
-async function _upsertAdditionalWorkoutsImpl(
-  date: string,
-  workouts: AdditionalWorkout[]
-): Promise<void> {
-  const db = getDatabase();
-  await _readAdditionalWorkoutsForWrite(db, date, 'upsertAdditionalWorkouts');
-  await _writeAdditionalWorkouts(db, date, workouts, 'upsertAdditionalWorkouts');
 }
 
 export function addAdditionalWorkout(date: string, workout: AdditionalWorkout): Promise<void> {

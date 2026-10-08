@@ -49,7 +49,6 @@ jest.mock('../../db/database', () => ({
   upsertLogField: jest.fn().mockResolvedValue(undefined),
   upsertExerciseCompleted: jest.fn().mockResolvedValue(undefined),
   upsertBodyWeight: jest.fn().mockResolvedValue(undefined),
-  upsertAdditionalWorkouts: jest.fn().mockResolvedValue(undefined),
   addAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   toggleAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   syncRollingSchedule: jest.fn().mockResolvedValue(undefined),
