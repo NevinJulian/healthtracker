@@ -112,11 +112,11 @@ describe('DashboardScreen additional workouts pass only the change to the databa
       fireEvent.press(getByLabelText('Stub add workout'));
     });
     await act(async () => {
-      fireEvent.press(getByLabelText('Mark Run complete'));
+      fireEvent.press(getByLabelText('Mark Curls complete'));
     });
 
     expect(addAdditionalWorkout).toHaveBeenCalledWith(mockToday, workoutA);
-    expect(toggleAdditionalWorkout).toHaveBeenCalledWith(mockToday, workoutB.id);
+    expect(toggleAdditionalWorkout).toHaveBeenCalledWith(mockToday, workoutA.id);
 
     await act(async () => {
       releaseAdd();
