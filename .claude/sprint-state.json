@@ -376,8 +376,8 @@
     },
     "431": {
       "lane": "C",
-      "status": "in_test",
-      "roundTrips": 0,
+      "status": "in_dev",
+      "roundTrips": 1,
       "commits": [
         "e618a53",
         "4b54e32",
@@ -387,7 +387,7 @@
         "efc21bf"
       ],
       "deviceCheck": "Debug build, force a load failure (temporary throw in getLogByDate / getWaterHistory). Cold start: error view; Retry works once the throw is removed. Then with data on screen, throw and refocus: banner appears and the data remains.",
-      "notes": "WO ready; last in lane C. New src/components/LoadErrorView.tsx (variant screen|banner); imported directly, src/components/index.ts untouched to avoid a lane B conflict. Strings are analyst picks. | dev (two runs: the first was cut off by the session ending after e618a53/4b54e32/794b62b; the second verified and committed the left-over Dashboard change unchanged as ac7a9b1, then did Analytics): six files only, +596 lines, no existing test touched. Dashboard 5 of 8 new tests fail without the fix, Analytics 5 of 8; in each file the empty-load test and the two race tests pass before the fix (tester to show they can fail). Dev says the banner disappears at every load start and comes back on failure (the WO clears loadError at load start) and did NOT compare with MealPrep's view. Analytics initial error view has no pull-to-refresh, Retry only.",
+      "notes": "WO ready; last in lane C. New src/components/LoadErrorView.tsx (variant screen|banner); imported directly, src/components/index.ts untouched to avoid a lane B conflict. Strings are analyst picks. | dev (two runs: the first was cut off by the session ending after e618a53/4b54e32/794b62b; the second verified and committed the left-over Dashboard change unchanged as ac7a9b1, then did Analytics): six files only, +596 lines, no existing test touched. Dashboard 5 of 8 new tests fail without the fix, Analytics 5 of 8; in each file the empty-load test and the two race tests pass before the fix (tester to show they can fail). Dev says the banner disappears at every load start and comes back on failure (the WO clears loadError at load start) and did NOT compare with MealPrep's view. Analytics initial error view has no pull-to-refresh, Retry only. | tester APPROVE r0 (1267/99 locally and with TZ=UTC; cold --no-cache runs clean; every pre-passing test shown able to fail by mutation except one not run in isolation). Two things it asked me to rule on: (B) Dashboard - a first load that succeeds with NO row for today followed by a load that rejects sets loadError 'refresh', but the !entry branch renders no banner: the screen shows 'No entry for today - try reopening the app.' with no Retry, i.e. the exact silent failure and misleading text #431 is about (rare: sync normally creates today's row). (M3) Analytics - the isCurrent() condition on hasLoadedOnceRef can be deleted with all 8 tests green (superseded run A resolves late, run B rejects: the mutant shows the refresh banner over zeroed cards instead of the error view). ORCHESTRATOR: B is the issue's own bug left in one branch of a lane-owned file, and M3 is new logic without a test - sent back for both; counted as round trip 1 although the tester approved. RULING for B: when a load fails and there is no entry on screen, the Dashboard shows the screen variant (Couldn't load today + Retry), never the No-entry text and never the banner (its text says the last loaded data is showing, and there is none). HUMAN: the banner disappears while any load is pending and comes back on failure - identical to MealPrep (#401), so no divergence; the Dashboard's error view has no header (MealPrep and Analytics keep theirs), matching the Dashboard's own loading / no-entry states.",
       "workOrder": "C:/git/ht-lanes/wo/431.md",
       "decisionSource": "SPRINT.md §3 known pattern (#431 follows MealPrep's error view from #401, one shared component; MealPrep keeps its own)"
     },
@@ -774,6 +774,10 @@
     {
       "at": "2026-10-08T06:47:00Z",
       "event": "#431 in_test (efc21bf, 1267/99 per dev; lane C pushed). Security SKIPPED for #431 by orchestrator decision: the diff is two screens, one presentational component and tests; nothing reaches src/db, backup, src/api, the filesystem or external input"
+    },
+    {
+      "at": "2026-10-08T07:05:00Z",
+      "event": "#431 tester APPROVE r0, but orchestrator sent it back: a failed load is still silent when the Dashboard has no entry on screen, and the Analytics hasLoadedOnceRef guard has no test (roundTrips=1) -> in_dev. Dry-run merge of lane C into integration (git merge-tree, in memory): clean; database.ts is the only file changed on both sides"
     }
   ],
   "status": "running",
@@ -841,7 +845,13 @@
     "SMALL (#425 analyst): CLAUDE.md Testing setup says moduleNameMapper stubs expo-file-system/legacy; for that module the jest-expo preset mock wins",
     "SMALL (#435 tester): measurements modal race - save pending, Cancel, reopen and type, then the old save resolves: the old handleSave calls onClose and closes the NEW modal, losing the typed text (same shape as before this sprint)",
     "SMALL (#435 tester): after a successful measurement or set write whose refresh read fails, the pills / set list show stale values until the next load (no message; data is saved)",
-    "SMALL (#435 tester r2): MeasurementsModal.handleSave sends all five fields on every Save, so after a partial failure (one invalid field) the valid field is written twice (idempotent upsert; existing behaviour)"
+    "SMALL (#435 tester r2): MeasurementsModal.handleSave sends all five fields on every Save, so after a partial failure (one invalid field) the valid field is written twice (idempotent upsert; existing behaviour)",
+    "SMALL (#431 tester): Analytics - a refresh that fails after an earlier step already committed (e.g. weight history) shows the new weight next to old nutrition data under a banner that says Showing the last loaded data (follows the work order's partial-commit rule)",
+    "SMALL (#431 tester): Analytics - pressing Retry on the initial error view clears the error at once, and until the retry settles the header and zeroed cards show (no loading state; extends the #431 analyst finding that loading starts false)",
+    "SMALL (#431 tester): Dashboard - navigating away while the very first load is in flight leaves the spinner up until the next focus load (run id bumped, finally skipped); same before #431",
+    "SMALL (#431 tester): Analytics still calls console.error('Failed to load analytics') for a load that rejects after unmount (log only, no state write)",
+    "SMALL (#431 tester): the Dashboard initial error view is a bare centred view without a header, while MealPrep's and the Analytics one keep ScreenHeader; LoadErrorView has its own errorTitle/errorSub styles instead of MealPrep's emptyTitle/emptySub (values not compared)",
+    "SMALL (#431 tester): Button forwards the press event to onPress, and LoadErrorView passes onRetry straight through, so the load functions receive the event as an argument (harmless today: loadToday and loadData take no parameters)"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
