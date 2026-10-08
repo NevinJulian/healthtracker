@@ -131,16 +131,58 @@ describe('getLatestMeasurements reports the date each value was measured', () =>
     });
   });
 
-  it('still returns a legacy all-NULL row from getBodyMeasurements', async () => {
+  it('skips a legacy all-NULL row in getBodyMeasurements and leaves it stored', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
 
     await db.getDatabase().runAsync('INSERT INTO body_measurements (date) VALUES (?)', ['2026-01-05']);
 
+    expect(await db.getBodyMeasurements()).toEqual([]);
+    const count = await db
+      .getDatabase()
+      .getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM body_measurements');
+    expect(count?.n).toBe(1);
+  });
+});
+
+describe('getBodyMeasurements returns only rows with at least one value', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  async function seed(db: DatabaseModule): Promise<void> {
+    const raw = db.getDatabase();
+    await raw.runAsync('INSERT INTO body_measurements (date) VALUES (?)', ['2025-01-01']);
+    await raw.runAsync('INSERT INTO body_measurements (date, arm_cm) VALUES (?, ?)', ['2025-01-02', 30]);
+    await db.logBodyMeasurement('2025-01-03', { waist_cm: 80, chest_cm: 90, hips_cm: 100, thigh_cm: 55, arm_cm: 31 });
+  }
+
+  it('omits the all-NULL row with and without sinceDateKey, keeping date order and the row itself', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await seed(db);
+
+    expect((await db.getBodyMeasurements()).map((r) => r.date)).toEqual(['2025-01-02', '2025-01-03']);
+    expect((await db.getBodyMeasurements('2025-01-01')).map((r) => r.date)).toEqual([
+      '2025-01-02',
+      '2025-01-03',
+    ]);
+    expect((await db.getBodyMeasurements('2025-01-03')).map((r) => r.date)).toEqual(['2025-01-03']);
+    const count = await db
+      .getDatabase()
+      .getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM body_measurements');
+    expect(count?.n).toBe(3);
+  });
+
+  it('treats a stored 0 as a value', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await db.getDatabase().runAsync('INSERT INTO body_measurements (date, chest_cm) VALUES (?, ?)', ['2025-02-01', 0]);
+
     const rows = await db.getBodyMeasurements();
     expect(rows).toHaveLength(1);
-    expect(rows[0].date).toBe('2026-01-05');
-    expect(rows[0].waist_cm).toBeNull();
+    expect(rows[0].chest_cm).toBe(0);
+    expect(await db.getBodyMeasurements('2025-02-01')).toHaveLength(1);
   });
 });
 

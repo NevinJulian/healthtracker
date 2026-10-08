@@ -596,22 +596,66 @@ describe('addAdditionalWorkout and toggleAdditionalWorkout read-modify-write ins
     const toggled = addDays(FAR_PAST(), -1);
 
     await db.addAdditionalWorkout(added, A);
-    await db.toggleAdditionalWorkout(toggled, 'missing');
+    await expect(db.toggleAdditionalWorkout(toggled, 'missing')).rejects.toThrow('missing');
 
     expect(JSON.parse((await readRaw(db, added)) as string)).toEqual([A]);
     expect(await readRaw(db, toggled)).toBe('[]');
   });
 
-  it('toggle with an unknown id resolves and leaves the stored value unchanged', async () => {
+  it('toggle with an unknown id rejects and leaves the stored value unchanged', async () => {
     const db = loadFreshDatabaseModule();
     await db.initDatabase();
     const date = todayKey();
     const raw = '[ {"id":"b","name":"Run","completed":false} ]';
     await seedRaw(db, date, raw);
 
-    await expect(db.toggleAdditionalWorkout(date, 'nope')).resolves.toBeUndefined();
+    await expect(db.toggleAdditionalWorkout(date, 'nope')).rejects.toThrow('nope');
 
     expect(await readRaw(db, date)).toBe(raw);
+  });
+
+  it('an unknown-id toggle rejects with a plain Error naming the date and the id', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await seedRaw(db, date, JSON.stringify([B]));
+
+    const error = await db.toggleAdditionalWorkout(date, 'nope').then(
+      () => undefined,
+      (e: unknown) => e
+    );
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(db.CorruptJsonError);
+    expect((error as Error).message).toContain(date);
+    expect((error as Error).message).toContain('nope');
+  });
+
+  it('a rejected toggle does not block the next queued toggle', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await seedRaw(db, date, JSON.stringify([B]));
+
+    const rejected = db.toggleAdditionalWorkout(date, 'nope');
+    const valid = db.toggleAdditionalWorkout(date, B.id);
+
+    await expect(rejected).rejects.toThrow('nope');
+    await expect(valid).resolves.toBeUndefined();
+    expect(JSON.parse((await readRaw(db, date)) as string)).toEqual([{ ...B, completed: true }]);
+  });
+
+  it('toggle of a known id flips completed in both directions', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await seedRaw(db, date, JSON.stringify([A, B]));
+
+    await db.toggleAdditionalWorkout(date, B.id);
+    expect(JSON.parse((await readRaw(db, date)) as string)).toEqual([A, { ...B, completed: true }]);
+
+    await db.toggleAdditionalWorkout(date, B.id);
+    expect(JSON.parse((await readRaw(db, date)) as string)).toEqual([A, B]);
   });
 });
 
@@ -905,5 +949,254 @@ describe('daily_log writers reject dates outside the valid range', () => {
 
       expect(await rowCount(db, good)).toBe(1);
     });
+  });
+});
+
+describe('stored daily_log arrays are valid only when every item is an object with a string id', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const COLUMNS = ['exercises', 'additional_workouts'] as const;
+  const CORRUPT = ['', 'null', '{}', '"x"', '[null]', '[1]', '["a"]', '[{}]', '[{"id":"a"},null]', '{not json'];
+  const VALID = ['[]', '[{"id":"a"}]'];
+  const workout = { id: 'a', name: 'Curls', muscle_group: 'Arms', sets: '3', reps: '10', completed: false };
+
+  async function setup(column: string, raw: string): Promise<{ db: DatabaseModule; date: string }> {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await db.getDatabase().runAsync(`UPDATE daily_log SET ${column} = ? WHERE date = ?`, [raw, date]);
+    return { db, date };
+  }
+
+  async function stored(db: DatabaseModule, date: string, column: string): Promise<string> {
+    const row = await db
+      .getDatabase()
+      .getFirstAsync<Record<string, string>>(`SELECT ${column} AS raw FROM daily_log WHERE date = ?`, [date]);
+    return (row as Record<string, string>).raw;
+  }
+
+  function writers(db: DatabaseModule, date: string, column: (typeof COLUMNS)[number]): Array<() => Promise<void>> {
+    return column === 'exercises'
+      ? [() => db.upsertExerciseCompleted(date, 'a', true)]
+      : [
+          () => db.upsertAdditionalWorkouts(date, [workout]),
+          () => db.addAdditionalWorkout(date, workout),
+          () => db.toggleAdditionalWorkout(date, 'a'),
+        ];
+  }
+
+  const corruptCases = COLUMNS.flatMap((column) => CORRUPT.map((raw) => [column, raw] as const));
+  const validCases = COLUMNS.flatMap((column) => VALID.map((raw) => [column, raw] as const));
+
+  it.each(corruptCases)('%s = %j: writers throw CorruptJsonError and leave the text alone', async (column, raw) => {
+    const { db, date } = await setup(column, raw);
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    for (const write of writers(db, date, column)) {
+      const err = await write().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(db.CorruptJsonError);
+      expect(err).toMatchObject({ column, date });
+      expect(await stored(db, date, column)).toBe(raw);
+    }
+    spy.mockRestore();
+  });
+
+  it.each(corruptCases)('%s = %j: reset keeps the text and writes a fresh value', async (column, raw) => {
+    const { db, date } = await setup(column, raw);
+
+    await db.resetCorruptDayColumn(date, column);
+
+    const keptRow = await db
+      .getDatabase()
+      .getFirstAsync<{ value: string }>('SELECT value FROM app_state WHERE key = ?', [`corrupt_json:${column}:${date}`]);
+    expect(keptRow?.value).toBe(raw);
+    expect(Array.isArray(JSON.parse(await stored(db, date, column)))).toBe(true);
+  });
+
+  it.each(validCases)('%s = %j: writers succeed and reset refuses', async (column, raw) => {
+    const { db, date } = await setup(column, raw);
+
+    await expect(db.resetCorruptDayColumn(date, column)).rejects.toThrow('not corrupt');
+    for (const write of writers(db, date, column)) {
+      await expect(write()).resolves.toBeUndefined();
+    }
+  });
+});
+
+describe('reading daily_log drops items that are not objects with a string id', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const keep = { id: 'a', completed: true };
+  const cases: Array<[string, unknown[]]> = [
+    ['[null,{"id":"a","completed":true}]', [keep]],
+    ['[1]', []],
+    ['["a"]', []],
+    ['[{}]', []],
+    ['[[],{"id":"a","completed":true}]', [keep]],
+    ['[{"id":1}]', []],
+    ['{}', []],
+    ['{not json', []],
+  ];
+
+  it.each(cases)('%j reads as %j in both columns without throwing', async (raw, expected) => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await db
+      .getDatabase()
+      .runAsync('UPDATE daily_log SET exercises = ?, additional_workouts = ? WHERE date = ?', [raw, raw, date]);
+
+    const entry = await db.getLogByDate(date);
+
+    expect(entry?.exercises).toEqual(expected);
+    expect(entry?.additional_workouts).toEqual(expected);
+  });
+});
+
+describe('resetCorruptDayColumn only accepts the two known columns', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])('rejects %j as an unsupported column', async (column) => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await expect(
+      db.resetCorruptDayColumn(todayKey(), column as unknown as 'exercises')
+    ).rejects.toThrow('unsupported column');
+  });
+});
+
+describe('syncRollingSchedule leaves a row with an invalid exercises array untouched', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  it.each(['[null]', '[{"id":"a"},null]'])('%s inside the backfill window is not overwritten', async (raw) => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await db.getDatabase().runAsync('UPDATE daily_log SET exercises = ? WHERE date = ?', [raw, date]);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await db.syncRollingSchedule();
+
+    const row = await db
+      .getDatabase()
+      .getFirstAsync<{ exercises: string }>('SELECT exercises FROM daily_log WHERE date = ?', [date]);
+    expect(row?.exercises).toBe(raw);
+    warn.mockRestore();
+  });
+});
+
+describe('weekly template exercises are read as stored', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const stored = '[{"name":"X"},{"id":"a","name":"Y"}]';
+
+  it('getWeeklyTemplate returns items without an id unfiltered', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await db.getDatabase().runAsync('UPDATE weekly_template SET exercises = ? WHERE day_of_week = 3', [stored]);
+
+    const wednesday = (await db.getWeeklyTemplate()).find((d) => d.day_of_week === 3);
+
+    expect(wednesday?.exercises).toEqual(JSON.parse(stored));
+  });
+
+  it('a new daily_log row built from that template carries the items with completed reset', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const target = addDays(todayKey(), 5);
+    const dow = dateKeyToLocalDate(target).getDay();
+    await db.getDatabase().runAsync('UPDATE weekly_template SET exercises = ? WHERE day_of_week = ?', [stored, dow]);
+    await db.getDatabase().runAsync('DELETE FROM daily_log WHERE date = ?', [target]);
+
+    await db.syncRollingSchedule();
+
+    const row = await db
+      .getDatabase()
+      .getFirstAsync<{ exercises: string }>('SELECT exercises FROM daily_log WHERE date = ?', [target]);
+    expect(JSON.parse(row?.exercises ?? 'null')).toEqual([
+      { name: 'X', completed: false },
+      { id: 'a', name: 'Y', completed: false },
+    ]);
+  });
+});
+
+describe('read entries flag a column unreadable exactly when the writers refuse it', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+    jest.useRealTimers();
+  });
+
+  const COLUMNS = ['exercises', 'additional_workouts'] as const;
+  const CORRUPT = ['', 'null', '{}', '"x"', '[null]', '[1]', '["a"]', '[{}]', '[{"id":"a"},null]', '{not json', '[{"name":"x"}]'];
+  const VALID = ['[]', '[{"id":"a"}]'];
+  const workout = { id: 'a', name: 'Curls', muscle_group: 'Arms', sets: '3', reps: '10', completed: false };
+  const cases = COLUMNS.flatMap((column) => [...CORRUPT, ...VALID].map((raw) => [column, raw] as const));
+
+  async function seeded(column: string, raw: string): Promise<{ db: DatabaseModule; date: string }> {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const date = todayKey();
+    await db.getDatabase().runAsync(`UPDATE daily_log SET ${column} = ? WHERE date = ?`, [raw, date]);
+    return { db, date };
+  }
+
+  async function writerRefuses(db: DatabaseModule, date: string, column: (typeof COLUMNS)[number]): Promise<boolean> {
+    const write =
+      column === 'exercises'
+        ? () => db.upsertExerciseCompleted(date, 'a', true)
+        : () => db.upsertAdditionalWorkouts(date, [workout]);
+    const err = await write().then(
+      () => undefined,
+      (e: unknown) => e
+    );
+    return err instanceof db.CorruptJsonError;
+  }
+
+  it.each(cases)('%s = %j: getLogByDate flags it iff the writer refuses it', async (column, raw) => {
+    const { db, date } = await seeded(column, raw);
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const refuses = await writerRefuses(db, date, column);
+    spy.mockRestore();
+    await db.getDatabase().runAsync(`UPDATE daily_log SET ${column} = ? WHERE date = ?`, [raw, date]);
+
+    const entry = await db.getLogByDate(date);
+
+    expect(entry?.unreadable?.includes(column) ?? false).toBe(refuses);
+  });
+
+  it('a row with both columns corrupt flags both, a valid row flags none', async () => {
+    const { db, date } = await seeded('exercises', '{bad');
+    await db.getDatabase().runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', ['[1]', date]);
+
+    expect((await db.getLogByDate(date))?.unreadable).toEqual(['exercises', 'additional_workouts']);
+
+    await db.getDatabase().runAsync('UPDATE daily_log SET exercises = ?, additional_workouts = ? WHERE date = ?', ['[]', '[]', date]);
+    expect((await db.getLogByDate(date))?.unreadable ?? []).toEqual([]);
+  });
+
+  it('getDailyLogsBetween flags per row', async () => {
+    const { db, date } = await seeded('additional_workouts', '{bad');
+    const other = addDays(date, 1);
+
+    const rows = await db.getDailyLogsBetween(date, other);
+
+    expect(rows.find((r) => r.date === date)?.unreadable).toEqual(['additional_workouts']);
+    expect(rows.find((r) => r.date === other)?.unreadable ?? []).toEqual([]);
   });
 });

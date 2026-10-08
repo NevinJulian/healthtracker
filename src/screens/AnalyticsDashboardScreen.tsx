@@ -65,6 +65,7 @@ import {
 } from '../db/database';
 import { addDays as addDaysKey } from '../utils/dates';
 import { Card, ProgressBar, ScreenHeader, Pill } from '../components';
+import LoadErrorView from '../components/LoadErrorView';
 import {
   computeStreaks,
   computeStrengthProgression,
@@ -1279,6 +1280,7 @@ function NutritionSectionCard({
 
 export default function AnalyticsDashboardScreen() {
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<'initial' | 'refresh' | null>(null);
   const [stats7Day, setStats7Day] = useState<RollingStats>({
     walk: 0, gym: 0, extra: 0, total: 0, fasting: 0,
   });
@@ -1348,6 +1350,7 @@ export default function AnalyticsDashboardScreen() {
   // the screen would silently stop updating after navigating away and back.
   const runIdRef = useRef(0);
   const mountedRef = useRef(true);
+  const hasLoadedOnceRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -1361,6 +1364,7 @@ export default function AnalyticsDashboardScreen() {
     const isCurrent = () => mountedRef.current && runIdRef.current === myRunId;
 
     setLoading(true);
+    setLoadError(null);
     try {
       // `logs` below feeds computeStats(7/30), the fasting-streak scan,
       // computeStreaks, and the 30-day consistency grid — every one of
@@ -1528,8 +1532,10 @@ export default function AnalyticsDashboardScreen() {
       } else {
         if (isCurrent()) setLiftHistoryByExercise({});
       }
+      if (isCurrent()) hasLoadedOnceRef.current = true;
     } catch (err) {
       console.error('Failed to load analytics', err);
+      if (isCurrent()) setLoadError(hasLoadedOnceRef.current ? 'refresh' : 'initial');
     } finally {
       if (isCurrent()) setLoading(false);
     }
@@ -1556,6 +1562,15 @@ export default function AnalyticsDashboardScreen() {
       ? `+${weightDelta.toFixed(1)}`
       : weightDelta.toFixed(1);
 
+  if (loadError === 'initial') {
+    return (
+      <View style={styles.screen}>
+        <ScreenHeader title="Progress" subtitle="Last 30 days" />
+        <LoadErrorView variant="screen" title="Couldn't load your progress" onRetry={loadData} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -1569,6 +1584,8 @@ export default function AnalyticsDashboardScreen() {
         }
       >
         <ScreenHeader title="Progress" subtitle="Last 30 days" />
+
+        {loadError === 'refresh' && <LoadErrorView variant="banner" onRetry={loadData} />}
 
         {/* Metric cards row */}
         <View style={styles.metricsRow}>
