@@ -109,7 +109,7 @@ async function renderWithModalOpen() {
   return utils;
 }
 
-describe('DashboardScreen measurements modal (#325)', () => {
+describe('DashboardScreen measurements modal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetLogByDate.mockResolvedValue({ ...mockEntry });
