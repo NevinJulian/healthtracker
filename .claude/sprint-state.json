@@ -494,9 +494,23 @@
       "lane": "F",
       "status": "in_dev",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "e97ff4a",
+        "3d18a6f",
+        "3ed58b7",
+        "ed6e07a",
+        "fa3d338",
+        "c82243d",
+        "625f4dd",
+        "99fd0a3",
+        "c4f8a5c",
+        "2da1ea7",
+        "b93f5d7",
+        "23324d5",
+        "e2df38a"
+      ],
       "deviceCheck": "From the integration branch in Expo Go or a dev build: (1) Settings > Backup: export, then restore that same file - success alert with non-zero rows, Meal prep plan and ticked meals unchanged, Dashboard loads (the new temp-table SQL has only run on sql.js so far, so this step matters). (2) Dashboard with a logged measurement: the pills show value, cm and date. (3) Settings: change a profile field and a reminder toggle, force-close, reopen: both persisted.",
-      "notes": "WO ready (24 checkbox rows: 15 DO, 3 ALREADY DONE, 6 LEAVE). ALREADY DONE: the v37 comment (via #412), the POST_RESTORE_STEPS comment (gone), the font-error-while-init-pending case in App.startFailure.test.tsx. LEAVE by the owner's decision: winter mapping, onboarding age keypad, MealPrep handleToggleConsumed guard, restore alert column names. LEAVE by the ANALYST (HUMAN: these two boxes stay unticked although the decision says do the tidy-ups and the cold-review items): Button.tsx raw 13 / 48 (no token has these values; a swap would restyle every button and tokens.ts is not on the checklist), and the #408 Remove confirm that promises a refund the db does not give (changing it is a behaviour change plus a product call on which batch to credit; the decision allows exactly one behaviour fix and names another) - the latter is filed as its own issue. DO: comment/doc edits (MealPrepScreen, three test titles, AppNavigator, five Jest 30 comments, two eslint-disable lines, the restoreFromPayload docblock), removal of upsertAdditionalWorkouts with 16 tests, MEASUREMENT_FIELDS reuse, pills rename, trackProfileWrite -> trackSettingWrite, three strengthened tests (importRecipe abort, extraWorkouts, corruptDay), the one behaviour fix (restore treats a NULL weekly_meal_plan.is_consumed as 0), and the RESTORE_SLOT_DEDUPE_SQL rewrite to one temp table (not a MIGRATIONS entry; riskiest, last, behind a characterisation test committed green on the old SQL). 17 commits planned. ORCHESTRATOR: the developer work is split into two dispatches on the same branch - part A (commits 1-13, comments / tidy-ups / tests) and part B (commits 14-17, the restore path) - so the restore changes get a fresh context; one tester and one security review over the whole issue afterwards. Expected count from the lane baseline 1367/105: -16 +5 +6 = 1362 tests, 107 suites.",
+      "notes": "WO ready (24 checkbox rows: 15 DO, 3 ALREADY DONE, 6 LEAVE). ALREADY DONE: the v37 comment (via #412), the POST_RESTORE_STEPS comment (gone), the font-error-while-init-pending case in App.startFailure.test.tsx. LEAVE by the owner's decision: winter mapping, onboarding age keypad, MealPrep handleToggleConsumed guard, restore alert column names. LEAVE by the ANALYST (HUMAN: these two boxes stay unticked although the decision says do the tidy-ups and the cold-review items): Button.tsx raw 13 / 48 (no token has these values; a swap would restyle every button and tokens.ts is not on the checklist), and the #408 Remove confirm that promises a refund the db does not give (changing it is a behaviour change plus a product call on which batch to credit; the decision allows exactly one behaviour fix and names another) - the latter is filed as its own issue. DO: comment/doc edits (MealPrepScreen, three test titles, AppNavigator, five Jest 30 comments, two eslint-disable lines, the restoreFromPayload docblock), removal of upsertAdditionalWorkouts with 16 tests, MEASUREMENT_FIELDS reuse, pills rename, trackProfileWrite -> trackSettingWrite, three strengthened tests (importRecipe abort, extraWorkouts, corruptDay), the one behaviour fix (restore treats a NULL weekly_meal_plan.is_consumed as 0), and the RESTORE_SLOT_DEDUPE_SQL rewrite to one temp table (not a MIGRATIONS entry; riskiest, last, behind a characterisation test committed green on the old SQL). 17 commits planned. ORCHESTRATOR: the developer work is split into two dispatches on the same branch - part A (commits 1-13, comments / tidy-ups / tests) and part B (commits 14-17, the restore path) - so the restore changes get a fresh context; one tester and one security review over the whole issue afterwards. Expected count from the lane baseline 1367/105: -16 +5 +6 = 1362 tests, 107 suites. | dev part A (13 commits, tip e2df38a, 1351/105 = 1367 - 16): comment-only commits proven by transpiling each file with comments removed before and after (EQUAL for all, incl. jest.config.js and database.ts); 16 upsertAdditionalWorkouts tests deleted and listed; renames shown to be pure; strengthened tests go red under every named mutation. DEVIATIONS: (1) in the writers(db,date,column) list the upsert entry was removed, not replaced (add and toggle were already in it); (2) two work-order claims that the OLD test stays green under the named mutation were wrong (importRecipe: the literal mutation gives 4 calls and turns the old test red too, a variant with started = 1 gives 3 and discriminates; corruptDay: the old notice tests also go red) - the new tests are red in every case. Dev admits two slips where git checkout HEAD -- dropped uncommitted edits (redone and re-verified). Not run under an explicit TZ=UTC (npm test already sets it).",
       "decisionSource": "latest owner comment on #437 (6026263652): do the comments, docs and tidy-ups incl. the cold-review ones; upsertAdditionalWorkouts goes with its tests; the v37 comment is part of #412; of the behaviour notes only is_consumed NULL -> 0 on restore; the other four stay; the expo/src/winter mapping is not investigated",
       "workOrder": "C:/git/ht-lanes/wo/437.md"
     }
@@ -843,6 +857,10 @@
     {
       "at": "2026-10-08T07:26:56Z",
       "event": "filed #444 (MealPrep Remove confirm promises a refund the db does not give for a NULL inventory pointer; the unticked #408 box of #437); not worked"
+    },
+    {
+      "at": "2026-10-08T07:34:38Z",
+      "event": "#437 part A done (13 commits, tip e2df38a, 1351/105 per dev; schema.ts untouched) -> part B (commits 14-17: is_consumed NULL -> 0 on restore, RESTORE_SLOT_DEDUPE_SQL to one temp table) dispatched; still in_dev"
     }
   ],
   "status": "running",
@@ -925,7 +943,8 @@
     "SMALL (#437 analyst): schema.ts:748, the // comment above migration 36, still says lane D's #317 will append v37",
     "SMALL (#437 analyst): more issue-number comments remain in database.ts (e.g. near 1826 and 2703) and MealPrepScreen.focus.test.tsx:127 has (#329) in a title",
     "SMALL (#437 analyst): App.tsx:94 shows the init error over the font error when both exist",
-    "SMALL (#437 analyst): a NULL in any other NOT NULL column of a hand-edited backup still aborts the whole restore (same class as the is_consumed case #437 fixes)"
+    "SMALL (#437 analyst): a NULL in any other NOT NULL column of a hand-edited backup still aborts the whole restore (same class as the is_consumed case #437 fixes)",
+    "SMALL (#437 dev A): issue-number comments beyond #437's rows remain in MealPrepScreen.focus.test.tsx (lines 16, 127), DashboardScreen.measurements.test.tsx (6, 60), the dailyLogUpserts.test.ts header (#305 history) and many places in database.ts (e.g. near 99, 290-305, 450, 621, 759, 945-1023, and a #369 comment inside restoreFromPayload)"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
