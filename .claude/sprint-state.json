@@ -535,10 +535,13 @@
     441,
     442,
     443,
-    444
+    444,
+    445
   ],
-  "smallFindings": [],
-  "smallFindingsIssue": null,
+  "smallFindings": [
+    "filed as #445"
+  ],
+  "smallFindingsIssue": 445,
   "log": [
     {
       "at": "2026-10-07T20:11:02Z",
@@ -910,9 +913,13 @@
       "at": "2026-10-08T08:09:59Z",
       "event": "merged lane F into integration 311191c (no conflicts); gates green: typecheck clean, 1387/107 (baseline on main 1118/93). All six lanes merged, 17 of 17 issues merged, 0 parked. MIGRATIONS on the merged branch re-checked against main bbfe649: 38 entries identical (version, sql, precondition); the only changed SQL constant is RESTORE_SLOT_DEDUPE_SQL. Diff against main without state file and report: 74 files, +4630 / -727",
       "sha": "311191c"
+    },
+    {
+      "at": "2026-10-08T08:14:26Z",
+      "event": "GitHub CI test check on integration 36378f1 (all six lanes merged): completed success. Filed #445 (Sprint 4: small findings, 58 boxes); none worked. SPRINT_REPORT.md written. Sprint finished: 17 of 17 merged, 0 parked, no abort condition. NOT opened: the PR - the cold review and the device checks come first and belong to the human"
     }
   ],
-  "status": "running",
+  "status": "finished",
   "pendingFindings": [
     "USER-HITTABLE (#423 analyst): OnboardingScreen branch in App.tsx is outside the error boundary the #423 decision asks for, so a render crash on first launch is still uncaught",
     "USER-HITTABLE/DATA-LOSS (#426 analyst): rescueExport offers the wal only after the db share resolves; if the first share is cancelled or fails the wal is never offered",
@@ -1005,6 +1012,26 @@
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
     "442": "Discover import: Already in library blocks a refresh, Alert says Try again in a minute (covers the #428 analyst + tester/security entries)",
     "443": "Recipe editor: save-deadline Not looked up notice is set on a screen that closes at once (covers the #428 security entry)",
-    "444": "MealPrep Remove confirm promises a refund that is not given for a meal ticked without stock (covers the pendingFindings entry from the #437 analyst; an unticked box of #437)"
+    "444": "MealPrep Remove confirm promises a refund that is not given for a meal ticked without stock (covers the pendingFindings entry from the #437 analyst; an unticked box of #437)",
+    "445": "Sprint 4: small findings - 58 checkboxes collected from pendingFindings (everything not covered by #441-#444 and not resolved inside the sprint)"
+  },
+  "finishedAt": "2026-10-08T08:14:26Z",
+  "final": {
+    "integrationCodeTip": "311191c",
+    "typecheck": "pass",
+    "tests": 1387,
+    "testSuites": 107,
+    "baselineTests": 1118,
+    "baselineSuites": 93,
+    "merged": 17,
+    "parked": 0,
+    "blockedLanes": 0,
+    "ciOnPushedTip": "36378f1 test: success",
+    "prOpened": false,
+    "outstandingForHuman": [
+      "cold review (/code-review on main...sprint/auto-fixes in a fresh session)",
+      "device checks in SPRINT_REPORT.md section 7",
+      "open the PR via the GitHub MCP (command in SPRINT_REPORT.md section 5)"
+    ]
   }
 }
