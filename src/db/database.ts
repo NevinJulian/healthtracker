@@ -2749,7 +2749,9 @@ async function _restoreFromPayload(
 
         const columns = keys.join(', ');
         const placeholders = keys.map(() => '?').join(', ');
-        const values = keys.map((k) => row[k]);
+        const values = keys.map((k) =>
+          tableName === 'weekly_meal_plan' && k === 'is_consumed' && row[k] === null ? 0 : row[k]
+        );
 
         await db.runAsync(
           `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders})`,
