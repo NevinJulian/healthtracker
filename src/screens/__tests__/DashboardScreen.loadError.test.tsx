@@ -229,4 +229,57 @@ describe('DashboardScreen load errors', () => {
     expect(getByText('NEWER TASK')).toBeTruthy();
     expect(queryByText('OLDER TASK')).toBeNull();
   });
+
+  describe('a failed reload with no entry on screen', () => {
+    const NO_ENTRY = 'No entry for today — try reopening the app.';
+
+    async function arrive() {
+      mockGetLogByDate.mockResolvedValueOnce(null);
+      const utils = render(<DashboardScreen />);
+      await triggerFocus();
+      expect(utils.getByText(NO_ENTRY)).toBeTruthy();
+      mockGetLogByDate.mockRejectedValueOnce(new Error('boom'));
+      await triggerFocus();
+      return utils;
+    }
+
+    it('shows the error view, not the empty text or the banner', async () => {
+      const { getByText, getByLabelText, queryByText } = await arrive();
+
+      expect(getByText(TITLE)).toBeTruthy();
+      expect(getByText(SUB)).toBeTruthy();
+      expect(getByLabelText('Retry')).toBeTruthy();
+      expect(queryByText(NO_ENTRY)).toBeNull();
+      expect(queryByText(BANNER)).toBeNull();
+      expect(alertSpy).not.toHaveBeenCalled();
+    });
+
+    it('Retry that returns an entry shows the data and no error', async () => {
+      const { getByText, getByLabelText, queryByText } = await arrive();
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Retry'));
+      });
+      await flush();
+
+      expect(getByText('Walk 30 min')).toBeTruthy();
+      expect(queryByText(TITLE)).toBeNull();
+      expect(queryByText(BANNER)).toBeNull();
+    });
+
+    it('Retry that returns no row shows the empty text and no error', async () => {
+      const { getByText, getByLabelText, queryByText } = await arrive();
+      mockGetLogByDate.mockResolvedValueOnce(null);
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Retry'));
+      });
+      await flush();
+
+      expect(getByText(NO_ENTRY)).toBeTruthy();
+      expect(queryByText(TITLE)).toBeNull();
+      expect(queryByText(SUB)).toBeNull();
+      expect(queryByText(BANNER)).toBeNull();
+    });
+  });
 });
