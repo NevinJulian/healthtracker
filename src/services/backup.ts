@@ -165,7 +165,6 @@ export function validatePayload(
 /** Returns the version string from package.json (bundled at build time). */
 function getAppVersion(): string {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const pkg = require('../../package.json') as { version?: string };
     return pkg.version ?? '1.0.0';
   } catch {
@@ -357,7 +356,7 @@ export async function importBackup(
 
   let restored: Awaited<ReturnType<typeof restoreFromPayload>>;
   try {
-    restored = await restoreFromPayload(payload.tables);
+    restored = await restoreFromPayload(payload.tables, payload.schemaVersion);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     throw new Error(

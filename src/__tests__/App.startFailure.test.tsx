@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { ScrollView } from 'react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 jest.mock('react-native-gesture-handler', () => ({}));
 jest.mock('react-native-safe-area-context', () => ({
@@ -17,7 +18,11 @@ jest.mock('../db/database', () => ({
   getOnboardingComplete: jest.fn(),
   getLatestBodyWeight: jest.fn(),
 }));
-jest.mock('../services/rescueExport', () => ({ exportRawDatabase: jest.fn() }));
+jest.mock('../services/rescueExport', () => ({
+  exportRawDatabase: jest.fn(),
+  hasRescueWal: jest.fn(() => Promise.resolve(false)),
+  clearRescueCopies: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('../db/devStress369', () => ({ installStress369: jest.fn() }));
 jest.mock('../services/notifications', () => ({
   configureNotificationHandler: jest.fn(),
@@ -35,10 +40,13 @@ jest.mock('../screens/OnboardingScreen', () => {
 
 import { useFonts } from 'expo-font';
 import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from '../db/database';
-import { exportRawDatabase } from '../services/rescueExport';
+import { clearRescueCopies, exportRawDatabase, hasRescueWal } from '../services/rescueExport';
 import App from '../../App';
+import { COLD_RENDER_WAIT } from '../testUtils/coldRenderWait';
 
 const rescue = exportRawDatabase as jest.Mock;
+const walPresent = hasRescueWal as jest.Mock;
+const clearCopies = clearRescueCopies as jest.Mock;
 
 const init = initDatabase as jest.Mock;
 
@@ -47,6 +55,7 @@ beforeEach(() => {
   init.mockReset();
   jest.spyOn(console, 'error').mockImplementation(() => {});
   (useFonts as jest.Mock).mockReturnValue([true, null]);
+  walPresent.mockResolvedValue(false);
   (getOnboardingComplete as jest.Mock).mockResolvedValue(true);
   (getLatestBodyWeight as jest.Mock).mockResolvedValue(null);
 });
@@ -55,14 +64,14 @@ describe('App start failure screen', () => {
   it('shows the error and a Retry button when init rejects', async () => {
     init.mockRejectedValueOnce(new Error('disk exploded'));
     render(<App />);
-    expect(await screen.findByText(/disk exploded/)).toBeTruthy();
+    expect(await screen.findByText(/disk exploded/, undefined, COLD_RENDER_WAIT)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
   });
 
   it('re-runs init on Retry and renders the navigator once it succeeds', async () => {
     init.mockRejectedValueOnce(new Error('disk exploded')).mockResolvedValueOnce(undefined);
     render(<App />);
-    fireEvent.press(await screen.findByRole('button', { name: 'Retry' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT));
     expect(await screen.findByText('NAVIGATOR')).toBeTruthy();
     expect(init).toHaveBeenCalledTimes(2);
   });
@@ -70,7 +79,7 @@ describe('App start failure screen', () => {
   it('keeps the failure screen when Retry fails again', async () => {
     init.mockRejectedValueOnce(new Error('first')).mockRejectedValueOnce(new Error('second'));
     render(<App />);
-    fireEvent.press(await screen.findByRole('button', { name: 'Retry' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT));
     expect(await screen.findByText(/second/)).toBeTruthy();
   });
 
@@ -78,22 +87,83 @@ describe('App start failure screen', () => {
     init.mockRejectedValueOnce(new Error('disk exploded'));
     rescue.mockResolvedValueOnce(undefined);
     render(<App />);
-    fireEvent.press(await screen.findByRole('button', { name: 'Save data' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Save data' }, COLD_RENDER_WAIT));
     await waitFor(() => expect(rescue).toHaveBeenCalledTimes(1));
+  });
+
+  it('starts one init for two Retry presses in the same tick', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded')).mockResolvedValue(undefined);
+    render(<App />);
+    const retryButton = await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT);
+    await act(async () => {
+      fireEvent.press(retryButton);
+      fireEvent.press(retryButton);
+    });
+    expect(init).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for a pending init before exporting on a font error', async () => {
+    (useFonts as jest.Mock).mockReturnValue([false, new Error('font failed')]);
+    let finishInit: () => void = () => {};
+    init.mockReturnValue(new Promise<void>((resolve) => { finishInit = resolve; }));
+    rescue.mockResolvedValue(undefined);
+    render(<App />);
+    fireEvent.press(await screen.findByRole('button', { name: 'Save data' }, COLD_RENDER_WAIT));
+    await act(async () => {});
+    expect(rescue).not.toHaveBeenCalled();
+    await act(async () => { finishInit(); });
+    await waitFor(() => expect(rescue).toHaveBeenCalledTimes(1));
+  });
+
+  it('renders the failure screen inside a ScrollView', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded'));
+    render(<App />);
+    await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT);
+    expect(screen.UNSAFE_getByType(ScrollView)).toBeTruthy();
+  });
+
+  it('clears rescue copies once on mount and not again on Retry', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded')).mockResolvedValue(undefined);
+    render(<App />);
+    fireEvent.press(await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT));
+    await screen.findByText('NAVIGATOR');
+    expect(clearCopies).toHaveBeenCalledTimes(1);
+  });
+
+  it('survives clearRescueCopies rejecting', async () => {
+    clearCopies.mockRejectedValueOnce(new Error('cache gone'));
+    init.mockResolvedValue(undefined);
+    render(<App />);
+    expect(await screen.findByText('NAVIGATOR', undefined, COLD_RENDER_WAIT)).toBeTruthy();
+  });
+
+  it('tells the user to keep both files when a wal exists', async () => {
+    walPresent.mockResolvedValue(true);
+    init.mockRejectedValueOnce(new Error('disk exploded'));
+    render(<App />);
+    expect(await screen.findByText('Saving shares two files. Keep both.', undefined, COLD_RENDER_WAIT)).toBeTruthy();
+  });
+
+  it('omits the two-files sentence when there is no wal', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded'));
+    render(<App />);
+    await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT);
+    await waitFor(() => expect(walPresent).toHaveBeenCalled());
+    expect(screen.queryByText('Saving shares two files. Keep both.')).toBeNull();
   });
 
   it('shows a message when Save data fails', async () => {
     init.mockRejectedValueOnce(new Error('disk exploded'));
     rescue.mockRejectedValueOnce(new Error('The database file was not found on this device.'));
     render(<App />);
-    fireEvent.press(await screen.findByRole('button', { name: 'Save data' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Save data' }, COLD_RENDER_WAIT));
     expect(await screen.findByText(/database file was not found/)).toBeTruthy();
   });
 
   it('states there is no reset and offers no reset, delete or clear action', async () => {
     init.mockRejectedValueOnce(new Error('disk exploded'));
     render(<App />);
-    await screen.findByRole('button', { name: 'Retry' });
+    await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT);
     expect(
       screen.getByText(
         "Clearing the app's storage in Android settings deletes all your data, so there is no reset button here.",
@@ -107,7 +177,7 @@ describe('App start failure screen', () => {
     (useFonts as jest.Mock).mockReturnValue([false, new Error('font failed')]);
     init.mockResolvedValue(undefined);
     render(<App />);
-    expect(await screen.findByText(/font failed/)).toBeTruthy();
+    expect(await screen.findByText(/font failed/, undefined, COLD_RENDER_WAIT)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Save data' })).toBeTruthy();
   });

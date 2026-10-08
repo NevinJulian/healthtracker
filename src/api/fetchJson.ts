@@ -30,11 +30,14 @@ const RETRY_DELAY_MS = 1000;
 export class FetchJsonError extends Error {
   /** HTTP status code, when the failure came from a non-2xx response. */
   status?: number;
+  /** Raw `Retry-After` header of a non-2xx response, unparsed. */
+  retryAfter?: string;
 
-  constructor(message: string, status?: number) {
+  constructor(message: string, status?: number, retryAfter?: string) {
     super(message);
     this.name = 'FetchJsonError';
     this.status = status;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -200,7 +203,12 @@ export async function fetchJson<T = unknown>(
           await retryDelay(signal);
           continue;
         }
-        throw new FetchJsonError(`Request failed with status ${res.status}`, res.status);
+        const retryAfter = res.headers?.get?.('Retry-After') ?? undefined;
+        throw new FetchJsonError(
+          `Request failed with status ${res.status}`,
+          res.status,
+          retryAfter,
+        );
       }
 
       try {

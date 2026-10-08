@@ -169,7 +169,7 @@ describe('openfoodfacts — mocked fetch', () => {
     // so the function falls through to the network fetch.
     const result = await lookupNutrition('testIngredient2025');
     // result should be the OFF data (db mock cache always misses)
-    if (result !== null) {
+    if (typeof result === 'object' && result !== null) {
       expect(result.kcal).toBe(250);
       expect(result.protein).toBe(12);
       expect(result.carbs).toBe(30);

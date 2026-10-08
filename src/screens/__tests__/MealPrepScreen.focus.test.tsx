@@ -268,7 +268,7 @@ describe('MealPrepScreen focus/load behaviour (#329)', () => {
   });
 });
 
-describe('MealPrepScreen refresh failure banner (#401)', () => {
+describe('MealPrepScreen refresh failure banner', () => {
   let errorSpy: jest.SpyInstance;
 
   beforeEach(() => {

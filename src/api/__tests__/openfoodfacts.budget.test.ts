@@ -67,14 +67,14 @@ describe('openfoodfacts — search budget', () => {
     return require('../openfoodfacts') as typeof import('../openfoodfacts');
   }
 
-  it('sends no request for the 11th search inside a minute and resolves null', async () => {
+  it('sends no request for the 11th search inside a minute and resolves not-looked-up', async () => {
     const { lookupNutrition: lookup } = load();
     for (let i = 0; i < 10; i++) {
       expect(await lookup(`item${i}`)).not.toBeNull();
     }
     expect(fetchMock).toHaveBeenCalledTimes(10);
 
-    expect(await lookup('item11')).toBeNull();
+    expect(await lookup('item11')).toBe('not-looked-up');
     expect(fetchMock).toHaveBeenCalledTimes(10);
   });
 
@@ -88,7 +88,7 @@ describe('openfoodfacts — search budget', () => {
     for (let i = 0; i < 10; i++) await lookup(`item${i}`);
     putOFFCache.mockClear();
 
-    expect(await lookup('over')).toBeNull();
+    expect(await lookup('over')).toBe('not-looked-up');
     expect(putOFFCache).not.toHaveBeenCalled();
 
     now += 60_000;
@@ -108,8 +108,42 @@ describe('openfoodfacts — search budget', () => {
     jest.useRealTimers();
     expect(fetchMock).toHaveBeenCalledTimes(10);
 
-    expect(await lookup('item5')).toBeNull();
+    expect(await lookup('item5')).toBe('not-looked-up');
     expect(fetchMock).toHaveBeenCalledTimes(10);
+  });
+
+  it('sends again after the clock steps back, and still enforces the budget', async () => {
+    const { lookupNutrition: lookup } = load();
+    for (let i = 0; i < 10; i++) await lookup(`item${i}`);
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+
+    now -= 300_000;
+    expect(await lookup('after-step')).not.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(11);
+
+    for (let i = 0; i < 9; i++) await lookup(`more${i}`);
+    expect(fetchMock).toHaveBeenCalledTimes(20);
+    await lookup('over');
+    expect(fetchMock).toHaveBeenCalledTimes(20);
+  });
+
+  it("resolves 'not-looked-up' for a refused search and null for an empty or failed one", async () => {
+    const { lookupNutrition: lookup } = load();
+    for (let i = 0; i < 10; i++) await lookup(`item${i}`);
+
+    expect(await lookup('over')).toBe('not-looked-up');
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+
+    now += 60_000;
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ products: [] }) });
+    expect(await lookup('empty')).toBeNull();
+    fetchMock.mockRejectedValueOnce(new Error('offline'));
+    fetchMock.mockRejectedValueOnce(new Error('offline'));
+    jest.useFakeTimers({ doNotFake: ['Date'] });
+    const failed = lookup('failed');
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(await failed).toBeNull();
+    jest.useRealTimers();
   });
 
   it('does not spend budget on a cache hit', async () => {

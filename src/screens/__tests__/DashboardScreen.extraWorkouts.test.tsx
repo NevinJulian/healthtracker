@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 
 import { render, fireEvent, act } from '@testing-library/react-native';
 
@@ -55,11 +56,11 @@ jest.mock('../../components/BioForceModal', () => {
 });
 
 jest.mock('../../db/database', () => ({
+  CorruptJsonError: jest.requireActual('../../db/database').CorruptJsonError,
   getLogByDate: jest.fn().mockResolvedValue(null),
   upsertLogField: jest.fn().mockResolvedValue(undefined),
   upsertExerciseCompleted: jest.fn().mockResolvedValue(undefined),
   upsertBodyWeight: jest.fn().mockResolvedValue(undefined),
-  upsertAdditionalWorkouts: jest.fn().mockResolvedValue(undefined),
   addAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   toggleAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   syncRollingSchedule: jest.fn().mockResolvedValue(undefined),
@@ -81,7 +82,6 @@ import {
   getLogByDate,
   addAdditionalWorkout,
   toggleAdditionalWorkout,
-  upsertAdditionalWorkouts,
 } from '../../db/database';
 
 async function flushMicrotasks() {
@@ -112,15 +112,48 @@ describe('DashboardScreen additional workouts pass only the change to the databa
       fireEvent.press(getByLabelText('Stub add workout'));
     });
     await act(async () => {
-      fireEvent.press(getByLabelText('Mark Run complete'));
+      fireEvent.press(getByLabelText('Mark Curls complete'));
     });
 
     expect(addAdditionalWorkout).toHaveBeenCalledWith(mockToday, workoutA);
-    expect(toggleAdditionalWorkout).toHaveBeenCalledWith(mockToday, workoutB.id);
-    expect(upsertAdditionalWorkouts).not.toHaveBeenCalled();
+    expect(toggleAdditionalWorkout).toHaveBeenCalledWith(mockToday, workoutA.id);
 
     await act(async () => {
       releaseAdd();
     });
+  });
+});
+
+describe('DashboardScreen reverts an additional-workout tick the database rejects', () => {
+  let alertSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(getLogByDate).mockResolvedValue({ ...mockEntry });
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('a plain Error reloads the day, restores the tick and offers no reset', async () => {
+    jest.mocked(toggleAdditionalWorkout).mockRejectedValueOnce(new Error('x'));
+    const { getByLabelText, queryByLabelText } = render(<DashboardScreen />);
+    await flushMicrotasks();
+    const loadsBefore = jest.mocked(getLogByDate).mock.calls.length;
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Mark Run complete'));
+    });
+    await flushMicrotasks();
+
+    expect(jest.mocked(getLogByDate).mock.calls.length).toBeGreaterThan(loadsBefore);
+    expect(queryByLabelText('Mark Run complete')).not.toBeNull();
+    expect(queryByLabelText('Mark Run incomplete')).toBeNull();
+    expect(alertSpy).not.toHaveBeenCalled();
   });
 });

@@ -8,13 +8,12 @@
  *   - #37  SELECT moved outside withTransactionAsync
  *   - #38  _db reset to null on failure
  *   - #39  Versioned migration runner using schema_version table
- *   - Old-schema reset: detects incompatible daily_log and wipes DB
+ *   - Old-schema check: refuses to start on an incompatible daily_log
  *
  * Feature additions (issue #40):
  *   - Exercise[] JSON column on weekly_template and daily_log
  *   - upsertExerciseCompleted() — toggles a single exercise in the JSON array
  *   - updateTemplateExercises() — replaces the full exercise list for a weekday
- *   - resetIfIncompatibleSchema now also detects missing exercises column
  */
 
 import * as SQLite from 'expo-sqlite';
@@ -158,6 +157,8 @@ export interface DailyLogEntry {
   exercises: Exercise[];
   body_weight: number | null;
   additional_workouts: AdditionalWorkout[];
+  /** Columns whose stored text the writers would refuse; absent when all are readable. */
+  unreadable?: CorruptJsonColumn[];
 }
 
 // ─────────────────────────────────────────────
@@ -238,33 +239,42 @@ export class CorruptJsonError extends Error {
   }
 }
 
+function _isStoredItem(item: unknown): boolean {
+  return (
+    typeof item === 'object' &&
+    item !== null &&
+    !Array.isArray(item) &&
+    typeof (item as { id?: unknown }).id === 'string'
+  );
+}
+
 /**
- * Strict counterpart to parseExercises(), used ONLY by the write path in
- * upsertExerciseCompleted() (#319). parseExercises() is the read path and
- * stays lenient on purpose (returns [] on malformed input — screens rely on
- * that). But upsertExerciseCompleted() reads, patches, and writes the array
- * back: if it used the lenient parse, malformed stored JSON would silently
- * become [] and then get persisted, permanently destroying whatever was
- * actually stored. This returns a discriminated result instead of throwing
- * so the caller decides how to fail (console.error + throw, see below).
+ * Strict parse for the write path: a stored array is valid only when every item
+ * is a non-array object with a string id. Anything else is refused rather than
+ * coerced to [] and persisted, which would destroy the stored text.
  */
-function _tryParseExercisesForWrite(
+function _parseStoredArray(
   raw: string | null | undefined
-): { ok: true; value: Exercise[] } | { ok: false } {
+): { ok: true; value: unknown[] } | { ok: false } {
   try {
-    const parsed = JSON.parse(raw ?? '[]');
-    return Array.isArray(parsed) ? { ok: true, value: parsed } : { ok: false };
+    const parsed: unknown = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) && parsed.every(_isStoredItem)
+      ? { ok: true, value: parsed }
+      : { ok: false };
   } catch {
     return { ok: false };
   }
 }
 
-function _isStoredJsonArray(raw: string | null | undefined): boolean {
-  try {
-    return Array.isArray(JSON.parse(raw ?? '[]'));
-  } catch {
-    return false;
-  }
+function _tryParseExercisesForWrite(
+  raw: string | null | undefined
+): { ok: true; value: Exercise[] } | { ok: false } {
+  const result = _parseStoredArray(raw);
+  return result.ok ? { ok: true, value: result.value as Exercise[] } : { ok: false };
+}
+
+function _isValidStoredArray(raw: string | null | undefined): boolean {
+  return _parseStoredArray(raw).ok;
 }
 
 function parseAdditionalWorkouts(raw: string | null | undefined): AdditionalWorkout[] {
@@ -564,38 +574,22 @@ async function seedRecipeLibrary(db: SQLite.SQLiteDatabase): Promise<void> {
 }
 
 // ─────────────────────────────────────────────
-// Old-schema reset helper
+// Old-schema check
 // ─────────────────────────────────────────────
 
-/**
- * Detects incompatible schemas left by previous app versions:
- *   1. daily_log missing 'date' column (very old schema)
- *   2. (Compatible schema — no reset needed)
- *
- * Note: missing 'exercises' column is handled by migrations v11/v12 via
- * ALTER TABLE, so no reset is needed for that case.
- */
-async function resetIfIncompatibleSchema(
-  db: SQLite.SQLiteDatabase
-): Promise<SQLite.SQLiteDatabase> {
+async function assertCompatibleSchema(db: SQLite.SQLiteDatabase): Promise<void> {
   const columns = await db.getAllAsync<{ name: string }>(
     'PRAGMA table_info(daily_log)'
   );
 
-  if (columns.length === 0) return db; // Fresh install
-  const hasDateColumn = columns.some((c) => c.name === 'date');
-  if (hasDateColumn) return db; // Compatible
+  if (columns.length === 0) return;
+  if (columns.some((c) => c.name === 'date')) return;
 
-  console.warn(
-    '[DB] Incompatible daily_log schema detected (missing "date" column). ' +
-    'Deleting old database and starting fresh…'
+  throw new Error(
+    'Your saved data uses an old format that this version cannot read: ' +
+    'the daily_log table has no date column. Nothing was changed or deleted. ' +
+    'Tap Save data to export a copy of your data.'
   );
-  await db.closeAsync();
-  await SQLite.deleteDatabaseAsync(DB_NAME);
-  console.log('[DB] Old database deleted. Opening fresh database…');
-  const freshDb = await SQLite.openDatabaseAsync(DB_NAME);
-  await freshDb.execAsync('PRAGMA journal_mode = WAL;');
-  return freshDb;
 }
 
 // ─────────────────────────────────────────────
@@ -846,12 +840,12 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (_db) return _db;
 
   console.log('[DB] Opening database…');
-  let db = await SQLite.openDatabaseAsync(DB_NAME);
+  const db = await SQLite.openDatabaseAsync(DB_NAME);
 
   try {
     await db.execAsync('PRAGMA journal_mode = WAL;');
 
-    db = await resetIfIncompatibleSchema(db);
+    await assertCompatibleSchema(db);
     if (_isDev()) _trackDbActivity(db);
     // Test-only tripwire (#369): the sql.js test adapter exposes this hook
     // and then throws if withTransactionAsync is ever called while the
@@ -1081,13 +1075,6 @@ async function _upsertBodyWeightImpl(date: string, weight: number): Promise<void
   _assertWrote(result, 'upsertBodyWeight', date);
 }
 
-export function upsertAdditionalWorkouts(
-  date: string,
-  workouts: AdditionalWorkout[]
-): Promise<void> {
-  return _enqueueWrite('upsertAdditionalWorkouts', () => _upsertAdditionalWorkoutsImpl(date, workouts));
-}
-
 async function _readAdditionalWorkoutsForWrite(
   db: SQLite.SQLiteDatabase,
   date: string,
@@ -1098,7 +1085,7 @@ async function _readAdditionalWorkoutsForWrite(
     'SELECT additional_workouts FROM daily_log WHERE date = ?',
     [date]
   );
-  if (!_isStoredJsonArray(row?.additional_workouts)) {
+  if (!_isValidStoredArray(row?.additional_workouts)) {
     console.error(
       `[DB] ${caller}: malformed additional_workouts JSON for date=${date} — refusing to write, stored value left unchanged`
     );
@@ -1120,15 +1107,6 @@ async function _writeAdditionalWorkouts(
   _assertWrote(result, caller, date);
 }
 
-async function _upsertAdditionalWorkoutsImpl(
-  date: string,
-  workouts: AdditionalWorkout[]
-): Promise<void> {
-  const db = getDatabase();
-  await _readAdditionalWorkoutsForWrite(db, date, 'upsertAdditionalWorkouts');
-  await _writeAdditionalWorkouts(db, date, workouts, 'upsertAdditionalWorkouts');
-}
-
 export function addAdditionalWorkout(date: string, workout: AdditionalWorkout): Promise<void> {
   return _enqueueWrite('addAdditionalWorkout', async () => {
     const db = getDatabase();
@@ -1141,7 +1119,9 @@ export function toggleAdditionalWorkout(date: string, id: string): Promise<void>
   return _enqueueWrite('toggleAdditionalWorkout', async () => {
     const db = getDatabase();
     const current = await _readAdditionalWorkoutsForWrite(db, date, 'toggleAdditionalWorkout');
-    if (!current.some((w) => w.id === id)) return;
+    if (!current.some((w) => w.id === id)) {
+      throw new Error(`[DB] toggleAdditionalWorkout: no additional workout ${id} for date=${date}`);
+    }
     const updated = current.map((w) => (w.id === id ? { ...w, completed: !w.completed } : w));
     await _writeAdditionalWorkouts(db, date, updated, 'toggleAdditionalWorkout');
   });
@@ -1168,7 +1148,7 @@ export function resetCorruptDayColumn(date: string, column: CorruptJsonColumn): 
 }
 
 async function _resetCorruptDayColumnImpl(date: string, column: CorruptJsonColumn): Promise<void> {
-  if (!(column in CORRUPT_JSON_SELECT)) {
+  if (!Object.hasOwn(CORRUPT_JSON_SELECT, column)) {
     throw new Error(`[DB] resetCorruptDayColumn: unsupported column "${column}"`);
   }
   if (!isValidDateKey(date)) {
@@ -1176,7 +1156,7 @@ async function _resetCorruptDayColumnImpl(date: string, column: CorruptJsonColum
   }
   const db = getDatabase();
   const row = await db.getFirstAsync<{ raw: string | null }>(CORRUPT_JSON_SELECT[column], [date]);
-  if (!row || _isStoredJsonArray(row.raw)) {
+  if (!row || _isValidStoredArray(row.raw)) {
     throw new Error(`[DB] resetCorruptDayColumn: ${column} for date=${date} is not corrupt, nothing reset`);
   }
   const raw = row.raw as string;
@@ -1334,6 +1314,9 @@ function mapLogRow(row: {
   body_weight?: number | null;
   additional_workouts?: string;
 }): DailyLogEntry {
+  const unreadable: CorruptJsonColumn[] = [];
+  if (!_isValidStoredArray(row.exercises)) unreadable.push('exercises');
+  if (!_isValidStoredArray(row.additional_workouts)) unreadable.push('additional_workouts');
   return {
     date: row.date,
     walking_task: row.walking_task,
@@ -1343,15 +1326,25 @@ function mapLogRow(row: {
     fasting_completed: row.fasting_completed === 1,
     is_rest_day: row.is_rest_day === 1,
     is_meal_prep_day: row.is_meal_prep_day === 1,
-    exercises: parseExercises(row.exercises),
+    exercises: parseExercises(row.exercises).filter(_isStoredItem),
     body_weight: row.body_weight ?? null,
-    additional_workouts: parseAdditionalWorkouts(row.additional_workouts),
+    additional_workouts: parseAdditionalWorkouts(row.additional_workouts).filter(_isStoredItem),
+    ...(unreadable.length > 0 && { unreadable }),
   };
 }
 
 // ─────────────────────────────────────────────
 // Recipes CRUD
 // ─────────────────────────────────────────────
+
+function parseIngredients(raw: unknown, recipeId: string): Recipe['ingredients'] {
+  try {
+    const parsed = JSON.parse(raw as string);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  console.warn('[DB] Unreadable ingredients for recipe, returning none:', recipeId);
+  return [];
+}
 
 export async function getRecipes(category?: string): Promise<Recipe[]> {
   const db = getDatabase();
@@ -1367,7 +1360,7 @@ export async function getRecipes(category?: string): Promise<Recipe[]> {
 
   return rows.map((r) => ({
     ...r,
-    ingredients: JSON.parse(r.ingredients),
+    ingredients: parseIngredients(r.ingredients, r.id),
   }));
 }
 
@@ -1376,7 +1369,7 @@ export async function getRecipesIncludingArchived(): Promise<Recipe[]> {
   const rows = await db.getAllAsync<any>('SELECT * FROM recipe_library');
   return rows.map((r) => ({
     ...r,
-    ingredients: JSON.parse(r.ingredients),
+    ingredients: parseIngredients(r.ingredients, r.id),
   }));
 }
 
@@ -1389,7 +1382,7 @@ export async function getRecipeById(id: string): Promise<Recipe | null> {
   if (!row) return null;
   return {
     ...row,
-    ingredients: JSON.parse(row.ingredients),
+    ingredients: parseIngredients(row.ingredients, row.id),
   };
 }
 
@@ -2016,7 +2009,7 @@ export async function getCookingTasks(): Promise<CookingTaskWithRecipe[]> {
       fat: r.fat,
       prepTimeMinutes: r.prepTimeMinutes,
       defaultServings: r.defaultServings,
-      ingredients: JSON.parse(r.ingredients ?? '[]'),
+      ingredients: parseIngredients(r.ingredients ?? '[]', r.recipe_id),
       instructions: r.instructions,
       freezerTips: r.freezerTips ?? '',
     } as Recipe,
@@ -2611,71 +2604,23 @@ export async function dumpTable(
   return rows;
 }
 
-/**
- * Restore all tables from the backup payload inside a single transaction.
- * Rules:
- *   - schema_version and sqlite_* tables are never touched.
- *   - Only tables that exist in the current DB are restored (unknown tables
- *     in older/newer backups are silently skipped).
- *   - Per-row INSERT uses that row's own column list so new columns added by
- *     later migrations default-fill rather than error.
- *   - A backup can legitimately contain rows that violate a UNIQUE index
- *     added by a later migration than the one the backup was taken under
- *     (validatePayload() accepts any backup at or below the current schema
- *     version): pre-#303 backups can have duplicate (date, meal_type) rows
- *     in weekly_meal_plan, and pre-#317 backups (or ones taken before
- *     v37's renumber ever ran) can have colliding/gapped set_index values
- *     in workout_set_log. Both unique indexes always exist on the live DB
- *     by the time restore runs, so the second offending INSERT would throw
- *     — and since restore is one transaction, that would roll back every
- *     table, not just the offending one. So: drop both indexes before
- *     restoring, restore every table exactly as before, then re-run each
- *     affected repair step (POST_RESTORE_STEPS) against the
- *     just-restored data, in order, inside the same transaction.
- *     RESTORE_SLOT_DEDUPE_SQL credits any consumed loser's batch, dedupes
- *     weekly_meal_plan per (date, meal_type), preferring a consumed row whose
- *     inventory pointer is live, and recreates its index.
- *     RESTORE_SET_INDEX_SQL renumbers a workout_set_log (date, exercise)
- *     partition densely by (set_index, created_at, id) only if two of its
- *     rows share a set_index, then recreates its index. Both run after their
- *     index was dropped above, never while it exists. A clean backup is
- *     unaffected by either: nothing matches the dedupe's credit/delete WHERE
- *     clauses, and collision-free partitions keep their set_index values,
- *     gaps included.
- *
- * A row's own keys are NOT trusted as column identifiers: unlike values,
- * column names can't be parameterised, so a backup file (user-supplied,
- * JSON.parse'd from a picked file) with a crafted row key would otherwise
- * be interpolated straight into the INSERT's column list — a SQL injection
- * path (#315). Each table's real columns are read once via
- * `PRAGMA table_info(<table>)` (table name is already whitelisted against
- * listUserTables() above) and every row is filtered down to only the keys
- * that are real columns before the INSERT is built. A row left with zero
- * known keys is skipped entirely — not inserted, not counted in
- * rowsRestored. What got dropped is reported per table, both via
- * console.warn (this module's existing best-effort logging style) and via
- * the optional `skipped` field on the return value.
- *
- * @param payloadTables  The `tables` object from the BackupPayload.
- * @returns A summary of what was restored, plus optionally what was skipped.
- */
+const RENUMBER_MIGRATION_VERSION = 37;
 
-/**
- * Data-repair steps re-applied, in this order, against freshly-restored data
- * every time restoreFromPayload() runs — because a backup taken before a
- * step shipped, or before it happened to run, can legitimately still need it.
- * Their unique indexes are dropped before the restore loop (see the
- * restoreFromPayload doc comment above) and recreated here.
- *
- *   - RESTORE_SLOT_DEDUPE_SQL: weekly_meal_plan (date, meal_type) dedupe +
- *     unique index, preferring a consumed row whose inventory pointer is live.
- *   - RESTORE_SET_INDEX_SQL: workout_set_log renumber of colliding
- *     (date, exercise) partitions only + unique index.
- */
-const POST_RESTORE_STEPS: readonly { sql: string }[] = [
-  { sql: RESTORE_SLOT_DEDUPE_SQL },
-  { sql: RESTORE_SET_INDEX_SQL },
-];
+async function runSetIndexRepair(
+  db: ReturnType<typeof getDatabase>,
+  backupSchemaVersion: number
+): Promise<void> {
+  if (backupSchemaVersion >= RENUMBER_MIGRATION_VERSION) {
+    await db.execAsync(RESTORE_SET_INDEX_SQL);
+    return;
+  }
+  const renumber = MIGRATIONS.find((m) => m.version === RENUMBER_MIGRATION_VERSION);
+  if (!renumber) {
+    throw new Error(`Restore failed: migration v${RENUMBER_MIGRATION_VERSION} not found.`);
+  }
+  if (renumber.precondition) await renumber.precondition(db);
+  await db.execAsync(renumber.sql);
+}
 
 type RestoreFromPayloadResult = {
   tablesRestored: number;
@@ -2684,17 +2629,59 @@ type RestoreFromPayloadResult = {
   consumedMealsWithoutRefund?: number;
 };
 
+/**
+ * Restore all tables from the backup payload inside a single transaction.
+ * Rules:
+ *   - schema_version and sqlite_* tables are never touched.
+ *   - Only tables that exist in the current DB are restored; unknown tables
+ *     in older or newer backups are skipped.
+ *   - Per-row INSERT uses that row's own column list, so columns added by
+ *     later migrations default-fill rather than error.
+ *   - A row's keys are never used as column identifiers directly: names can't
+ *     be parameterised, and a backup file is user-supplied. Each table's real
+ *     columns are read once from `PRAGMA table_info(<table>)` and every row is
+ *     filtered down to those keys before the INSERT is built. A row left with
+ *     no known keys is skipped, not inserted and not counted in rowsRestored.
+ *   - A backup can contain rows that violate a UNIQUE index added by a later
+ *     migration than the one it was taken under: duplicate (date, meal_type)
+ *     rows in weekly_meal_plan, and colliding or gapped set_index values in
+ *     workout_set_log. Both unique indexes exist on the live DB, so the
+ *     offending INSERT would throw and roll back every table. Both indexes are
+ *     therefore dropped first, every table is restored, and then two repairs
+ *     run in order inside the same transaction:
+ *       1. RESTORE_SLOT_DEDUPE_SQL credits each consumed loser's batch, keeps
+ *          one weekly_meal_plan row per (date, meal_type), preferring a
+ *          consumed row whose inventory pointer is live, and recreates its
+ *          index.
+ *       2. The set_index repair depends on backupSchemaVersion. Below 37,
+ *          migration 37's precondition and SQL run, renumbering every
+ *          partition by (created_at, id). From 37 on, set_index is
+ *          authoritative and RESTORE_SET_INDEX_SQL renumbers a partition by
+ *          (set_index, created_at, id) only if two of its rows share a
+ *          set_index, so a clean backup keeps its values, gaps included. Both
+ *          recreate the index.
+ *   - What was dropped is reported per table, via console.warn and the
+ *     optional `skipped` field of the result.
+ *
+ * @param payloadTables  The `tables` object from the BackupPayload.
+ * @param backupSchemaVersion  The BackupPayload's schemaVersion.
+ * @returns A summary of what was restored, plus optionally what was skipped.
+ */
 export function restoreFromPayload(
-  payloadTables: Record<string, Record<string, unknown>[]>
+  payloadTables: Record<string, Record<string, unknown>[]>,
+  backupSchemaVersion: number
 ): Promise<RestoreFromPayloadResult> {
   // The whole restore, including listUserTables() before its transaction,
   // is one unit on the write queue (#369). Nothing can interleave with it:
   // a sync fired mid-restore waits and then syncs the restored data.
-  return _enqueueWrite('restoreFromPayload', () => _restoreFromPayload(payloadTables));
+  return _enqueueWrite('restoreFromPayload', () =>
+    _restoreFromPayload(payloadTables, backupSchemaVersion)
+  );
 }
 
 async function _restoreFromPayload(
-  payloadTables: Record<string, Record<string, unknown>[]>
+  payloadTables: Record<string, Record<string, unknown>[]>,
+  backupSchemaVersion: number
 ): Promise<RestoreFromPayloadResult> {
   const db = getDatabase();
   const liveTableNames = await listUserTables();
@@ -2712,7 +2699,7 @@ async function _restoreFromPayload(
   await db.withTransactionAsync(async () => {
     // Drop first so a legacy backup's duplicate weekly_meal_plan rows or
     // colliding/gapped workout_set_log rows (see above) can all be inserted
-    // below; both indexes are recreated by POST_RESTORE_STEPS after the
+    // below; both indexes are recreated by the repair steps after the
     // restore loop.
     await db.execAsync('DROP INDEX IF EXISTS idx_weekly_meal_plan_date_meal_type');
     await db.execAsync('DROP INDEX IF EXISTS idx_workout_set_log_date_exercise_set_index');
@@ -2762,7 +2749,9 @@ async function _restoreFromPayload(
 
         const columns = keys.join(', ');
         const placeholders = keys.map(() => '?').join(', ');
-        const values = keys.map((k) => row[k]);
+        const values = keys.map((k) =>
+          tableName === 'weekly_meal_plan' && k === 'is_consumed' && row[k] === null ? 0 : row[k]
+        );
 
         await db.runAsync(
           `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders})`,
@@ -2789,9 +2778,8 @@ async function _restoreFromPayload(
     // Each step's index was dropped above, before this loop ran — never
     // while it existed — matching the ordering both the dedupe and the
     // renumber require.
-    for (const step of POST_RESTORE_STEPS) {
-      await db.execAsync(step.sql);
-    }
+    await db.execAsync(RESTORE_SLOT_DEDUPE_SQL);
+    await runSetIndexRepair(db, backupSchemaVersion);
 
     if (legacyPayload) {
       const consumed = await db.getFirstAsync<{ n: number }>(
@@ -2847,6 +2835,19 @@ export async function setNutritionGoalCalories(kcal: number): Promise<void> {
 /** Persist the user's daily protein goal (grams). */
 export async function setNutritionGoalProtein(g: number): Promise<void> {
   await setSetting(SETTING_NUTRITION_GOAL_PROTEIN, String(g));
+}
+
+/** Persist both nutrition goals in one transaction: both commit or neither does. */
+export function setNutritionGoals(kcal: number, g: number): Promise<void> {
+  return _enqueueWrite('setNutritionGoals', async () => {
+    const db = getDatabase();
+    const upsert =
+      'INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value';
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(upsert, [SETTING_NUTRITION_GOAL_CALORIES, String(kcal)]);
+      await db.runAsync(upsert, [SETTING_NUTRITION_GOAL_PROTEIN, String(g)]);
+    });
+  });
 }
 
 // ── User profile settings (#281) ─────────────────────────────────────────────
@@ -3123,8 +3124,7 @@ async function _logBodyMeasurementImpl(
   fields: MeasurementInput
 ): Promise<void> {
   const db = getDatabase();
-  const columns = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
-  const provided = columns.filter((c) => Number.isFinite(fields[c]));
+  const provided = MEASUREMENT_FIELDS.filter((c) => Number.isFinite(fields[c]));
   if (provided.length === 0) return;
 
   const existing = await db.getFirstAsync<{ id: number }>(
@@ -3150,9 +3150,12 @@ async function _logBodyMeasurementImpl(
   );
 }
 
+const MEASUREMENT_FIELDS = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
+
 /**
- * Return all body-measurement rows since `sinceDateKey` (inclusive), ordered
- * ascending by date.  Returns all rows when `sinceDateKey` is omitted.
+ * Return body-measurement rows since `sinceDateKey` (inclusive), ordered
+ * ascending by date. Returns all rows when `sinceDateKey` is omitted. Rows
+ * with no value in any measurement column are skipped.
  *
  * @param sinceDateKey - Optional earliest date (YYYY-MM-DD) to include.
  */
@@ -3160,21 +3163,17 @@ export async function getBodyMeasurements(
   sinceDateKey?: string
 ): Promise<BodyMeasurement[]> {
   const db = getDatabase();
-  let rows: BodyMeasurement[];
+  const hasValue = MEASUREMENT_FIELDS.map((c) => `${c} IS NOT NULL`).join(' OR ');
   if (sinceDateKey) {
-    rows = await db.getAllAsync<BodyMeasurement>(
-      'SELECT * FROM body_measurements WHERE date >= ? ORDER BY date ASC',
+    return db.getAllAsync<BodyMeasurement>(
+      `SELECT * FROM body_measurements WHERE date >= ? AND (${hasValue}) ORDER BY date ASC`,
       [sinceDateKey]
     );
-  } else {
-    rows = await db.getAllAsync<BodyMeasurement>(
-      'SELECT * FROM body_measurements ORDER BY date ASC'
-    );
   }
-  return rows;
+  return db.getAllAsync<BodyMeasurement>(
+    `SELECT * FROM body_measurements WHERE ${hasValue} ORDER BY date ASC`
+  );
 }
-
-const MEASUREMENT_FIELDS = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
 
 export type MeasurementField = (typeof MEASUREMENT_FIELDS)[number];
 

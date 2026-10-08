@@ -38,7 +38,7 @@ import {
   updateRecipe,
 } from '../db/database';
 import { computeRecipeMacros, ComputeIngredient } from '../nutrition/computeMacros';
-import { lookupNutrition } from '../api/openfoodfacts';
+import { lookupNutrition, OFFNutrition } from '../api/openfoodfacts';
 import { normaliseIngredientName } from '../nutrition/units';
 import { NUTRITION_TABLE } from '../nutrition/nutritionTable';
 import { Card, Button, ScreenHeader } from '../components';
@@ -136,6 +136,7 @@ export default function RecipeEditorScreen() {
   const [macros, setMacros] = useState<ComputedMacros | null>(null);
   const [macroLoading, setMacroLoading] = useState(false);
   const [estimatedIngredients, setEstimatedIngredients] = useState<string[]>([]);
+  const [notLookedUpIngredients, setNotLookedUpIngredients] = useState<string[]>([]);
 
   // ── Loading / saving state ────────────────────────────────────────────────
   const [loading, setLoading] = useState(isEdit);
@@ -145,6 +146,8 @@ export default function RecipeEditorScreen() {
   const recomputeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lookupController = useRef<AbortController | null>(null);
   const latestRecompute = useRef<{ inputs: string; result: Promise<ComputedMacros | null> } | null>(null);
+  const resolvedLookups = useRef<Record<string, OFFNutrition>>({});
+  const noDataLookups = useRef<Set<string>>(new Set());
 
   useEffect(() => () => lookupController.current?.abort(), []);
 
@@ -230,6 +233,11 @@ export default function RecipeEditorScreen() {
     return result;
   };
 
+  const showUnmatched = (unmatched: string[], notLookedUp: Set<string>) => {
+    setEstimatedIngredients(unmatched.filter((n) => !notLookedUp.has(n)));
+    setNotLookedUpIngredients(unmatched.filter((n) => notLookedUp.has(n)));
+  };
+
   const runMacroRecompute = async (
     validIngredients: RecipeIngredient[],
     numServings: number,
@@ -240,6 +248,7 @@ export default function RecipeEditorScreen() {
     if (validIngredients.length === 0) {
       setMacros(null);
       setEstimatedIngredients([]);
+      setNotLookedUpIngredients([]);
       setMacroLoading(false);
       return null;
     }
@@ -250,8 +259,11 @@ export default function RecipeEditorScreen() {
 
     setMacroLoading(true);
     try {
-      // Build OFF overrides for ingredients not in local table
-      const offOverrides: Record<string, { kcal: number; protein: number; carbs: number; fat: number }> = {};
+      const offOverrides: Record<string, OFFNutrition> = {};
+      resolvedLookups.current = offOverrides;
+      const refused = new Set<string>();
+      const noData = new Set<string>();
+      noDataLookups.current = noData;
       const needsOFF = validIngredients.filter((ing) => {
         const key = normaliseIngredientName(ing.name);
         return !NUTRITION_TABLE[key];
@@ -262,13 +274,17 @@ export default function RecipeEditorScreen() {
         try {
           const nutrition = await lookupNutrition(ing.name, signal);
           if (signal.aborted) return null;
-          if (nutrition) {
+          if (nutrition === 'not-looked-up') {
+            refused.add(ing.name);
+          } else if (typeof nutrition === 'object' && nutrition !== null) {
             const key = normaliseIngredientName(ing.name);
             offOverrides[key] = nutrition;
             offOverrides[ing.name.toLowerCase()] = nutrition;
+          } else {
+            noData.add(ing.name);
           }
         } catch {
-          // OFF call failed — ingredient will be estimated
+          noData.add(ing.name);
         }
       }
 
@@ -285,7 +301,7 @@ export default function RecipeEditorScreen() {
       );
 
       setMacros(result.macros);
-      setEstimatedIngredients(result.unmatchedIngredients);
+      showUnmatched(result.unmatchedIngredients, refused);
       return result.macros;
     } catch {
       return null;
@@ -367,9 +383,21 @@ export default function RecipeEditorScreen() {
         clearTimeout(deadline);
       }
       if (settled === 'timeout') lookupController.current?.abort();
-      const finalMacros =
-        (settled === 'timeout' ? null : settled) ??
-        computeRecipeMacros(validIngredients, numServings).macros;
+      let finalMacros = settled === 'timeout' ? null : settled;
+      if (finalMacros === null) {
+        const fallback = computeRecipeMacros(
+          validIngredients,
+          numServings,
+          Object.keys(resolvedLookups.current).length > 0 ? resolvedLookups.current : undefined,
+        );
+        finalMacros = fallback.macros;
+        if (settled === 'timeout') {
+          const cutOff = new Set(
+            fallback.unmatchedIngredients.filter((n) => !noDataLookups.current.has(n)),
+          );
+          showUnmatched(fallback.unmatchedIngredients, cutOff);
+        }
+      }
 
       const recipe: Recipe = {
         id: isEdit ? recipeId : `custom-${Date.now()}`,
@@ -622,12 +650,19 @@ export default function RecipeEditorScreen() {
                 Add ingredients with quantities to see macros.
               </Text>
             )}
-            {estimatedIngredients.length > 0 && (
+            {(estimatedIngredients.length > 0 || notLookedUpIngredients.length > 0) && (
               <View style={styles.estimatedBanner}>
                 <Ionicons name="information-circle-outline" size={14} color={Colors.goldDeep} />
                 <Text style={styles.estimatedText}>
-                  Estimated (no data):{' '}
-                  {estimatedIngredients.join(', ')}
+                  {estimatedIngredients.length > 0 && (
+                    <Text>Estimated (no data): {estimatedIngredients.join(', ')}</Text>
+                  )}
+                  {estimatedIngredients.length > 0 && notLookedUpIngredients.length > 0 && '\n'}
+                  {notLookedUpIngredients.length > 0 && (
+                    <Text>
+                      Not looked up (try Recompute in a minute): {notLookedUpIngredients.join(', ')}
+                    </Text>
+                  )}
                 </Text>
               </View>
             )}

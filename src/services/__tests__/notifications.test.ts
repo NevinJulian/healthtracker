@@ -101,6 +101,30 @@ describe('parseTimeString', () => {
     expect(parseTimeString('25:00')).toEqual({ hour: 8, minute: 0 });
     expect(parseTimeString('12:99')).toEqual({ hour: 8, minute: 0 });
   });
+
+  it.each([
+    ['08:30', 8, 30],
+    ['00:00', 0, 0],
+    ['23:59', 23, 59],
+    [' 14:30 ', 14, 30],
+  ])('accepts %j', (input, hour, minute) => {
+    expect(parseTimeString(input)).toEqual({ hour, minute });
+  });
+
+  it.each([
+    '8abc:30xyz',
+    '8:30',
+    '08:30:00',
+    '08:60',
+    '24:00',
+    '08:3',
+    '-1:30',
+    '',
+    'abc',
+    '٠٨:٣٠',
+  ])('falls back to 08:00 for %j', (input) => {
+    expect(parseTimeString(input)).toEqual({ hour: 8, minute: 0 });
+  });
 });
 
 describe('formatTimeString', () => {
@@ -336,15 +360,11 @@ describe('stable notification identifiers (#309)', () => {
     expect(entries.has('backup-reminder')).toBe(true);
   });
 
-  // Note: checkAndNotifyEmptyInventory itself is not exercised end-to-end
-  // here. It resolves `getCookWhenEmptyEnabled` via a dynamic `import('../db/database')`
-  // (pre-existing, unrelated to #309), which Jest 30's node testEnvironment
-  // cannot evaluate without --experimental-vm-modules (see jest.config.js's
-  // winter-runtime notes) — the call throws and is swallowed by the
-  // function's own try/catch. That's a pre-existing limitation, not
-  // something #309 touches; source-reading confirms the TIME_INTERVAL
-  // request built in checkAndNotifyEmptyInventory (src/services/notifications.ts)
-  // has no `identifier` field, which is what the work order asks to preserve.
+  // checkAndNotifyEmptyInventory is not exercised end-to-end here. It resolves
+  // `getCookWhenEmptyEnabled` via a dynamic `import('../db/database')`, which
+  // does not evaluate in this suite, so the call throws and the function's own
+  // try/catch swallows it. Its TIME_INTERVAL request has no `identifier` field,
+  // confirmed by reading `notifications.ts`.
 });
 
 // ─── #309: post-upgrade notification-id sweep ──────────────────────────────

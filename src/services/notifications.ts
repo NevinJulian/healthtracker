@@ -165,17 +165,13 @@ export async function ensurePermissions(): Promise<boolean> {
 // ─── Workout reminder ────────────────────────────────────────────────────────
 
 /**
- * Parse a "HH:MM" time string into { hour, minute }.
+ * Parse a zero-padded "HH:MM" time string (surrounding whitespace allowed) into { hour, minute }.
  * Returns { hour: 8, minute: 0 } as a safe fallback on any parse error.
  */
 export function parseTimeString(time: string): { hour: number; minute: number } {
-  const [hStr, mStr] = time.split(':');
-  const hour = parseInt(hStr ?? '8', 10);
-  const minute = parseInt(mStr ?? '0', 10);
-  if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-    return { hour: 8, minute: 0 };
-  }
-  return { hour, minute };
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time.trim());
+  if (!match) return { hour: 8, minute: 0 };
+  return { hour: Number(match[1]), minute: Number(match[2]) };
 }
 
 /**

@@ -82,7 +82,7 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
     // Pre-fix, this throws (UNIQUE constraint violation on the second
     // weekly_meal_plan row) and the whole transaction — including app_state
     // — rolls back. That must not happen.
-    await expect(db.restoreFromPayload(payloadTables)).resolves.toBeDefined();
+    await expect(db.restoreFromPayload(payloadTables, 38)).resolves.toBeDefined();
 
     const raw = db.getDatabase();
 
@@ -123,7 +123,7 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
       ],
     };
 
-    await expect(db.restoreFromPayload(payloadTables)).resolves.toBeDefined();
+    await expect(db.restoreFromPayload(payloadTables, 38)).resolves.toBeDefined();
 
     const raw = db.getDatabase();
 
@@ -161,7 +161,7 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
         { id: 10, date: '2024-06-07', meal_type: 'dinner', recipe_id: RECIPE_ID, is_consumed: 1, consumed_from_inventory_id: 4 },
         { id: 11, date: '2024-06-07', meal_type: 'dinner', recipe_id: RECIPE_ID, is_consumed: 1, consumed_from_inventory_id: null },
       ],
-    });
+    }, 38);
 
     const raw = db.getDatabase();
     const ids = await raw.getAllAsync<{ id: number }>(
@@ -196,7 +196,7 @@ describe('restoreFromPayload() with pre-v35 duplicate weekly_meal_plan rows (#30
       ],
     };
 
-    await expect(db.restoreFromPayload(payloadTables)).resolves.toBeDefined();
+    await expect(db.restoreFromPayload(payloadTables, 38)).resolves.toBeDefined();
 
     const raw = db.getDatabase();
 

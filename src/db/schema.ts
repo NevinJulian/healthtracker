@@ -430,8 +430,8 @@ export interface Migration {
    * propagate, so the migration and its schema_version row both roll back.
    *
    * Every caller that executes a migration's `sql` must run its
-   * `precondition` first — runMigrations() and restoreFromPayload()'s
-   * post-restore replay both do.
+   * `precondition` first — runMigrations() does, and so does
+   * restoreFromPayload() when it replays v37 for a pre-v37 backup.
    */
   precondition?: (db: MigrationPreconditionDb) => Promise<void>;
 }
@@ -764,11 +764,11 @@ export const MIGRATIONS: Migration[] = [
   // atomically via INSERT…SELECT MAX(set_index)+1 instead of trusting a
   // caller-supplied value — but that fix does nothing for rows already on
   // disk. This migration renumbers every existing row densely (0, 1, 2, …)
-  // per (date, exercise), ordered by (created_at, id) — the same order
-  // getWorkoutSetsForDay/getWorkoutHistory now read by (set_index is no
-  // longer an ORDER BY column) — then adds a UNIQUE index on
-  // (date, exercise, set_index) so the database itself rejects any future
-  // collision, not just logWorkoutSet's new INSERT…SELECT.
+  // per (date, exercise), ordered by (created_at, id), then adds a UNIQUE
+  // index on (date, exercise, set_index) so the database itself rejects any
+  // future collision, not just logWorkoutSet's new INSERT…SELECT. From then
+  // on set_index is the display order (getWorkoutSetsForDay and the history
+  // reads order by it).
   //
   // Idempotent: the renumber UPDATE recomputes new_index from (created_at,
   // id) order every time, and that order doesn't change between runs, so
@@ -793,10 +793,11 @@ export const MIGRATIONS: Migration[] = [
   //     finishes.
   //   - Restore (restoreFromPayload, database.ts): DROPs the index before
   //     its restore loop (so a legacy backup's colliding/gapped
-  //     workout_set_log rows can be inserted at all) and only re-runs this
-  //     migration's SQL — looked up at runtime via
-  //     POST_RESTORE_MIGRATION_VERSIONS, never copied or reimplemented,
-  //     same pattern as v35/#303 — after every table has been restored.
+  //     workout_set_log rows can be inserted at all). For a backup from
+  //     before v37 it then runs this migration's precondition and SQL,
+  //     looked up in MIGRATIONS at runtime and never copied, after every
+  //     table has been restored. A backup from v37 on uses
+  //     RESTORE_SET_INDEX_SQL instead, which keeps collision-free set order.
   {
     version: 37,
     precondition: async (db) => {
@@ -833,28 +834,28 @@ export const MIGRATIONS: Migration[] = [
  * a live pointer credit their batch.
  */
 export const RESTORE_SLOT_DEDUPE_SQL = `
-  WITH survivors AS (
-    SELECT g.date AS date, g.meal_type AS meal_type,
-      COALESCE(
-        (SELECT w1.id FROM weekly_meal_plan w1
-         WHERE w1.date = g.date AND w1.meal_type = g.meal_type AND w1.is_consumed = 1
-           AND w1.consumed_from_inventory_id IN (SELECT id FROM meal_inventory)
-         ORDER BY w1.id DESC LIMIT 1),
-        (SELECT w2.id FROM weekly_meal_plan w2
-         WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
-         ORDER BY w2.id DESC LIMIT 1),
-        (SELECT w3.id FROM weekly_meal_plan w3
-         WHERE w3.date = g.date AND w3.meal_type = g.meal_type
-         ORDER BY w3.id DESC LIMIT 1)
-      ) AS survivor_id
-    FROM weekly_meal_plan g
-    GROUP BY g.date, g.meal_type
-  )
+  CREATE TEMP TABLE restore_slot_survivors AS
+  SELECT g.date AS date, g.meal_type AS meal_type,
+    COALESCE(
+      (SELECT w1.id FROM weekly_meal_plan w1
+       WHERE w1.date = g.date AND w1.meal_type = g.meal_type AND w1.is_consumed = 1
+         AND w1.consumed_from_inventory_id IN (SELECT id FROM meal_inventory)
+       ORDER BY w1.id DESC LIMIT 1),
+      (SELECT w2.id FROM weekly_meal_plan w2
+       WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
+       ORDER BY w2.id DESC LIMIT 1),
+      (SELECT w3.id FROM weekly_meal_plan w3
+       WHERE w3.date = g.date AND w3.meal_type = g.meal_type
+       ORDER BY w3.id DESC LIMIT 1)
+    ) AS survivor_id
+  FROM weekly_meal_plan g
+  GROUP BY g.date, g.meal_type;
+
   UPDATE meal_inventory
   SET portions_available = portions_available + (
     SELECT COUNT(*)
     FROM weekly_meal_plan loser
-    JOIN survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
+    JOIN restore_slot_survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
     WHERE loser.consumed_from_inventory_id = meal_inventory.id
       AND loser.is_consumed = 1
       AND loser.id != s.survivor_id
@@ -862,40 +863,26 @@ export const RESTORE_SLOT_DEDUPE_SQL = `
   WHERE EXISTS (
     SELECT 1
     FROM weekly_meal_plan loser
-    JOIN survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
+    JOIN restore_slot_survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
     WHERE loser.consumed_from_inventory_id = meal_inventory.id
       AND loser.is_consumed = 1
       AND loser.id != s.survivor_id
   );
 
-  WITH survivors AS (
-    SELECT g.date AS date, g.meal_type AS meal_type,
-      COALESCE(
-        (SELECT w1.id FROM weekly_meal_plan w1
-         WHERE w1.date = g.date AND w1.meal_type = g.meal_type AND w1.is_consumed = 1
-           AND w1.consumed_from_inventory_id IN (SELECT id FROM meal_inventory)
-         ORDER BY w1.id DESC LIMIT 1),
-        (SELECT w2.id FROM weekly_meal_plan w2
-         WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
-         ORDER BY w2.id DESC LIMIT 1),
-        (SELECT w3.id FROM weekly_meal_plan w3
-         WHERE w3.date = g.date AND w3.meal_type = g.meal_type
-         ORDER BY w3.id DESC LIMIT 1)
-      ) AS survivor_id
-    FROM weekly_meal_plan g
-    GROUP BY g.date, g.meal_type
-  )
   DELETE FROM weekly_meal_plan
-  WHERE id NOT IN (SELECT survivor_id FROM survivors);
+  WHERE id NOT IN (SELECT survivor_id FROM restore_slot_survivors);
+
+  DROP TABLE restore_slot_survivors;
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_meal_plan_date_meal_type ON weekly_meal_plan(date, meal_type);
 `;
 
 /**
- * Restore-only replacement for v37's renumber. Not a migration: it runs only
- * inside restoreFromPayload's transaction, after the unique index is dropped.
- * A (date, exercise) partition is renumbered densely from 0 only if two of its
- * rows share a set_index, ordered by set_index, created_at, id. Collision-free
+ * Restore-only set_index repair for backups from v37 on (older backups get
+ * v37 itself). Not a migration: it runs only inside restoreFromPayload's
+ * transaction, after the unique index is dropped. A (date, exercise)
+ * partition is renumbered densely from 0 only if two of its rows share a
+ * set_index, ordered by set_index, created_at, id. Collision-free
  * partitions keep their set_index values, gaps included. The new indexes are
  * staged in a temp table so the ordering never reads values it has already
  * rewritten.

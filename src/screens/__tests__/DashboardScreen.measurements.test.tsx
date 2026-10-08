@@ -63,7 +63,6 @@ jest.mock('../../db/database', () => ({
   upsertLogField: jest.fn(() => Promise.resolve(undefined)),
   upsertExerciseCompleted: jest.fn(() => Promise.resolve(undefined)),
   upsertBodyWeight: jest.fn(() => Promise.resolve(undefined)),
-  upsertAdditionalWorkouts: jest.fn(() => Promise.resolve(undefined)),
   addAdditionalWorkout: jest.fn(() => Promise.resolve(undefined)),
   toggleAdditionalWorkout: jest.fn(() => Promise.resolve(undefined)),
   syncRollingSchedule: jest.fn(() => Promise.resolve(undefined)),
@@ -109,7 +108,7 @@ async function renderWithModalOpen() {
   return utils;
 }
 
-describe('DashboardScreen measurements modal (#325)', () => {
+describe('DashboardScreen measurements modal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetLogByDate.mockResolvedValue({ ...mockEntry });

@@ -50,6 +50,7 @@ import {
   getNutritionGoals,
   setNutritionGoalCalories,
   setNutritionGoalProtein,
+  setNutritionGoals,
   getUserProfile,
   setProfileHeightCm,
   setProfileAge,
@@ -198,10 +199,9 @@ function stepMinute(minute: number, delta: number): number {
 // only a stepper's onPress handler ever sets `dirtyRef.current = true`, so
 // hydration never schedules a write.
 //
-// `commit` is passed fresh (not memoized) on every render by callers, so by
-// the time it actually runs it always reflects the latest values of any
-// other state it closes over (e.g. whether the reminder is enabled) — never
-// a stale outer closure.
+// `commit` is passed fresh (not memoized) on every render by callers, but it
+// reads any other state it needs (e.g. whether the reminder is enabled) from
+// `latestRef`, not from the render it closes over.
 
 const STEPPER_DEBOUNCE_MS = 400;
 
@@ -216,15 +216,10 @@ function useDebouncedCommit<T>(
   commitRef.current = commit;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Runs the commit and catches a rejected write so it never becomes an
-  // unhandled promise rejection — it's fired from a timer/AppState callback,
-  // not from an event handler React can attach its own error boundary to.
-  // `Promise.resolve(...)` also normalizes the `void | Promise<void>` return
-  // type of `commit` into something `.catch` can always be called on.
+  // Fired from a timer/AppState callback, so a rejected write must be caught
+  // here. `Promise.resolve` normalizes the `void | Promise<void>` return type.
   const runCommit = useCallback((committedValue: T) => {
-    Promise.resolve(commitRef.current(committedValue)).catch((err: unknown) => {
-      console.error('[SettingsScreen] debounced stepper write failed:', err);
-    });
+    Promise.resolve(commitRef.current(committedValue)).catch(reportWriteFailure);
   }, []);
 
   // Flush a still-pending write immediately (used on unmount/blur/
@@ -268,6 +263,56 @@ function useDebouncedCommit<T>(
   }, [flush]);
 
   return flush;
+}
+
+interface LatestSettings {
+  reminder: ReminderState;
+  cooking: CookingReminderState;
+  mealReminders: MealReminderState;
+  backupReminder: BackupReminderState;
+  profile: UserProfileData;
+  latestWeight: number | null;
+}
+
+const INITIAL_REMINDER: ReminderState = {
+  enabled: false,
+  time: '08:00',
+  permissionDenied: false,
+};
+
+const INITIAL_COOKING: CookingReminderState = {
+  cookWhenEmptyEnabled: false,
+  weeklyCookDayEnabled: false,
+  weeklyCookDay: 0,
+  weeklyCookDayTime: '10:00',
+  permissionDenied: false,
+};
+
+const INITIAL_PROFILE: UserProfileData = {
+  heightCm: null,
+  age: null,
+  sex: null,
+  activityLevel: null,
+  goalType: null,
+};
+
+// The setter updates `latestRef` synchronously, before React re-renders, so an
+// async handler reading the ref after an await sees every earlier update.
+function useLatestState<K extends keyof LatestSettings>(
+  latestRef: React.MutableRefObject<LatestSettings>,
+  key: K,
+): [LatestSettings[K], (update: React.SetStateAction<LatestSettings[K]>) => void] {
+  type T = LatestSettings[K];
+  const [value, setValue] = useState<T>(latestRef.current[key]);
+  const set = useCallback(
+    (update: React.SetStateAction<T>) => {
+      const next = update instanceof Function ? update(latestRef.current[key]) : update;
+      latestRef.current = { ...latestRef.current, [key]: next };
+      setValue(next);
+    },
+    [latestRef, key],
+  );
+  return [value, set];
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -350,6 +395,18 @@ function reportWriteFailure(error: unknown) {
   Alert.alert('Error', 'Failed to save your setting. Please try again.');
 }
 
+async function scheduleAfterSave(schedule: () => Promise<void>) {
+  try {
+    await schedule();
+  } catch (error) {
+    console.error('[SettingsScreen] failed to schedule reminder:', error);
+    Alert.alert(
+      'Reminder not scheduled',
+      'Your setting was saved, but the reminder could not be scheduled.'
+    );
+  }
+}
+
 interface WriteGuard {
   seqRef: React.MutableRefObject<number>;
   pendingRef: React.MutableRefObject<number>;
@@ -402,25 +459,24 @@ Skipped data this app version doesn't recognise: ${parts.join(', ')}${more}`;
 }
 
 export default function SettingsScreen() {
-  const [reminder, setReminder] = useState<ReminderState>({
-    enabled: false,
-    time: '08:00',
-    permissionDenied: false,
+  const latestRef = useRef<LatestSettings>({
+    reminder: INITIAL_REMINDER,
+    cooking: INITIAL_COOKING,
+    mealReminders: DEFAULT_MEAL_REMINDER_STATE,
+    backupReminder: DEFAULT_BACKUP_REMINDER_STATE,
+    profile: INITIAL_PROFILE,
+    latestWeight: null,
   });
 
-  const [cooking, setCooking] = useState<CookingReminderState>({
-    cookWhenEmptyEnabled: false,
-    weeklyCookDayEnabled: false,
-    weeklyCookDay: 0,
-    weeklyCookDayTime: '10:00',
-    permissionDenied: false,
-  });
+  const [reminder, setReminder] = useLatestState(latestRef, 'reminder');
+
+  const [cooking, setCooking] = useLatestState(latestRef, 'cooking');
 
   // Meal-time reminders (#287)
-  const [mealReminders, setMealReminders] = useState<MealReminderState>(DEFAULT_MEAL_REMINDER_STATE);
+  const [mealReminders, setMealReminders] = useLatestState(latestRef, 'mealReminders');
 
   // Backup reminder (#293)
-  const [backupReminder, setBackupReminder] = useState<BackupReminderState>(DEFAULT_BACKUP_REMINDER_STATE);
+  const [backupReminder, setBackupReminder] = useLatestState(latestRef, 'backupReminder');
 
   // Backup state
   const [backupBusy, setBackupBusy] = useState(false);
@@ -433,13 +489,7 @@ export default function SettingsScreen() {
   const [hydrationGoalMl, setHydrationGoalMl] = useState(2000);
 
   // User profile state (#281)
-  const [profile, setProfile] = useState<UserProfileData>({
-    heightCm: null,
-    age: null,
-    sex: null,
-    activityLevel: null,
-    goalType: null,
-  });
+  const [profile, setProfile] = useLatestState(latestRef, 'profile');
   // Editable text fields for the profile (strings so TextInput is controlled)
   const [profileHeightStr, setProfileHeightStr] = useState('');
   const [profileAgeStr, setProfileAgeStr] = useState('');
@@ -481,7 +531,7 @@ export default function SettingsScreen() {
   const caloriesEditGuard = useWriteGuard();
   const proteinEditGuard = useWriteGuard();
   const hydrationEditGuard = useWriteGuard();
-  const [latestWeight, setLatestWeight] = useState<number | null>(null);
+  const [, setLatestWeight] = useLatestState(latestRef, 'latestWeight');
   const [recalcBusy, setRecalcBusy] = useState(false);
 
   // ── Stepper debounce: dirty refs (#313) ────────────────────────────────
@@ -512,39 +562,39 @@ export default function SettingsScreen() {
   // ── Stepper debounce: debounced commits (#313) ─────────────────────────
   const flushWorkoutTime = useDebouncedCommit(reminder.time, workoutTimeDirtyRef, async (time) => {
     await setWorkoutReminderTime(time);
-    if (reminder.enabled) {
-      await reconcileScheduledNotifications();
+    if (latestRef.current.reminder.enabled) {
+      await scheduleAfterSave(reconcileScheduledNotifications);
     }
   });
 
   const flushCookDayTime = useDebouncedCommit(cooking.weeklyCookDayTime, cookDayTimeDirtyRef, async (time) => {
     await setWeeklyCookDayTime(time);
-    if (cooking.weeklyCookDayEnabled) {
-      await reconcileScheduledNotifications();
+    if (latestRef.current.cooking.weeklyCookDayEnabled) {
+      await scheduleAfterSave(reconcileScheduledNotifications);
     }
   });
 
   const flushBreakfastTime = useDebouncedCommit(mealReminders.breakfast.time, breakfastTimeDirtyRef, async (time) => {
     await setMealReminderTime('breakfast', time);
-    if (mealReminders.breakfast.enabled) {
+    if (latestRef.current.mealReminders.breakfast.enabled) {
       const { hour, minute } = parseTimeString(time);
-      await scheduleMealReminder('breakfast', hour, minute);
+      await scheduleAfterSave(() => scheduleMealReminder('breakfast', hour, minute));
     }
   });
 
   const flushLunchTime = useDebouncedCommit(mealReminders.lunch.time, lunchTimeDirtyRef, async (time) => {
     await setMealReminderTime('lunch', time);
-    if (mealReminders.lunch.enabled) {
+    if (latestRef.current.mealReminders.lunch.enabled) {
       const { hour, minute } = parseTimeString(time);
-      await scheduleMealReminder('lunch', hour, minute);
+      await scheduleAfterSave(() => scheduleMealReminder('lunch', hour, minute));
     }
   });
 
   const flushDinnerTime = useDebouncedCommit(mealReminders.dinner.time, dinnerTimeDirtyRef, async (time) => {
     await setMealReminderTime('dinner', time);
-    if (mealReminders.dinner.enabled) {
+    if (latestRef.current.mealReminders.dinner.enabled) {
       const { hour, minute } = parseTimeString(time);
-      await scheduleMealReminder('dinner', hour, minute);
+      await scheduleAfterSave(() => scheduleMealReminder('dinner', hour, minute));
     }
   });
 
@@ -562,8 +612,9 @@ export default function SettingsScreen() {
 
   const flushBackupTime = useDebouncedCommit(backupReminder.time, backupTimeDirtyRef, async (time) => {
     await setBackupReminderTime(time);
-    if (backupReminder.enabled) {
-      await scheduleBackupReminder(backupReminder.day, time);
+    const { enabled, day } = latestRef.current.backupReminder;
+    if (enabled) {
+      await scheduleAfterSave(() => scheduleBackupReminder(day, time));
     }
   });
 
@@ -809,11 +860,11 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await trackProfileWrite(workoutEnabledGuard.seqRef, workoutEnabledGuard.pendingRef, () =>
+      await trackSettingWrite(workoutEnabledGuard.seqRef, workoutEnabledGuard.pendingRef, () =>
         setWorkoutReminderEnabled(value)
       );
       setReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
-      await reconcileScheduledNotifications();
+      await scheduleAfterSave(reconcileScheduledNotifications);
     } catch (error) {
       reportWriteFailure(error);
     }
@@ -843,7 +894,7 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await trackProfileWrite(cookWhenEmptyGuard.seqRef, cookWhenEmptyGuard.pendingRef, () =>
+      await trackSettingWrite(cookWhenEmptyGuard.seqRef, cookWhenEmptyGuard.pendingRef, () =>
         setCookWhenEmptyEnabled(value)
       );
       setCooking((prev) => ({ ...prev, cookWhenEmptyEnabled: value, permissionDenied: false }));
@@ -863,11 +914,11 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await trackProfileWrite(weeklyCookDayEnabledGuard.seqRef, weeklyCookDayEnabledGuard.pendingRef, () =>
+      await trackSettingWrite(weeklyCookDayEnabledGuard.seqRef, weeklyCookDayEnabledGuard.pendingRef, () =>
         setWeeklyCookDayEnabled(value)
       );
       setCooking((prev) => ({ ...prev, weeklyCookDayEnabled: value, permissionDenied: false }));
-      await reconcileScheduledNotifications();
+      await scheduleAfterSave(reconcileScheduledNotifications);
     } catch (error) {
       reportWriteFailure(error);
     }
@@ -877,10 +928,10 @@ export default function SettingsScreen() {
 
   async function handleWeekdaySelect(day: number) {
     try {
-      await trackProfileWrite(weeklyCookDayGuard.seqRef, weeklyCookDayGuard.pendingRef, () => setWeeklyCookDay(day));
+      await trackSettingWrite(weeklyCookDayGuard.seqRef, weeklyCookDayGuard.pendingRef, () => setWeeklyCookDay(day));
       setCooking((prev) => ({ ...prev, weeklyCookDay: day }));
-      if (cooking.weeklyCookDayEnabled) {
-        await reconcileScheduledNotifications();
+      if (latestRef.current.cooking.weeklyCookDayEnabled) {
+        await scheduleAfterSave(reconcileScheduledNotifications);
       }
     } catch (error) {
       reportWriteFailure(error);
@@ -912,18 +963,18 @@ export default function SettingsScreen() {
     }
     try {
       const guard = mealEnabledGuards[meal];
-      await trackProfileWrite(guard.seqRef, guard.pendingRef, () => setMealReminderEnabled(meal, value));
+      await trackSettingWrite(guard.seqRef, guard.pendingRef, () => setMealReminderEnabled(meal, value));
       setMealReminders((prev) => ({
         ...prev,
         [meal]: { ...prev[meal], enabled: value },
         permissionDenied: false,
       }));
-      const time = mealReminders[meal].time;
+      const time = latestRef.current.mealReminders[meal].time;
       const { hour, minute } = parseTimeString(time);
       if (value) {
-        await scheduleMealReminder(meal, hour, minute);
+        await scheduleAfterSave(() => scheduleMealReminder(meal, hour, minute));
       } else {
-        await cancelMealReminder(meal);
+        await scheduleAfterSave(() => cancelMealReminder(meal));
       }
     } catch (error) {
       reportWriteFailure(error);
@@ -967,7 +1018,7 @@ export default function SettingsScreen() {
 
   // ── Profile: field save helpers (#281) ────────────────────────────────
 
-  async function trackProfileWrite(
+  async function trackSettingWrite(
     seqRef: React.MutableRefObject<number>,
     pendingRef: React.MutableRefObject<number>,
     write: () => Promise<void>,
@@ -990,7 +1041,7 @@ export default function SettingsScreen() {
       profileHeightInvalidRef.current = false;
       setProfileHeightError(null);
       try {
-        await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, clearProfileHeightCm);
+        await trackSettingWrite(heightWriteSeqRef, heightPendingWritesRef, clearProfileHeightCm);
         setProfile((prev) => ({ ...prev, heightCm: null }));
       } catch (error) {
         reportWriteFailure(error);
@@ -1009,7 +1060,7 @@ export default function SettingsScreen() {
     profileHeightInvalidRef.current = false;
     setProfileHeightError(null);
     try {
-      await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, () => setProfileHeightCm(val));
+      await trackSettingWrite(heightWriteSeqRef, heightPendingWritesRef, () => setProfileHeightCm(val));
       setProfile((prev) => ({ ...prev, heightCm: val }));
     } catch (error) {
       reportWriteFailure(error);
@@ -1022,7 +1073,7 @@ export default function SettingsScreen() {
       profileAgeInvalidRef.current = false;
       setProfileAgeError(null);
       try {
-        await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, clearProfileAge);
+        await trackSettingWrite(ageWriteSeqRef, agePendingWritesRef, clearProfileAge);
         setProfile((prev) => ({ ...prev, age: null }));
       } catch (error) {
         reportWriteFailure(error);
@@ -1038,7 +1089,7 @@ export default function SettingsScreen() {
     profileAgeInvalidRef.current = false;
     setProfileAgeError(null);
     try {
-      await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, () => setProfileAge(val));
+      await trackSettingWrite(ageWriteSeqRef, agePendingWritesRef, () => setProfileAge(val));
       setProfile((prev) => ({ ...prev, age: val }));
     } catch (error) {
       reportWriteFailure(error);
@@ -1047,7 +1098,7 @@ export default function SettingsScreen() {
 
   async function handleProfileSex(sex: Sex) {
     try {
-      await trackProfileWrite(sexGuard.seqRef, sexGuard.pendingRef, () => setProfileSex(sex));
+      await trackSettingWrite(sexGuard.seqRef, sexGuard.pendingRef, () => setProfileSex(sex));
       setProfile((prev) => ({ ...prev, sex }));
     } catch (error) {
       reportWriteFailure(error);
@@ -1056,7 +1107,7 @@ export default function SettingsScreen() {
 
   async function handleProfileActivity(level: ActivityLevel) {
     try {
-      await trackProfileWrite(activityGuard.seqRef, activityGuard.pendingRef, () => setProfileActivityLevel(level));
+      await trackSettingWrite(activityGuard.seqRef, activityGuard.pendingRef, () => setProfileActivityLevel(level));
       setProfile((prev) => ({ ...prev, activityLevel: level }));
     } catch (error) {
       reportWriteFailure(error);
@@ -1065,7 +1116,7 @@ export default function SettingsScreen() {
 
   async function handleProfileGoal(goal: GoalType) {
     try {
-      await trackProfileWrite(goalGuard.seqRef, goalGuard.pendingRef, () => setProfileGoalType(goal));
+      await trackSettingWrite(goalGuard.seqRef, goalGuard.pendingRef, () => setProfileGoalType(goal));
       setProfile((prev) => ({ ...prev, goalType: goal }));
     } catch (error) {
       reportWriteFailure(error);
@@ -1075,7 +1126,7 @@ export default function SettingsScreen() {
   // ── Profile: recalculate goals ────────────────────────────────────────
 
   async function handleRecalcGoals() {
-    const { heightCm, age, sex, activityLevel, goalType } = profile;
+    const { heightCm, age, sex, activityLevel, goalType } = latestRef.current.profile;
     if (
       heightCm == null || age == null || sex == null ||
       activityLevel == null || goalType == null
@@ -1086,12 +1137,11 @@ export default function SettingsScreen() {
       );
       return;
     }
-    const weightKg = latestWeight ?? 80; // fallback if no weight logged
+    const weightKg = latestRef.current.latestWeight ?? 80; // fallback if no weight logged
     const goals = suggestGoals({ sex, age, heightCm, activityLevel, goalType }, weightKg);
     setRecalcBusy(true);
     try {
-      await setNutritionGoalCalories(goals.calories);
-      await setNutritionGoalProtein(goals.protein);
+      await setNutritionGoals(goals.calories, goals.protein);
       setGoalCalories(goals.calories);
       setGoalProtein(goals.protein);
       Alert.alert(
@@ -1210,11 +1260,11 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await trackProfileWrite(backupEnabledGuard.seqRef, backupEnabledGuard.pendingRef, () =>
+      await trackSettingWrite(backupEnabledGuard.seqRef, backupEnabledGuard.pendingRef, () =>
         setBackupReminderEnabled(value)
       );
       setBackupReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
-      await reconcileScheduledNotifications();
+      await scheduleAfterSave(reconcileScheduledNotifications);
     } catch (error) {
       reportWriteFailure(error);
     }
@@ -1224,10 +1274,10 @@ export default function SettingsScreen() {
 
   async function handleBackupReminderDaySelect(day: number) {
     try {
-      await trackProfileWrite(backupDayGuard.seqRef, backupDayGuard.pendingRef, () => setBackupReminderDay(day));
+      await trackSettingWrite(backupDayGuard.seqRef, backupDayGuard.pendingRef, () => setBackupReminderDay(day));
       setBackupReminder((prev) => ({ ...prev, day }));
-      if (backupReminder.enabled) {
-        await reconcileScheduledNotifications();
+      if (latestRef.current.backupReminder.enabled) {
+        await scheduleAfterSave(reconcileScheduledNotifications);
       }
     } catch (error) {
       reportWriteFailure(error);

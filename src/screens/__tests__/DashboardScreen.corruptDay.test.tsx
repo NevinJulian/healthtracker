@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, AppState } from 'react-native';
 
 import { render, fireEvent, act } from '@testing-library/react-native';
 
@@ -30,6 +30,15 @@ const mockEntry = {
   additional_workouts: [workoutB],
 };
 
+const NOTICE = "This day's data can't be read";
+
+const flagged = (unreadable: Array<'exercises' | 'additional_workouts'>) => ({
+  ...mockEntry,
+  exercises: unreadable.includes('exercises') ? [] : mockEntry.exercises,
+  additional_workouts: unreadable.includes('additional_workouts') ? [] : mockEntry.additional_workouts,
+  unreadable,
+});
+
 jest.mock('../../components/BioForceModal', () => {
   const { TouchableOpacity, Text } = require('react-native');
   return {
@@ -49,7 +58,6 @@ jest.mock('../../db/database', () => ({
   upsertLogField: jest.fn().mockResolvedValue(undefined),
   upsertExerciseCompleted: jest.fn().mockResolvedValue(undefined),
   upsertBodyWeight: jest.fn().mockResolvedValue(undefined),
-  upsertAdditionalWorkouts: jest.fn().mockResolvedValue(undefined),
   addAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   toggleAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   syncRollingSchedule: jest.fn().mockResolvedValue(undefined),
@@ -74,6 +82,7 @@ import {
   toggleAdditionalWorkout,
   upsertExerciseCompleted,
   resetCorruptDayColumn,
+  toISODate,
 } from '../../db/database';
 
 async function flushMicrotasks() {
@@ -117,28 +126,36 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
   const cases = [
     {
       name: 'adding a workout',
+      entry: flagged(['additional_workouts']),
+      noticeShown: true,
       column: 'additional_workouts' as const,
       act: (q: ReturnType<typeof render>) => fireEvent.press(q.getByLabelText('Stub add workout')),
       arrange: () => jest.mocked(addAdditionalWorkout).mockRejectedValueOnce(new CorruptJsonError('t', 'additional_workouts', mockToday)),
     },
     {
-      name: 'toggling a workout',
+      name: 'toggling a workout whose data became unreadable after the day loaded',
+      entry: { ...mockEntry },
+      noticeShown: false,
       column: 'additional_workouts' as const,
       act: (q: ReturnType<typeof render>) => fireEvent.press(q.getByLabelText('Mark Run complete')),
       arrange: () => jest.mocked(toggleAdditionalWorkout).mockRejectedValueOnce(new CorruptJsonError('t', 'additional_workouts', mockToday)),
     },
     {
-      name: 'toggling an exercise',
+      name: 'toggling an exercise whose data became unreadable after the day loaded',
+      entry: { ...mockEntry },
+      noticeShown: false,
       column: 'exercises' as const,
       act: (q: ReturnType<typeof render>) => fireEvent.press(q.getByLabelText('Mark Squat complete')),
       arrange: () => jest.mocked(upsertExerciseCompleted).mockRejectedValueOnce(new CorruptJsonError('t', 'exercises', mockToday)),
     },
   ];
 
-  it.each(cases)('$name: shows the Alert with Cancel and Reset this day', async ({ arrange, act: press }) => {
-    arrange();
+  it.each(cases)('$name: shows the Alert with Cancel and Reset this day', async ({ arrange, act: press, entry, noticeShown }) => {
+    jest.mocked(getLogByDate).mockResolvedValue(entry);
     const q = render(<DashboardScreen />);
     await flushMicrotasks();
+    expect(q.queryByText(NOTICE) !== null).toBe(noticeShown);
+    arrange();
 
     await act(async () => {
       press(q);
@@ -151,10 +168,12 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
     expect(buttons.map((b) => b.text)).toEqual(['Cancel', 'Reset this day']);
   });
 
-  it.each(cases)('$name: Reset this day calls the reset with the refused date and column, then reloads', async ({ arrange, act: press, column }) => {
-    arrange();
+  it.each(cases)('$name: Reset this day calls the reset with the refused date and column, then reloads', async ({ arrange, act: press, column, entry, noticeShown }) => {
+    jest.mocked(getLogByDate).mockResolvedValue(entry);
     const q = render(<DashboardScreen />);
     await flushMicrotasks();
+    expect(q.queryByText(NOTICE) !== null).toBe(noticeShown);
+    arrange();
     await act(async () => {
       press(q);
     });
@@ -170,6 +189,7 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
   });
 
   it('Cancel resets nothing', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['additional_workouts']));
     jest.mocked(addAdditionalWorkout).mockRejectedValueOnce(new CorruptJsonError('t', 'additional_workouts', mockToday));
     const q = render(<DashboardScreen />);
     await flushMicrotasks();
@@ -185,6 +205,7 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
   });
 
   it('a failed reset is surfaced with a second Alert', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['additional_workouts']));
     jest.mocked(addAdditionalWorkout).mockRejectedValueOnce(new CorruptJsonError('t', 'additional_workouts', mockToday));
     jest.mocked(resetCorruptDayColumn).mockRejectedValueOnce(new Error('disk full'));
     const q = render(<DashboardScreen />);
@@ -202,6 +223,7 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
   });
 
   it('other write errors show no Alert', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['additional_workouts']));
     jest.mocked(addAdditionalWorkout).mockRejectedValueOnce(new Error('boom'));
     const q = render(<DashboardScreen />);
     await flushMicrotasks();
@@ -212,5 +234,179 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
     await flushMicrotasks();
 
     expect(alertSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('DashboardScreen shows a notice with a reset button when a day loads unreadable', () => {
+  const exercisesLabel = "Reset this day's exercises";
+  const workoutsLabel = "Reset this day's extra workouts";
+  let alertSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('shows no notice for a readable day', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue({ ...mockEntry });
+    const q = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    expect(q.queryByText(NOTICE)).toBeNull();
+    expect(q.queryByText('Reset this day', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it.each([
+    ['exercises' as const, exercisesLabel, workoutsLabel],
+    ['additional_workouts' as const, workoutsLabel, exercisesLabel],
+  ])('%s: notice and button appear in that card only, with no Alert', async (column, shown, hidden) => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged([column]));
+    const q = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    expect(q.getAllByText(NOTICE)).toHaveLength(1);
+    expect(q.getAllByText('Reset this day', { includeHiddenElements: true })).toHaveLength(1);
+    expect(q.getByLabelText(shown)).toBeTruthy();
+    expect(q.queryByLabelText(hidden)).toBeNull();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('exercises: the notice replaces the empty-list hint', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['exercises']));
+    const q = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    expect(q.queryByText(/No individual exercises configured/)).toBeNull();
+  });
+
+  it('both columns unreadable: both cards show their own notice', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['exercises', 'additional_workouts']));
+    const q = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    expect(q.getAllByText(NOTICE)).toHaveLength(2);
+    expect(q.getByLabelText(exercisesLabel)).toBeTruthy();
+    expect(q.getByLabelText(workoutsLabel)).toBeTruthy();
+  });
+
+  it.each([
+    ['exercises' as const, exercisesLabel],
+    ['additional_workouts' as const, workoutsLabel],
+  ])('%s: pressing the button resets once, reloads, and the notice goes away', async (column, label) => {
+    jest.mocked(getLogByDate).mockResolvedValueOnce(flagged([column])).mockResolvedValue({ ...mockEntry });
+    const q = render(<DashboardScreen />);
+    await flushMicrotasks();
+    const loadsBefore = jest.mocked(getLogByDate).mock.calls.length;
+
+    await act(async () => {
+      fireEvent.press(q.getByLabelText(label));
+    });
+    await flushMicrotasks();
+
+    expect(resetCorruptDayColumn).toHaveBeenCalledTimes(1);
+    expect(resetCorruptDayColumn).toHaveBeenCalledWith(mockToday, column);
+    expect(jest.mocked(getLogByDate).mock.calls.length).toBeGreaterThan(loadsBefore);
+    expect(q.queryByText(NOTICE)).toBeNull();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('two rapid presses call the reset once', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['exercises']));
+    let release: () => void = () => {};
+    jest.mocked(resetCorruptDayColumn).mockImplementationOnce(
+      () => new Promise<void>((resolve) => { release = resolve; })
+    );
+    const q = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.press(q.getByLabelText(exercisesLabel));
+      fireEvent.press(q.getByLabelText(exercisesLabel));
+    });
+    await act(async () => {
+      release();
+    });
+    await flushMicrotasks();
+
+    expect(resetCorruptDayColumn).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed reset shows Reset failed and a later press works', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['exercises']));
+    jest.mocked(resetCorruptDayColumn).mockRejectedValueOnce(new Error('disk full'));
+    const q = render(<DashboardScreen />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.press(q.getByLabelText(exercisesLabel));
+    });
+    await flushMicrotasks();
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(lastAlert(alertSpy).title).toBe('Reset failed');
+
+    await act(async () => {
+      fireEvent.press(q.getByLabelText(exercisesLabel));
+    });
+    await flushMicrotasks();
+
+    expect(resetCorruptDayColumn).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('DashboardScreen resets the day whose notice is shown after the date rolls over', () => {
+  const LOADED_DAY = '2026-09-19';
+  const NEXT_DAY = '2026-09-20';
+  let errorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+    jest.mocked(toISODate).mockImplementation(() => LOADED_DAY);
+  });
+
+  it.each([
+    ['exercises' as const, "Reset this day's exercises"],
+    ['additional_workouts' as const, "Reset this day's extra workouts"],
+  ])('%s: resets the loaded entry date, not the new render-time date', async (column, label) => {
+    jest.mocked(getLogByDate).mockResolvedValueOnce({
+      ...mockEntry,
+      date: LOADED_DAY,
+      exercises: [],
+      additional_workouts: [],
+      unreadable: [column],
+    });
+    const q = render(<DashboardScreen />);
+    await flushMicrotasks();
+    expect(q.getByLabelText(label)).toBeTruthy();
+
+    jest.mocked(toISODate).mockImplementation(() => NEXT_DAY);
+    jest.mocked(getLogByDate).mockRejectedValue(new Error('reload failed'));
+    const calls = jest.mocked(AppState.addEventListener).mock.calls;
+    const handler = calls[calls.length - 1][1] as (state: string) => void;
+    await act(async () => {
+      handler('active');
+    });
+    await flushMicrotasks();
+    expect(q.getByLabelText(label)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(q.getByLabelText(label));
+    });
+    await flushMicrotasks();
+
+    expect(resetCorruptDayColumn).toHaveBeenCalledTimes(1);
+    expect(resetCorruptDayColumn).toHaveBeenCalledWith(LOADED_DAY, column);
   });
 });

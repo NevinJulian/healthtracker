@@ -24,13 +24,14 @@
  *     (date, exercise), ordered by (created_at, id), then adds
  *     `UNIQUE(date, exercise, set_index)` so the database itself rejects any
  *     future collision.
- *   - `restoreFromPayload` (database.ts) drops both unique indexes before the
- *     restore loop (so a legacy backup with colliding/gapped workout_set_log
- *     rows can be inserted at all) and runs `POST_RESTORE_STEPS` after the
- *     loop, inside the same transaction. Its set_index step is
- *     `RESTORE_SET_INDEX_SQL`, not v37: it renumbers only the (date, exercise)
- *     partitions that actually collide, ordered by (set_index, created_at,
- *     id), and then recreates the index.
+ *   - `restoreFromPayload(tables, backupSchemaVersion)` (database.ts) drops both
+ *     unique indexes before the restore loop (so a legacy backup with
+ *     colliding/gapped workout_set_log rows can be inserted at all) and
+ *     repairs set_index after it, inside the same transaction. A backup from
+ *     before v37 gets v37's own renumber by (created_at, id); a backup from
+ *     v37 on gets `RESTORE_SET_INDEX_SQL`, which renumbers only the
+ *     (date, exercise) partitions that actually collide, ordered by
+ *     (set_index, created_at, id). Both recreate the index.
  *
  * Uses the same sql.js-backed adapter and fresh-module-per-test pattern as
  * restoreLegacyDuplicates.test.ts / migrationAtomicity.test.ts.
@@ -413,7 +414,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
     // would succeed trivially WITHOUT renumbering — the assertions below on
     // the renumbered set_index values and the index's existence are what
     // catch that.
-    await expect(db.restoreFromPayload(payloadTables)).resolves.toBeDefined();
+    await expect(db.restoreFromPayload(payloadTables, 38)).resolves.toBeDefined();
 
     const raw = db.getDatabase();
 
@@ -444,7 +445,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
         { id: 32, date: '2024-09-01', exercise: 'Squat', set_index: 1, reps: 5, weight_kg: 80, created_at: '2024-09-01T10:10:00.000Z' },
         { id: 33, date: '2024-09-01', exercise: 'Squat', set_index: 2, reps: 5, weight_kg: 80, created_at: '2024-09-01T10:00:00.000Z' },
       ],
-    });
+    }, 38);
 
     const raw = db.getDatabase();
     const rows = await raw.getAllAsync<{ id: number; set_index: number }>(
@@ -471,7 +472,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
         { id: 42, date: '2024-09-02', exercise: 'Press', set_index: 5, reps: 5, weight_kg: 40, created_at: '2024-09-02T10:05:00.000Z' },
         { id: 43, date: '2024-09-02', exercise: 'Press', set_index: 9, reps: 5, weight_kg: 40, created_at: '2024-09-02T10:10:00.000Z' },
       ],
-    });
+    }, 38);
 
     const rows = await db.getDatabase().getAllAsync<{ id: number; set_index: number }>(
       "SELECT id, set_index FROM workout_set_log WHERE date = '2024-09-02' ORDER BY id ASC"
@@ -491,7 +492,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
         { id: 54, date: '2024-09-03', exercise: 'Dip', set_index: 2, reps: 10, weight_kg: 0, created_at: '2024-09-03T10:40:00.000Z' },
         { id: 55, date: '2024-09-03', exercise: 'Dip', set_index: 7, reps: 10, weight_kg: 0, created_at: '2024-09-03T10:20:00.000Z' },
       ],
-    });
+    }, 38);
 
     const raw = db.getDatabase();
     const curl = await raw.getAllAsync<{ id: number; set_index: number }>(
@@ -529,7 +530,7 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
       ],
     };
 
-    await expect(db.restoreFromPayload(payloadTables)).resolves.toBeDefined();
+    await expect(db.restoreFromPayload(payloadTables, 38)).resolves.toBeDefined();
 
     const raw = db.getDatabase();
 
@@ -551,6 +552,134 @@ describe('restoreFromPayload() with colliding/gapped workout_set_log rows (#317)
     );
     expect(idx35).not.toBeNull();
     expect(idx37).not.toBeNull();
+  });
+});
+
+describe('restoreFromPayload() by backup schema version', () => {
+  const INDEX_SQL =
+    "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_workout_set_log_date_exercise_set_index'";
+
+  const cde = (date: string) => [
+    { id: 1, date, exercise: 'Row', set_index: 2, reps: 8, weight_kg: 40, created_at: `${date}T10:02:00.000Z` },
+    { id: 2, date, exercise: 'Row', set_index: 1, reps: 8, weight_kg: 41, created_at: `${date}T10:10:00.000Z` },
+    { id: 3, date, exercise: 'Row', set_index: 2, reps: 8, weight_kg: 42, created_at: `${date}T10:15:00.000Z` },
+  ];
+
+  async function readBack(db: DatabaseModule, date: string) {
+    const sets = await db.getWorkoutSetsForDay(date);
+    return sets.map((s) => ({ id: s.id, set_index: s.set_index }));
+  }
+
+  it('version 36: colliding C(2,10:02), D(1,10:10), E(2,10:15) read back C, D, E with set_index 0, 1, 2, as an in-place v37 upgrade gives', async () => {
+    const date = '2024-10-01';
+
+    const upgradeRaw = keepAlive(await createSqljsDb());
+    await migrateToV36(upgradeRaw);
+    for (const r of cde(date)) {
+      await upgradeRaw.runAsync(
+        'INSERT INTO workout_set_log (id, date, exercise, set_index, reps, weight_kg, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [r.id, r.date, r.exercise, r.set_index, r.reps, r.weight_kg, r.created_at]
+      );
+    }
+    const upgraded = loadFreshDatabaseModuleWithRaw(upgradeRaw);
+    await upgraded.initDatabase();
+    const expected = await readBack(upgraded, date);
+    expect(expected).toEqual([
+      { id: 1, set_index: 0 },
+      { id: 2, set_index: 1 },
+      { id: 3, set_index: 2 },
+    ]);
+
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await db.restoreFromPayload({ workout_set_log: cde(date) }, 36);
+
+    expect(await readBack(db, date)).toEqual(expected);
+    expect(await db.getDatabase().getFirstAsync(INDEX_SQL)).not.toBeNull();
+  });
+
+  it('version 36: collision-free but gapped and out-of-created_at rows are renumbered by (created_at, id)', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.restoreFromPayload(
+      {
+        workout_set_log: [
+          { id: 1, date: '2024-10-02', exercise: 'Squat', set_index: 0, reps: 5, weight_kg: 80, created_at: '2024-10-02T10:20:00.000Z' },
+          { id: 2, date: '2024-10-02', exercise: 'Squat', set_index: 4, reps: 5, weight_kg: 80, created_at: '2024-10-02T10:10:00.000Z' },
+          { id: 3, date: '2024-10-02', exercise: 'Squat', set_index: 9, reps: 5, weight_kg: 80, created_at: '2024-10-02T10:00:00.000Z' },
+        ],
+      },
+      36
+    );
+
+    expect(await readBack(db, '2024-10-02')).toEqual([
+      { id: 3, set_index: 0 },
+      { id: 2, set_index: 1 },
+      { id: 1, set_index: 2 },
+    ]);
+    expect(await db.getDatabase().getFirstAsync(INDEX_SQL)).not.toBeNull();
+  });
+
+  it('version 37: collision-free rows keep set_index and order even when created_at disagrees', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.restoreFromPayload(
+      {
+        workout_set_log: [
+          { id: 1, date: '2024-10-03', exercise: 'Squat', set_index: 0, reps: 5, weight_kg: 80, created_at: '2024-10-03T10:20:00.000Z' },
+          { id: 2, date: '2024-10-03', exercise: 'Squat', set_index: 4, reps: 5, weight_kg: 80, created_at: '2024-10-03T10:10:00.000Z' },
+          { id: 3, date: '2024-10-03', exercise: 'Squat', set_index: 9, reps: 5, weight_kg: 80, created_at: '2024-10-03T10:00:00.000Z' },
+        ],
+      },
+      37
+    );
+
+    expect(await readBack(db, '2024-10-03')).toEqual([
+      { id: 1, set_index: 0 },
+      { id: 2, set_index: 4 },
+      { id: 3, set_index: 9 },
+    ]);
+    expect(await db.getDatabase().getFirstAsync(INDEX_SQL)).not.toBeNull();
+  });
+
+  it('version 37: colliding rows renumber by set_index first', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.restoreFromPayload({ workout_set_log: cde('2024-10-04') }, 37);
+
+    expect(await readBack(db, '2024-10-04')).toEqual([
+      { id: 2, set_index: 0 },
+      { id: 1, set_index: 1 },
+      { id: 3, set_index: 2 },
+    ]);
+    expect(await db.getDatabase().getFirstAsync(INDEX_SQL)).not.toBeNull();
+  });
+
+  it('version 36 rolls the whole restore back and keeps current data if v37 cannot be applied', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await db.logWorkoutSet('2024-10-05', 'Curl', { reps: 10, weightKg: 15 });
+
+    const loaded = require('../schema') as typeof import('../schema');
+    const real = loaded.MIGRATIONS.find((m) => m.version === 37)!;
+    const original = real.precondition;
+    real.precondition = async () => {
+      throw new Error('precondition boom');
+    };
+    try {
+      await expect(
+        db.restoreFromPayload({ workout_set_log: cde('2024-10-06') }, 36)
+      ).rejects.toThrow('precondition boom');
+    } finally {
+      real.precondition = original;
+    }
+
+    expect(await readBack(db, '2024-10-06')).toEqual([]);
+    expect(await readBack(db, '2024-10-05')).toHaveLength(1);
+    expect(await db.getDatabase().getFirstAsync(INDEX_SQL)).not.toBeNull();
   });
 });
 

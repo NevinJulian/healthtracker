@@ -56,6 +56,7 @@ import {
   BioForceModal,
 } from '../components';
 import { iconChipIconColor } from '../components/IconChip';
+import LoadErrorView from '../components/LoadErrorView';
 
 // ─── Verdure circle checkbox ──────────────────────────────────────────────────
 // Replaces old square Checkbox: 24px circle, empty = line2 ring, done = sage fill
@@ -195,6 +196,26 @@ function ExerciseRow({
   );
 }
 
+function UnreadableNotice({
+  resetLabel,
+  onReset,
+}: {
+  resetLabel: string;
+  onReset: () => void;
+}) {
+  return (
+    <View>
+      <Text style={styles.noExercisesHint}>This day's data can't be read</Text>
+      <Button
+        title="Reset this day"
+        variant="ghost"
+        accessibilityLabel={resetLabel}
+        onPress={onReset}
+      />
+    </View>
+  );
+}
+
 // ─── Hammer Section ───────────────────────────────────────────────────────────
 
 function HammerSection({
@@ -203,12 +224,14 @@ function HammerSection({
   onExerciseToggle,
   onSessionToggle,
   onOpenLogger,
+  onResetUnreadable,
 }: {
   entry: DailyLogEntry;
   workoutSets: Record<string, WorkoutSet[]>;
   onExerciseToggle: (id: string, value: boolean) => void;
   onSessionToggle: () => void;
   onOpenLogger: (exerciseName: string) => void;
+  onResetUnreadable: () => void;
 }) {
   const doneCount = entry.exercises.filter((e) => e.completed).length;
   const total = entry.exercises.length;
@@ -246,7 +269,9 @@ function HammerSection({
       </Card>
 
       {/* Exercise list */}
-      {entry.exercises.length > 0 ? (
+      {entry.unreadable?.includes('exercises') ? (
+        <UnreadableNotice resetLabel="Reset this day's exercises" onReset={onResetUnreadable} />
+      ) : entry.exercises.length > 0 ? (
         <Card style={styles.exerciseListCard}>
           {entry.exercises.map((ex, idx) => (
             <React.Fragment key={ex.id}>
@@ -284,6 +309,7 @@ export default function DashboardScreen() {
   const [entry, setEntry] = useState<DailyLogEntry | null>(null);
   const [todaysMeals, setTodaysMeals] = useState<MealPlanWithRecipe[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<'initial' | 'refresh' | null>(null);
 
   // Mirrors `todaysMeals` synchronously (#330). handleToggleMeal reads this
   // instead of a render-closure value: React applies setState updates on its
@@ -367,6 +393,7 @@ export default function DashboardScreen() {
     // tests deliberately don't model that, and correctness shouldn't lean
     // on it either).
     const date = toISODate();
+    setLoadError(null);
     if (!hasLoadedOnceRef.current) {
       setLoading(true);
     }
@@ -402,6 +429,7 @@ export default function DashboardScreen() {
     } catch (err) {
       if (!mountedRef.current || runIdRef.current !== runId) return;
       console.error('DashboardScreen: loadToday error', err);
+      setLoadError(hasLoadedOnceRef.current ? 'refresh' : 'initial');
     } finally {
       if (mountedRef.current && runIdRef.current === runId) {
         setLoading(false);
@@ -463,14 +491,22 @@ export default function DashboardScreen() {
     }
   };
 
+  const resetInFlightRef = useRef(false);
+
   const resetCorruptDay = async (date: string, column: CorruptJsonColumn) => {
+    if (resetInFlightRef.current) return;
+    resetInFlightRef.current = true;
     try {
-      await resetCorruptDayColumn(date, column);
-    } catch (err) {
-      console.error('resetCorruptDayColumn error', err);
-      Alert.alert('Reset failed', 'This day could not be reset. Nothing was changed.');
+      try {
+        await resetCorruptDayColumn(date, column);
+      } catch (err) {
+        console.error('resetCorruptDayColumn error', err);
+        Alert.alert('Reset failed', 'This day could not be reset. Nothing was changed.');
+      }
+      await loadToday();
+    } finally {
+      resetInFlightRef.current = false;
     }
-    loadToday();
   };
 
   const offerCorruptDayReset = (err: CorruptJsonError) => {
@@ -607,14 +643,21 @@ export default function DashboardScreen() {
 
   // ── Measurement handlers ──────────────────────────────────────────────────────
 
-  const handleSaveMeasurements = async (fields: MeasurementFields) => {
+  const handleSaveMeasurements = async (fields: MeasurementFields): Promise<boolean> => {
     try {
       await logBodyMeasurement(today, fields);
+    } catch (err) {
+      console.error('logBodyMeasurement error', err);
+      Alert.alert('Error', 'Failed to save your measurements. Please try again.');
+      return false;
+    }
+    try {
       const updated = await getLatestMeasurements();
       setLatestMeasurements(updated);
     } catch (err) {
-      console.error('logBodyMeasurement error', err);
+      console.error('getLatestMeasurements error', err);
     }
+    return true;
   };
 
   // ── Workout set logging handlers (#285) ──────────────────────────────────────
@@ -623,13 +666,18 @@ export default function DashboardScreen() {
     exerciseName: string,
     reps: number,
     weightKg: number
-  ) => {
+  ): Promise<boolean> => {
     try {
       // set_index is assigned atomically by logWorkoutSet itself (#317) —
       // no longer computed from the current in-memory array length, which
       // collided with a surviving set after deleting one mid-session.
       await logWorkoutSet(today, exerciseName, { reps, weightKg });
-      // Optimistically refresh from DB so IDs are correct
+    } catch (err) {
+      console.error('logWorkoutSet error', err);
+      Alert.alert('Error', 'Failed to save your set. Please try again.');
+      return false;
+    }
+    try {
       const updated = await getWorkoutSetsForDay(today);
       const grouped: Record<string, WorkoutSet[]> = {};
       for (const s of updated) {
@@ -638,8 +686,9 @@ export default function DashboardScreen() {
       }
       setWorkoutSets(grouped);
     } catch (err) {
-      console.error('logWorkoutSet error', err);
+      console.error('getWorkoutSetsForDay error', err);
     }
+    return true;
   };
 
   const handleDeleteSet = async (setId: number) => {
@@ -684,6 +733,14 @@ export default function DashboardScreen() {
       <View style={styles.centred}>
         <ActivityIndicator size="large" color={Colors.sage} />
         <Text style={styles.loadingText}>Syncing schedule…</Text>
+      </View>
+    );
+  }
+
+  if (loadError && !entry) {
+    return (
+      <View style={styles.centred}>
+        <LoadErrorView variant="screen" title="Couldn't load today" onRetry={loadToday} />
       </View>
     );
   }
@@ -744,6 +801,8 @@ export default function DashboardScreen() {
         </View>
       )}
 
+      {loadError === 'refresh' && <LoadErrorView variant="banner" onRetry={loadToday} />}
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -777,6 +836,7 @@ export default function DashboardScreen() {
           onExerciseToggle={handleExerciseToggle}
           onSessionToggle={() => handleToggle('hammer_completed')}
           onOpenLogger={(name) => setActiveSetLogger(name)}
+          onResetUnreadable={() => void resetCorruptDay(entry.date, 'exercises')}
         />
 
         {/* ── Intermittent fasting ─────────────────────────────────────────── */}
@@ -967,13 +1027,13 @@ export default function DashboardScreen() {
             {latestMeasurements && (
               <View style={styles.measurementPills}>
                 {MEASUREMENT_PILLS.map(({ field, label }) => {
-                  const entry = latestMeasurements[field];
-                  if (!entry) return null;
+                  const measurement = latestMeasurements[field];
+                  if (!measurement) return null;
                   return (
                     <View key={field} style={styles.measurePill}>
                       <Text style={styles.measurePillLabel}>{label}</Text>
-                      <Text style={styles.measurePillValue}>{entry.value} cm</Text>
-                      <Text style={styles.measurePillDate}>{entry.date}</Text>
+                      <Text style={styles.measurePillValue}>{measurement.value} cm</Text>
+                      <Text style={styles.measurePillDate}>{measurement.date}</Text>
                     </View>
                   );
                 })}
@@ -985,6 +1045,13 @@ export default function DashboardScreen() {
         {/* ── Extra Workouts ───────────────────────────────────────────────── */}
         <View style={styles.section}>
           <Text style={styles.extraWorkoutsTitle}>Bonuses / Ad-hoc</Text>
+
+          {entry.unreadable?.includes('additional_workouts') && (
+            <UnreadableNotice
+              resetLabel="Reset this day's extra workouts"
+              onReset={() => void resetCorruptDay(entry.date, 'additional_workouts')}
+            />
+          )}
 
           {(entry.additional_workouts || []).map((aw) => (
             <Row
@@ -1098,7 +1165,7 @@ function MeasurementsModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  onSave: (fields: MeasurementFields) => Promise<void>;
+  onSave: (fields: MeasurementFields) => Promise<boolean>;
   latest: LatestMeasurements | null;
 }) {
   const [waist, setWaist] = useState('');
@@ -1106,6 +1173,7 @@ function MeasurementsModal({
   const [hips, setHips] = useState('');
   const [thigh, setThigh] = useState('');
   const [arm, setArm] = useState('');
+  const savingRef = useRef(false);
 
   const waistResult = parseMeasurementField(waist, 'waist_cm');
   const chestResult = parseMeasurementField(chest, 'chest_cm');
@@ -1122,18 +1190,26 @@ function MeasurementsModal({
   };
 
   const handleSave = async () => {
+    if (savingRef.current) return;
     const keys = Object.keys(fieldResults) as MeasurementKey[];
     const hasError = keys.some((k) => fieldResults[k].isError);
     const hasValue = keys.some((k) => fieldResults[k].value !== undefined);
 
     if (hasValue) {
-      await onSave({
-        waist_cm: waistResult.value,
-        chest_cm: chestResult.value,
-        hips_cm: hipsResult.value,
-        thigh_cm: thighResult.value,
-        arm_cm: armResult.value,
-      });
+      savingRef.current = true;
+      let saved: boolean;
+      try {
+        saved = await onSave({
+          waist_cm: waistResult.value,
+          chest_cm: chestResult.value,
+          hips_cm: hipsResult.value,
+          thigh_cm: thighResult.value,
+          arm_cm: armResult.value,
+        });
+      } finally {
+        savingRef.current = false;
+      }
+      if (!saved) return;
     }
 
     if (!hasError) {
@@ -1214,7 +1290,7 @@ function SetLoggerModal({
   exerciseName: string;
   sets: WorkoutSet[];
   onClose: () => void;
-  onAddSet: (reps: number, weightKg: number) => Promise<void>;
+  onAddSet: (reps: number, weightKg: number) => Promise<boolean>;
   onDeleteSet: (id: number) => Promise<void>;
 }) {
   const lastSet = sets.length > 0 ? sets[sets.length - 1] : null;
@@ -1239,8 +1315,7 @@ function SetLoggerModal({
     }
     setSaving(true);
     try {
-      await onAddSet(reps, weight);
-      setRepsInput('');
+      if (await onAddSet(reps, weight)) setRepsInput('');
       // Keep weight for the next set (common UX pattern)
     } finally {
       setSaving(false);
