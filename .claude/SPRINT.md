@@ -1,4 +1,4 @@
-# Sprint protocol — autonomous issue-fixing run
+# Sprint protocol — autonomous sprint run
 
 This is the orchestrator's rulebook. The **main Claude Code session is the orchestrator** — subagents
 cannot spawn subagents, so the orchestrator is never itself a subagent.
@@ -56,8 +56,8 @@ orchestrator → analyst → developer → tester → security → orchestrator 
 | Stage | Agent | Gate to pass |
 |---|---|---|
 | Understand | `analyst` | Acceptance criteria are concrete and testable. Ambiguity resolved or issue parked. |
-| Implement | `developer` | typecheck + test green, regression test written, commits are small and atomic |
-| Verify | `tester` | Regression test genuinely fails on the pre-fix commit and passes after. Acceptance criteria met. |
+| Implement | `developer` | typecheck + test green, regression or feature tests written, commits are small and atomic |
+| Verify | `tester` | The new tests genuinely fail on the commit before the change and pass after. Acceptance criteria met. |
 | Review | `security` | No new injection surface, no unvalidated external input reaching SQL or the filesystem, no swallowed errors on a data-writing path |
 | Land | orchestrator | Merge branch into `sprint/auto-fixes`, resolve conflicts via `conflict` agent if needed |
 
@@ -72,9 +72,11 @@ The `cleanup` agent runs **once at the end of each lane**, not per issue.
 - **Cold review.** A fresh Claude Code session, with none of the sprint's context, reviews the whole
   `main...sprint/auto-fixes` diff (`/code-review` on the branch). The orchestrator and its agents
   have seen every rationale. A cold reader only has the code, and that is the point.
-- **Device test.** A human runs every issue's **Device check** from its work order on the phone,
-  from the integration branch, **before the PR is opened**. Jest and CI cannot see a native crash.
-  The SDK 57 expo-notifications crash was invisible to both.
+- **Device test.** A human runs every issue's **Device check** from its work order on the phone, in
+  Expo Go via the QR code, from the integration branch, **before the PR is opened**. A device check
+  never needs edited code, a preview build or a notification. What only those could show is covered
+  by tests, and the report names it. Jest and CI cannot see a native crash. The SDK 57
+  expo-notifications crash was invisible to both.
 
 The orchestrator does neither. It lists both as outstanding in the report.
 
@@ -86,45 +88,59 @@ Most of the scope touches `src/db/database.ts` or one of the big screens. Runnin
 parallel worktrees guarantees conflicts on every merge. So issues are grouped into lanes by file
 ownership, lanes run in parallel, and **issues within a lane run serially on one branch**.
 
-This table is sprint 4's scope. `/sprint` freezes exactly the issues in the Issues column that are
-still open. Sprints 1 to 3 are done. Their lanes are in git history.
+This table is sprint 5's scope. `/sprint` freezes exactly the issues in the Issues column that are
+still open. Sprints 1 to 4 were bug sprints and are done. Their lanes are in git history.
 
 | Lane | Branch | Owns | Issues, in order |
 |---|---|---|---|
-| A — db core | `sprint/lane-a-db` | `src/db/**` and `src/services/backup.ts`, except the functions granted to lanes C and E | #427, #412, #430 |
-| B — app start | `sprint/lane-b-start` | `App.tsx`, `src/services/rescueExport.ts`, and new components they need | #426, #423 |
-| C — Dashboard and Analytics | `sprint/lane-c-dashboard` | `src/screens/DashboardScreen.tsx`, `src/screens/AnalyticsDashboardScreen.tsx`, a new shared error view in `src/components/`, and in `database.ts` the `daily_log` JSON read and write helpers, `mapLogRow`, the exercise and additional-workout writers, `resetCorruptDayColumn` and the body-measurement functions | #434, #411, #435, #432, #431 |
-| D — network | `sprint/lane-d-api` | `src/api/**`, `src/nutrition/**`, `src/screens/{Discover,DiscoverDetail,RecipeEditor}Screen.tsx` | #424, #428 |
-| E — settings and notifications | `sprint/lane-e-settings` | `src/screens/SettingsScreen.tsx`, `src/services/notifications.ts`, and in `database.ts` a new function that saves both nutrition goals in one transaction | #422, #433, #429 |
-| F — repo hygiene | `sprint/lane-f-repo` | `__mocks__/**`, and for #437 the files its checklist names | #425, #437 |
+| A — training | `sprint/lane-a-training` | `src/db/schema.ts`, `src/screens/DashboardScreen.tsx`, `src/screens/AnalyticsDashboardScreen.tsx`, `src/screens/analyticsHelpers.ts`, and in `database.ts` the `workout_set_log` functions | #344, #337, #342 |
+| B — meals | `sprint/lane-b-meals` | `src/screens/{MealPrep,ShoppingList}Screen.tsx`, a new aisle lookup under `src/data/`, and in `database.ts` the shopping-list, meal-plan, inventory and `cook_log` functions | #444, #347, #348 |
+| C — data | `sprint/lane-c-data` | `src/services/backup.ts`, a new `src/services/csvExport.ts`, `src/screens/SettingsScreen.tsx`, `App.tsx`, and new read functions in `database.ts` for the CSV export | #338, #339 |
+| D — recipes | `sprint/lane-d-recipes` | `src/api/**`, `src/nutrition/**`, `src/screens/{Recipes,RecipeEditor,RecipeDetail,Discover,DiscoverDetail}Screen.tsx`, the route params in `src/navigation/AppNavigator.tsx`, and in `database.ts` the recipe and `off_cache` functions | #442, #443, #352 |
 
-Each lane also owns the tests for what it changes.
+Each lane also owns the tests for what it changes and any new file it creates.
 
-**Known patterns.** #431 follows MealPrep's error view from #401, as one shared component for the
-Dashboard and Analytics. MealPrep keeps its own view for now. #435 follows #404: an Alert, and the
-modal stays open.
+**Features.** Sprint 5 is the first feature sprint. #444, #442 and #443 are bugs in files these lanes
+own anyway.
+
+- For a feature, the pipeline's regression test means the feature's tests. They must fail on the lane
+  commit before the feature code, because the behaviour is missing and not just an import, and pass
+  after.
+- The decision comment is the whole scope. What the issue leaves for later is not built. If something
+  beyond the decision looks necessary, the analyst says so in the work order and the orchestrator
+  files it.
+- UI wording and small layout choices the decision doesn't make are the analyst's picks. The work
+  order lists them, and the report repeats them in §6.
+- New UI uses the Verdure tokens and the existing components in `src/components/`.
 
 **Ordering constraints** — these are real dependencies, not preferences:
 
-- Lanes C and E start after lane A has merged into the integration branch, because they also edit
-  `database.ts`. Lanes B and D start right away.
-- Lane C: #434 before #411. Both change what counts as corrupt, and #411 builds on it.
-- Lane F runs last, after every other lane has merged, because #437 touches files in several lanes.
-  For #437, lane F only edits comments, docs and the listed tidy-ups, plus the one behaviour fix its
-  decision names.
+- Lanes A, B and D start right away. Lane C starts after lane A has merged into the integration
+  branch, because #339 exports #344's set type.
+- Lane A: #344 first, because #337's "last time" line leaves warm-ups out. #342 last.
+- Lane B: #444 first.
+- Lane D: #442 and #443 before #352.
+- Only lane A adds a migration: v39 for #344. No other lane touches `schema.ts`.
+- In `database.ts`, a lane puts new functions next to the functions it owns, never at the end of the
+  file.
+- Lane B may use `src/nutrition/units.ts` but not change it.
+- No lane changes `package.json`, `package-lock.json` or `app.json`. A developer who thinks it needs
+  a new package stops and reports.
 
 **Cross-lane dependencies** are the orchestrator's problem. A developer who finds that its issue needs
 a file another lane owns stops and reports, as rule 7 says.
 
-**Decisions** for every issue that needed one are in the issue comments: #411, #412, #423, #424, #425,
-#426, #427, #428, #429, #430, #432, #437. The latest decision comment is binding.
+**Decisions.** Every issue in the table has a decision comment, and the latest one is binding. #348 is
+adapted to this app's Lunch and Dinner slots, and its quick add moved to #447.
 
 ### Excluded from this sprint
 
-- **#436 (Expo patch updates and the `splash` key)** — done by hand before this sprint, because it
-  changes `package.json` and needs Expo Go and the build check before the PR.
-- **#396 (`PRAGMA foreign_keys`)** — needs the restore rework and a per-table cascade decision first.
-- **#392 and every other feature request.** Features run one at a time, outside the sprint.
+- **Sprint 6:** #349 (barcode scanning) and #392 (muscle map) add native packages. #346 (weekly
+  review) and #351 (adaptive TDEE) build on #342, and #447 (quick add) changes the daily totals they
+  read.
+- **Sprint 7:** #350 (dark mode), on its own, because it touches every screen.
+- **#353 and #355** need a development build, and the phone checks run in Expo Go.
+- **#396, #441 and #445** are not part of the feature sprints.
 
 ---
 
@@ -188,7 +204,7 @@ Write `SPRINT_REPORT.md` to the repo root when the run ends — completed, abort
 Required sections:
 
 1. **Outcome** — one paragraph. What landed, what did not, whether the integration branch is green.
-2. **Merged** — table: issue, title, branch, commits, what the regression test asserts.
+2. **Merged** — table: issue, title, branch, commits, what the regression or feature tests assert.
 3. **Parked** — table: issue, how far it got, exactly why it stalled, what a human needs to decide.
    This is the most useful section. Be specific — "tester rejected twice because the fix changes
    `date_cooked` semantics and the issue does not say whether that is acceptable" is useful, "failed"
