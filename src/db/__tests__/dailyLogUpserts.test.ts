@@ -1,6 +1,7 @@
 /**
  * Regression test for #305: the five daily_log writers (upsertLogField,
- * upsertExerciseCompleted, upsertBodyWeight, addWater, setWaterForDay) are bare `UPDATE ... WHERE date = ?` statements.
+ * upsertExerciseCompleted, upsertBodyWeight, addWater, setWaterForDay) are bare
+ * `UPDATE ... WHERE date = ?` statements.
  * When called for a date that has no daily_log row yet (e.g. outside the
  * current 7-day rolling window — the window is only today ± 7 days, but a
  * screen can still be showing/editing a date further out, like a date from

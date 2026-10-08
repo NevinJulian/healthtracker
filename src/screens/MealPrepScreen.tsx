@@ -108,10 +108,10 @@ export default function MealPrepScreen() {
     };
   }, []);
 
-  // runIdRef guards against overlapping loads: it is
-  // bumped at the start of every loadData() call, and again when the focus
-  // effect's cleanup runs (i.e. on blur). A load only commits its results
-  // if it is still the current run when it resolves, so a stale in-flight
+  // runIdRef guards against overlapping loads: it is bumped at the start of
+  // every loadData() call, and again when the focus effect's cleanup runs
+  // (i.e. on blur). A load only commits its results if it is still the
+  // current run when it resolves, so a stale in-flight
   // load — whether superseded by a newer load or abandoned via blur — can
   // never clobber newer state. Post-action refreshes (handleLogCookedMeal,
   // handleAssignMeal, handleToggleConsumed) naturally win this way too,

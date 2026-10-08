@@ -1,7 +1,7 @@
 /**
  * A hand-edited or third-party backup can carry a NULL (or no) is_consumed on
- * a weekly_meal_plan row. The column is NOT NULL DEFAULT 0, so a NULL used to
- * abort the whole restore. It is now read as "not eaten".
+ * a weekly_meal_plan row. The column is NOT NULL DEFAULT 0, so a NULL would
+ * abort the whole restore; it is restored as 0, "not eaten".
  *
  * Same sql.js-backed adapter and fresh-module-per-test pattern as
  * restoreLegacyRefundWarning.test.ts.
