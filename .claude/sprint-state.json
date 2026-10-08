@@ -160,7 +160,8 @@
         437
       ],
       "parked": [],
-      "base": "71e0259"
+      "base": "71e0259",
+      "cleanup": "2c30894: three comment-only edits (re-wrapped the over-long dailyLogUpserts.test.ts header line; removed history words from the restoreNullIsConsumed.test.ts header; re-flowed the runIdRef comment in MealPrepScreen.tsx that the lane had left ragged). Orchestrator verified all three files compile to identical output with comments stripped (acdc12c vs 2c30894) and read the diff. Nothing dead found; schema.ts, jest.config.js and __mocks__ not touched; 1387/107 before and after"
     }
   },
   "issues": {
@@ -896,6 +897,10 @@
     {
       "at": "2026-10-08T08:06:16Z",
       "event": "#437 ready (tester APPROVE r2 after 1 round trip; security APPROVE on 5ec16ad, the round-2 delta is three test files; 1387/107); lane F out of issues (2 done, 0 parked) -> cleanup"
+    },
+    {
+      "at": "2026-10-08T08:08:53Z",
+      "event": "lane F cleanup: 2c30894, comment-only in three files (verified by the orchestrator: identical output with comments stripped), 1387/107 unchanged -> merging lane F into integration"
     }
   ],
   "status": "running",
@@ -984,7 +989,8 @@
     "SMALL (#437 tester r2): in RESTORE_SLOT_DEDUPE_SQL the WHERE EXISTS clause of the UPDATE is redundant with the SET expression (rows it filters out would get +0), so any weakening of it is invisible to tests - a candidate for simplification, not a bug",
     "SMALL (#437 tester): hand-edited is_consumed values such as 'yes', '', 2 or -1 are stored raw by restore (unchanged); the UI tests for truthiness and shows such a row as eaten while toggleMealConsumed and removeMealFromPlan test === 1 and treat it as not consumed",
     "SMALL (#437 tester): the dailyLogUpserts.test.ts header line runs past 100 columns after the edit, and its (#305) history mention predates the sprint",
-    "SMALL (#437 tester): the reworded notifications.test.ts comment states that the dynamic import does not evaluate in this suite, so the call throws - a factual claim nobody probed"
+    "SMALL (#437 tester): the reworded notifications.test.ts comment states that the dynamic import does not evaluate in this suite, so the call throws - a factual claim nobody probed",
+    "SMALL (lane F cleanup): more older issue-number comments and titles next to lines the lane touched: SettingsScreen.tsx near 1019 (#281) above trackSettingWrite, MealPrepScreen.focus.test.tsx describe title (#329), notifications.test.ts describe title and section comment (#309), dailyLogUpserts.test.ts lines 1 and 23 (#305); many *.test.tsx files carry an unused import React (tsconfig does not enable noUnusedLocals)"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
