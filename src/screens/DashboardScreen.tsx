@@ -1027,13 +1027,13 @@ export default function DashboardScreen() {
             {latestMeasurements && (
               <View style={styles.measurementPills}>
                 {MEASUREMENT_PILLS.map(({ field, label }) => {
-                  const entry = latestMeasurements[field];
-                  if (!entry) return null;
+                  const measurement = latestMeasurements[field];
+                  if (!measurement) return null;
                   return (
                     <View key={field} style={styles.measurePill}>
                       <Text style={styles.measurePillLabel}>{label}</Text>
-                      <Text style={styles.measurePillValue}>{entry.value} cm</Text>
-                      <Text style={styles.measurePillDate}>{entry.date}</Text>
+                      <Text style={styles.measurePillValue}>{measurement.value} cm</Text>
+                      <Text style={styles.measurePillDate}>{measurement.date}</Text>
                     </View>
                   );
                 })}

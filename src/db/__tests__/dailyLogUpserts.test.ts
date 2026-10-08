@@ -1,7 +1,7 @@
 /**
- * Regression test for #305: the six daily_log writers (upsertLogField,
- * upsertExerciseCompleted, upsertBodyWeight, upsertAdditionalWorkouts,
- * addWater, setWaterForDay) are bare `UPDATE ... WHERE date = ?` statements.
+ * Regression test for #305: the five daily_log writers (upsertLogField,
+ * upsertExerciseCompleted, upsertBodyWeight, addWater, setWaterForDay) are bare
+ * `UPDATE ... WHERE date = ?` statements.
  * When called for a date that has no daily_log row yet (e.g. outside the
  * current 7-day rolling window — the window is only today ± 7 days, but a
  * screen can still be showing/editing a date further out, like a date from
@@ -101,19 +101,6 @@ describe('daily_log writers create a missing row instead of silently no-op-ing (
     const after = await db.getLogByDate(date);
     expect(after).not.toBeNull();
     expect(after?.body_weight).toBe(71.4);
-  });
-
-  it('upsertAdditionalWorkouts creates the row and persists the value for a date with no row (far past)', async () => {
-    const db = loadFreshDatabaseModule();
-    await db.initDatabase();
-    const date = FAR_PAST();
-
-    const workouts = [{ id: 'w1', name: 'Extra Row', completed: false }];
-    await db.upsertAdditionalWorkouts(date, workouts);
-
-    const after = await db.getLogByDate(date);
-    expect(after).not.toBeNull();
-    expect(after?.additional_workouts).toEqual(workouts);
   });
 
   it('addWater creates the row and persists the value for a date with no row (far past)', async () => {
@@ -442,92 +429,6 @@ describe('a plain daily_log write cannot be swallowed by another unit\'s rollbac
   });
 });
 
-describe('upsertAdditionalWorkouts refuses to overwrite malformed stored JSON (#370)', () => {
-  afterEach(() => {
-    jest.dontMock('expo-sqlite');
-    jest.useRealTimers();
-  });
-
-  const workouts = [{ id: 'w1', name: 'Run', completed: false }] as never;
-
-  async function readRaw(db: DatabaseModule, date: string): Promise<string | undefined> {
-    const row = await db.getDatabase().getFirstAsync<{ additional_workouts: string }>(
-      'SELECT additional_workouts FROM daily_log WHERE date = ?',
-      [date]
-    );
-    return row?.additional_workouts;
-  }
-
-  async function seedRaw(db: DatabaseModule, date: string, raw: string): Promise<void> {
-    await db
-      .getDatabase()
-      .runAsync('UPDATE daily_log SET additional_workouts = ? WHERE date = ?', [raw, date]);
-  }
-
-  it('rejects malformed text, leaves it byte-identical, and the read path still returns []', async () => {
-    const db = loadFreshDatabaseModule();
-    await db.initDatabase();
-    const date = todayKey();
-    const corrupted = '{not json';
-    await seedRaw(db, date, corrupted);
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    await expect(db.upsertAdditionalWorkouts(date, workouts)).rejects.toThrow(date);
-
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    expect(await readRaw(db, date)).toBe(corrupted);
-    expect((await db.getLogByDate(date))?.additional_workouts).toEqual([]);
-    consoleErrorSpy.mockRestore();
-  });
-
-  it.each(['{}', '"x"'])('refuses valid JSON that is not an array (%s)', async (raw) => {
-    const db = loadFreshDatabaseModule();
-    await db.initDatabase();
-    const date = todayKey();
-    await seedRaw(db, date, raw);
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    await expect(db.upsertAdditionalWorkouts(date, workouts)).rejects.toThrow();
-
-    expect(await readRaw(db, date)).toBe(raw);
-    consoleErrorSpy.mockRestore();
-  });
-
-  it('still writes over the valid [] default, an existing array, and a missing row', async () => {
-    const db = loadFreshDatabaseModule();
-    await db.initDatabase();
-    const date = todayKey();
-
-    await db.upsertAdditionalWorkouts(date, workouts);
-    expect(JSON.parse((await readRaw(db, date)) as string)).toEqual(workouts);
-
-    await db.upsertAdditionalWorkouts(date, []);
-    expect(await readRaw(db, date)).toBe('[]');
-
-    const future = WINDOW_EDGE();
-    await db.getDatabase().runAsync('DELETE FROM daily_log WHERE date = ?', [future]);
-    await db.upsertAdditionalWorkouts(future, workouts);
-    expect(JSON.parse((await readRaw(db, future)) as string)).toEqual(workouts);
-  });
-
-  it('a rejected call does not wedge the queue', async () => {
-    const db = loadFreshDatabaseModule();
-    await db.initDatabase();
-    const bad = todayKey();
-    const good = FAR_PAST();
-    await seedRaw(db, bad, '{not json');
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    const first = db.upsertAdditionalWorkouts(bad, workouts);
-    const second = db.upsertAdditionalWorkouts(good, workouts);
-    await expect(first).rejects.toThrow();
-    await expect(second).resolves.toBeUndefined();
-
-    expect(JSON.parse((await readRaw(db, good)) as string)).toEqual(workouts);
-    consoleErrorSpy.mockRestore();
-  });
-});
-
 describe('addAdditionalWorkout and toggleAdditionalWorkout read-modify-write inside one queued unit', () => {
   afterEach(() => {
     jest.dontMock('expo-sqlite');
@@ -686,7 +587,7 @@ describe('refused writes throw a typed CorruptJsonError naming the column and da
     spy.mockRestore();
   });
 
-  it.each(['upsert', 'add', 'toggle'] as const)(
+  it.each(['add', 'toggle'] as const)(
     '%s on additional_workouts rejects with column=additional_workouts',
     async (kind) => {
       const db = loadFreshDatabaseModule();
@@ -696,11 +597,9 @@ describe('refused writes throw a typed CorruptJsonError naming the column and da
       const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       const call =
-        kind === 'upsert'
-          ? db.upsertAdditionalWorkouts(date, [workout])
-          : kind === 'add'
-            ? db.addAdditionalWorkout(date, workout)
-            : db.toggleAdditionalWorkout(date, 'a');
+        kind === 'add'
+          ? db.addAdditionalWorkout(date, workout)
+          : db.toggleAdditionalWorkout(date, 'a');
       const err = await call.catch((e: unknown) => e);
 
       expect(err).toBeInstanceOf(db.CorruptJsonError);
@@ -885,13 +784,22 @@ describe('daily_log writers reject dates outside the valid range', () => {
     jest.useRealTimers();
   });
 
-  const workouts = [{ id: 'w1', name: 'Run', completed: false }] as never;
+  const extraWorkout = { id: 'w1', name: 'Run', muscle_group: 'Legs', sets: '1', reps: '1', completed: false };
 
   const writers: [string, (db: DatabaseModule, date: string) => Promise<void>][] = [
     ['upsertLogField', (db, d) => db.upsertLogField(d, 'walk_completed', true)],
     ['upsertExerciseCompleted', (db, d) => db.upsertExerciseCompleted(d, 'some-exercise-id', true)],
     ['upsertBodyWeight', (db, d) => db.upsertBodyWeight(d, 70)],
-    ['upsertAdditionalWorkouts', (db, d) => db.upsertAdditionalWorkouts(d, workouts)],
+    ['addAdditionalWorkout', (db, d) => db.addAdditionalWorkout(d, extraWorkout)],
+    [
+      'toggleAdditionalWorkout',
+      (db, d) =>
+        db.toggleAdditionalWorkout(d, extraWorkout.id).catch((e: unknown) => {
+          // An unknown id is rejected only after the date check and row creation.
+          if (e instanceof Error && /no additional workout/.test(e.message)) return;
+          throw e;
+        }),
+    ],
     ['addWater', (db, d) => db.addWater(d, 250)],
     ['setWaterForDay', (db, d) => db.setWaterForDay(d, 1000)],
   ];
@@ -982,7 +890,6 @@ describe('stored daily_log arrays are valid only when every item is an object wi
     return column === 'exercises'
       ? [() => db.upsertExerciseCompleted(date, 'a', true)]
       : [
-          () => db.upsertAdditionalWorkouts(date, [workout]),
           () => db.addAdditionalWorkout(date, workout),
           () => db.toggleAdditionalWorkout(date, 'a'),
         ];
@@ -1160,7 +1067,7 @@ describe('read entries flag a column unreadable exactly when the writers refuse 
     const write =
       column === 'exercises'
         ? () => db.upsertExerciseCompleted(date, 'a', true)
-        : () => db.upsertAdditionalWorkouts(date, [workout]);
+        : () => db.addAdditionalWorkout(date, workout);
     const err = await write().then(
       () => undefined,
       (e: unknown) => e

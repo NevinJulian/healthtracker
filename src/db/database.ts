@@ -1075,13 +1075,6 @@ async function _upsertBodyWeightImpl(date: string, weight: number): Promise<void
   _assertWrote(result, 'upsertBodyWeight', date);
 }
 
-export function upsertAdditionalWorkouts(
-  date: string,
-  workouts: AdditionalWorkout[]
-): Promise<void> {
-  return _enqueueWrite('upsertAdditionalWorkouts', () => _upsertAdditionalWorkoutsImpl(date, workouts));
-}
-
 async function _readAdditionalWorkoutsForWrite(
   db: SQLite.SQLiteDatabase,
   date: string,
@@ -1112,15 +1105,6 @@ async function _writeAdditionalWorkouts(
     date,
   ]);
   _assertWrote(result, caller, date);
-}
-
-async function _upsertAdditionalWorkoutsImpl(
-  date: string,
-  workouts: AdditionalWorkout[]
-): Promise<void> {
-  const db = getDatabase();
-  await _readAdditionalWorkoutsForWrite(db, date, 'upsertAdditionalWorkouts');
-  await _writeAdditionalWorkouts(db, date, workouts, 'upsertAdditionalWorkouts');
 }
 
 export function addAdditionalWorkout(date: string, workout: AdditionalWorkout): Promise<void> {
@@ -2620,57 +2604,6 @@ export async function dumpTable(
   return rows;
 }
 
-/**
- * Restore all tables from the backup payload inside a single transaction.
- * Rules:
- *   - schema_version and sqlite_* tables are never touched.
- *   - Only tables that exist in the current DB are restored (unknown tables
- *     in older/newer backups are silently skipped).
- *   - Per-row INSERT uses that row's own column list so new columns added by
- *     later migrations default-fill rather than error.
- *   - A backup can legitimately contain rows that violate a UNIQUE index
- *     added by a later migration than the one the backup was taken under
- *     (validatePayload() accepts any backup at or below the current schema
- *     version): pre-#303 backups can have duplicate (date, meal_type) rows
- *     in weekly_meal_plan, and pre-#317 backups (or ones taken before
- *     v37's renumber ever ran) can have colliding/gapped set_index values
- *     in workout_set_log. Both unique indexes always exist on the live DB
- *     by the time restore runs, so the second offending INSERT would throw
- *     — and since restore is one transaction, that would roll back every
- *     table, not just the offending one. So: drop both indexes before
- *     restoring, restore every table exactly as before, then run the repair
- *     steps against the just-restored data, in order, inside the same
- *     transaction.
- *     RESTORE_SLOT_DEDUPE_SQL credits any consumed loser's batch, dedupes
- *     weekly_meal_plan per (date, meal_type), preferring a consumed row whose
- *     inventory pointer is live, and recreates its index.
- *     The set_index step depends on the backup's schema version. Before v37
- *     set_index was computed by the caller and can collide or run against the
- *     logged order, so v37's own precondition and SQL run: every partition is
- *     renumbered by (created_at, id), as an in-place upgrade would. From v37
- *     on, set_index is authoritative: RESTORE_SET_INDEX_SQL renumbers a
- *     partition densely by (set_index, created_at, id) only if two of its rows
- *     share a set_index. Both recreate the index and run after it was dropped
- *     above. A clean v37+ backup keeps its set_index values, gaps included.
- *
- * A row's own keys are NOT trusted as column identifiers: unlike values,
- * column names can't be parameterised, so a backup file (user-supplied,
- * JSON.parse'd from a picked file) with a crafted row key would otherwise
- * be interpolated straight into the INSERT's column list — a SQL injection
- * path (#315). Each table's real columns are read once via
- * `PRAGMA table_info(<table>)` (table name is already whitelisted against
- * listUserTables() above) and every row is filtered down to only the keys
- * that are real columns before the INSERT is built. A row left with zero
- * known keys is skipped entirely — not inserted, not counted in
- * rowsRestored. What got dropped is reported per table, both via
- * console.warn (this module's existing best-effort logging style) and via
- * the optional `skipped` field on the return value.
- *
- * @param payloadTables  The `tables` object from the BackupPayload.
- * @param backupSchemaVersion  The BackupPayload's schemaVersion.
- * @returns A summary of what was restored, plus optionally what was skipped.
- */
-
 const RENUMBER_MIGRATION_VERSION = 37;
 
 async function runSetIndexRepair(
@@ -2696,6 +2629,44 @@ type RestoreFromPayloadResult = {
   consumedMealsWithoutRefund?: number;
 };
 
+/**
+ * Restore all tables from the backup payload inside a single transaction.
+ * Rules:
+ *   - schema_version and sqlite_* tables are never touched.
+ *   - Only tables that exist in the current DB are restored; unknown tables
+ *     in older or newer backups are skipped.
+ *   - Per-row INSERT uses that row's own column list, so columns added by
+ *     later migrations default-fill rather than error.
+ *   - A row's keys are never used as column identifiers directly: names can't
+ *     be parameterised, and a backup file is user-supplied. Each table's real
+ *     columns are read once from `PRAGMA table_info(<table>)` and every row is
+ *     filtered down to those keys before the INSERT is built. A row left with
+ *     no known keys is skipped, not inserted and not counted in rowsRestored.
+ *   - A backup can contain rows that violate a UNIQUE index added by a later
+ *     migration than the one it was taken under: duplicate (date, meal_type)
+ *     rows in weekly_meal_plan, and colliding or gapped set_index values in
+ *     workout_set_log. Both unique indexes exist on the live DB, so the
+ *     offending INSERT would throw and roll back every table. Both indexes are
+ *     therefore dropped first, every table is restored, and then two repairs
+ *     run in order inside the same transaction:
+ *       1. RESTORE_SLOT_DEDUPE_SQL credits each consumed loser's batch, keeps
+ *          one weekly_meal_plan row per (date, meal_type), preferring a
+ *          consumed row whose inventory pointer is live, and recreates its
+ *          index.
+ *       2. The set_index repair depends on backupSchemaVersion. Below 37,
+ *          migration 37's precondition and SQL run, renumbering every
+ *          partition by (created_at, id). From 37 on, set_index is
+ *          authoritative and RESTORE_SET_INDEX_SQL renumbers a partition by
+ *          (set_index, created_at, id) only if two of its rows share a
+ *          set_index, so a clean backup keeps its values, gaps included. Both
+ *          recreate the index.
+ *   - What was dropped is reported per table, via console.warn and the
+ *     optional `skipped` field of the result.
+ *
+ * @param payloadTables  The `tables` object from the BackupPayload.
+ * @param backupSchemaVersion  The BackupPayload's schemaVersion.
+ * @returns A summary of what was restored, plus optionally what was skipped.
+ */
 export function restoreFromPayload(
   payloadTables: Record<string, Record<string, unknown>[]>,
   backupSchemaVersion: number
@@ -2778,7 +2749,9 @@ async function _restoreFromPayload(
 
         const columns = keys.join(', ');
         const placeholders = keys.map(() => '?').join(', ');
-        const values = keys.map((k) => row[k]);
+        const values = keys.map((k) =>
+          tableName === 'weekly_meal_plan' && k === 'is_consumed' && row[k] === null ? 0 : row[k]
+        );
 
         await db.runAsync(
           `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders})`,
@@ -3151,8 +3124,7 @@ async function _logBodyMeasurementImpl(
   fields: MeasurementInput
 ): Promise<void> {
   const db = getDatabase();
-  const columns = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
-  const provided = columns.filter((c) => Number.isFinite(fields[c]));
+  const provided = MEASUREMENT_FIELDS.filter((c) => Number.isFinite(fields[c]));
   if (provided.length === 0) return;
 
   const existing = await db.getFirstAsync<{ id: number }>(

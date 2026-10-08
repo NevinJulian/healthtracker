@@ -165,7 +165,6 @@ export function validatePayload(
 /** Returns the version string from package.json (bundled at build time). */
 function getAppVersion(): string {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const pkg = require('../../package.json') as { version?: string };
     return pkg.version ?? '1.0.0';
   } catch {

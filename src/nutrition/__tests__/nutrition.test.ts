@@ -6,7 +6,7 @@
  *   - normaliseIngredientName (key normaliser)
  *   - computeRecipeMacros (end-to-end, with hand-verified reference recipes)
  *
- * Tests run in the existing Jest 30 + node environment (no DB, no native modules).
+ * Tests run in the existing jest + node environment (no DB, no native modules).
  */
 
 import { convertToGrams } from '../units';

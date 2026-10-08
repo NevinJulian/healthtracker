@@ -860,7 +860,7 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await trackProfileWrite(workoutEnabledGuard.seqRef, workoutEnabledGuard.pendingRef, () =>
+      await trackSettingWrite(workoutEnabledGuard.seqRef, workoutEnabledGuard.pendingRef, () =>
         setWorkoutReminderEnabled(value)
       );
       setReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
@@ -894,7 +894,7 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await trackProfileWrite(cookWhenEmptyGuard.seqRef, cookWhenEmptyGuard.pendingRef, () =>
+      await trackSettingWrite(cookWhenEmptyGuard.seqRef, cookWhenEmptyGuard.pendingRef, () =>
         setCookWhenEmptyEnabled(value)
       );
       setCooking((prev) => ({ ...prev, cookWhenEmptyEnabled: value, permissionDenied: false }));
@@ -914,7 +914,7 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await trackProfileWrite(weeklyCookDayEnabledGuard.seqRef, weeklyCookDayEnabledGuard.pendingRef, () =>
+      await trackSettingWrite(weeklyCookDayEnabledGuard.seqRef, weeklyCookDayEnabledGuard.pendingRef, () =>
         setWeeklyCookDayEnabled(value)
       );
       setCooking((prev) => ({ ...prev, weeklyCookDayEnabled: value, permissionDenied: false }));
@@ -928,7 +928,7 @@ export default function SettingsScreen() {
 
   async function handleWeekdaySelect(day: number) {
     try {
-      await trackProfileWrite(weeklyCookDayGuard.seqRef, weeklyCookDayGuard.pendingRef, () => setWeeklyCookDay(day));
+      await trackSettingWrite(weeklyCookDayGuard.seqRef, weeklyCookDayGuard.pendingRef, () => setWeeklyCookDay(day));
       setCooking((prev) => ({ ...prev, weeklyCookDay: day }));
       if (latestRef.current.cooking.weeklyCookDayEnabled) {
         await scheduleAfterSave(reconcileScheduledNotifications);
@@ -963,7 +963,7 @@ export default function SettingsScreen() {
     }
     try {
       const guard = mealEnabledGuards[meal];
-      await trackProfileWrite(guard.seqRef, guard.pendingRef, () => setMealReminderEnabled(meal, value));
+      await trackSettingWrite(guard.seqRef, guard.pendingRef, () => setMealReminderEnabled(meal, value));
       setMealReminders((prev) => ({
         ...prev,
         [meal]: { ...prev[meal], enabled: value },
@@ -1018,7 +1018,7 @@ export default function SettingsScreen() {
 
   // ── Profile: field save helpers (#281) ────────────────────────────────
 
-  async function trackProfileWrite(
+  async function trackSettingWrite(
     seqRef: React.MutableRefObject<number>,
     pendingRef: React.MutableRefObject<number>,
     write: () => Promise<void>,
@@ -1041,7 +1041,7 @@ export default function SettingsScreen() {
       profileHeightInvalidRef.current = false;
       setProfileHeightError(null);
       try {
-        await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, clearProfileHeightCm);
+        await trackSettingWrite(heightWriteSeqRef, heightPendingWritesRef, clearProfileHeightCm);
         setProfile((prev) => ({ ...prev, heightCm: null }));
       } catch (error) {
         reportWriteFailure(error);
@@ -1060,7 +1060,7 @@ export default function SettingsScreen() {
     profileHeightInvalidRef.current = false;
     setProfileHeightError(null);
     try {
-      await trackProfileWrite(heightWriteSeqRef, heightPendingWritesRef, () => setProfileHeightCm(val));
+      await trackSettingWrite(heightWriteSeqRef, heightPendingWritesRef, () => setProfileHeightCm(val));
       setProfile((prev) => ({ ...prev, heightCm: val }));
     } catch (error) {
       reportWriteFailure(error);
@@ -1073,7 +1073,7 @@ export default function SettingsScreen() {
       profileAgeInvalidRef.current = false;
       setProfileAgeError(null);
       try {
-        await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, clearProfileAge);
+        await trackSettingWrite(ageWriteSeqRef, agePendingWritesRef, clearProfileAge);
         setProfile((prev) => ({ ...prev, age: null }));
       } catch (error) {
         reportWriteFailure(error);
@@ -1089,7 +1089,7 @@ export default function SettingsScreen() {
     profileAgeInvalidRef.current = false;
     setProfileAgeError(null);
     try {
-      await trackProfileWrite(ageWriteSeqRef, agePendingWritesRef, () => setProfileAge(val));
+      await trackSettingWrite(ageWriteSeqRef, agePendingWritesRef, () => setProfileAge(val));
       setProfile((prev) => ({ ...prev, age: val }));
     } catch (error) {
       reportWriteFailure(error);
@@ -1098,7 +1098,7 @@ export default function SettingsScreen() {
 
   async function handleProfileSex(sex: Sex) {
     try {
-      await trackProfileWrite(sexGuard.seqRef, sexGuard.pendingRef, () => setProfileSex(sex));
+      await trackSettingWrite(sexGuard.seqRef, sexGuard.pendingRef, () => setProfileSex(sex));
       setProfile((prev) => ({ ...prev, sex }));
     } catch (error) {
       reportWriteFailure(error);
@@ -1107,7 +1107,7 @@ export default function SettingsScreen() {
 
   async function handleProfileActivity(level: ActivityLevel) {
     try {
-      await trackProfileWrite(activityGuard.seqRef, activityGuard.pendingRef, () => setProfileActivityLevel(level));
+      await trackSettingWrite(activityGuard.seqRef, activityGuard.pendingRef, () => setProfileActivityLevel(level));
       setProfile((prev) => ({ ...prev, activityLevel: level }));
     } catch (error) {
       reportWriteFailure(error);
@@ -1116,7 +1116,7 @@ export default function SettingsScreen() {
 
   async function handleProfileGoal(goal: GoalType) {
     try {
-      await trackProfileWrite(goalGuard.seqRef, goalGuard.pendingRef, () => setProfileGoalType(goal));
+      await trackSettingWrite(goalGuard.seqRef, goalGuard.pendingRef, () => setProfileGoalType(goal));
       setProfile((prev) => ({ ...prev, goalType: goal }));
     } catch (error) {
       reportWriteFailure(error);
@@ -1260,7 +1260,7 @@ export default function SettingsScreen() {
       }
     }
     try {
-      await trackProfileWrite(backupEnabledGuard.seqRef, backupEnabledGuard.pendingRef, () =>
+      await trackSettingWrite(backupEnabledGuard.seqRef, backupEnabledGuard.pendingRef, () =>
         setBackupReminderEnabled(value)
       );
       setBackupReminder((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
@@ -1274,7 +1274,7 @@ export default function SettingsScreen() {
 
   async function handleBackupReminderDaySelect(day: number) {
     try {
-      await trackProfileWrite(backupDayGuard.seqRef, backupDayGuard.pendingRef, () => setBackupReminderDay(day));
+      await trackSettingWrite(backupDayGuard.seqRef, backupDayGuard.pendingRef, () => setBackupReminderDay(day));
       setBackupReminder((prev) => ({ ...prev, day }));
       if (latestRef.current.backupReminder.enabled) {
         await scheduleAfterSave(reconcileScheduledNotifications);

@@ -141,7 +141,7 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  // Drawer label — Plus Jakarta Sans 600 SemiBold, breathing room after emoji icon
+  // Drawer label — Plus Jakarta Sans 600 SemiBold, breathing room after the icon
   drawerLabel: {
     fontFamily: Typography.title,
     fontSize: Typography.sizes.md,

@@ -23,8 +23,7 @@ type NotificationsModule = typeof ExpoNotifications;
 /**
  * Same check as isRunningInExpoGo() from 'expo': the ExpoGo native module
  * only exists inside Expo Go. Importing the 'expo' root here would pull its
- * runtime polyfills into every jest suite that touches notifications, which
- * Jest 30 rejects.
+ * runtime polyfills into every jest suite that touches notifications.
  */
 const runningInExpoGo = requireOptionalNativeModule('ExpoGo') != null;
 
@@ -63,7 +62,6 @@ function loadNotifications(): NotificationsModule {
   if (notificationsAvailable) {
     // require, not a top-level import, so the package's module body only
     // ever runs where it is safe to.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     return require('expo-notifications') as NotificationsModule;
   }
   console.warn(

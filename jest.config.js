@@ -14,8 +14,8 @@ module.exports = {
   testTimeout: 15000,
   moduleNameMapper: {
     // expo/src/winter installs __ExpoImportMetaRegistry via a getter that
-    // lazily requires runtime.native, which uses dynamic import() — blocked
-    // by Jest 30. Stub the whole namespace so setup.js is a no-op.
+    // lazily requires runtime.native, which uses dynamic import(). Stub the
+    // whole namespace so setup.js is a no-op.
     '^expo/src/winter(/.*)?$': '<rootDir>/__mocks__/expo-winter.js',
     '^expo-sqlite(/.*)?$': '<rootDir>/__mocks__/expo-sqlite.js',
     '^expo-asset(/.*)?$': '<rootDir>/__mocks__/expo-asset.js',

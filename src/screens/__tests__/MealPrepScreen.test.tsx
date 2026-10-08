@@ -106,7 +106,7 @@ describe('MealPrepScreen', () => {
   });
 });
 
-describe('MealPrepScreen log meal modal (#324)', () => {
+describe('MealPrepScreen log meal modal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetRecipes.mockResolvedValue(mockRecipes);

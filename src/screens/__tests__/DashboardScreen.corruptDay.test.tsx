@@ -30,6 +30,15 @@ const mockEntry = {
   additional_workouts: [workoutB],
 };
 
+const NOTICE = "This day's data can't be read";
+
+const flagged = (unreadable: Array<'exercises' | 'additional_workouts'>) => ({
+  ...mockEntry,
+  exercises: unreadable.includes('exercises') ? [] : mockEntry.exercises,
+  additional_workouts: unreadable.includes('additional_workouts') ? [] : mockEntry.additional_workouts,
+  unreadable,
+});
+
 jest.mock('../../components/BioForceModal', () => {
   const { TouchableOpacity, Text } = require('react-native');
   return {
@@ -49,7 +58,6 @@ jest.mock('../../db/database', () => ({
   upsertLogField: jest.fn().mockResolvedValue(undefined),
   upsertExerciseCompleted: jest.fn().mockResolvedValue(undefined),
   upsertBodyWeight: jest.fn().mockResolvedValue(undefined),
-  upsertAdditionalWorkouts: jest.fn().mockResolvedValue(undefined),
   addAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   toggleAdditionalWorkout: jest.fn().mockResolvedValue(undefined),
   syncRollingSchedule: jest.fn().mockResolvedValue(undefined),
@@ -118,28 +126,36 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
   const cases = [
     {
       name: 'adding a workout',
+      entry: flagged(['additional_workouts']),
+      noticeShown: true,
       column: 'additional_workouts' as const,
       act: (q: ReturnType<typeof render>) => fireEvent.press(q.getByLabelText('Stub add workout')),
       arrange: () => jest.mocked(addAdditionalWorkout).mockRejectedValueOnce(new CorruptJsonError('t', 'additional_workouts', mockToday)),
     },
     {
-      name: 'toggling a workout',
+      name: 'toggling a workout whose data became unreadable after the day loaded',
+      entry: { ...mockEntry },
+      noticeShown: false,
       column: 'additional_workouts' as const,
       act: (q: ReturnType<typeof render>) => fireEvent.press(q.getByLabelText('Mark Run complete')),
       arrange: () => jest.mocked(toggleAdditionalWorkout).mockRejectedValueOnce(new CorruptJsonError('t', 'additional_workouts', mockToday)),
     },
     {
-      name: 'toggling an exercise',
+      name: 'toggling an exercise whose data became unreadable after the day loaded',
+      entry: { ...mockEntry },
+      noticeShown: false,
       column: 'exercises' as const,
       act: (q: ReturnType<typeof render>) => fireEvent.press(q.getByLabelText('Mark Squat complete')),
       arrange: () => jest.mocked(upsertExerciseCompleted).mockRejectedValueOnce(new CorruptJsonError('t', 'exercises', mockToday)),
     },
   ];
 
-  it.each(cases)('$name: shows the Alert with Cancel and Reset this day', async ({ arrange, act: press }) => {
-    arrange();
+  it.each(cases)('$name: shows the Alert with Cancel and Reset this day', async ({ arrange, act: press, entry, noticeShown }) => {
+    jest.mocked(getLogByDate).mockResolvedValue(entry);
     const q = render(<DashboardScreen />);
     await flushMicrotasks();
+    expect(q.queryByText(NOTICE) !== null).toBe(noticeShown);
+    arrange();
 
     await act(async () => {
       press(q);
@@ -152,10 +168,12 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
     expect(buttons.map((b) => b.text)).toEqual(['Cancel', 'Reset this day']);
   });
 
-  it.each(cases)('$name: Reset this day calls the reset with the refused date and column, then reloads', async ({ arrange, act: press, column }) => {
-    arrange();
+  it.each(cases)('$name: Reset this day calls the reset with the refused date and column, then reloads', async ({ arrange, act: press, column, entry, noticeShown }) => {
+    jest.mocked(getLogByDate).mockResolvedValue(entry);
     const q = render(<DashboardScreen />);
     await flushMicrotasks();
+    expect(q.queryByText(NOTICE) !== null).toBe(noticeShown);
+    arrange();
     await act(async () => {
       press(q);
     });
@@ -171,6 +189,7 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
   });
 
   it('Cancel resets nothing', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['additional_workouts']));
     jest.mocked(addAdditionalWorkout).mockRejectedValueOnce(new CorruptJsonError('t', 'additional_workouts', mockToday));
     const q = render(<DashboardScreen />);
     await flushMicrotasks();
@@ -186,6 +205,7 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
   });
 
   it('a failed reset is surfaced with a second Alert', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['additional_workouts']));
     jest.mocked(addAdditionalWorkout).mockRejectedValueOnce(new CorruptJsonError('t', 'additional_workouts', mockToday));
     jest.mocked(resetCorruptDayColumn).mockRejectedValueOnce(new Error('disk full'));
     const q = render(<DashboardScreen />);
@@ -203,6 +223,7 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
   });
 
   it('other write errors show no Alert', async () => {
+    jest.mocked(getLogByDate).mockResolvedValue(flagged(['additional_workouts']));
     jest.mocked(addAdditionalWorkout).mockRejectedValueOnce(new Error('boom'));
     const q = render(<DashboardScreen />);
     await flushMicrotasks();
@@ -217,7 +238,6 @@ describe('DashboardScreen offers to reset a day whose stored JSON is unreadable'
 });
 
 describe('DashboardScreen shows a notice with a reset button when a day loads unreadable', () => {
-  const NOTICE = "This day's data can't be read";
   const exercisesLabel = "Reset this day's exercises";
   const workoutsLabel = "Reset this day's extra workouts";
   let alertSpy: jest.SpyInstance;
@@ -232,13 +252,6 @@ describe('DashboardScreen shows a notice with a reset button when a day loads un
   afterEach(() => {
     alertSpy.mockRestore();
     errorSpy.mockRestore();
-  });
-
-  const flagged = (unreadable: Array<'exercises' | 'additional_workouts'>) => ({
-    ...mockEntry,
-    exercises: unreadable.includes('exercises') ? [] : mockEntry.exercises,
-    additional_workouts: unreadable.includes('additional_workouts') ? [] : mockEntry.additional_workouts,
-    unreadable,
   });
 
   it('shows no notice for a readable day', async () => {

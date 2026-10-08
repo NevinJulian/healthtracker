@@ -834,28 +834,28 @@ export const MIGRATIONS: Migration[] = [
  * a live pointer credit their batch.
  */
 export const RESTORE_SLOT_DEDUPE_SQL = `
-  WITH survivors AS (
-    SELECT g.date AS date, g.meal_type AS meal_type,
-      COALESCE(
-        (SELECT w1.id FROM weekly_meal_plan w1
-         WHERE w1.date = g.date AND w1.meal_type = g.meal_type AND w1.is_consumed = 1
-           AND w1.consumed_from_inventory_id IN (SELECT id FROM meal_inventory)
-         ORDER BY w1.id DESC LIMIT 1),
-        (SELECT w2.id FROM weekly_meal_plan w2
-         WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
-         ORDER BY w2.id DESC LIMIT 1),
-        (SELECT w3.id FROM weekly_meal_plan w3
-         WHERE w3.date = g.date AND w3.meal_type = g.meal_type
-         ORDER BY w3.id DESC LIMIT 1)
-      ) AS survivor_id
-    FROM weekly_meal_plan g
-    GROUP BY g.date, g.meal_type
-  )
+  CREATE TEMP TABLE restore_slot_survivors AS
+  SELECT g.date AS date, g.meal_type AS meal_type,
+    COALESCE(
+      (SELECT w1.id FROM weekly_meal_plan w1
+       WHERE w1.date = g.date AND w1.meal_type = g.meal_type AND w1.is_consumed = 1
+         AND w1.consumed_from_inventory_id IN (SELECT id FROM meal_inventory)
+       ORDER BY w1.id DESC LIMIT 1),
+      (SELECT w2.id FROM weekly_meal_plan w2
+       WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
+       ORDER BY w2.id DESC LIMIT 1),
+      (SELECT w3.id FROM weekly_meal_plan w3
+       WHERE w3.date = g.date AND w3.meal_type = g.meal_type
+       ORDER BY w3.id DESC LIMIT 1)
+    ) AS survivor_id
+  FROM weekly_meal_plan g
+  GROUP BY g.date, g.meal_type;
+
   UPDATE meal_inventory
   SET portions_available = portions_available + (
     SELECT COUNT(*)
     FROM weekly_meal_plan loser
-    JOIN survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
+    JOIN restore_slot_survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
     WHERE loser.consumed_from_inventory_id = meal_inventory.id
       AND loser.is_consumed = 1
       AND loser.id != s.survivor_id
@@ -863,31 +863,16 @@ export const RESTORE_SLOT_DEDUPE_SQL = `
   WHERE EXISTS (
     SELECT 1
     FROM weekly_meal_plan loser
-    JOIN survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
+    JOIN restore_slot_survivors s ON s.date = loser.date AND s.meal_type = loser.meal_type
     WHERE loser.consumed_from_inventory_id = meal_inventory.id
       AND loser.is_consumed = 1
       AND loser.id != s.survivor_id
   );
 
-  WITH survivors AS (
-    SELECT g.date AS date, g.meal_type AS meal_type,
-      COALESCE(
-        (SELECT w1.id FROM weekly_meal_plan w1
-         WHERE w1.date = g.date AND w1.meal_type = g.meal_type AND w1.is_consumed = 1
-           AND w1.consumed_from_inventory_id IN (SELECT id FROM meal_inventory)
-         ORDER BY w1.id DESC LIMIT 1),
-        (SELECT w2.id FROM weekly_meal_plan w2
-         WHERE w2.date = g.date AND w2.meal_type = g.meal_type AND w2.is_consumed = 1
-         ORDER BY w2.id DESC LIMIT 1),
-        (SELECT w3.id FROM weekly_meal_plan w3
-         WHERE w3.date = g.date AND w3.meal_type = g.meal_type
-         ORDER BY w3.id DESC LIMIT 1)
-      ) AS survivor_id
-    FROM weekly_meal_plan g
-    GROUP BY g.date, g.meal_type
-  )
   DELETE FROM weekly_meal_plan
-  WHERE id NOT IN (SELECT survivor_id FROM survivors);
+  WHERE id NOT IN (SELECT survivor_id FROM restore_slot_survivors);
+
+  DROP TABLE restore_slot_survivors;
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_meal_plan_date_meal_type ON weekly_meal_plan(date, meal_type);
 `;
