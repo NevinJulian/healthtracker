@@ -154,8 +154,10 @@
         425,
         437
       ],
-      "current": 425,
-      "done": [],
+      "current": 437,
+      "done": [
+        425
+      ],
       "parked": [],
       "base": "71e0259"
     }
@@ -257,17 +259,18 @@
     },
     "425": {
       "lane": "F",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "2f95a88",
         "7b4c6cf"
       ],
       "deviceCheck": "none (test-only)",
-      "notes": "WO ready; lane F waits for lane C. Probe confirmed: jest-expo's preset setup.js:130 registers jest.mock('expo-file-system/legacy', factory), which wins over the moduleNameMapper target, so the repo file never executes (only jest.requireActual reaches it); the non-legacy expo-file-system mock is NOT shadowed. Work: delete the three directory constants from __mocks__/expo-file-system/legacy.js, pin the shadowing with one new test; jest.config.js untouched; inline-mock tests stay. The analyst corrected the orchestrator's suggested test (asserting defined strings would contradict the decision). | Baseline for the developer is now 1365/104 (the work order still says 1230/100: lane C merged after it was written). | dev: 2f95a88 test (2 tests: the requireActual key check failed first with the three names in the received array; the module-id pin passes before and after and also asserts downloadAsync, a key only the preset mock has), 7b4c6cf deletes the three constants and adds a 3-line header note saying the preset factory wins. 1365/104 -> 1367/105. npm test itself already runs under cross-env TZ=UTC, so the plain run is a UTC run.",
+      "notes": "WO ready; lane F waits for lane C. Probe confirmed: jest-expo's preset setup.js:130 registers jest.mock('expo-file-system/legacy', factory), which wins over the moduleNameMapper target, so the repo file never executes (only jest.requireActual reaches it); the non-legacy expo-file-system mock is NOT shadowed. Work: delete the three directory constants from __mocks__/expo-file-system/legacy.js, pin the shadowing with one new test; jest.config.js untouched; inline-mock tests stay. The analyst corrected the orchestrator's suggested test (asserting defined strings would contradict the decision). | Baseline for the developer is now 1365/104 (the work order still says 1230/100: lane C merged after it was written). | dev: 2f95a88 test (2 tests: the requireActual key check failed first with the three names in the received array; the module-id pin passes before and after and also asserts downloadAsync, a key only the preset mock has), 7b4c6cf deletes the three constants and adds a 3-line header note saying the preset factory wins. 1365/104 -> 1367/105. npm test itself already runs under cross-env TZ=UTC, so the plain run is a UTC run. | tester APPROVE r0. Notes: a plain require of the repo mock path also returns the preset factory (only jest.requireActual reaches the file); the pin's failure message is a bare toBeUndefined.",
       "workOrder": "C:/git/ht-lanes/wo/425.md",
       "decisionSource": "owner comment on #425 (remove the shadowed values from the global mock; leave the jest config as it is; tests that need those paths mock them inline)",
-      "securityReview": "skipped: a jest mock file and one test; no app code, no db/api/backup/filesystem path"
+      "securityReview": "skipped: a jest mock file and one test; no app code, no db/api/backup/filesystem path",
+      "regressionProof": "test 1 fails with the mock file from 71e0259 (received key array starts with the three names), passes at 7b4c6cf; the module-id pin shown to be real: preset registration at jest-expo/src/preset/setup.js:130, keys only the preset has are downloadAsync, readDirectoryAsync, createDownloadResumable; the pin goes red when the repo file wins (jest.unmock) and when a simulated preset upgrade defines documentDirectory; stable alone, --no-cache twice, --runInBand, ordered after the backup/rescue/App suites, and in the full run; repo-wide grep: no reader ever got its value from the three deleted lines; diff is exactly two files; 1367/105 (tester reproduced). npm test is cross-env TZ=UTC jest, so a separate UTC run is redundant"
     },
     "426": {
       "lane": "B",
@@ -826,6 +829,10 @@
     {
       "at": "2026-10-08T07:22:33Z",
       "event": "#425 in_test (7b4c6cf, 1367/105 per dev; lane F pushed). Security SKIPPED for #425: test-only (a jest mock and one test file)"
+    },
+    {
+      "at": "2026-10-08T07:24:57Z",
+      "event": "#425 ready (tester APPROVE r0, security skipped; 1367/105); lane F -> #437 (analyst still running)"
     }
   ],
   "status": "running",
@@ -901,7 +908,8 @@
     "SMALL (#431 tester): the Dashboard initial error view is a bare centred view without a header, while MealPrep's and the Analytics one keep ScreenHeader; LoadErrorView has its own errorTitle/errorSub styles instead of MealPrep's emptyTitle/emptySub (values not compared)",
     "SMALL (#431 tester): Button forwards the press event to onPress, and LoadErrorView passes onRetry straight through, so the load functions receive the event as an argument (harmless today: loadToday and loadData take no parameters)",
     "SMALL (#431 tester r2): Dashboard - a first load that throws after setEntry ran (only if the set-grouping loop throws, e.g. getWorkoutSetsForDay resolving a non-array) leaves loadError 'initial' with an entry on screen, and neither the error view (loadError && !entry) nor the banner ('refresh' only) is drawn; before round 2 of #431 this case showed the error view. Needs a malformed db result",
-    "SMALL (lane C cleanup): older comments in lane C files still carry issue numbers and history, outside the lane's own hunks: DashboardScreen.tsx near lines 312, 393 (#330, #304) and 673 (#317); database.ts near 825 (#305) and the upsertExerciseCompleted docblock near 1017 (#319)"
+    "SMALL (lane C cleanup): older comments in lane C files still carry issue numbers and history, outside the lane's own hunks: DashboardScreen.tsx near lines 312, 393 (#330, #304) and 673 (#317); database.ts near 825 (#305) and the upsertExerciseCompleted docblock near 1017 (#319)",
+    "SMALL (#425 tester): the module-id pin in fileSystemLegacyMock.test.ts fails with a bare Expected undefined message when a jest-expo upgrade starts to define documentDirectory; a custom message would say what to revisit"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
