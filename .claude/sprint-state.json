@@ -103,7 +103,8 @@
         431
       ],
       "parked": [],
-      "base": "4dea4c6"
+      "base": "4dea4c6",
+      "cleanup": "no changes needed, no commit (agent read all 12 files of the lane diff, +1620/-65; tsc --noUnusedLocals shows only the repo-wide import React convention; the helper the lane replaced, _isStoredJsonArray, has no reference left; no stale docblock, no debug output, no issue numbers in the lane's own comments or titles; 1271/99 before and after). Left alone on my instruction because they are #437's work: upsertAdditionalWorkouts and its tests, the local columns array in _logBodyMeasurementImpl, the const entry shadow in the Dashboard pills map"
     },
     "D": {
       "branch": "sprint/lane-d-api",
@@ -792,6 +793,10 @@
     {
       "at": "2026-10-08T07:22:00Z",
       "event": "#431 ready (tester APPROVE r2 after 1 round trip, security skipped; 1271/99 locally and with TZ=UTC); lane C out of issues (5 done, 0 parked) -> cleanup"
+    },
+    {
+      "at": "2026-10-08T07:31:00Z",
+      "event": "lane C cleanup: nothing worth doing, no commit (tip stays acf001a, 1271/99) -> merging lane C into integration"
     }
   ],
   "status": "running",
@@ -866,7 +871,8 @@
     "SMALL (#431 tester): Analytics still calls console.error('Failed to load analytics') for a load that rejects after unmount (log only, no state write)",
     "SMALL (#431 tester): the Dashboard initial error view is a bare centred view without a header, while MealPrep's and the Analytics one keep ScreenHeader; LoadErrorView has its own errorTitle/errorSub styles instead of MealPrep's emptyTitle/emptySub (values not compared)",
     "SMALL (#431 tester): Button forwards the press event to onPress, and LoadErrorView passes onRetry straight through, so the load functions receive the event as an argument (harmless today: loadToday and loadData take no parameters)",
-    "SMALL (#431 tester r2): Dashboard - a first load that throws after setEntry ran (only if the set-grouping loop throws, e.g. getWorkoutSetsForDay resolving a non-array) leaves loadError 'initial' with an entry on screen, and neither the error view (loadError && !entry) nor the banner ('refresh' only) is drawn; before round 2 of #431 this case showed the error view. Needs a malformed db result"
+    "SMALL (#431 tester r2): Dashboard - a first load that throws after setEntry ran (only if the set-grouping loop throws, e.g. getWorkoutSetsForDay resolving a non-array) leaves loadError 'initial' with an entry on screen, and neither the error view (loadError && !entry) nor the banner ('refresh' only) is drawn; before round 2 of #431 this case showed the error view. Needs a malformed db result",
+    "SMALL (lane C cleanup): older comments in lane C files still carry issue numbers and history, outside the lane's own hunks: DashboardScreen.tsx near lines 312, 393 (#330, #304) and 673 (#317); database.ts near 825 (#305) and the upsertExerciseCompleted docblock near 1017 (#319)"
   ],
   "findingsFiled": {
     "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
