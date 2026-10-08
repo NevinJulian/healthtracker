@@ -3122,8 +3122,7 @@ async function _logBodyMeasurementImpl(
   fields: MeasurementInput
 ): Promise<void> {
   const db = getDatabase();
-  const columns = ['waist_cm', 'chest_cm', 'hips_cm', 'thigh_cm', 'arm_cm'] as const;
-  const provided = columns.filter((c) => Number.isFinite(fields[c]));
+  const provided = MEASUREMENT_FIELDS.filter((c) => Number.isFinite(fields[c]));
   if (provided.length === 0) return;
 
   const existing = await db.getFirstAsync<{ id: number }>(
