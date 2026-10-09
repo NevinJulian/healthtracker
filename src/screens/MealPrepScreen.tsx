@@ -507,12 +507,16 @@ function MealSlot({
   onRemove: (id: number) => void;
   onAssign: () => void;
 }) {
-  const confirmRemove = (planId: number, eaten: boolean) => {
+  const confirmRemove = (planId: number, eaten: boolean, refunds: boolean) => {
+    let message = 'Remove this meal from your plan?';
+    if (eaten) {
+      message = refunds
+        ? 'This portion will go back to your inventory and the meal will be removed from your nutrition history.'
+        : 'This meal will be removed from your nutrition history.';
+    }
     Alert.alert(
       'Remove meal',
-      eaten
-        ? 'This portion will go back to your inventory and the meal will be removed from your nutrition history.'
-        : 'Remove this meal from your plan?',
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Remove', style: 'destructive', onPress: () => onRemove(planId) },
@@ -563,7 +567,7 @@ function MealSlot({
           </View>
           <TouchableOpacity
             style={styles.removeBtn}
-            onPress={() => confirmRemove(plan.id, plan.is_consumed)}
+            onPress={() => confirmRemove(plan.id, plan.is_consumed, plan.consumed_from_inventory_id != null)}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel={`Remove ${recipe?.title ?? label} from plan`}
