@@ -24,6 +24,7 @@ import {
   copyDayToDate,
   getRecipes,
   getRecipesIncludingArchived,
+  getOftenCookedRecipes,
   Recipe,
   MealInventoryWithRecipe,
   WeeklyMealPlanItem,
@@ -46,6 +47,15 @@ import { iconChipIconColor } from '../components/IconChip';
 // ─── Helpers ──────────────────────────────────────────────────
 
 const logDbError = (err: any) => console.error('[MealPrepScreen] DB Error:', err);
+
+async function loadOftenCookedIds(): Promise<string[]> {
+  try {
+    return (await getOftenCookedRecipes()).map((r) => r.recipe_id);
+  } catch (err) {
+    console.warn('[MealPrepScreen] getOftenCookedRecipes failed:', err);
+    return [];
+  }
+}
 
 // ─── Verdure circle checkbox (24px, sage when done) ───────────
 
@@ -99,6 +109,7 @@ export default function MealPrepScreen() {
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [planRecipes, setPlanRecipes] = useState<Recipe[]>([]);
+  const [oftenCookedIds, setOftenCookedIds] = useState<string[]>([]);
 
   // Tracks whether the screen has completed its first load. Post-action
   // refreshes (handleLogCookedMeal, handleAssignMeal, handleToggleConsumed)
@@ -134,17 +145,19 @@ export default function MealPrepScreen() {
       setLoading(true);
     }
     try {
-      const [inv, plan, allRecipes, allPlanRecipes] = await Promise.all([
+      const [inv, plan, allRecipes, allPlanRecipes, oftenIds] = await Promise.all([
         getMealInventory(),
         getWeeklyMealPlan(),
         getRecipes(),
         getRecipesIncludingArchived(),
+        loadOftenCookedIds(),
       ]);
       if (!mountedRef.current || runIdRef.current !== runId) return;
       setInventory(inv);
       setWeeklyPlan(plan);
       setRecipes(allRecipes);
       setPlanRecipes(allPlanRecipes);
+      setOftenCookedIds(oftenIds);
       hasLoadedOnceRef.current = true;
     } catch (err) {
       if (!mountedRef.current || runIdRef.current !== runId) return;
@@ -526,6 +539,7 @@ export default function MealPrepScreen() {
           visible={logModalVisible}
           onClose={() => setLogModalVisible(false)}
           recipes={recipes}
+          oftenCookedIds={oftenCookedIds}
           onSave={handleLogCookedMeal}
           saving={saving}
         />
@@ -788,10 +802,33 @@ function MacroChip({ label, value }: { label: string; value: string }) {
 
 // ─── Log Meal Modal ───────────────────────────────────────────
 
-function LogMealModal({ visible, onClose, recipes, onSave, saving }: {
+type PickerItem =
+  | { kind: 'header'; key: string; text: string }
+  | { kind: 'recipe'; key: string; recipe: Recipe };
+
+function pickerItems(recipes: Recipe[], oftenCookedIds: string[]): PickerItem[] {
+  const byId = new Map(recipes.map((r) => [r.id, r]));
+  const often = oftenCookedIds.flatMap((id) => {
+    const recipe = byId.get(id);
+    return recipe ? [recipe] : [];
+  });
+  const oftenSet = new Set(often.map((r) => r.id));
+  const rest = recipes.filter((r) => !oftenSet.has(r.id));
+  const toItem = (recipe: Recipe): PickerItem => ({ kind: 'recipe', key: recipe.id, recipe });
+  if (often.length === 0) return rest.map(toItem);
+  return [
+    { kind: 'header', key: 'header-often', text: 'Often cooked' },
+    ...often.map(toItem),
+    { kind: 'header', key: 'header-all', text: 'All recipes' },
+    ...rest.map(toItem),
+  ];
+}
+
+function LogMealModal({ visible, onClose, recipes, oftenCookedIds, onSave, saving }: {
   visible: boolean;
   onClose: () => void;
   recipes: Recipe[];
+  oftenCookedIds: string[];
   onSave: (recipe_id: string, portions: number) => void;
   saving: boolean;
 }) {
@@ -818,9 +855,13 @@ function LogMealModal({ visible, onClose, recipes, onSave, saving }: {
 
           <FlatList
             style={styles.modalList}
-            data={recipes}
-            keyExtractor={(r) => r.id}
-            renderItem={({ item }) => {
+            data={pickerItems(recipes, oftenCookedIds)}
+            keyExtractor={(i) => i.key}
+            renderItem={({ item: entry }) => {
+              if (entry.kind === 'header') {
+                return <Text style={styles.pickerSectionHeader}>{entry.text}</Text>;
+              }
+              const item = entry.recipe;
               const isSelected = selectedRecipeId === item.id;
               return (
                 <TouchableOpacity
@@ -1309,6 +1350,15 @@ const styles = StyleSheet.create({
   },
   modalList: {
     maxHeight: 260,
+  },
+  pickerSectionHeader: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: Colors.textMuted,
+    paddingTop: Spacing.sm,
   },
   recipeOpt: {
     flexDirection: 'row',
