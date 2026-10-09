@@ -17,6 +17,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { daysBetween } from '../utils/dates';
 import {
   DailyLogEntry,
   Exercise,
@@ -41,6 +42,7 @@ import {
   type LatestMeasurements,
   logWorkoutSet,
   getWorkoutSetsForDay,
+  getLastSetForExercise,
   deleteWorkoutSet,
   type WorkoutSet,
   type CorruptJsonColumn,
@@ -665,13 +667,15 @@ export default function DashboardScreen() {
   const handleLogSet = async (
     exerciseName: string,
     reps: number,
-    weightKg: number
+    weightKg: number,
+    setType?: 'warmup'
   ): Promise<boolean> => {
     try {
-      // set_index is assigned atomically by logWorkoutSet itself (#317) —
-      // no longer computed from the current in-memory array length, which
-      // collided with a surviving set after deleting one mid-session.
-      await logWorkoutSet(today, exerciseName, { reps, weightKg });
+      await logWorkoutSet(
+        today,
+        exerciseName,
+        setType ? { reps, weightKg, setType } : { reps, weightKg }
+      );
     } catch (err) {
       console.error('logWorkoutSet error', err);
       Alert.alert('Error', 'Failed to save your set. Please try again.');
@@ -1105,8 +1109,11 @@ export default function DashboardScreen() {
         <SetLoggerModal
           exerciseName={activeSetLogger}
           sets={workoutSets[activeSetLogger] ?? []}
+          today={today}
           onClose={() => setActiveSetLogger(null)}
-          onAddSet={(reps, weightKg) => handleLogSet(activeSetLogger, reps, weightKg)}
+          onAddSet={(reps, weightKg, setType) =>
+            handleLogSet(activeSetLogger, reps, weightKg, setType)
+          }
           onDeleteSet={handleDeleteSet}
         />
       )}
@@ -1276,29 +1283,53 @@ function MeasurementsModal({
  * SetLoggerModal — bottom-sheet modal for logging actual sets for one exercise.
  *
  * Shows today's already-logged sets with a delete affordance, and a simple
- * form to add a new set (reps + weight in kg).  Weight is pre-filled from the
- * last logged set for this exercise (or 0 if none).  Uses Verdure tokens
- * throughout; no emoji, outline Ionicons only.
+ * form to add a new set (reps + weight in kg), a set type toggle (working or
+ * warm-up) and the last working set from an earlier session.  Weight starts
+ * from today's last logged set, or empty if there is none.  Uses Verdure
+ * tokens throughout; no emoji, outline Ionicons only.
  */
 function SetLoggerModal({
   exerciseName,
   sets,
+  today,
   onClose,
   onAddSet,
   onDeleteSet,
 }: {
   exerciseName: string;
   sets: WorkoutSet[];
+  today: string;
   onClose: () => void;
-  onAddSet: (reps: number, weightKg: number) => Promise<boolean>;
+  onAddSet: (reps: number, weightKg: number, setType?: 'warmup') => Promise<boolean>;
   onDeleteSet: (id: number) => Promise<void>;
 }) {
   const lastSet = sets.length > 0 ? sets[sets.length - 1] : null;
+  const [isWarmup, setIsWarmup] = useState(false);
   const [repsInput, setRepsInput] = useState('');
   const [weightInput, setWeightInput] = useState(
     lastSet ? String(lastSet.weight_kg) : ''
   );
   const [saving, setSaving] = useState(false);
+  const [previous, setPrevious] = useState<WorkoutSet | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPrevious(null);
+    (async () => {
+      try {
+        const set = await getLastSetForExercise(exerciseName, today);
+        if (!cancelled) setPrevious(set);
+      } catch (err) {
+        if (!cancelled) console.error('getLastSetForExercise error', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [exerciseName, today]);
+
+  const daysAgo = previous ? daysBetween(previous.date, today) : 0;
+  const when = daysAgo === 1 ? 'yesterday' : daysAgo > 1 ? `${daysAgo} days ago` : '';
 
   const handleAdd = async () => {
     const repsText = repsInput.trim();
@@ -1315,7 +1346,7 @@ function SetLoggerModal({
     }
     setSaving(true);
     try {
-      if (await onAddSet(reps, weight)) setRepsInput('');
+      if (await onAddSet(reps, weight, isWarmup ? 'warmup' : undefined)) setRepsInput('');
       // Keep weight for the next set (common UX pattern)
     } finally {
       setSaving(false);
@@ -1358,6 +1389,9 @@ function SetLoggerModal({
                   <Text style={styles.setDetail}>
                     {s.reps} reps @ {s.weight_kg} kg
                   </Text>
+                  {s.set_type === 'warmup' && (
+                    <Pill label="Warm-up" accent="gold" accessibilityLabel="Warm-up set" />
+                  )}
                   <TouchableOpacity
                     onPress={() => onDeleteSet(s.id)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1374,6 +1408,44 @@ function SetLoggerModal({
           {/* Add a new set */}
           <View style={styles.setInputArea}>
             <Text style={styles.setInputHeading}>Add set</Text>
+            <View style={styles.setTypeRow}>
+              {([
+                { label: 'Working', warmup: false },
+                { label: 'Warm-up', warmup: true },
+              ] as const).map(({ label, warmup }) => {
+                const selected = isWarmup === warmup;
+                return (
+                  <TouchableOpacity
+                    key={label}
+                    style={[styles.setTypeSegment, selected && styles.setTypeSegmentSelected]}
+                    onPress={() => setIsWarmup(warmup)}
+                    activeOpacity={0.75}
+                    accessibilityRole="radio"
+                    accessibilityLabel={label}
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.setTypeText, selected && styles.setTypeTextSelected]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {previous && (
+              <TouchableOpacity
+                onPress={() => {
+                  setRepsInput(String(previous.reps));
+                  setWeightInput(String(previous.weight_kg));
+                }}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Use last time: ${previous.reps} reps at ${previous.weight_kg} kg${when ? `, ${when}` : ''}`}
+              >
+                <Text style={styles.lastTimeText}>
+                  {`Last time: ${previous.weight_kg} kg × ${previous.reps}${when ? ` · ${when}` : ''}`}
+                </Text>
+              </TouchableOpacity>
+            )}
             <View style={styles.setInputRow}>
               <View style={styles.setInputField}>
                 <Text style={styles.setInputLabel}>Reps</Text>
@@ -1382,7 +1454,7 @@ function SetLoggerModal({
                   value={repsInput}
                   onChangeText={setRepsInput}
                   keyboardType="number-pad"
-                  placeholder="—"
+                  placeholder={previous ? String(previous.reps) : '—'}
                   placeholderTextColor={Colors.textMuted}
                   returnKeyType="next"
                   selectTextOnFocus
@@ -1395,7 +1467,7 @@ function SetLoggerModal({
                   value={weightInput}
                   onChangeText={setWeightInput}
                   keyboardType="decimal-pad"
-                  placeholder="—"
+                  placeholder={previous ? String(previous.weight_kg) : '—'}
                   placeholderTextColor={Colors.textMuted}
                   returnKeyType="done"
                   selectTextOnFocus
@@ -1988,6 +2060,35 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: Colors.textMuted,
     marginBottom: Spacing.sm,
+  },
+  lastTimeText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.sageDeep,
+    marginBottom: Spacing.sm,
+  },
+  setTypeRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  setTypeSegment: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+  },
+  setTypeSegmentSelected: {
+    backgroundColor: Colors.sageTint,
+  },
+  setTypeText: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+  },
+  setTypeTextSelected: {
+    color: Colors.sageDeep,
   },
   setInputRow: {
     flexDirection: 'row',

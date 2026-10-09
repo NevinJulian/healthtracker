@@ -168,4 +168,46 @@ describe('backup export → restore round trip reproduces the DB exactly (#336)'
       expect({ table, rows: afterRows }).toEqual({ table, rows: beforeRows });
     }
   });
+
+  it('keeps set_type through a round trip', async () => {
+    const { db, backup } = loadFreshModules();
+    await db.initDatabase();
+
+    await db.logWorkoutSet('2024-03-01', 'Bench Press', { reps: 10, weightKg: 40, setType: 'warmup' });
+    await db.logWorkoutSet('2024-03-01', 'Bench Press', { reps: 5, weightKg: 80 });
+
+    const before = await backup.buildBackupPayload();
+    expect(before.tables.workout_set_log.map((r) => r.set_type)).toEqual(['warmup', null]);
+
+    await db.restoreFromPayload(before.tables, 39);
+
+    const sets = await db.getWorkoutSetsForDay('2024-03-01');
+    expect(sets.map((s) => s.set_type)).toEqual(['warmup', null]);
+  });
+
+  it('restores a backup without set_type as NULL (guard)', async () => {
+    const { db } = loadFreshModules();
+    await db.initDatabase();
+
+    await db.restoreFromPayload(
+      {
+        workout_set_log: [
+          {
+            id: 1,
+            date: '2024-03-01',
+            exercise: 'Bench Press',
+            set_index: 0,
+            reps: 5,
+            weight_kg: 80,
+            created_at: '2024-03-01T10:00:00.000Z',
+          },
+        ],
+      },
+      38
+    );
+
+    const sets = await db.getWorkoutSetsForDay('2024-03-01');
+    expect(sets).toHaveLength(1);
+    expect(sets[0].set_type).toBeNull();
+  });
 });

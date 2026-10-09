@@ -3229,29 +3229,35 @@ export interface WorkoutSet {
   set_index: number;
   reps: number;
   weight_kg: number;
+  /** `'warmup'` for a warm-up set; null (or absent) for a working set. */
+  set_type?: string | null;
   created_at: string;
+}
+
+/** Details of one set to log. Omit `setType` for a working set. */
+export interface WorkoutSetInput {
+  reps: number;
+  weightKg: number;
+  setType?: 'warmup';
 }
 
 /**
  * Insert one logged set for an exercise on `date`.
  *
- * `set_index` is NOT caller-supplied (#317): it's assigned atomically as one
- * past the current max set_index for this (date, exercise) pair, via a
- * single INSERT…SELECT rather than a separate read-then-write. The previous
- * design took a caller-computed index (DashboardScreen used
- * `existingSets.length`), which collided with a surviving row's set_index
- * whenever a set was deleted before the next one was logged. v37 (schema.ts)
- * enforces UNIQUE(date, exercise, set_index) at the schema level, so any
- * remaining race would throw here rather than silently duplicate.
+ * `set_index` is NOT caller-supplied: it's assigned atomically as one past the
+ * current max set_index for this (date, exercise) pair, via a single
+ * INSERT…SELECT rather than a separate read-then-write. The schema enforces
+ * UNIQUE(date, exercise, set_index), so any remaining race would throw here
+ * rather than silently duplicate.
  *
  * @param date      - YYYY-MM-DD date key (use toISODate() / localDateKey()).
  * @param exercise  - Exercise name (matches Exercise.name from daily_log.exercises).
- * @param set       - Set details: reps performed, weight in kg.
+ * @param set       - Set details: reps performed, weight in kg, and `setType: 'warmup'` for a warm-up.
  */
 export function logWorkoutSet(
   date: string,
   exercise: string,
-  set: { reps: number; weightKg: number }
+  set: WorkoutSetInput
 ): Promise<void> {
   return _enqueueWrite('logWorkoutSet', () => _logWorkoutSetImpl(date, exercise, set));
 }
@@ -3259,15 +3265,24 @@ export function logWorkoutSet(
 async function _logWorkoutSetImpl(
   date: string,
   exercise: string,
-  set: { reps: number; weightKg: number }
+  set: WorkoutSetInput
 ): Promise<void> {
   const db = getDatabase();
   const createdAt = new Date().toISOString();
   await db.runAsync(
-    `INSERT INTO workout_set_log (date, exercise, set_index, reps, weight_kg, created_at)
-     SELECT ?, ?, COALESCE(MAX(set_index), -1) + 1, ?, ?, ?
+    `INSERT INTO workout_set_log (date, exercise, set_index, reps, weight_kg, created_at, set_type)
+     SELECT ?, ?, COALESCE(MAX(set_index), -1) + 1, ?, ?, ?, ?
      FROM workout_set_log WHERE date = ? AND exercise = ?`,
-    [date, exercise, set.reps, set.weightKg, createdAt, date, exercise]
+    [
+      date,
+      exercise,
+      set.reps,
+      set.weightKg,
+      createdAt,
+      set.setType === 'warmup' ? 'warmup' : null,
+      date,
+      exercise,
+    ]
   );
 }
 
@@ -3309,6 +3324,25 @@ export async function getWorkoutHistory(
     return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SINCE_SQL, [exercise, sinceDateKey]);
   }
   return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SQL, [exercise]);
+}
+
+export const WORKOUT_LAST_SET_SQL = `SELECT * FROM workout_set_log
+     WHERE exercise = ? AND date < ? AND (set_type IS NULL OR set_type <> 'warmup')
+     ORDER BY date DESC, set_index DESC LIMIT 1`;
+
+/**
+ * Return the last working set of the most recent session of `exercise`
+ * before `beforeDate`, or null if there is none. Warm-ups never count.
+ *
+ * @param exercise   - Exact exercise name as logged.
+ * @param beforeDate - YYYY-MM-DD; only earlier dates are considered.
+ */
+export async function getLastSetForExercise(
+  exercise: string,
+  beforeDate: string
+): Promise<WorkoutSet | null> {
+  const db = getDatabase();
+  return db.getFirstAsync<WorkoutSet>(WORKOUT_LAST_SET_SQL, [exercise, beforeDate]);
 }
 
 /**

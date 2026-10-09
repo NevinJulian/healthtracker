@@ -824,6 +824,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 38, sql: `
   ALTER TABLE recipe_library ADD COLUMN archived_at TEXT;
 ` },
+  { version: 39, sql: 'ALTER TABLE workout_set_log ADD COLUMN set_type TEXT;' },
 ];
 
 /**

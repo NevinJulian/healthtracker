@@ -34,6 +34,7 @@ import {
   WORKOUT_SETS_FOR_DAY_SQL,
   WORKOUT_HISTORY_SQL,
   WORKOUT_HISTORY_SINCE_SQL,
+  WORKOUT_LAST_SET_SQL,
 } from '../database';
 
 let SQL: SqlJsStatic;
@@ -119,6 +120,11 @@ describe('v36 indexes (#331)', () => {
     const all = planDetail(db, WORKOUT_HISTORY_SQL, ['Bench Press']);
     expect(usesIndex(since, 'idx_workout_set_log_exercise_date')).toBe(true);
     expect(usesIndex(all, 'idx_workout_set_log_exercise_date')).toBe(true);
+  });
+
+  it("getLastSetForExercise's query uses idx_workout_set_log_exercise_date", () => {
+    const detail = planDetail(db, WORKOUT_LAST_SET_SQL, ['Bench Press', '2024-01-01']);
+    expect(usesIndex(detail, 'idx_workout_set_log_exercise_date')).toBe(true);
   });
 
   it("the meal_inventory active-stock query (WHERE recipe_id = ? AND portions_available > 0) uses idx_meal_inventory_recipe", () => {
