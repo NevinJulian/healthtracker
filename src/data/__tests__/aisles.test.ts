@@ -74,6 +74,26 @@ describe('aisleFor', () => {
     ['Sparkling water', 'Drinks'],
     ['chicken broth (low sodium)', 'Tins and jars'],
     ['frozen peas & carrots', 'Frozen'],
+    ['egg (for meatballs)', 'Dairy and eggs'],
+    ['oat flour (for meatballs)', 'Pantry'],
+    ['coriander (ground)', 'Spices and oils'],
+    ['butter beans', 'Tins and jars'],
+    ['beans', 'Tins and jars'],
+    ['bean', 'Tins and jars'],
+    ['olives', 'Tins and jars'],
+    ['olive', 'Tins and jars'],
+    ['garlic salt', 'Spices and oils'],
+    ['celery salt', 'Spices and oils'],
+    ['cornmeal', 'Pantry'],
+    ['popcorn', 'Pantry'],
+    ['pepperoni', 'Meat and fish'],
+    ['ginger ale', 'Drinks'],
+    ['peanut oil', 'Spices and oils'],
+    ['Gemüse', 'Produce'],
+    ['Obst', 'Produce'],
+    ['fruit', 'Produce'],
+    ['vegetables', 'Produce'],
+    ['Gemüsebrühe', 'Tins and jars'],
     ['xyzzy', 'Other'],
   ] as const)('%s -> %s', (name, aisle) => {
     expect(aisleFor(name)).toBe(aisle);
@@ -165,5 +185,24 @@ describe('groupByAisle', () => {
 
   it('returns nothing for an empty list', () => {
     expect(groupByAisle([])).toEqual([]);
+  });
+});
+
+describe('aisle table invariants', () => {
+  it('has no keyword in two sections', () => {
+    const seen = new Map<string, string>();
+    for (const aisle of KEYWORD_AISLES) {
+      for (const kw of AISLE_KEYWORDS[aisle]) {
+        expect({ kw, first: seen.get(kw) }).toEqual({ kw, first: undefined });
+        seen.set(kw, aisle);
+      }
+    }
+  });
+
+  it('has no keyword twice in one section', () => {
+    for (const aisle of KEYWORD_AISLES) {
+      const list = AISLE_KEYWORDS[aisle];
+      expect(new Set(list).size).toBe(list.length);
+    }
   });
 });
