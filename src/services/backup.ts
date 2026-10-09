@@ -3,7 +3,7 @@
  *
  * Architecture:
  *   - Raw DB queries live in src/db/database.ts (getCurrentSchemaVersion,
- *     listUserTables, dumpTable, restoreFromPayload).
+ *     dumpAllTables, restoreFromPayload).
  *   - This file owns file I/O (expo-file-system), the share sheet
  *     (expo-sharing), and the document picker (expo-document-picker).
  *
@@ -48,8 +48,7 @@ import {
 } from 'expo-file-system/legacy';
 import {
   getCurrentSchemaVersion,
-  listUserTables,
-  dumpTable,
+  dumpAllTables,
   restoreFromPayload,
 } from '../db/database';
 import { reconcileScheduledNotifications } from './notifications';
@@ -198,20 +197,15 @@ const isoDateString = localDateKey;
 /**
  * Dump all user tables from the database and assemble a BackupPayload object.
  *
- * This is the single source-of-truth for the serialization format — both
- * exportBackup (user-initiated) and the pre-restore safety snapshot (#293)
- * call this to avoid duplicating the dump/serialize logic.
+ * This is the single source-of-truth for the serialization format: the
+ * manual export, the automatic backup and the pre-restore safety snapshot all
+ * call it. The tables are read as one unit on the database write queue
+ * (dumpAllTables), so every table in the payload is from the same moment.
  *
  * @returns A fully-populated BackupPayload ready for JSON serialization.
  */
 export async function buildBackupPayload(): Promise<BackupPayload> {
-  const schemaVersion = await getCurrentSchemaVersion();
-  const tableNames = await listUserTables();
-  const tables: Record<string, Record<string, unknown>[]> = {};
-
-  for (const name of tableNames) {
-    tables[name] = await dumpTable(name);
-  }
+  const { schemaVersion, tables } = await dumpAllTables();
 
   return {
     format: 'healthtracker-backup',

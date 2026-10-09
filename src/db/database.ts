@@ -2803,6 +2803,25 @@ export async function dumpTable(
   return rows;
 }
 
+/**
+ * Read the schema version and every user table as one unit on the write
+ * queue, so the result is one point in time: no write or restore can land
+ * between two tables. Call this from outside the queue only.
+ */
+export function dumpAllTables(): Promise<{
+  schemaVersion: number;
+  tables: Record<string, Record<string, unknown>[]>;
+}> {
+  return _enqueueWrite('dumpAllTables', async () => {
+    const schemaVersion = await getCurrentSchemaVersion();
+    const tables: Record<string, Record<string, unknown>[]> = {};
+    for (const name of await listUserTables()) {
+      tables[name] = await dumpTable(name);
+    }
+    return { schemaVersion, tables };
+  });
+}
+
 const RENUMBER_MIGRATION_VERSION = 37;
 
 async function runSetIndexRepair(

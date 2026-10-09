@@ -36,8 +36,7 @@ import {
 jest.mock('../../db/database', () => ({
   // Read by backup.ts directly
   getCurrentSchemaVersion: jest.fn(),
-  listUserTables: jest.fn(),
-  dumpTable: jest.fn(),
+  dumpAllTables: jest.fn(),
   restoreFromPayload: jest.fn(),
   // Read (transitively) by the real reconcileScheduledNotifications in
   // ../notifications, which importBackup calls after a successful restore.
@@ -349,8 +348,7 @@ describe('importBackup — notification resync (#310)', () => {
 
     // DB happy path: schema check passes, restore succeeds.
     jest.mocked(db.getCurrentSchemaVersion).mockResolvedValue(5);
-    jest.mocked(db.listUserTables).mockResolvedValue(['daily_log']);
-    jest.mocked(db.dumpTable).mockResolvedValue([]);
+    jest.mocked(db.dumpAllTables).mockResolvedValue({ schemaVersion: 5, tables: { daily_log: [] } });
     jest.mocked(db.restoreFromPayload).mockResolvedValue({ tablesRestored: 1, rowsRestored: 0 });
 
     // Settings read by the real reconcileScheduledNotifications: sweep

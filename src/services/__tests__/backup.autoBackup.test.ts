@@ -60,8 +60,7 @@ jest.mock('expo-file-system/legacy', () => {
 
 jest.mock('../../db/database', () => ({
   getCurrentSchemaVersion: jest.fn(),
-  listUserTables: jest.fn(),
-  dumpTable: jest.fn(),
+  dumpAllTables: jest.fn(),
   restoreFromPayload: jest.fn(),
 }));
 
@@ -128,8 +127,7 @@ beforeEach(() => {
   files.clear();
   dirs.clear();
   jest.mocked(db.getCurrentSchemaVersion).mockResolvedValue(5);
-  jest.mocked(db.listUserTables).mockResolvedValue(['daily_log']);
-  jest.mocked(db.dumpTable).mockResolvedValue([]);
+  jest.mocked(db.dumpAllTables).mockResolvedValue({ schemaVersion: 5, tables: { daily_log: [] } });
 });
 
 afterEach(() => {
