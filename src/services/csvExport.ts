@@ -1,7 +1,12 @@
-import type {
-  DailyLogExportRow,
-  MealExportRow,
-  WorkoutSetExportRow,
+import * as Sharing from 'expo-sharing';
+import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
+import {
+  getAllDailyLogForExport,
+  getAllMealsForExport,
+  getAllWorkoutSetsForExport,
+  type DailyLogExportRow,
+  type MealExportRow,
+  type WorkoutSetExportRow,
 } from '../db/database';
 
 export type CsvValue = string | number | boolean | null | undefined;
@@ -75,6 +80,48 @@ export function mealsToCsv(rows: readonly MealExportRow[]): string {
   );
 }
 
+/**
+ * Write workout_sets.csv, daily_log.csv and meals.csv to the cache directory and
+ * share them one after the other. A file that cannot be written or shared is
+ * reported and does not stop the next one.
+ *
+ * @returns The names of the files that failed.
+ * @throws  When sharing is unavailable, a table cannot be read, or no file was exported.
+ */
 export async function exportCsv(): Promise<{ failed: string[] }> {
-  return { failed: [] };
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error('Sharing is not available on this device. Cannot export CSV.');
+  }
+
+  const [sets, log, meals] = await Promise.all([
+    getAllWorkoutSetsForExport(),
+    getAllDailyLogForExport(),
+    getAllMealsForExport(),
+  ]);
+  const files = [
+    { name: 'workout_sets.csv', content: workoutSetsToCsv(sets) },
+    { name: 'daily_log.csv', content: dailyLogToCsv(log) },
+    { name: 'meals.csv', content: mealsToCsv(meals) },
+  ];
+
+  const failed: string[] = [];
+  for (const file of files) {
+    const uri = `${cacheDirectory ?? ''}${file.name}`;
+    try {
+      await writeAsStringAsync(uri, file.content);
+      await Sharing.shareAsync(uri, {
+        mimeType: 'text/csv',
+        dialogTitle: `Save ${file.name}`,
+        UTI: 'public.comma-separated-values-text',
+      });
+    } catch (err) {
+      console.warn(`[csvExport] Could not export ${file.name}:`, err);
+      failed.push(file.name);
+    }
+  }
+
+  if (failed.length === files.length) {
+    throw new Error('Could not export any CSV file.');
+  }
+  return { failed };
 }
