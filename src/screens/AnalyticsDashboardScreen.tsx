@@ -829,7 +829,7 @@ function PRSummaryCard({
   history: WorkoutSetSlice[];
 }) {
   const prs = computePRs(history);
-  const hasData = history.length > 0;
+  const hasData = prs.bestWeight !== null;
 
   return (
     <View style={styles.prExerciseBlock}>
@@ -1526,6 +1526,7 @@ export default function AnalyticsDashboardScreen() {
             exercise: s.exercise,
             reps: s.reps,
             weight_kg: s.weight_kg,
+            set_type: s.set_type,
           }));
         });
         if (isCurrent()) setLiftHistoryByExercise(byEx);

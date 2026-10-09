@@ -485,6 +485,7 @@ export function computePRs(history: WorkoutSetSlice[]): PRRecord {
   let bestVolume: { value: number; date: string } | null = null;
 
   for (const set of history) {
+    if (set.set_type === 'warmup') continue;
     const orm = estimated1RM(set.weight_kg, set.reps);
     const volume = set.weight_kg * set.reps;
 
@@ -551,6 +552,7 @@ export function bestSetPerDay(
   >();
 
   for (const set of history) {
+    if (set.set_type === 'warmup') continue;
     const existing = byDate.get(set.date);
     const orm = estimated1RM(set.weight_kg, set.reps);
 
