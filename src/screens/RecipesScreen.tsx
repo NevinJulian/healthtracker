@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
+  Modal,
   TouchableOpacity,
   ScrollView,
   TextInput,
@@ -11,8 +12,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import { getRecipes, Recipe } from '../db/database';
+import { fetchRecipePage, RecipePageError } from '../api/fetchRecipePage';
 import { useNavigation } from '@react-navigation/native';
-import { Card, IconChip, ScreenHeader } from '../components';
+import { Button, Card, IconChip, ScreenHeader } from '../components';
 import { iconChipIconColor } from '../components/IconChip';
 
 // ─── Category → accent family mapping ────────────────────────────────────────
@@ -113,10 +115,57 @@ export default function RecipesScreen() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const navigation = useNavigation<any>();
+  const [importOpen, setImportOpen] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
     loadRecipes(activeCategory);
   }, [activeCategory]);
+
+  useEffect(
+    () => () => {
+      importRequest.current?.abort();
+      importRequest.current = null;
+    },
+    [],
+  );
+
+  const closeImport = () => {
+    importRequest.current?.abort();
+    importRequest.current = null;
+    setImportOpen(false);
+    setImportBusy(false);
+    setImportUrl('');
+    setImportError(null);
+  };
+
+  const startImport = async () => {
+    if (importBusy || importUrl.trim() === '') return;
+    const controller = new AbortController();
+    importRequest.current = controller;
+    setImportBusy(true);
+    setImportError(null);
+    try {
+      const draft = await fetchRecipePage(importUrl, controller.signal);
+      if (importRequest.current !== controller) return;
+      importRequest.current = null;
+      setImportOpen(false);
+      setImportBusy(false);
+      setImportUrl('');
+      navigation.navigate('RecipeEditor', { draft });
+    } catch (err) {
+      if (importRequest.current !== controller) return;
+      importRequest.current = null;
+      setImportBusy(false);
+      if (err instanceof RecipePageError && err.code === 'aborted') return;
+      setImportError(
+        err instanceof RecipePageError ? err.message : new RecipePageError('network').message,
+      );
+    }
+  };
 
   const loadRecipes = async (category: string) => {
     const data = await getRecipes(category);
@@ -146,17 +195,66 @@ export default function RecipesScreen() {
         subtitle={`${filteredRecipes.length} recipe${filteredRecipes.length === 1 ? '' : 's'}`}
         style={styles.screenHeader}
         trailing={
-          <TouchableOpacity
-            style={styles.newRecipeBtn}
-            onPress={() => navigation.navigate('RecipeEditor')}
-            activeOpacity={0.75}
-            accessibilityLabel="Create new recipe"
-            accessibilityRole="button"
-          >
-            <Ionicons name="add-outline" size={20} color={Colors.surface} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.newRecipeBtn}
+              onPress={() => setImportOpen(true)}
+              activeOpacity={0.75}
+              accessibilityLabel="Import recipe from URL"
+              accessibilityRole="button"
+            >
+              <Ionicons name="link-outline" size={20} color={Colors.surface} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.newRecipeBtn}
+              onPress={() => navigation.navigate('RecipeEditor')}
+              activeOpacity={0.75}
+              accessibilityLabel="Create new recipe"
+              accessibilityRole="button"
+            >
+              <Ionicons name="add-outline" size={20} color={Colors.surface} />
+            </TouchableOpacity>
+          </View>
         }
       />
+
+      <Modal visible={importOpen} animationType="fade" transparent onRequestClose={closeImport}>
+        <View style={styles.dialogRoot}>
+          <View style={styles.dialogScrim} />
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>Import from URL</Text>
+            <TextInput
+              style={styles.dialogInput}
+              placeholder="https://..."
+              placeholderTextColor={Colors.textMuted}
+              value={importUrl}
+              onChangeText={setImportUrl}
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="go"
+              onSubmitEditing={startImport}
+              editable={!importBusy}
+              accessibilityLabel="Recipe web address"
+            />
+            {importError !== null && <Text style={styles.dialogError}>{importError}</Text>}
+            <View style={styles.dialogActions}>
+              <Button
+                title="Cancel"
+                variant="ghost"
+                onPress={closeImport}
+                style={styles.dialogButton}
+              />
+              <Button
+                title={importBusy ? 'Importing...' : 'Import'}
+                onPress={startImport}
+                disabled={importBusy || importUrl.trim() === ''}
+                style={styles.dialogButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Search bar */}
       <View style={styles.searchRow}>
@@ -233,6 +331,59 @@ const styles = StyleSheet.create({
   screenHeader: {
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.sm,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  dialogRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  dialogScrim: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: Colors.textPrimary,
+    opacity: 0.45,
+  },
+  dialog: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  dialogTitle: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xl,
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
+  },
+  dialogInput: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  dialogError: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.clayDeep,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  dialogButton: {
+    flex: 1,
   },
   newRecipeBtn: {
     width: 36,
