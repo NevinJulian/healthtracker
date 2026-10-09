@@ -109,7 +109,7 @@
       "name": "recipes",
       "branch": "sprint/lane-d-recipes",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "cleanup",
+      "status": "merged",
       "order": [
         442,
         443,
@@ -123,7 +123,9 @@
       "parked": [
         352
       ],
-      "landingBranch": "sprint/lane-d-recipes-442-443 (created at 45be56c, the tip of #443, and pushed; this is what merges). sprint/lane-d-recipes keeps the parked #352 work at a355753."
+      "landingBranch": "sprint/lane-d-recipes-442-443 (created at 45be56c, the tip of #443, and pushed; this is what merges). sprint/lane-d-recipes keeps the parked #352 work at a355753.",
+      "mergeSha": "ec31d05",
+      "cleanup": "no changes needed, no commit (run on sprint/lane-d-recipes-442-443 over c698da2..45be56c: nothing left of the old dynamic import, every new state and variable is read, the three openfoodfacts docblocks and the importRecipe header match the new behaviour, no 'in a minute' left, no issue numbers in the diff's comments or test titles; 1402/108 before, no edits). One comment outside the diff's hunks is now inaccurate and was left: importRecipe.ts:32 still says refused before a request was sent."
     }
   },
   "issues": {
@@ -345,7 +347,7 @@
     "442": {
       "lane": "D",
       "kind": "bug",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "711b910",
@@ -360,12 +362,13 @@
       "deviceCheck": "none (decision item 5: the limit cannot be reached on purpose in Expo Go, tests cover it)",
       "notes": "WO ready, no PARK, no file outside lane D. Claim verified: notLookedUpSentence (DiscoverDetailScreen.tsx:55-57) is the only source of the Try again in a minute text; a lookup that got the 429 itself returns null at openfoodfacts.ts:189 after setting pausedUntil; the sentinel is never cached. Fix: return 'not-looked-up' in the 429 branch; new singular/plural sentences; In your library subtitle. Existing assertions that change (they pin the replaced behaviour): retryAfter.test.ts:56,74,88 (toBeNull on the 429 receiver) and notLookedUp.test.tsx:47,77,81 (old sentence). Side effect to watch: in the editor, 429 receivers move from the no-data branch into the Not looked up banner (wording is #443's). ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst picked In your library for every no-warning case, which would also change a fresh clean import; decision item 4 is only about a recipe already in the library, so the subtitle is shown only when the load effect found the recipe or dbImportRecipe returned false, and a fresh clean import keeps Macros computed from local data. | dev: 4 commits, 1393/108 per dev. fetchFromOFF returns the sentinel after the 429 branch sets the pause; one sentence function for Alert and card; new alreadyInLibrary state set in exactly two places. Existing assertions changed as listed in the work order (retryAfter.test.ts:56,74,88 toBeNull -> 'not-looked-up'; the NOT_LOOKED_UP constant at notLookedUp.test.tsx:47). BEYOND THE WORK ORDER: the already-in-library effect's dynamic import('../db/database') was replaced by a static import of getRecipeById, because under jest the dynamic import throws and the empty catch swallowed it, so the reopen path could not be tested; same module is already imported statically in that file. Tester asked to judge it.",
       "securityReview": "APPROVE (c698da2..d0c057d, read through git): the only new network-derived value is the constant sentinel returned after the pause is set; the sentinel is excluded before every sink (cache write only for real objects, importRecipe and the editor branch on the string first, batch keeps objects only), no NaN path; a 429 or any failure is never cached; budget, pause formula (longer wins, 1-300 s clamp, 60 s default), abort handling and the 5xx retry are untouched; the import is still INSERT OR IGNORE and never overwrites; a failed import is never shown as In your library. Note: a 5xx first attempt whose retry is refused locally still resolves null (unchanged).",
-      "regressionProof": "tester APPROVE r0: with openfoodfacts.ts from 711b910, 12 of 22 retryAfter tests fail (the 429 receiver resolves null), all pass at d0c057d; with DiscoverDetailScreen.tsx from 5f0b565, 4 of 5 Discover tests fail (both sentences, both In your library cases), the fresh-clean-import guard passes before and after by design; the three edited assertions and the wording constant judged legitimate (they pinned 429 receiver = no data and the old sentence), nothing else weakened; sentinel never reaches the cache, a truthiness check or computeRecipeMacros; pause tests untouched and green; with the dynamic import put back the found-on-load test fails, so the static import was needed and is behaviour-preserving; 1393/108 (tester reproduced). Gap: the tester did not see the in-flight Promise.all assertion in its own red list (the developer reported two array-diff failures there); it sits inside tests that were red."
+      "regressionProof": "tester APPROVE r0: with openfoodfacts.ts from 711b910, 12 of 22 retryAfter tests fail (the 429 receiver resolves null), all pass at d0c057d; with DiscoverDetailScreen.tsx from 5f0b565, 4 of 5 Discover tests fail (both sentences, both In your library cases), the fresh-clean-import guard passes before and after by design; the three edited assertions and the wording constant judged legitimate (they pinned 429 receiver = no data and the old sentence), nothing else weakened; sentinel never reaches the cache, a truthiness check or computeRecipeMacros; pause tests untouched and green; with the dynamic import put back the found-on-load test fails, so the static import was needed and is behaviour-preserving; 1393/108 (tester reproduced). Gap: the tester did not see the in-flight Promise.all assertion in its own red list (the developer reported two array-diff failures there); it sits inside tests that were red.",
+      "mergeSha": "ec31d05"
     },
     "443": {
       "lane": "D",
       "kind": "bug",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "9dd5480",
@@ -380,7 +383,8 @@
       "deviceCheck": "none (decision item 5)",
       "notes": "WO ready (ahead), no PARK. handleSave is RecipeEditorScreen.tsx:344-429; the count is knowable in the aborted case too (fallback.unmatchedIngredients minus the no-data set, the expression the deadline path already uses). Design: one finish() with a once-flag and a mounted ref; Alert.alert('Saved', msg, [OK -> finish], { cancelable: true, onDismiss: finish }); saving stays true while the Alert is up. Analyst picks to repeat in the report: title Saved, button OK, banner keeps the names in parentheses, the Alert also counts lookups refused by the budget or a 429 pause when the recompute finished (the decision's lead sentence covers any save with ingredients that were not looked up), the Alert still shows after an unmount but then navigates nowhere. Existing assertions that change: saveDeadline.test.tsx:167 and :184 (old banner text). | dev STOPPED before the fix commit (correctly): with saving kept true while the Alert is up, the existing assertion saveDeadline.test.tsx:95 (no Saving... label after a deadline save) fails. ORCHESTRATOR decision: the assertion stays; it pins that a save never stays stuck on Saving.... saving goes false when the write finishes, as today; a separate closing state disables Save and Cancel and makes handleSave inert while the Alert is up; the developer's own new test changes accordingly in its own commit. Not counted as a round trip (no tester verdict yet). So far: 9dd5480 (banner wording, two listed assertions changed), 1c6136e (failing tests). | dev done after the design change: 4 commits, tip 45be56c, 1402/108 per dev; saving resets in the existing finally; new closing state set after a successful write when the Alert shows and cleared in finish; Save and Cancel disabled={saving || closing}; handleSave returns at once while closing; finish has a once-flag and a mounted check, called from onPress and onDismiss; showUnmatched now runs on every path. Existing assertions changed: only saveDeadline.test.tsx:167 and :184 (old banner text); line 95 untouched. Dev's own caveat: the Save-disabled test cannot tell the disabled button from the handleSave guard. RecipeEditorScreen suites run three times, identical.",
       "securityReview": "APPROVE (d0c057d..45be56c, handleSave read at the tip through git): the saved payload is unchanged on all three paths (normal = the settled macros, timeout and aborted = computed.macros with the same arguments as the old fallback); the new always-on computeRecipeMacros call is pure and its result is used only for the unmatched list; the Saved Alert and finish run only after the write resolved; a rejected write goes to the existing catch, closing is never set, so the user can retry; no path to a second write (saving while pending, closing while the Alert is up, a once-flag on finish); finish checks mounted and uses the recipe id captured for this save; the Alert text is a fixed string plus a count, the banner shows the user's own ingredient names, no API text. Notes: after an abort race the Alert count can come from a slightly newer lookup state than the settled macros (notice text only); navigation still runs inside the outer try on the no-notice path, so a throwing navigation after a successful create would show Failed to save (unchanged shape); if the Alert is never answered the buttons stay disabled (data is already saved).",
-      "regressionProof": "tester APPROVE r0: with RecipeEditorScreen.tsx from b37248a and the tests at the tip, 8 of 19 fail (Alert.alert called 0 times; the double-answer test on its navigation assertion), all pass at 45be56c; the no-Alert guard goes red when no-data ingredients are counted; disabled={saving} alone turns the Save-disabled test red. createRecipe payloads compared before and after the fix for three scratch cases (mixed fine / no-data / refused / hanging, a Recompute tap during the save, one hanging ingredient): identical macros and ingredients. Mixed save: Alert says 2, banner lists the same two names, the no-data one is kept apart. A rejected createRecipe shows only the Error Alert, no navigation, Save usable again. Only the two banner assertions changed among existing expects; the Saving... assertion is untouched. Suites run 3 times incl. --no-cache, 19/19 each. 1402/108 (tester reproduced). GAPS: removing if (closing) return leaves every test green (the guard is unreachable while the button is disabled; read, not tested); the updateRecipe rejection path was not run (same catch)."
+      "regressionProof": "tester APPROVE r0: with RecipeEditorScreen.tsx from b37248a and the tests at the tip, 8 of 19 fail (Alert.alert called 0 times; the double-answer test on its navigation assertion), all pass at 45be56c; the no-Alert guard goes red when no-data ingredients are counted; disabled={saving} alone turns the Save-disabled test red. createRecipe payloads compared before and after the fix for three scratch cases (mixed fine / no-data / refused / hanging, a Recompute tap during the save, one hanging ingredient): identical macros and ingredients. Mixed save: Alert says 2, banner lists the same two names, the no-data one is kept apart. A rejected createRecipe shows only the Error Alert, no navigation, Save usable again. Only the two banner assertions changed among existing expects; the Saving... assertion is untouched. Suites run 3 times incl. --no-cache, 19/19 each. 1402/108 (tester reproduced). GAPS: removing if (closing) return leaves every test green (the guard is unreachable while the button is disabled; read, not tested); the updateRecipe rejection path was not run (same catch).",
+      "mergeSha": "ec31d05"
     },
     "444": {
       "lane": "B",
@@ -519,7 +523,8 @@
     "SMALL (#338 tester): a directory named like a valid backup inside auto-backups would be listed, counted and pruned recursively by deleteAsync; only the app creates entries there",
     "SMALL, for the HUMAN (#338 tester): after a device clock that ran far ahead is corrected, the future-dated automatic backups stay at the top of the Settings list and are not pruned until their date arrives (bounded: at most 7 of them)",
     "SMALL (#338 tester): the font-error start test stays green when only one of fontsLoaded / !showFailure is dropped from the effect's condition (the two overlap by design)",
-    "SMALL (#352 tester r3, parked work): '2 (6 oz) cans tuna' and '1 (8-ounce) package cream cheese' give a count with the bracketed unit text in the name; '2 cups (240g) flour' gives 480 g because parseMeasure takes 240 g per cup"
+    "SMALL (#352 tester r3, parked work): '2 (6 oz) cans tuna' and '1 (8-ounce) package cream cheese' give a count with the bracketed unit text in the name; '2 cups (240g) flour' gives 480 g because parseMeasure takes 240 g per cup",
+    "SMALL (lane D cleanup): the field doc on notLookedUpIngredients in src/nutrition/importRecipe.ts:32 still says refused before a request was sent; after #442 a lookup that got a 429 answer lands there too (outside the lane's hunks, so left)"
   ],
   "log": [
     {
@@ -689,6 +694,11 @@
     {
       "at": "2026-10-09T08:40:31Z",
       "event": "#352 tester REJECT r3 at a355753 -> PARKED (roundTrips 3; never a fourth attempt). Stalled on one class of line: a modifier between quantity and unit ('1 heaped tsp sugar' gives 1 whole). Comment posted on #352; filed #452 (the editor drops quantity-0 ingredients on save: present before the sprint, its fix is inside the parked work, and #442's wording points users at that save). Lane D lands #442 and #443 only: branch sprint/lane-d-recipes-442-443 created at 45be56c and pushed, cleanup dispatched on it; the parked work stays on sprint/lane-d-recipes. #338: tester APPROVE r0 + security APPROVE, but sent back by the orchestrator for the self-deleting safety snapshot and an unguarded missing-folder branch -> ROUND TRIP 1, fresh developer dispatched"
+    },
+    {
+      "at": "2026-10-09T08:42:19Z",
+      "event": "lane D cleanup: nothing to do, no commit -> merged sprint/lane-d-recipes-442-443 (#442, #443; 9 files, +448/-43) into integration ec31d05, no conflicts; gates green: typecheck exit 0, 1638 tests / 121 suites, exit 0. The parked #352 files are not on the integration branch. Lanes A, B and D are merged; lane C has #338 in round 2 and #339 pending",
+      "sha": "ec31d05"
     }
   ],
   "aheadAnalysis": {
@@ -721,6 +731,14 @@
       "tests": 1623,
       "testSuites": 120,
       "ci": "ad5d3d2 test: completed success (GitHub check-runs, read 2026-10-09T08:24Z)"
+    },
+    "afterLaneD": {
+      "mergeSha": "ec31d05",
+      "typecheck": "pass",
+      "tests": 1638,
+      "testSuites": 121,
+      "ci": "pending",
+      "note": "only #442 and #443; none of the parked #352 files (recipeHtml.ts, fetchRecipePage.ts, parseIngredientLine.ts) are on the integration branch"
     }
   }
 }
