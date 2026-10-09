@@ -94,15 +94,16 @@
       "name": "data",
       "branch": "sprint/lane-c-data",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "in_progress",
+      "status": "cleanup",
       "waitsFor": "lane A merged into sprint/auto-fixes (#339 exports #344's set type)",
       "order": [
         338,
         339
       ],
-      "current": 339,
+      "current": null,
       "done": [
-        338
+        338,
+        339
       ],
       "parked": [],
       "base": "da4e89a"
@@ -194,7 +195,7 @@
     "339": {
       "lane": "C",
       "kind": "feature",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "edc742c",
@@ -214,7 +215,8 @@
       "workOrder": "C:/git/ht-lanes/wo/339.md",
       "deviceCheck": "Expo Go: export, save the three files and open meals.csv in Google Sheets. Umlauts and recipe names with commas are intact. On Android also check that the three share sheets appear one after the other.",
       "notes": "WO ready (ahead), no PARK, no file outside lane C, no migration. New src/services/csvExport.ts (pure escapeCsvField, buildCsv and three serialisers, separate from exportCsv which reads, writes and shares), three new unbounded ordered readers in database.ts next to their related readers, one button in SettingsScreen.tsx; backup.ts and App.tsx untouched (shareFile is not reused, it hardcodes the JSON mime type). Verified: created_at is stored as toISOString(); recipe macros are INTEGER and already per serving; recipes are only archived, never hard-deleted, so a missing recipe can only come from a restored backup (title and macros then written empty). daily_log exports date, body_weight, water_ml, walk_completed, hammer_completed, fasting_completed; left out: the two task labels, is_rest_day, is_meal_prep_day and both JSON columns. Analyst picks to repeat in the report: CRLF line ends with a final CRLF; NULL and non-finite numbers written empty, flags as 0/1; set_type written as working for anything that is not warmup; row order (sets by date, exercise, set_index; daily log by date, including the planned future rows; meals by date, meal type, id); files in cacheDirectory, overwritten each run; dialog title Save <filename>; partial failure shows CSV export incomplete naming the files, total failure CSV export failed, full success no message; the button shares backupBusy. FOR THE HUMAN, NOT IN THE DECISION: a FORMULA GUARD - a text field starting with = + - @ TAB or CR gets a leading apostrophe before quoting (numbers are never touched), so a recipe titled -5 min bowl is exported with an apostrophe in front. The decision says RFC 4180 quoting and that names stay intact; the guard is there because recipe titles can come from the web (TheMealDB, URL import) and a spreadsheet would run such a field as a formula. Easy to remove if a byte-faithful export is wanted. UNVERIFIED by the analyst: whether Sharing.shareAsync resolves only when the sheet is dismissed on Android (rescueExport already shares two files in sequence the same way). | dev: all five steps done, 10 commits, tip c8bd38a, 1600/118 per dev, both exit codes 0. New src/services/csvExport.ts (escapeCsvField, guardFormula as ONE function with its own tests, three serialisers, exportCsv); database.ts +62 and 0 deletions: getAllDailyLogForExport at line 1216 (after getWeightHistory), getAllMealsForExport at 1751 (after getWeeklyMealPlan), getAllWorkoutSetsForExport at 3382 (after getWorkoutHistory), import block untouched; SettingsScreen +43. Headers exactly as the decision lists them. No existing test edited; the existing Settings suites needed no new mock entries. exportCsv checks isAvailableAsync first, reads all three tables (a reader error throws and nothing is written), then per file writes to cacheDirectory and awaits the share; a failure is recorded and the next file still goes out; all three failing throws. A dismissed share sheet cannot be detected and is not reported as failed.",
-      "securityReview": "APPROVE (e6fb6e6..c8bd38a, read through git at the tip; nothing run): the three readers are constant SQL with no parameters, read-only, with a fixed ORDER BY; the database.ts diff is three hunks of additions only, no existing function and no import touched; quoting covers comma, double quote, CR and LF with quotes doubled, so a stored value cannot break out of its field; the formula guard covers = + - @ TAB CR, runs before quoting, and every text column goes through escapeCsvField; it branches on the runtime typeof, so text stored in a number column by a restored backup is guarded too and only real numbers skip it; the export never writes to the database; each path is the cache directory constant plus one of three literal names; a rejected write or share ends in an alert that names the files, a total failure in CSV export failed; the console.warn logs only the file name and the error. Notes: the three reads are not one snapshot (a write between them could leave the files out of step); cacheDirectory null gives a bare relative name whose write fails loudly; the CSV files with health data stay in the app-private cache until the next export; two taps in one frame could start two exports that write the same files (harmless); guarded text shows a visible leading apostrophe after import; Excel in a semicolon-delimiter locale may not split on commas (usability)."
+      "securityReview": "APPROVE (e6fb6e6..c8bd38a, read through git at the tip; nothing run): the three readers are constant SQL with no parameters, read-only, with a fixed ORDER BY; the database.ts diff is three hunks of additions only, no existing function and no import touched; quoting covers comma, double quote, CR and LF with quotes doubled, so a stored value cannot break out of its field; the formula guard covers = + - @ TAB CR, runs before quoting, and every text column goes through escapeCsvField; it branches on the runtime typeof, so text stored in a number column by a restored backup is guarded too and only real numbers skip it; the export never writes to the database; each path is the cache directory constant plus one of three literal names; a rejected write or share ends in an alert that names the files, a total failure in CSV export failed; the console.warn logs only the file name and the error. Notes: the three reads are not one snapshot (a write between them could leave the files out of step); cacheDirectory null gives a bare relative name whose write fails loudly; the CSV files with health data stay in the app-private cache until the next export; two taps in one frame could start two exports that write the same files (harmless); guarded text shows a visible leading apostrophe after import; Excel in a semicolon-delimiter locale may not split on commas (usability).",
+      "regressionProof": "tester APPROVE r0: each step's tests are red on the stub or pre-feature source (18 of 28 for the escaping helper, 14 of 14 serialisers, 7 of 10 readers, 10 of 11 write-and-share, 7 of 7 Settings) and green at c8bd38a; every pass-by-design case goes red under a one-line mutation. Round trip on the real sql.js engine through a parser the tester wrote fresh: exercise names and recipe titles with comma, double quote, lone CR, lone LF, CRLF, leading and trailing spaces, tab, umlauts and sharp s, emoji, empty string, a lone quote, a trailing backslash, a 100 000-character field, an embedded U+FEFF, and titles starting with = - + @ TAB; numbers 0, -2.5, 1/3, 0.1+0.2, 1e21, 1e-7 - every field came back identical apart from the documented rules (guard apostrophe, NULL to empty). Bytes: BOM EF BB BF once at the start, every line ends in CRLF, an empty input gives BOM + header + CRLF exactly. 400 daily_log rows from 2019 to 2024 all exported in date order with exactly six columns; daily_log has exactly three *_completed columns and all are exported; a meal whose recipe row is missing keeps date, meal type and tick with empty title and macros; an archived recipe keeps its title and macros. 50 000 set rows serialise in about 70 ms (3.7 MB). The guard is one function called once. Scope: exactly eight files; database.ts additions only in three places; test diff adds files only. typecheck exit 0 at the tip and at the stub commit 83cb3f2; 1600/118 (the tester read the totals through grep, so the full-suite exit code is the developer's and the orchestrator's at merge). DISCREPANCY to note: the tester says the reader tests were red on a TypeError (function missing) at 5aafc11, the developer says stubs returning [] existed there and the failures were on values; typecheck was reported clean at every commit by the developer."
     },
     "342": {
       "lane": "A",
@@ -550,7 +552,9 @@
     "SMALL, for the HUMAN (#339 security): Excel in a locale that uses the semicolon as list separator (German and Swiss settings do) may open the comma-separated files in one column; Google Sheets, which the device check uses, splits on commas",
     "SMALL (#339 security): the three CSV files with health data stay in the app-private cache directory after sharing until the next export overwrites them or the OS reclaims the cache",
     "SMALL (#339 security): the Export as CSV handler reads the busy flag from the render closure, so two taps within one frame could start two exports writing the same cache files (harmless; a ref would close it)",
-    "SMALL (#339 security): the three export readers run as three separate reads, not one snapshot (same class as #449)"
+    "SMALL (#339 security): the three export readers run as three separate reads, not one snapshot (same class as #449)",
+    "SMALL (#339 tester): is_consumed and the three completion flags are written to the CSV as stored, so a hand-edited or restored value such as 2 comes out as 2 (the app only stores 0 and 1)",
+    "SMALL, for the HUMAN (#339 tester + orchestrator): the CSV formula guard is not in the decision: a text field starting with = + - @ TAB or CR is written with a leading apostrophe ('-5 min bowl' becomes '-5 min bowl with an apostrophe in front, visible in the spreadsheet); it is one function, guardFormula in csvExport.ts, called once"
   ],
   "log": [
     {
@@ -746,6 +750,10 @@
     {
       "at": "2026-10-09T08:54:58Z",
       "event": "#339 security APPROVE on c8bd38a (tester still running). Trial merge of lane C into the integration branch (git merge-tree): no conflicts"
+    },
+    {
+      "at": "2026-10-09T08:58:48Z",
+      "event": "#339 ready (tester APPROVE r0, security APPROVE, 1600/118). Lane C is out of issues (2 done, 0 parked, 1 round trip on #338) -> cleanup dispatched over caea6aa..c8bd38a (29 commits)"
     }
   ],
   "aheadAnalysis": {
