@@ -359,12 +359,21 @@ export interface TrendPoint {
  * per weigh-in; days without one are not represented and do not change alpha.
  */
 export function ewmaTrend(points: { date: string; weight: number }[]): TrendPoint[] {
-  return [];
+  const out: TrendPoint[] = [];
+  for (const p of points) {
+    const prev = out.length > 0 ? out[out.length - 1].trend : p.weight;
+    out.push({
+      date: p.date,
+      weight: p.weight,
+      trend: prev + TREND_ALPHA * (p.weight - prev),
+    });
+  }
+  return out;
 }
 
 /** Trend entries that are shown: those from the TREND_MIN_POINTS-th weigh-in on. */
 export function visibleTrend<T>(points: T[]): T[] {
-  return [];
+  return points.slice(TREND_MIN_POINTS - 1);
 }
 
 // ─────────────────────────────────────────────
