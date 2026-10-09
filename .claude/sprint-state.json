@@ -615,6 +615,11 @@
     {
       "at": "2026-10-09T08:24:47Z",
       "event": "#352 round 2 dev done (b087974..e8c7cbd, eight commits; 1588/113 per dev) -> in_test with a fresh tester; security resumed on the delta. Integration pushed at ad5d3d2 (lane B merged), CI pending"
+    },
+    {
+      "at": "2026-10-09T08:24:56Z",
+      "event": "GitHub CI test check on integration ad5d3d2 (lanes A and B merged): completed success",
+      "sha": "ad5d3d2"
     }
   ],
   "aheadAnalysis": {
@@ -645,7 +650,7 @@
       "typecheck": "pass",
       "tests": 1623,
       "testSuites": 120,
-      "ci": "pending"
+      "ci": "ad5d3d2 test: completed success (GitHub check-runs, read 2026-10-09T08:24Z)"
     }
   }
 }
