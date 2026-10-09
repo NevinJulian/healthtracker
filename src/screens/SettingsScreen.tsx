@@ -1215,6 +1215,24 @@ export default function SettingsScreen() {
     }
   }
 
+  // ── Backup: share an automatic backup ───────────────────────────────────
+
+  async function handleAutoBackupShare(backup: AutoBackupEntry) {
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      const shared = await shareFile(backup.uri, 'Save your HealthTracker backup');
+      if (!shared) {
+        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong.';
+      Alert.alert('Share failed', message);
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
   // ── Backup: restore ─────────────────────────────────────────────────────
 
   function handleBackupRestore() {
@@ -1925,6 +1943,7 @@ export default function SettingsScreen() {
                 </View>
                 <TouchableOpacity
                   style={[styles.autoBackupAction, backupBusy && styles.backupRowDisabled]}
+                  onPress={() => handleAutoBackupShare(backup)}
                   disabled={backupBusy}
                   accessibilityLabel={`Share automatic backup ${title}`}
                   accessibilityRole="button"

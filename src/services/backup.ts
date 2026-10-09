@@ -452,17 +452,22 @@ async function performRestore(uri: string, options: RestoreOptions): Promise<Res
 
 /**
  * Share an existing file URI via the OS share sheet.
- * Used to let the user save the safety snapshot after a restore completes.
+ * Used to let the user save the safety snapshot after a restore completes,
+ * and to share an automatic backup.
  *
- * @param uri - A file:// URI returned by writeSafetySnapshot or exportBackup.
+ * @param uri - A file:// URI returned by writeSafetySnapshot, exportBackup or listAutoBackups.
+ * @param dialogTitle - Title of the share sheet.
  * @returns true when the share sheet was presented, false when sharing is unavailable.
  */
-export async function shareFile(uri: string, _dialogTitle?: string): Promise<boolean> {
+export async function shareFile(
+  uri: string,
+  dialogTitle = 'Save your safety backup'
+): Promise<boolean> {
   const sharingAvailable = await Sharing.isAvailableAsync();
   if (!sharingAvailable) return false;
   await Sharing.shareAsync(uri, {
     mimeType: 'application/json',
-    dialogTitle: 'Save your safety backup',
+    dialogTitle,
     UTI: 'public.json',
   });
   return true;
