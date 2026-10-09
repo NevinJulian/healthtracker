@@ -120,7 +120,8 @@
       "commits": [],
       "title": "last session's performance as a prefill on set inputs",
       "decisionSource": "owner comment 6070869800 on #337: last working set of the most recent session before today; line 'Last time: 80 kg x 8 · 3 days ago' above the inputs, tap fills both; placeholders while empty; 'yesterday' / 'N days ago'; no history = no line, empty inputs; today's prefill from today's last set stays; getLastSetForExercise(exercise, beforeDate) on the (exercise, date) index, LIMIT 1",
-      "securityPlan": "required (new query in src/db)"
+      "securityPlan": "required (new query in src/db)",
+      "workOrder": "C:/git/ht-lanes/wo/337.md"
     },
     "338": {
       "lane": "C",
@@ -143,7 +144,8 @@
       "commits": [],
       "title": "CSV export alongside the JSON backup",
       "decisionSource": "owner comment 6070878592 on #339: three files shared one after the other (workout_sets.csv, daily_log.csv, meals.csv), no zip, a dismissed sheet does not stop the next; 'Export as CSV' button below the JSON export; RFC 4180 quoting, UTF-8 with BOM, ISO dates, one header row, empty db = headers only; columns as listed in the comment (set_type working|warmup from #344); built in memory; unit tests for the escaping helper",
-      "securityPlan": "required (filesystem, db reads, user text into files)"
+      "securityPlan": "required (filesystem, db reads, user text into files)",
+      "workOrder": "C:/git/ht-lanes/wo/339.md"
     },
     "342": {
       "lane": "A",
@@ -161,15 +163,23 @@
     "344": {
       "lane": "A",
       "kind": "feature",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "23623e3",
+        "a3f1fcd",
+        "fd43749",
+        "91bf0a7",
+        "da6298c",
+        "10a3f39"
+      ],
       "title": "set types (warm-up / working) per set",
       "decisionSource": "owner comment 6070858497 on #344: working + warm-up only, no RPE; migration v39 ADD COLUMN set_type TEXT (NULL = working, 'warmup'); two-option toggle above Add set, resets to Working on open; Warm-up label in today's list; warm-ups left out of computePRs, bestSetPerDay, progression chart, volume; backups carry the column",
       "securityPlan": "required (src/db, migration, restore)",
       "workOrder": "C:/git/ht-lanes/wo/344.md",
       "deviceCheck": "Expo Go: open a lift's set logger, log one Warm-up and two Working sets for one exercise. The warm-up row shows a Warm-up label, the working rows do not. Open Analytics: that exercise's PR and progression ignore the warm-up. Reopen the logger: the toggle is back on Working.",
-      "notes": "WO ready, no PARK. Verified: last migration is v38 (schema.ts:824); writer _logWorkoutSetImpl database.ts:3251-3272, only caller DashboardScreen.tsx:674; SetLoggerModal :1283-1425; computePRs analyticsHelpers.ts:477, bestSetPerDay :544; no volume sum beyond computePRs.bestVolume. Backup path needs no source change: dumpTable is SELECT * and restore filters rows to the live PRAGMA table_info columns, so no file outside lane A changes. Design: v39 appended; logWorkoutSet gets optional setType ('warmup' written, else NULL; key omitted for working so existing toHaveBeenCalledWith stay valid); helpers skip set_type === 'warmup'; PRSummaryCard hasData = bestWeight !== null. Analyst picks: two-segment toggle between the Add set heading and the inputs, Pill label Warm-up (gold) in the set list, toggle state inside the modal. ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst also picked a warm-up-aware initial weight prefill (last non-warm-up set); removed, because the #344 decision does not mention the prefill and #337's decision says today's prefill from today's last set stays."
+      "notes": "WO ready, no PARK. Verified: last migration is v38 (schema.ts:824); writer _logWorkoutSetImpl database.ts:3251-3272, only caller DashboardScreen.tsx:674; SetLoggerModal :1283-1425; computePRs analyticsHelpers.ts:477, bestSetPerDay :544; no volume sum beyond computePRs.bestVolume. Backup path needs no source change: dumpTable is SELECT * and restore filters rows to the live PRAGMA table_info columns, so no file outside lane A changes. Design: v39 appended; logWorkoutSet gets optional setType ('warmup' written, else NULL; key omitted for working so existing toHaveBeenCalledWith stay valid); helpers skip set_type === 'warmup'; PRSummaryCard hasData = bestWeight !== null. Analyst picks: two-segment toggle between the Add set heading and the inputs, Pill label Warm-up (gold) in the set list, toggle state inside the modal. ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst also picked a warm-up-aware initial weight prefill (last non-warm-up set); removed, because the #344 decision does not mention the prefill and #337's decision says today's prefill from today's last set stays. | dev: 6 commits, 1403/108 per dev; WorkoutSetInput type added; toggle segments have role radio with labels Working / Warm-up; the Pill got accessibilityLabel 'Warm-up set' because Pill hides its text from the accessibility tree; prefill unchanged per the amendment; da6298c repairs a test the same branch added in a3f1fcd (no existing assertion touched). ORCHESTRATOR checked the migration file mechanically: git diff c698da2..10a3f39 -- src/db/schema.ts is 1 added line, 0 removed (v39 after v38) - not an abort condition. Tester and security dispatched in parallel.",
+      "securityReview": "APPROVE (c698da2..10a3f39, read through git): the INSERT binds all 8 values and only the literal 'warmup' or NULL can reach the column; v39 is a static string appended after v38, nothing before it changed; workout_set_log is created only in v33 and no path adds the column outside v39; restoreFromPayload never reads or writes schema_version (listUserTables excludes it), so v39 cannot hit a duplicate column at start-up; runMigrations wraps each migration and its version row in one transaction; the v37 replay for old backups touches only set_index and its index; restore still filters row keys against PRAGMA table_info of the live table; a restored set_type is bound as a value and only ever compared with === 'warmup', any other value counts as a working set; validatePayload still refuses a backup newer than the app; the failed-write Alert is unchanged. Notes: set_type is typed string | null, not a literal union; an older build opening a v39 database ignores the column."
     },
     "347": {
       "lane": "B",
@@ -241,7 +251,7 @@
       "securityPlan": "skip if the diff stays in RecipeEditorScreen.tsx and its tests; decide on the diff",
       "workOrder": "C:/git/ht-lanes/wo/443.md",
       "deviceCheck": "none (decision item 5)",
-      "notes": "WO ready (ahead), no PARK. handleSave is RecipeEditorScreen.tsx:344-429; the count is knowable in the aborted case too (fallback.unmatchedIngredients minus the no-data set, the expression the deadline path already uses). Design: one finish() with a once-flag and a mounted ref; Alert.alert('Saved', msg, [OK -> finish], { cancelable: true, onDismiss: finish }); saving stays true while the Alert is up. Analyst picks to repeat in the report: title Saved, button OK, banner keeps the names in parentheses, the Alert also counts lookups refused by the budget or a 429 pause when the recompute finished (the decision's lead sentence covers any save with ingredients that were not looked up), the Alert still shows after an unmount but then navigates nowhere. Existing assertions that change: saveDeadline.test.tsx:167 and :184 (old banner text)."
+      "notes": "WO ready (ahead), no PARK. handleSave is RecipeEditorScreen.tsx:344-429; the count is knowable in the aborted case too (fallback.unmatchedIngredients minus the no-data set, the expression the deadline path already uses). Design: one finish() with a once-flag and a mounted ref; Alert.alert('Saved', msg, [OK -> finish], { cancelable: true, onDismiss: finish }); saving stays true while the Alert is up. Analyst picks to repeat in the report: title Saved, button OK, banner keeps the names in parentheses, the Alert also counts lookups refused by the budget or a 429 pause when the recompute finished (the decision's lead sentence covers any save with ingredients that were not looked up), the Alert still shows after an unmount but then navigates nowhere. Existing assertions that change: saveDeadline.test.tsx:167 and :184 (old banner text). | dev STOPPED before the fix commit (correctly): with saving kept true while the Alert is up, the existing assertion saveDeadline.test.tsx:95 (no Saving... label after a deadline save) fails. ORCHESTRATOR decision: the assertion stays; it pins that a save never stays stuck on Saving.... saving goes false when the write finishes, as today; a separate closing state disables Save and Cancel and makes handleSave inert while the Alert is up; the developer's own new test changes accordingly in its own commit. Not counted as a round trip (no tester verdict yet). So far: 9dd5480 (banner wording, two listed assertions changed), 1c6136e (failing tests)."
     },
     "444": {
       "lane": "B",
@@ -302,7 +312,12 @@
     "SMALL (#352 analyst): parseMeasure misreads: '1 pinch' -> 1 whole (pinch is not in detectUnit, parseMeasure.ts:275-319; expected a vague 0), '1,5 kg' -> 6000 g (splits on the comma at :275 and adds the parts at :121; expected 1500 g), '1 EL' -> 1 whole (:191; expected 15 g). No TheMealDB measure in the repo is confirmed to hit them; the new URL import normalises before calling parseMeasure",
     "SMALL (#352 analyst): src/db/__tests__/recipeHelpers.test.ts:80-92 asserts the drop of quantity-0 rows against a local copy of the function, so it neither fails nor guards",
     "SMALL (#442 tester): if the load-time getRecipeById check resolved after a fresh import had finished, alreadyInLibrary would flip a clean import's card to In your library; warnings still show; needs a window of milliseconds",
-    "SMALL (#442 tester): RecipeEditorScreen.tsx:663 still says try Recompute in a minute (#443 owns it)"
+    "SMALL (#442 tester): RecipeEditorScreen.tsx:663 still says try Recompute in a minute (#443 owns it)",
+    "SMALL (#344 dev): an exercise with only warm-ups shows both empty states in Analytics (No sets logged yet. in the PR card and No data for this exercise yet. in the chart)",
+    "SMALL (#344 dev): the SetLoggerModal doc comment still says simple form to add a new set (reps + weight in kg) and does not mention the type toggle - for lane A cleanup",
+    "SMALL (#344 dev): the set logger styles around setIndexText and setInputHeading use a raw fontSize: 9 (predates the sprint; token rule)",
+    "SMALL (#344 dev + orchestrator): the shared Pill hides its text from the accessibility tree unless it gets an accessibilityLabel (same shape as the Button finding from sprint 4)",
+    "SMALL (#443 dev): the double-call test in saveDeadline renders a second editor while the first is still mounted; could be two tests"
   ],
   "log": [
     {
@@ -336,12 +351,16 @@
     {
       "at": "2026-10-09T07:42:14Z",
       "event": "#442 ready (tester APPROVE r0, security APPROVE, 1393/108) -> lane D moves to #443, developer dispatched. Filed #449 (backup export not transactional) and #450 (quantity-0 ingredients shown as 0 g / on the shopping list), label found-during-sprint; neither is worked. Orchestrator amendment appended to the #352 work order: the ld+json script scan must be linear (indexOf, stop at the first unclosed tag), because the regex in rule 2 is quadratic on a hostile 3 MB page"
+    },
+    {
+      "at": "2026-10-09T07:45:58Z",
+      "event": "#344 dev done (6 commits, tip 10a3f39, 1403/108 per dev); orchestrator verified schema.ts is +1/-0 against the base -> in_test; security APPROVE already in. Snapshot worktree read-a created at 10a3f39; analysts dispatched for #337 and #339. #443 developer stopped on an existing assertion (saveDeadline.test.tsx:95); orchestrator kept the assertion and changed the design detail (saving released after the write, a separate closing state blocks Save while the Alert is up); developer resumed"
     }
   ],
   "aheadAnalysis": {
-    "337": "waits for #344 ready",
+    "337": "running (analyst reads the snapshot worktree C:/git/ht-lanes/read-a at 10a3f39)",
     "338": "ready",
-    "339": "waits for #344 ready",
+    "339": "running (analyst reads the snapshot worktree C:/git/ht-lanes/read-a at 10a3f39)",
     "342": "ready (amended)",
     "347": "ready",
     "348": "ready",
