@@ -1,15 +1,24 @@
 jest.mock('expo-file-system/legacy', () => {
   const files = new Map<string, { content: string; mtime: number }>();
+  const dirs = new Set<string>();
   let clock = 1_000_000;
 
   const isUnder = (dir: string, uri: string) =>
     uri.startsWith(dir) && !uri.slice(dir.length).includes('/');
+  const withSlash = (uri: string) => (uri.endsWith('/') ? uri : `${uri}/`);
+  const dirExists = (uri: string) => {
+    const dir = withSlash(uri);
+    return dirs.has(dir) || [...files.keys()].some((key) => key.startsWith(dir));
+  };
 
   return {
     __files: files,
+    __dirs: dirs,
     documentDirectory: 'file:///document/',
     cacheDirectory: 'file:///cache/',
-    makeDirectoryAsync: jest.fn(async () => undefined),
+    makeDirectoryAsync: jest.fn(async (uri: string) => {
+      dirs.add(withSlash(uri));
+    }),
     writeAsStringAsync: jest.fn(async (uri: string, content: string) => {
       clock -= 1;
       files.set(uri, { content, mtime: clock });
@@ -28,9 +37,10 @@ jest.mock('expo-file-system/legacy', () => {
     deleteAsync: jest.fn(async (uri: string) => {
       files.delete(uri);
     }),
-    readDirectoryAsync: jest.fn(async (dir: string) =>
-      [...files.keys()].filter((uri) => isUnder(dir, uri)).map((uri) => uri.slice(dir.length))
-    ),
+    readDirectoryAsync: jest.fn(async (dir: string) => {
+      if (!dirExists(dir)) throw new Error(`Location '${dir}' isn't readable or doesn't exist`);
+      return [...files.keys()].filter((uri) => isUnder(dir, uri)).map((uri) => uri.slice(dir.length));
+    }),
     getInfoAsync: jest.fn(async (uri: string) => {
       const file = files.get(uri);
       if (file) {
@@ -42,8 +52,7 @@ jest.mock('expo-file-system/legacy', () => {
           modificationTime: file.mtime,
         };
       }
-      const dir = uri.endsWith('/') ? uri : `${uri}/`;
-      const isDir = [...files.keys()].some((key) => key.startsWith(dir));
+      const isDir = dirExists(uri);
       return { exists: isDir, isDirectory: isDir, uri };
     }),
   };
@@ -73,8 +82,10 @@ import {
 
 const fsMock = FileSystem as unknown as typeof FileSystem & {
   __files: Map<string, { content: string; mtime: number }>;
+  __dirs: Set<string>;
 };
 const files = fsMock.__files;
+const dirs = fsMock.__dirs;
 const deleteAsync = jest.mocked(FileSystem.deleteAsync);
 
 const SAFETY_DIR = 'file:///document/safety-snapshots/';
@@ -87,6 +98,7 @@ function snapshotName(date: Date): string {
 beforeEach(() => {
   jest.clearAllMocks();
   files.clear();
+  dirs.clear();
   jest.mocked(db.getCurrentSchemaVersion).mockResolvedValue(5);
   jest.mocked(db.listUserTables).mockResolvedValue(['daily_log']);
   jest.mocked(db.dumpTable).mockResolvedValue([]);
@@ -242,6 +254,19 @@ describe('runAutoBackupIfDue', () => {
     const saved = JSON.parse(files.get(autoFiles()[0])?.content ?? '{}');
     expect(saved.format).toBe('healthtracker-backup');
     expect(FileSystem.makeDirectoryAsync).toHaveBeenCalledWith(AUTO_DIR, { intermediates: true });
+  });
+
+  it('logs no warning or error on the first run, when no folder exists yet', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await runAutoBackupIfDue(NOW);
+    await writeSafetySnapshot();
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+    warn.mockRestore();
+    error.mockRestore();
   });
 
   it('writes nothing when the newest backup is 23 hours old', async () => {
