@@ -294,7 +294,7 @@ export async function writeSafetySnapshot(): Promise<string> {
   await writeAsStringAsync(fileUri, json);
   if (documentDirectory) {
     try {
-      await pruneSafetySnapshots(dir);
+      await pruneSafetySnapshots(dir, fileName);
     } catch (err) {
       console.warn('[Backup] Failed to prune safety snapshots:', err);
     }
@@ -302,12 +302,12 @@ export async function writeSafetySnapshot(): Promise<string> {
   return fileUri;
 }
 
-async function pruneSafetySnapshots(dir: string): Promise<void> {
-  const names = (await readDirectoryAsync(dir))
-    .filter((name) => SAFETY_NAME_RE.test(name))
+async function pruneSafetySnapshots(dir: string, justWritten: string): Promise<void> {
+  const others = (await readDirectoryAsync(dir))
+    .filter((name) => name !== justWritten && SAFETY_NAME_RE.test(name))
     .sort()
     .reverse();
-  for (const name of names.slice(SAFETY_KEEP)) {
+  for (const name of others.slice(SAFETY_KEEP - 1)) {
     await deleteMatching(dir, name, SAFETY_NAME_RE);
   }
 }
