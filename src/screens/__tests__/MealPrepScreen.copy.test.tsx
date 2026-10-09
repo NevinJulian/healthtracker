@@ -111,7 +111,7 @@ describe('MealPrepScreen copy a meal', () => {
     const { getAllByLabelText, queryAllByLabelText } = await renderScreen();
 
     expect(getAllByLabelText('Copy Chicken Bowl to…')).toHaveLength(1);
-    expect(queryAllByLabelText(/^Copy .* to…$/)).toHaveLength(1);
+    expect(queryAllByLabelText(/^Copy (?!day to…$).* to…$/)).toHaveLength(1);
   });
 
   it('offers the six other visible days and never the source day', async () => {

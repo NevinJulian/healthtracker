@@ -21,6 +21,7 @@ import {
   toggleMealConsumed,
   removeMealFromPlan,
   copyMealToDates,
+  copyDayToDate,
   getRecipes,
   getRecipesIncludingArchived,
   Recipe,
@@ -31,7 +32,7 @@ import {
 } from '../db/database';
 import { checkAndNotifyEmptyInventory } from '../services/notifications';
 import { addDays as addDaysKey } from '../utils/dates';
-import { copyResultMessage } from '../data/copyResult';
+import { copyResultMessage, CopyResult } from '../data/copyResult';
 import {
   Card,
   Row,
@@ -93,6 +94,8 @@ export default function MealPrepScreen() {
   const [copyMealTarget, setCopyMealTarget] = useState<{ planId: number; title: string; date: string } | null>(
     null
   );
+
+  const [copyDaySource, setCopyDaySource] = useState<string | null>(null);
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [planRecipes, setPlanRecipes] = useState<Recipe[]>([]);
@@ -233,13 +236,11 @@ export default function MealPrepScreen() {
     });
   };
 
-  const handleCopyMeal = async (dates: string[]) => {
-    if (!copyMealTarget) return;
-    const { planId } = copyMealTarget;
+  const runCopy = async (copy: () => Promise<CopyResult>, close: () => void) => {
     await runGuarded(async () => {
       try {
-        const result = await copyMealToDates(planId, dates);
-        setCopyMealTarget(null);
+        const result = await copy();
+        close();
         loadData();
         const { title, message } = copyResultMessage(result);
         Alert.alert(title, message);
@@ -248,6 +249,18 @@ export default function MealPrepScreen() {
         Alert.alert('Error', 'Failed to copy. Please try again.');
       }
     });
+  };
+
+  const handleCopyMeal = async (dates: string[]) => {
+    if (!copyMealTarget) return;
+    const { planId } = copyMealTarget;
+    await runCopy(() => copyMealToDates(planId, dates), () => setCopyMealTarget(null));
+  };
+
+  const handleCopyDay = async (dates: string[]) => {
+    if (!copyDaySource || dates.length !== 1) return;
+    const from = copyDaySource;
+    await runCopy(() => copyDayToDate(from, dates[0]), () => setCopyDaySource(null));
   };
 
   const handleToggleConsumed = async (planId: number, currentVal: boolean) => {
@@ -435,6 +448,20 @@ export default function MealPrepScreen() {
                 />
               </View>
 
+              {(lunchPlan || dinnerPlan) && (
+                <View style={styles.assignBtnWrap}>
+                  <TouchableOpacity
+                    style={styles.assignBtn}
+                    onPress={() => setCopyDaySource(dateStr)}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel="Copy day to…"
+                  >
+                    <Text style={styles.assignBtnText}>Copy day to…</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Daily total footer — only when something is consumed */}
               {(totalKcal > 0 || totalProtein > 0) && (
                 <View style={styles.dailyTotal}>
@@ -515,10 +542,21 @@ export default function MealPrepScreen() {
       {copyMealTarget && (
         <CopyTargetModal
           title={`Copy ${copyMealTarget.title} to…`}
+          multiple
           targets={copyTargetsFor(copyMealTarget.date)}
           saving={saving}
           onClose={() => setCopyMealTarget(null)}
           onConfirm={handleCopyMeal}
+        />
+      )}
+
+      {copyDaySource && (
+        <CopyTargetModal
+          title="Copy day to…"
+          targets={copyTargetsFor(copyDaySource)}
+          saving={saving}
+          onClose={() => setCopyDaySource(null)}
+          onConfirm={handleCopyDay}
         />
       )}
     </View>
@@ -672,8 +710,9 @@ function copyTargetsFor(sourceDate: string): CopyTarget[] {
   return targets;
 }
 
-function CopyTargetModal({ title, targets, saving, onClose, onConfirm }: {
+function CopyTargetModal({ title, multiple = false, targets, saving, onClose, onConfirm }: {
   title: string;
+  multiple?: boolean;
   targets: CopyTarget[];
   saving: boolean;
   onClose: () => void;
@@ -681,8 +720,11 @@ function CopyTargetModal({ title, targets, saving, onClose, onConfirm }: {
 }) {
   const [chosen, setChosen] = useState<string[]>([]);
 
-  const toggle = (date: string) =>
-    setChosen((prev) => (prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date]));
+  const choose = (date: string) =>
+    setChosen((prev) => {
+      if (!multiple) return [date];
+      return prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date];
+    });
 
   const orderedChoice = targets.filter((t) => chosen.includes(t.date)).map((t) => t.date);
 
@@ -701,10 +743,10 @@ function CopyTargetModal({ title, targets, saving, onClose, onConfirm }: {
               return (
                 <TouchableOpacity
                   style={[styles.recipeOpt, isSelected && styles.recipeOptSelected]}
-                  onPress={() => toggle(item.date)}
+                  onPress={() => choose(item.date)}
                   disabled={saving}
                   activeOpacity={0.75}
-                  accessibilityRole="checkbox"
+                  accessibilityRole={multiple ? 'checkbox' : 'radio'}
                   accessibilityLabel={item.label}
                   accessibilityState={{ checked: isSelected }}
                 >
