@@ -20,6 +20,7 @@ import * as SQLite from 'expo-sqlite';
 import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, RESTORE_SLOT_DEDUPE_SQL, RESTORE_SET_INDEX_SQL, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
 import { recipes } from '../data/recipes';
+import { shoppingKey, mergedQuantity } from '../data/shoppingMerge';
 import { NUTRITION_GOALS, NutritionGoals } from '../nutrition/goals';
 import type { Sex, ActivityLevel, GoalType } from '../nutrition/tdee';
 import {
@@ -1622,6 +1623,19 @@ export function addShoppingListItem(name: string, total_quantity: number, unit: 
 
 async function _addShoppingListItemImpl(name: string, total_quantity: number, unit: string): Promise<void> {
   const db = getDatabase();
+  const key = shoppingKey(name);
+  if (key !== '' && Number.isFinite(total_quantity)) {
+    const open = await db.getAllAsync<{ id: number; ingredient_name: string; total_quantity: number; unit: string }>(
+      'SELECT id, ingredient_name, total_quantity, unit FROM shopping_list WHERE is_checked = 0 ORDER BY id ASC'
+    );
+    for (const line of open) {
+      if (shoppingKey(line.ingredient_name) !== key) continue;
+      const merged = mergedQuantity(line.total_quantity, line.unit, total_quantity, unit);
+      if (merged === null) continue;
+      await db.runAsync('UPDATE shopping_list SET total_quantity = ? WHERE id = ?', [merged, line.id]);
+      return;
+    }
+  }
   await db.runAsync(
     'INSERT INTO shopping_list (ingredient_name, total_quantity, unit, is_checked) VALUES (?, ?, ?, 0)',
     [name, total_quantity, unit]
