@@ -2390,6 +2390,35 @@ export async function getMostCookedRecipes(limit: number = 5): Promise<CookedRec
   }));
 }
 
+export interface OftenCookedInput {
+  recipe_id: string;
+  title: string;
+  cook_events: number;
+  last_date: string;
+}
+
+export interface OftenCookedRecipe {
+  recipe_id: string;
+  title: string;
+  cookEvents: number;
+  score: number;
+}
+
+export function rankOftenCooked(
+  rows: OftenCookedInput[],
+  today: string,
+  limit: number = 5
+): OftenCookedRecipe[] {
+  return [];
+}
+
+export async function getOftenCookedRecipes(
+  limit: number = 5,
+  today: string = toISODate()
+): Promise<OftenCookedRecipe[]> {
+  return [];
+}
+
 export interface InventorySnapshot {
   /** Total number of distinct recipes currently in stock. */
   recipesInStock: number;
