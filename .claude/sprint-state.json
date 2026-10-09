@@ -1,7 +1,7 @@
 {
   "sprint": 5,
   "startedAt": "2026-10-09T07:24:29Z",
-  "status": "running",
+  "status": "finished",
   "integrationBranch": "sprint/auto-fixes",
   "baseSha": "e4e6e3b",
   "baseline": {
@@ -436,7 +436,8 @@
     451,
     452,
     453,
-    454
+    454,
+    455
   ],
   "pendingFindings": [
     "SMALL (#444 analyst): WeeklyMealPlanItem.is_consumed is typed boolean but getWeeklyMealPlan returns raw 0/1 (database.ts:1719); truthy checks work, === true would not",
@@ -771,6 +772,10 @@
       "at": "2026-10-09T09:01:52Z",
       "event": "lane C cleanup ae52f46 (two constants moved above a docblock in backup.ts; read by the orchestrator, nothing that runs changed) -> merged lane C into integration 664e181, no conflicts; gates green: typecheck exit 0, 1778 tests / 129 suites, exit 0 (baseline on main 1387/107). All four lanes are merged: 10 of 11 issues merged, #352 parked",
       "sha": "664e181"
+    },
+    {
+      "at": "2026-10-09T09:06:05Z",
+      "event": "GitHub CI test check on integration 7d2cbcf (all four lanes merged): completed success. Filed #455 (Sprint 5: small findings, 85 boxes); none worked. SPRINT_REPORT.md written. Sprint finished: 10 of 11 merged, #352 parked after three round trips, no abort condition. NOT opened: the PR - the cold review and the device checks come first and belong to the human"
     }
   ],
   "aheadAnalysis": {
@@ -789,7 +794,8 @@
     "451": "Recipe editor: tapping Recompute or editing a row while a save is pending saves the recipe with partial macros (the #443 analyst's finding, reproduced by the #443 tester: 0/0/0/0 saved instead of 10 kcal / 3 g protein; present before the sprint)",
     "452": "Recipe editor: saving a recipe silently deletes its ingredients that have quantity 0 (DATA-LOSS, present before the sprint; the tested fix sits in the parked #352 commit 76d752f; #442's new wording sends users to exactly that save)",
     "453": "Shopping list: singular and plural names of the same ingredient stay separate lines (the #347 analyst's USER-HITTABLE finding; the decision has no plural handling)",
-    "454": "parseMeasure turns volumes into grams at 1 ml = 1 g for every ingredient ('1 1/2 cups flour' = 360 g), plus fl oz read as 1 ml and three misreads; on main today through the Discover import; found while #352 was tested"
+    "454": "parseMeasure turns volumes into grams at 1 ml = 1 g for every ingredient ('1 1/2 cups flour' = 360 g), plus fl oz read as 1 ml and three misreads; on main today through the Discover import; found while #352 was tested",
+    "455": "Sprint 5: small findings - 85 checkboxes collected from pendingFindings (everything not covered by #449-#454, not resolved inside the sprint; ten concern only the parked #352 branch; three are marked Read this one)"
   },
   "integration": {
     "afterLaneA": {
@@ -819,7 +825,59 @@
       "typecheck": "pass",
       "tests": 1778,
       "testSuites": 129,
-      "ci": "pending"
+      "ci": "7d2cbcf test: completed success (GitHub check-runs, read 2026-10-09T09:03Z)"
     }
+  },
+  "finishedAt": "2026-10-09T09:06:00Z",
+  "smallFindingsIssue": 455,
+  "final": {
+    "integrationCodeTip": "664e181",
+    "typecheck": "pass",
+    "tests": 1778,
+    "testSuites": 129,
+    "baselineTests": 1387,
+    "baselineSuites": 107,
+    "merged": 10,
+    "mergedIssues": [
+      344,
+      337,
+      342,
+      444,
+      347,
+      348,
+      442,
+      443,
+      338,
+      339
+    ],
+    "parked": 1,
+    "parkedIssues": [
+      352
+    ],
+    "blockedLanes": 0,
+    "roundTrips": {
+      "338": 1,
+      "347": 1,
+      "352": 3
+    },
+    "migrations": "v39 appended (ALTER TABLE workout_set_log ADD COLUMN set_type TEXT); schema.ts is +1/-0 against main e4e6e3b",
+    "ciOnPushedTip": "7d2cbcf test: success",
+    "issuesFiled": [
+      449,
+      450,
+      451,
+      452,
+      453,
+      454,
+      455
+    ],
+    "prOpened": false,
+    "outstandingForHuman": [
+      "decision on #452 before #442's wording ships (SPRINT_REPORT.md section 6, item 1)",
+      "cold review (/code-review on main...sprint/auto-fixes in a fresh session)",
+      "device checks in SPRINT_REPORT.md section 7",
+      "open the PR via the GitHub MCP (command in SPRINT_REPORT.md section 5)",
+      "decide what happens to the parked #352 on sprint/lane-d-recipes"
+    ]
   }
 }
