@@ -126,7 +126,10 @@
       "commits": [],
       "title": "automatic rotating local backups",
       "decisionSource": "owner comment 6070877910 on #338: auto-backups folder in documentDirectory; written after a successful start when the newest is older than 24 h or none exists, in the background, failure only logged; newest 7 kept; Settings 'Automatic backups' list newest first with date, time, size, Share and Restore through the existing restore path; pre-restore safety snapshot moves to documentDirectory, newest 3 kept, header comment corrected; manual export unchanged",
-      "securityPlan": "required (backup.ts, filesystem)"
+      "securityPlan": "required (backup.ts, filesystem)",
+      "workOrder": "C:/git/ht-lanes/wo/338.md",
+      "deviceCheck": "Expo Go: after a start, Settings lists one automatic backup. Share opens the share sheet. Restoring it works and your data is still there.",
+      "notes": "WO ready (ahead), no PARK, no file outside lane C. backup.ts uses expo-file-system/legacy throughout; tests need an inline jest.mock with an in-memory file map (rescueExport.test.ts is the pattern). Design: healthtracker-auto-YYYYMMDDTHHmmssZ.json under documentDirectory/auto-backups, newest decided by name, write to .tmp then moveAsync, prune pattern-matching files only (newest 7), files dated more than 1 h ahead ignored for the 24 h check; in-flight guard and a restoreInProgress flag; restoreBackupFromUri(uri, options) extracted from importBackup; safety snapshots to documentDirectory/safety-snapshots (newest 3); runAutoBackupIfDue().catch(log) after setDbReady(true) in App.tsx; shareFile gets an optional dialogTitle. Analyst picks to repeat in the report: section title, row format '8 Oct 2026, 14:03', sizes B/KB/MB with one decimal, text buttons Share and Restore, empty-state text, a restore confirm that names the backup."
     },
     "339": {
       "lane": "C",
@@ -146,18 +149,23 @@
       "commits": [],
       "title": "EWMA-smoothed weight trend line",
       "decisionSource": "owner comment 6070877036 on #342: alpha = 2/(10+1); trend moves only on weigh-in days, nothing interpolated; raw as faint dots, trend solid from the 5th weigh-in, computed over the longest loaded history; card shows kg/week = least-squares slope of the trend over the last 14 days when they hold >= 5 weigh-ins, else a dash; change figure uses trend values; helpers in analyticsHelpers.ts next to rollingAverage; plausibleWeights filters first",
-      "securityPlan": "skip if the diff stays in analyticsHelpers.ts and the Analytics screen; decide on the diff"
+      "securityPlan": "skip if the diff stays in analyticsHelpers.ts and the Analytics screen; decide on the diff",
+      "workOrder": "C:/git/ht-lanes/wo/342.md",
+      "deviceCheck": "Expo Go: the Analytics weight card shows faint dots and a smooth solid line, and the kg/week figure has the sign you'd expect from your last two weeks. Also toggle 30d/90d: the line must not restart at the left edge.",
+      "notes": "WO ready (ahead), no PARK, no database.ts change: the screen already loads getWeightHistory(30) and (90); the trend is computed over history90. The card draws View bars today, no line primitive and no chart package: bars are replaced by dots (percent positioning by calendar day) and a line made of rotated 2px View segments sized from onLayout. Helpers ewmaTrend, visibleTrend, weightRatePerWeek (window = last 14 days counted back from today, x = calendar days, slope x 7), formatWeightRate (U+2212 minus, 0.0 without sign, dash), weightChange for the Weight tile (the card itself has no change figure). ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst's weightChange fell back to the raw last-minus-first whenever the first weigh-in of the 30-day set has index < 4, i.e. for every user in the first month; the decision says trend values, not raw ones, so the tile now uses the earliest and latest weigh-ins of the 30-day set that have a shown trend value and shows a dash otherwise. The existing assertion weightResilience.test.tsx:151-165 (+5.0 from two raw points) therefore changes, keeping its intent. HUMAN: with more than 90 days of data the trend is seeded at the 90-day edge, so early values differ slightly from a full-history trend."
     },
     "344": {
       "lane": "A",
       "kind": "feature",
-      "status": "analysing",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "title": "set types (warm-up / working) per set",
       "decisionSource": "owner comment 6070858497 on #344: working + warm-up only, no RPE; migration v39 ADD COLUMN set_type TEXT (NULL = working, 'warmup'); two-option toggle above Add set, resets to Working on open; Warm-up label in today's list; warm-ups left out of computePRs, bestSetPerDay, progression chart, volume; backups carry the column",
       "securityPlan": "required (src/db, migration, restore)",
-      "workOrder": "C:/git/ht-lanes/wo/344.md"
+      "workOrder": "C:/git/ht-lanes/wo/344.md",
+      "deviceCheck": "Expo Go: open a lift's set logger, log one Warm-up and two Working sets for one exercise. The warm-up row shows a Warm-up label, the working rows do not. Open Analytics: that exercise's PR and progression ignore the warm-up. Reopen the logger: the toggle is back on Working.",
+      "notes": "WO ready, no PARK. Verified: last migration is v38 (schema.ts:824); writer _logWorkoutSetImpl database.ts:3251-3272, only caller DashboardScreen.tsx:674; SetLoggerModal :1283-1425; computePRs analyticsHelpers.ts:477, bestSetPerDay :544; no volume sum beyond computePRs.bestVolume. Backup path needs no source change: dumpTable is SELECT * and restore filters rows to the live PRAGMA table_info columns, so no file outside lane A changes. Design: v39 appended; logWorkoutSet gets optional setType ('warmup' written, else NULL; key omitted for working so existing toHaveBeenCalledWith stay valid); helpers skip set_type === 'warmup'; PRSummaryCard hasData = bestWeight !== null. Analyst picks: two-segment toggle between the Add set heading and the inputs, Pill label Warm-up (gold) in the set list, toggle state inside the modal. ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst also picked a warm-up-aware initial weight prefill (last non-warm-up set); removed, because the #344 decision does not mention the prefill and #337's decision says today's prefill from today's last set stays."
     },
     "347": {
       "lane": "B",
@@ -167,7 +175,10 @@
       "commits": [],
       "title": "shopping list: combine duplicate ingredients and group by aisle",
       "decisionSource": "owner comment 6070880122 on #347: merge at write time, no migration; into an existing unchecked line with the same normalised name and a compatible unit; checked lines never merged into; normalised = lowercase, trimmed, text before the first comma, spaces collapsed; g/kg and ml/l merge converted to the line's unit, other units only with themselves; existing lines not merged after the fact; aisles by keyword lookup in code (German + English), fixed section order, unmatched = Other; items alphabetical inside a section; units.ts may be used but not changed",
-      "securityPlan": "required (shopping-list writes in src/db)"
+      "securityPlan": "required (shopping-list writes in src/db)",
+      "workOrder": "C:/git/ht-lanes/wo/347.md",
+      "deviceCheck": "Expo Go: add two recipes that share an ingredient (e.g. two with olive oil or garlic cloves). The list shows one line with the summed amount, under its section.",
+      "notes": "WO ready (ahead), no PARK. The merge goes inside _addShoppingListItemImpl (database.ts:1623), so the single-item path and addRecipeToShoppingList (one transaction, loops the Impl) both get it and RecipeDetailScreen.tsx (lane D, the only caller) does not change. units.ts covers neither kg nor l (convertToGrams returns 0 for both), so the factors live in a new src/data/shoppingMerge.ts; aisles in a new src/data/aisles.ts (about 250-350 keywords, longest match wins, keywords of 3 chars or fewer match as whole words). The screen already groups by 6 inferred categories; those keyword lists are replaced. Analyst picks to repeat in the report: the merged line keeps its own name and unit, sum rounded to 3 decimals; merge target is the lowest-id unchecked compatible line; inside a section unchecked items come first and checked ones last, each part alphabetical (the decision says alphabetical inside each section; checked-last is today's behaviour, kept); empty key or non-finite quantity inserts as today."
     },
     "348": {
       "lane": "B",
@@ -177,7 +188,10 @@
       "commits": [],
       "title": "copy meal, copy day, often cooked",
       "decisionSource": "owner comment 6070880760 on #348: 'Copy to...' on a planned slot offers the next 7 days, same recipe into the same slot where empty, occupied skipped and counted, copies unticked; 'Copy day to...' copies Lunch and Dinner into the empty slots of one chosen day; Log Cooked Meal picker shows the 5 recipes with the highest cook events x 0.95^(days since last cooked) from cook_log in an 'Often cooked' section; quick add is #447, saved meals and time-of-day ranking not planned",
-      "securityPlan": "required (meal-plan writes in src/db)"
+      "securityPlan": "required (meal-plan writes in src/db)",
+      "workOrder": "C:/git/ht-lanes/wo/348.md",
+      "deviceCheck": "Expo Go: plan Lunch on day 1 and on day 2 (a different recipe), copy day 1's lunch to days 2, 3 and 4. Expect 'Copied 2 meals. Skipped 1 already planned.', days 3 and 4 filled and unticked, day 2 unchanged. Then open Log Cooked Meal: your usual recipes sit under Often cooked at the top, each once.",
+      "notes": "WO ready (ahead), no PARK, no migration. Verified: a slot is (date, meal_type) with a unique index (schema.ts:729) that restore drops briefly, so the copy SELECTs for emptiness inside its transaction; assignMealToPlan (database.ts:1760) checks no stock and moves no inventory (stock is a UI-only rule in AssignMealModal, MealPrepScreen.tsx:710); cook_log is one row per cook event. New: copyMealToDates(planId, dates), copyDayToDate(from, to) next to assignMealToPlan; rankOftenCooked + getOftenCookedRecipes next to getMostCookedRecipes. Analyst picks to repeat in the report: 'the next 7 days' = the 7 days the screen shows (today..today+6) minus the source day, so at most 6 targets; a copy does no stock check (the manual assign UI requires stock); result wording via Alert; section recipes are removed from the full list, which gets an All recipes header only when the section shows; archived recipes excluded; ties by later last date, then title, then id."
     },
     "352": {
       "lane": "D",
@@ -187,20 +201,28 @@
       "commits": [],
       "title": "import a recipe from a URL via schema.org JSON-LD",
       "decisionSource": "owner comment 6070883467 on #352: 'Import from URL' action on the Recipes screen with a small dialog; http/https only, 15 s timeout, at most 3 MB, non-2xx or non-HTML = clear error, reuse fetchJson hardening, no new package; every ld+json block incl. arrays and @graph, first object whose @type is or contains Recipe; map name, recipeIngredient, recipeInstructions (string, HowToStep, HowToSection), recipeYield (first number), totalTime or prepTime; unparsed ingredient lines kept as names; opens the editor prefilled, nothing saved until Save, macros from the editor's recompute; no-recipe message; no images, no page nutrition; only plain strings reach the editor",
-      "securityPlan": "required by the decision (untrusted web pages)"
+      "securityPlan": "required by the decision (untrusted web pages)",
+      "workOrder": "C:/git/ht-lanes/wo/352.md",
+      "notes": "WO draft received (ahead), sent back to the analyst to finalise: it called itself a first-pass draft, ran 1481 words, hedged on how tests fail before the code and had a garbled finding. Findings so far: fetchJson is JSON-only, so a separate HTML fetch module copies its timeout/abort pattern; the global fetch in SDK 57 is expo/fetch with a streaming body, so a real 3 MB cap works without a package; parseMeasure takes (name, measure), so a new line splitter src/nutrition/parseIngredientLine.ts is needed; recipe_library has no source column, so the source URL is not stored (would need a migration); the editor takes only {recipeId?} today, new param draft; rowsToIngredients (RecipeEditorScreen.tsx:87) drops rows with quantity <= 0, which would drop unparsed lines at Save, so the work order keeps named rows at quantity 0 (changes every save: analyst asked to verify the downstream consumers)."
     },
     "442": {
       "lane": "D",
       "kind": "bug",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "711b910",
+        "31c2726",
+        "5f0b565",
+        "d0c057d"
+      ],
       "title": "Discover import: not-looked-up recipe cannot be refreshed, alert says Try again in a minute",
       "decisionSource": "owner comment 6070881544 on #442 (latest of 2): no re-import refresh; new alert and card text with a singular form, pointing at the editor; lookups that receive the 429 itself count as not looked up; reopening an imported recipe in Discover says 'In your library'; device check none",
       "securityPlan": "required (src/api)",
       "workOrder": "C:/git/ht-lanes/wo/442.md",
       "deviceCheck": "none (decision item 5: the limit cannot be reached on purpose in Expo Go, tests cover it)",
-      "notes": "WO ready, no PARK, no file outside lane D. Claim verified: notLookedUpSentence (DiscoverDetailScreen.tsx:55-57) is the only source of the Try again in a minute text; a lookup that got the 429 itself returns null at openfoodfacts.ts:189 after setting pausedUntil; the sentinel is never cached. Fix: return 'not-looked-up' in the 429 branch; new singular/plural sentences; In your library subtitle. Existing assertions that change (they pin the replaced behaviour): retryAfter.test.ts:56,74,88 (toBeNull on the 429 receiver) and notLookedUp.test.tsx:47,77,81 (old sentence). Side effect to watch: in the editor, 429 receivers move from the no-data branch into the Not looked up banner (wording is #443's). ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst picked In your library for every no-warning case, which would also change a fresh clean import; decision item 4 is only about a recipe already in the library, so the subtitle is shown only when the load effect found the recipe or dbImportRecipe returned false, and a fresh clean import keeps Macros computed from local data."
+      "notes": "WO ready, no PARK, no file outside lane D. Claim verified: notLookedUpSentence (DiscoverDetailScreen.tsx:55-57) is the only source of the Try again in a minute text; a lookup that got the 429 itself returns null at openfoodfacts.ts:189 after setting pausedUntil; the sentinel is never cached. Fix: return 'not-looked-up' in the 429 branch; new singular/plural sentences; In your library subtitle. Existing assertions that change (they pin the replaced behaviour): retryAfter.test.ts:56,74,88 (toBeNull on the 429 receiver) and notLookedUp.test.tsx:47,77,81 (old sentence). Side effect to watch: in the editor, 429 receivers move from the no-data branch into the Not looked up banner (wording is #443's). ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst picked In your library for every no-warning case, which would also change a fresh clean import; decision item 4 is only about a recipe already in the library, so the subtitle is shown only when the load effect found the recipe or dbImportRecipe returned false, and a fresh clean import keeps Macros computed from local data. | dev: 4 commits, 1393/108 per dev. fetchFromOFF returns the sentinel after the 429 branch sets the pause; one sentence function for Alert and card; new alreadyInLibrary state set in exactly two places. Existing assertions changed as listed in the work order (retryAfter.test.ts:56,74,88 toBeNull -> 'not-looked-up'; the NOT_LOOKED_UP constant at notLookedUp.test.tsx:47). BEYOND THE WORK ORDER: the already-in-library effect's dynamic import('../db/database') was replaced by a static import of getRecipeById, because under jest the dynamic import throws and the empty catch swallowed it, so the reopen path could not be tested; same module is already imported statically in that file. Tester asked to judge it.",
+      "securityReview": "running in parallel with the tester on c698da2..d0c057d"
     },
     "443": {
       "lane": "D",
@@ -210,20 +232,28 @@
       "commits": [],
       "title": "Recipe editor: save-deadline notice is set on a screen that closes at once",
       "decisionSource": "owner comment 6070882693 on #443: Alert after the save and before the editor closes when ingredients were not looked up (deadline or aborted recompute), singular form, editor closes on dismiss; no Alert when every lookup finished; banner text 'Not looked up yet. Tap Recompute later.'; lookups stay sequential; device check none",
-      "securityPlan": "skip if the diff stays in RecipeEditorScreen.tsx and its tests; decide on the diff"
+      "securityPlan": "skip if the diff stays in RecipeEditorScreen.tsx and its tests; decide on the diff",
+      "workOrder": "C:/git/ht-lanes/wo/443.md",
+      "deviceCheck": "none (decision item 5)",
+      "notes": "WO ready (ahead), no PARK. handleSave is RecipeEditorScreen.tsx:344-429; the count is knowable in the aborted case too (fallback.unmatchedIngredients minus the no-data set, the expression the deadline path already uses). Design: one finish() with a once-flag and a mounted ref; Alert.alert('Saved', msg, [OK -> finish], { cancelable: true, onDismiss: finish }); saving stays true while the Alert is up. Analyst picks to repeat in the report: title Saved, button OK, banner keeps the names in parentheses, the Alert also counts lookups refused by the budget or a 429 pause when the recompute finished (the decision's lead sentence covers any save with ingredients that were not looked up), the Alert still shows after an unmount but then navigates nowhere. Existing assertions that change: saveDeadline.test.tsx:167 and :184 (old banner text)."
     },
     "444": {
       "lane": "B",
       "kind": "bug",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "fee7eea",
+        "eb6295b",
+        "14194af"
+      ],
       "title": "MealPrep Remove confirm promises a refund that is not given",
       "decisionSource": "owner comment 6070879398 on #444: confirm text depends on the inventory pointer; with a pointer unchanged, without one 'This meal will be removed from your nutrition history.'; the plan item on the screen gets consumed_from_inventory_id",
       "securityPlan": "skip if the diff is MealPrepScreen.tsx plus tests as the work order says (a text branch on a field already loaded); decide on the diff",
       "workOrder": "C:/git/ht-lanes/wo/444.md",
       "deviceCheck": "Expo Go: cook one portion of a recipe, assign it to two slots and tick both. Removing the second one shows the text without the inventory sentence. (Also remove the first, which has a pointer, and see the old text.)",
-      "notes": "WO ready, no PARK. Claim verified: confirmRemove (MealPrepScreen.tsx:510-521) shows the refund sentence for every eaten row; _creditPortion is a no-op on a NULL pointer. The plan item already carries consumed_from_inventory_id (type at database.ts:92-106, loader is SELECT *), so no database.ts source change is needed: one text branch in MealPrepScreen.tsx plus tests. The db-level test is a contract pin that passes today by design; the screen test is the fail-then-pass proof. Siblings: none."
+      "notes": "WO ready, no PARK. Claim verified: confirmRemove (MealPrepScreen.tsx:510-521) shows the refund sentence for every eaten row; _creditPortion is a no-op on a NULL pointer. The plan item already carries consumed_from_inventory_id (type at database.ts:92-106, loader is SELECT *), so no database.ts source change is needed: one text branch in MealPrepScreen.tsx plus tests. The db-level test is a contract pin that passes today by design; the screen test is the fail-then-pass proof. Siblings: none.",
+      "securityReview": "skipped: the diff c698da2..14194af is MealPrepScreen.tsx (+14/-5, one text branch on a field the screen already holds) and two test files; no source change in src/db, no data flow, no external input"
     }
   },
   "foundDuringSprint": [],
@@ -233,7 +263,29 @@
     "SMALL (#442 analyst): DiscoverDetailScreen.tsx:131 still says ingredient(s) in the no-data note of the import Alert; the decision gave a singular form only for the not-looked-up text",
     "SMALL (#442 analyst): DiscoverDetailScreen.tsx:160 uses a dynamic import() of ../db/database although importRecipe is already imported statically from it at :17",
     "SMALL (#442 analyst + orchestrator): after a fresh clean import the card says Macros computed from local data even when Open Food Facts supplied values; the decision does not touch that wording, so it stays",
-    "SMALL (#442 analyst): a 5xx first attempt whose retry is refused by a pause still returns null (no data), not not-looked-up; it is not a 429 receiver, so the decision does not cover it"
+    "SMALL (#442 analyst): a 5xx first attempt whose retry is refused by a pause still returns null (no data), not not-looked-up; it is not a 429 receiver, so the decision does not cover it",
+    "SMALL (#344 analyst): DashboardScreen.tsx:239 'total sets logged' will include warm-ups",
+    "SMALL (#344 analyst): an exercise with only warm-ups still appears in the analytics picker (getLoggedExercises) and shows the empty state",
+    "SMALL, for the HUMAN (#344 orchestrator): after a warm-up is logged, the weight field is prefilled from that warm-up (today's last set); a warm-up-aware prefill was proposed by the analyst and removed as outside the decision",
+    "USER-HITTABLE (#347 analyst): 'Onion' and 'Onions', 'Garlic' and 'Garlic cloves' stay separate shopping lines, because the decision defines no plural handling (seed recipes: onion 23 times, onions 13) - to be filed as its own issue once #347 is built",
+    "SMALL (#347 analyst): ShoppingListScreen row display uses toFixed(1) (:162), so 1.05 kg shows as 1.1 kg",
+    "SMALL (#347 analyst): the header comment in ShoppingListScreen.tsx:1-9 is stale",
+    "SMALL (#347 analyst): units.ts exports normaliseIngredientName, easy to confuse with the new shoppingKey",
+    "SMALL (#348 analyst): the CONSUMED TODAY label (MealPrepScreen.tsx:416) shows on every day card",
+    "SMALL (#348 analyst): the Assign picker requires stock but assignMealToPlan does not; the rule is UI only",
+    "SMALL (#348 analyst): getMostCookedRecipes ranks by portions while Often cooked ranks by events",
+    "USER-HITTABLE? (#443 analyst): after an aborted recompute the save fallback reads resolvedLookups.current / noDataLookups.current, which belong to the newest run (reassigned at RecipeEditorScreen.tsx:263/266) and may not match the ingredients being saved - needs a path in normal use before it gets its own issue; ask the #443 tester",
+    "SMALL (#443 analyst): the Recompute button (RecipeEditorScreen.tsx:669) is not disabled while saving, so tapping it can abort the pending run",
+    "DATA-LOSS (#338 analyst): buildBackupPayload (backup.ts:195-197) dumps the tables one by one, not in one transaction; a write between two dumps can give an inconsistent backup file, and a backup at start-up (while the first schedule sync runs) makes that more likely - to be filed as its own issue",
+    "SMALL (#338 analyst): the manual export file name carries only the date, so a second export on the same day overwrites the first cache file",
+    "SMALL (#338 analyst): the document picker's copyToCacheDirectory copies are never cleaned up",
+    "SMALL (#342 analyst): getWeightHistory(30) and (90) run as two queries although the 30-day set is derivable from the 90-day one",
+    "SMALL (#342 analyst): the 'kg this month' tile compares first and last point with no minimum span between them",
+    "SMALL (#352 analyst, to be restated precisely): parseMeasure misreads '1 EL' and '1 Prise' as 1 whole and '1,5 kg' as 6 (parseMeasure.ts:275,285); class depends on whether a TheMealDB measure can hit it",
+    "NOT A BUG, for the report (#352 analyst): the issue body asks to store the source URL; recipe_library has no column for it and the decision does not ask for it, so it is not built (needs a migration)",
+    "SMALL (orchestrator): .claude/agents/developer.md still says Expo SDK 54 / RN 0.81; CLAUDE.md says SDK 57 / RN 0.86 (developers were briefed with the right numbers)",
+    "SMALL (#442 dev): the already-imported effect in DiscoverDetailScreen still swallows every error in an empty catch, which is how the failing dynamic import stayed hidden under jest",
+    "SMALL (#442 dev): the existing assertion '1 ingredient(s) had no nutritional data.' pins the (s) form of the no-data note"
   ],
   "log": [
     {
@@ -255,16 +307,20 @@
     {
       "at": "2026-10-09T07:33:41Z",
       "event": "#442 work order ready (no PARK); orchestrator amendment narrows the In your library subtitle to recipes already in the library -> in_dev, developer dispatched on lane D"
+    },
+    {
+      "at": "2026-10-09T07:39:59Z",
+      "event": "#444 dev done (fee7eea, eb6295b, 14194af; 1390/107 per dev) -> in_test, security skipped (pure UI text branch). #442 dev done (711b910, 31c2726, 5f0b565, d0c057d; 1393/108 per dev) -> in_test, security in parallel. #344 work order ready with an orchestrator amendment (prefill unchanged) -> in_dev on lane A. Ahead work orders ready: #347 #348 #443 #338 #342 (#342 amended: no raw-delta fallback); #352 sent back to its analyst to finalise"
     }
   ],
   "aheadAnalysis": {
     "337": "waits for #344 ready",
-    "338": "running",
+    "338": "ready",
     "339": "waits for #344 ready",
-    "342": "running",
-    "347": "running",
-    "348": "running",
-    "352": "running",
-    "443": "running"
+    "342": "ready (amended)",
+    "347": "ready",
+    "348": "ready",
+    "352": "draft, back with the analyst",
+    "443": "ready"
   }
 }
