@@ -124,7 +124,7 @@ export async function fetchRecipePage(rawUrl: string, signal?: AbortSignal): Pro
 
   try {
     const res = await Promise.race([
-      fetch(url, { signal: controller.signal, headers: PAGE_HEADERS }),
+      fetch(url, { signal: controller.signal, headers: PAGE_HEADERS, credentials: 'omit' }),
       aborted,
     ]);
     if (res.url) checkScheme(res.url);
