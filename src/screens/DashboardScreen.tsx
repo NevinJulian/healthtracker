@@ -17,6 +17,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { daysBetween } from '../utils/dates';
 import {
   DailyLogEntry,
   Exercise,
@@ -41,6 +42,7 @@ import {
   type LatestMeasurements,
   logWorkoutSet,
   getWorkoutSetsForDay,
+  getLastSetForExercise,
   deleteWorkoutSet,
   type WorkoutSet,
   type CorruptJsonColumn,
@@ -1107,6 +1109,7 @@ export default function DashboardScreen() {
         <SetLoggerModal
           exerciseName={activeSetLogger}
           sets={workoutSets[activeSetLogger] ?? []}
+          today={today}
           onClose={() => setActiveSetLogger(null)}
           onAddSet={(reps, weightKg, setType) =>
             handleLogSet(activeSetLogger, reps, weightKg, setType)
@@ -1280,19 +1283,22 @@ function MeasurementsModal({
  * SetLoggerModal — bottom-sheet modal for logging actual sets for one exercise.
  *
  * Shows today's already-logged sets with a delete affordance, and a simple
- * form to add a new set (reps + weight in kg).  Weight is pre-filled from the
- * last logged set for this exercise (or 0 if none).  Uses Verdure tokens
- * throughout; no emoji, outline Ionicons only.
+ * form to add a new set (reps + weight in kg), a set type toggle (working or
+ * warm-up) and the last working set from an earlier session.  Weight starts
+ * from today's last logged set, or empty if there is none.  Uses Verdure
+ * tokens throughout; no emoji, outline Ionicons only.
  */
 function SetLoggerModal({
   exerciseName,
   sets,
+  today,
   onClose,
   onAddSet,
   onDeleteSet,
 }: {
   exerciseName: string;
   sets: WorkoutSet[];
+  today: string;
   onClose: () => void;
   onAddSet: (reps: number, weightKg: number, setType?: 'warmup') => Promise<boolean>;
   onDeleteSet: (id: number) => Promise<void>;
@@ -1304,6 +1310,26 @@ function SetLoggerModal({
     lastSet ? String(lastSet.weight_kg) : ''
   );
   const [saving, setSaving] = useState(false);
+  const [previous, setPrevious] = useState<WorkoutSet | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPrevious(null);
+    (async () => {
+      try {
+        const set = await getLastSetForExercise(exerciseName, today);
+        if (!cancelled) setPrevious(set);
+      } catch (err) {
+        if (!cancelled) console.error('getLastSetForExercise error', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [exerciseName, today]);
+
+  const daysAgo = previous ? daysBetween(previous.date, today) : 0;
+  const when = daysAgo === 1 ? 'yesterday' : daysAgo > 1 ? `${daysAgo} days ago` : '';
 
   const handleAdd = async () => {
     const repsText = repsInput.trim();
@@ -1405,6 +1431,11 @@ function SetLoggerModal({
                 );
               })}
             </View>
+            {previous && (
+              <Text style={styles.lastTimeText}>
+                {`Last time: ${previous.weight_kg} kg × ${previous.reps}${when ? ` · ${when}` : ''}`}
+              </Text>
+            )}
             <View style={styles.setInputRow}>
               <View style={styles.setInputField}>
                 <Text style={styles.setInputLabel}>Reps</Text>
@@ -2018,6 +2049,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: Colors.textMuted,
+    marginBottom: Spacing.sm,
+  },
+  lastTimeText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.sageDeep,
     marginBottom: Spacing.sm,
   },
   setTypeRow: {
