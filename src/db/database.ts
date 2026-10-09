@@ -2404,19 +2404,55 @@ export interface OftenCookedRecipe {
   score: number;
 }
 
+const OFTEN_COOKED_DECAY = 0.95;
+
+/**
+ * Orders recipes by cook events weighted by recency: events times 0.95 per
+ * day since the last cook. A future last date counts as today; a malformed
+ * one scores 0. Ties go to the later last date, then title, then id.
+ */
 export function rankOftenCooked(
   rows: OftenCookedInput[],
   today: string,
   limit: number = 5
 ): OftenCookedRecipe[] {
-  return [];
+  if (!(limit > 0)) return [];
+  return rows
+    .map((r) => {
+      const days = isValidDateKey(r.last_date) ? Math.max(0, _daysBetweenKey(r.last_date, today)) : null;
+      const score = days === null ? 0 : r.cook_events * Math.pow(OFTEN_COOKED_DECAY, days);
+      return { r, score };
+    })
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (a.r.last_date < b.r.last_date ? 1 : a.r.last_date > b.r.last_date ? -1 : 0) ||
+        a.r.title.localeCompare(b.r.title) ||
+        (a.r.recipe_id < b.r.recipe_id ? -1 : a.r.recipe_id > b.r.recipe_id ? 1 : 0)
+    )
+    .slice(0, limit)
+    .map(({ r, score }) => ({
+      recipe_id: r.recipe_id,
+      title: r.title,
+      cookEvents: r.cook_events,
+      score,
+    }));
 }
 
 export async function getOftenCookedRecipes(
   limit: number = 5,
   today: string = toISODate()
 ): Promise<OftenCookedRecipe[]> {
-  return [];
+  const db = getDatabase();
+  const rows = await db.getAllAsync<OftenCookedInput>(
+    `SELECT cl.recipe_id AS recipe_id, r.title AS title,
+            COUNT(*) AS cook_events, MAX(cl.date) AS last_date
+     FROM cook_log cl
+     JOIN recipe_library r ON cl.recipe_id = r.id
+     WHERE r.archived_at IS NULL
+     GROUP BY cl.recipe_id, r.title`
+  );
+  return rankOftenCooked(rows, today, limit);
 }
 
 export interface InventorySnapshot {
