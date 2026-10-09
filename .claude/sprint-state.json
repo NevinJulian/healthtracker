@@ -250,15 +250,21 @@
     "443": {
       "lane": "D",
       "kind": "bug",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "9dd5480",
+        "1c6136e",
+        "b37248a",
+        "45be56c"
+      ],
       "title": "Recipe editor: save-deadline notice is set on a screen that closes at once",
       "decisionSource": "owner comment 6070882693 on #443: Alert after the save and before the editor closes when ingredients were not looked up (deadline or aborted recompute), singular form, editor closes on dismiss; no Alert when every lookup finished; banner text 'Not looked up yet. Tap Recompute later.'; lookups stay sequential; device check none",
       "securityPlan": "skip if the diff stays in RecipeEditorScreen.tsx and its tests; decide on the diff",
       "workOrder": "C:/git/ht-lanes/wo/443.md",
       "deviceCheck": "none (decision item 5)",
-      "notes": "WO ready (ahead), no PARK. handleSave is RecipeEditorScreen.tsx:344-429; the count is knowable in the aborted case too (fallback.unmatchedIngredients minus the no-data set, the expression the deadline path already uses). Design: one finish() with a once-flag and a mounted ref; Alert.alert('Saved', msg, [OK -> finish], { cancelable: true, onDismiss: finish }); saving stays true while the Alert is up. Analyst picks to repeat in the report: title Saved, button OK, banner keeps the names in parentheses, the Alert also counts lookups refused by the budget or a 429 pause when the recompute finished (the decision's lead sentence covers any save with ingredients that were not looked up), the Alert still shows after an unmount but then navigates nowhere. Existing assertions that change: saveDeadline.test.tsx:167 and :184 (old banner text). | dev STOPPED before the fix commit (correctly): with saving kept true while the Alert is up, the existing assertion saveDeadline.test.tsx:95 (no Saving... label after a deadline save) fails. ORCHESTRATOR decision: the assertion stays; it pins that a save never stays stuck on Saving.... saving goes false when the write finishes, as today; a separate closing state disables Save and Cancel and makes handleSave inert while the Alert is up; the developer's own new test changes accordingly in its own commit. Not counted as a round trip (no tester verdict yet). So far: 9dd5480 (banner wording, two listed assertions changed), 1c6136e (failing tests)."
+      "notes": "WO ready (ahead), no PARK. handleSave is RecipeEditorScreen.tsx:344-429; the count is knowable in the aborted case too (fallback.unmatchedIngredients minus the no-data set, the expression the deadline path already uses). Design: one finish() with a once-flag and a mounted ref; Alert.alert('Saved', msg, [OK -> finish], { cancelable: true, onDismiss: finish }); saving stays true while the Alert is up. Analyst picks to repeat in the report: title Saved, button OK, banner keeps the names in parentheses, the Alert also counts lookups refused by the budget or a 429 pause when the recompute finished (the decision's lead sentence covers any save with ingredients that were not looked up), the Alert still shows after an unmount but then navigates nowhere. Existing assertions that change: saveDeadline.test.tsx:167 and :184 (old banner text). | dev STOPPED before the fix commit (correctly): with saving kept true while the Alert is up, the existing assertion saveDeadline.test.tsx:95 (no Saving... label after a deadline save) fails. ORCHESTRATOR decision: the assertion stays; it pins that a save never stays stuck on Saving.... saving goes false when the write finishes, as today; a separate closing state disables Save and Cancel and makes handleSave inert while the Alert is up; the developer's own new test changes accordingly in its own commit. Not counted as a round trip (no tester verdict yet). So far: 9dd5480 (banner wording, two listed assertions changed), 1c6136e (failing tests). | dev done after the design change: 4 commits, tip 45be56c, 1402/108 per dev; saving resets in the existing finally; new closing state set after a successful write when the Alert shows and cleared in finish; Save and Cancel disabled={saving || closing}; handleSave returns at once while closing; finish has a once-flag and a mounted check, called from onPress and onDismiss; showUnmatched now runs on every path. Existing assertions changed: only saveDeadline.test.tsx:167 and :184 (old banner text); line 95 untouched. Dev's own caveat: the Save-disabled test cannot tell the disabled button from the handleSave guard. RecipeEditorScreen suites run three times, identical.",
+      "securityReview": "running in parallel with the tester on d0c057d..45be56c. Not skipped although the diff is one screen file: handleSave is a data-writing path and its logic around the saved macros was reordered"
     },
     "444": {
       "lane": "B",
@@ -377,6 +383,10 @@
     {
       "at": "2026-10-09T07:49:09Z",
       "event": "#344 ready (tester APPROVE r0, security APPROVE, 1403/108) -> lane A moves to #337, developer dispatched"
+    },
+    {
+      "at": "2026-10-09T07:49:21Z",
+      "event": "#443 dev done (9dd5480, 1c6136e, b37248a, 45be56c; 1402/108 per dev) -> in_test, security in parallel (the save path changed)"
     }
   ],
   "aheadAnalysis": {
