@@ -258,6 +258,9 @@ export async function exportBackup(): Promise<string> {
 
 // ─── Safety snapshot (pre-restore) ───────────────────────────────────────────
 
+const SAFETY_DIR_NAME = 'safety-snapshots/';
+const SAFETY_NAME_RE = /^healthtracker-pre-restore-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json$/;
+
 /**
  * Produce a filename-safe ISO-ish timestamp for use in filenames.
  * Replaces ':' with '-' and strips milliseconds so the name is readable on
@@ -265,9 +268,6 @@ export async function exportBackup(): Promise<string> {
  *
  * Example: "2026-06-14T18-05-30"
  */
-const SAFETY_DIR_NAME = 'safety-snapshots/';
-const SAFETY_NAME_RE = /^healthtracker-pre-restore-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json$/;
-
 function safeTimestamp(): string {
   return new Date().toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, '');
 }
