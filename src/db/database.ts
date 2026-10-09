@@ -1800,6 +1800,13 @@ async function _assignMealToPlanImpl(date: string, meal_type: string, recipe_id:
   });
 }
 
+export async function copyMealToDates(
+  planId: number,
+  targetDates: string[]
+): Promise<{ copied: number; skipped: number }> {
+  return { copied: 0, skipped: 0 };
+}
+
 export function removeMealFromPlan(id: number): Promise<void> {
   return _enqueueWrite('removeMealFromPlan', () => _removeMealFromPlanImpl(id));
 }
