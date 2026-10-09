@@ -79,6 +79,15 @@ export interface RestoreResult {
   consumedMealsWithoutRefund?: number;
 }
 
+export interface RestoreOptions {
+  /**
+   * Called when the safety-snapshot write fails. Receives the error message.
+   * Should return true to proceed with the restore anyway, false to abort.
+   * Defaults to always aborting (returns false) when omitted.
+   */
+  onSnapshotFailed?: (errorMessage: string) => Promise<boolean>;
+}
+
 // ─── Pure helpers (exported for unit tests) ──────────────────────────────────
 
 /**
@@ -299,14 +308,7 @@ export async function writeSafetySnapshot(): Promise<string> {
  *          DB restore transaction fails.
  */
 export async function importBackup(
-  options: {
-    /**
-     * Called when the safety-snapshot write fails. Receives the error message.
-     * Should return true to proceed with the restore anyway, false to abort.
-     * Defaults to always aborting (returns false) when omitted.
-     */
-    onSnapshotFailed?: (errorMessage: string) => Promise<boolean>;
-  } = {}
+  options: RestoreOptions = {}
 ): Promise<RestoreResult | null> {
   const result = await DocumentPicker.getDocumentAsync({
     type: 'application/json',
@@ -400,4 +402,29 @@ export async function shareFile(uri: string): Promise<boolean> {
     UTI: 'public.json',
   });
   return true;
+}
+
+// ─── Automatic backups ───────────────────────────────────────────────────────
+
+export const AUTO_BACKUP_KEEP = 7;
+export const SAFETY_KEEP = 3;
+
+export interface AutoBackupEntry {
+  name: string;
+  uri: string;
+  createdAt: Date;
+  sizeBytes: number;
+}
+
+export async function runAutoBackupIfDue(_now: Date = new Date()): Promise<void> {}
+
+export async function listAutoBackups(): Promise<AutoBackupEntry[]> {
+  return [];
+}
+
+export async function restoreBackupFromUri(
+  _uri: string,
+  _options: RestoreOptions = {}
+): Promise<RestoreResult | null> {
+  return null;
 }
