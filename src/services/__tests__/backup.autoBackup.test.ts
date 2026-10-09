@@ -77,6 +77,7 @@ import {
   writeSafetySnapshot,
   runAutoBackupIfDue,
   listAutoBackups,
+  listSafetySnapshots,
   restoreBackupFromUri,
 } from '../backup';
 
@@ -501,6 +502,65 @@ describe('listAutoBackups', () => {
     readDirMock.mockResolvedValue([autoName(new Date(NOW.getTime() - 2 * HOUR)), missing]);
 
     const list = await listAutoBackups();
+
+    expect(list.map((entry) => entry.uri)).toEqual([kept]);
+  });
+});
+
+describe('listSafetySnapshots', () => {
+  beforeEach(() => {
+    if (defaultReadDir) readDirMock.mockImplementation(defaultReadDir);
+  });
+
+  it('is empty when the folder does not exist yet', async () => {
+    await expect(listSafetySnapshots()).resolves.toEqual([]);
+  });
+
+  it('lists valid snapshots newest first with date and size, ignoring other files', async () => {
+    const older = seedSnapshot(daysAgo(3));
+    const newer = seedSnapshot(daysAgo(1));
+    files.set(older, { content: 'a'.repeat(10), mtime: 9_999_999 });
+    files.set(newer, { content: 'b'.repeat(2048), mtime: 1 });
+    files.set(`${SAFETY_DIR}notes.txt`, { content: 'x', mtime: 1 });
+    files.set(`${SAFETY_DIR}${snapshotName(NOW)}.tmp`, { content: 'half', mtime: 1 });
+    files.set(`${SAFETY_DIR}healthtracker-pre-restore-2026-13-41T25-00-00.json`, {
+      content: 'x',
+      mtime: 1,
+    });
+    seedAuto(daysAgo(2));
+
+    const list = await listSafetySnapshots();
+
+    expect(list).toEqual([
+      { name: snapshotName(daysAgo(1)), uri: newer, createdAt: daysAgo(1), sizeBytes: 2048 },
+      { name: snapshotName(daysAgo(3)), uri: older, createdAt: daysAgo(3), sizeBytes: 10 },
+    ]);
+  });
+
+  it('lists the snapshot a restore has just written', async () => {
+    files.set('file:///cache/picked.json', {
+      content: JSON.stringify({
+        format: 'healthtracker-backup',
+        version: 1,
+        appVersion: '1.0.0',
+        schemaVersion: 5,
+        createdAt: '2026-10-01T00:00:00.000Z',
+        tables: {},
+      }),
+      mtime: 1,
+    });
+    jest.mocked(db.restoreFromPayload).mockResolvedValue({ tablesRestored: 0, rowsRestored: 0 });
+
+    const { safetySnapshotUri } = await restoreBackupFromUri('file:///cache/picked.json');
+
+    expect((await listSafetySnapshots()).map((entry) => entry.uri)).toEqual([safetySnapshotUri]);
+  });
+
+  it('drops an entry whose file has gone missing', async () => {
+    const kept = seedSnapshot(daysAgo(1));
+    readDirMock.mockResolvedValue([snapshotName(daysAgo(1)), snapshotName(daysAgo(2))]);
+
+    const list = await listSafetySnapshots();
 
     expect(list.map((entry) => entry.uri)).toEqual([kept]);
   });

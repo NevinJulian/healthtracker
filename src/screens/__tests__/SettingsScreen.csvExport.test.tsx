@@ -70,6 +70,7 @@ jest.mock('../../services/backup', () => ({
   importBackup: jest.fn(),
   shareFile: jest.fn(),
   listAutoBackups: jest.fn(),
+  listSafetySnapshots: jest.fn().mockResolvedValue([]),
   restoreBackupFromUri: jest.fn(),
 }));
 

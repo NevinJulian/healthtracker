@@ -70,6 +70,7 @@ jest.mock('../../services/backup', () => ({
   importBackup: jest.fn(),
   shareFile: jest.fn(),
   listAutoBackups: jest.fn(),
+  listSafetySnapshots: jest.fn(),
   restoreBackupFromUri: jest.fn(),
 }));
 
@@ -77,6 +78,7 @@ import SettingsScreen from '../SettingsScreen';
 import {
   exportBackup,
   listAutoBackups,
+  listSafetySnapshots,
   importBackup,
   shareFile,
   restoreBackupFromUri,
@@ -84,6 +86,7 @@ import {
 } from '../../services/backup';
 
 const mockList = jest.mocked(listAutoBackups);
+const mockSnapshots = jest.mocked(listSafetySnapshots);
 const mockRestore = jest.mocked(restoreBackupFromUri);
 const mockShare = jest.mocked(shareFile);
 
@@ -93,8 +96,16 @@ function entry(iso: string, sizeBytes: number): AutoBackupEntry {
   return { name, uri: `file:///document/auto-backups/${name}`, createdAt, sizeBytes };
 }
 
+function snapshot(iso: string, sizeBytes: number): AutoBackupEntry {
+  const createdAt = new Date(iso);
+  const name = `healthtracker-pre-restore-${iso.replace(/:/g, '-').replace('.000Z', '')}.json`;
+  return { name, uri: `file:///document/safety-snapshots/${name}`, createdAt, sizeBytes };
+}
+
 const NEWER = entry('2026-10-08T14:03:00.000Z', 2048);
 const OLDER = entry('2026-10-07T09:05:00.000Z', 500);
+const SNAPSHOT_NEWER = snapshot('2026-10-06T18:22:00.000Z', 1946);
+const SNAPSHOT_OLDER = snapshot('2026-10-01T07:45:00.000Z', 300);
 
 async function renderSettings() {
   render(<SettingsScreen />);
@@ -106,6 +117,7 @@ async function renderSettings() {
 beforeEach(() => {
   jest.clearAllMocks();
   mockList.mockReset().mockResolvedValue([]);
+  mockSnapshots.mockReset().mockResolvedValue([]);
 });
 
 describe('SettingsScreen automatic backups list', () => {
@@ -438,5 +450,213 @@ describe('SettingsScreen automatic backup restore', () => {
       finish();
     });
     expect(screen.queryByRole('button', { name: 'Back up data', disabled: true })).toBeNull();
+  });
+});
+
+describe('SettingsScreen safety snapshots list', () => {
+  const DATE_TITLE = /^\d{1,2} \w{3} 2026, \d{2}:\d{2}$/;
+
+  it('lists each one below the automatic backups as a Before restore entry with date, time and size', async () => {
+    mockList.mockResolvedValue([NEWER, OLDER]);
+    mockSnapshots.mockResolvedValue([SNAPSHOT_NEWER, SNAPSHOT_OLDER]);
+    await renderSettings();
+
+    expect(screen.getAllByText(DATE_TITLE).map((node) => node.props.children)).toEqual([
+      '8 Oct 2026, 14:03',
+      '7 Oct 2026, 09:05',
+      '6 Oct 2026, 18:22',
+      '1 Oct 2026, 07:45',
+    ]);
+    expect(screen.getByText('Before restore · 1.9 KB')).toBeTruthy();
+    expect(screen.getByText('Before restore · 300 B')).toBeTruthy();
+  });
+
+  it('gives every one a labelled Share and Restore button', async () => {
+    mockSnapshots.mockResolvedValue([SNAPSHOT_NEWER, SNAPSHOT_OLDER]);
+    await renderSettings();
+
+    for (const title of ['6 Oct 2026, 18:22', '1 Oct 2026, 07:45']) {
+      expect(screen.getByRole('button', { name: `Share safety copy ${title}` })).toBeTruthy();
+      expect(screen.getByRole('button', { name: `Restore safety copy ${title}` })).toBeTruthy();
+    }
+  });
+
+  it('shows them when there is no automatic backup yet', async () => {
+    mockSnapshots.mockResolvedValue([SNAPSHOT_NEWER]);
+    await renderSettings();
+
+    expect(screen.getByText(/No automatic backups yet/)).toBeTruthy();
+    expect(screen.getByText('Before restore · 1.9 KB')).toBeTruthy();
+  });
+
+  it('shows no Before restore entry when there are none', async () => {
+    mockList.mockResolvedValue([NEWER]);
+    await renderSettings();
+
+    expect(screen.queryByText(/Before restore/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /safety copy/ })).toBeNull();
+  });
+
+  it('says so when they cannot be read, and still lists the automatic backups', async () => {
+    mockList.mockResolvedValue([NEWER]);
+    mockSnapshots.mockRejectedValue(new Error('no folder'));
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await renderSettings();
+
+    expect(screen.getByText('Could not read the safety copies saved before a restore.')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Restore automatic backup 8 Oct 2026, 14:03' })
+    ).toBeTruthy();
+  });
+
+  it('still lists them when the automatic backups cannot be read', async () => {
+    mockList.mockRejectedValue(new Error('no folder'));
+    mockSnapshots.mockResolvedValue([SNAPSHOT_NEWER]);
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await renderSettings();
+
+    expect(screen.getByText('Could not read the automatic backups.')).toBeTruthy();
+    expect(screen.getByText('Before restore · 1.9 KB')).toBeTruthy();
+  });
+
+  it('disables the row buttons while another backup action is running', async () => {
+    mockSnapshots.mockResolvedValue([SNAPSHOT_NEWER]);
+    jest.mocked(exportBackup).mockReturnValue(new Promise(() => {}));
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Back up data' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Share safety copy 6 Oct 2026, 18:22', disabled: true })
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Restore safety copy 6 Oct 2026, 18:22', disabled: true })
+    ).toBeTruthy();
+  });
+});
+
+describe('SettingsScreen safety snapshot share and restore', () => {
+  const SHARE_NAME = 'Share safety copy 6 Oct 2026, 18:22';
+  const RESTORE_NAME = 'Restore safety copy 6 Oct 2026, 18:22';
+  const RESULT = {
+    tablesRestored: 12,
+    rowsRestored: 340,
+    safetySnapshotUri: 'file:///document/safety-snapshots/s.json',
+  };
+  let alertSpy: jest.SpyInstance;
+
+  type AlertButton = { text: string; onPress?: () => void | Promise<void> };
+  const buttonsOf = (call: number): AlertButton[] => alertSpy.mock.calls[call][2] as AlertButton[];
+
+  beforeEach(() => {
+    mockList.mockResolvedValue([NEWER]);
+    mockSnapshots.mockResolvedValue([SNAPSHOT_NEWER, SNAPSHOT_OLDER]);
+    mockRestore.mockReset().mockResolvedValue(RESULT);
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    alertSpy.mockRestore();
+  });
+
+  it('shares the chosen snapshot file with the safety backup dialog title', async () => {
+    mockShare.mockResolvedValue(true);
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: SHARE_NAME }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockShare).toHaveBeenCalledTimes(1);
+    expect(mockShare).toHaveBeenCalledWith(SNAPSHOT_NEWER.uri, 'Save your safety backup');
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('tells the user when sharing is unavailable', async () => {
+    mockShare.mockResolvedValue(false);
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: SHARE_NAME }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith('Sharing unavailable', expect.any(String));
+  });
+
+  it('reports a failed share', async () => {
+    mockShare.mockRejectedValue(new Error('file vanished'));
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: SHARE_NAME }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith('Share failed', 'file vanished');
+  });
+
+  it('asks for confirmation naming the snapshot before restoring anything', async () => {
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: RESTORE_NAME }));
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][1]).toBe(
+      'Restore the safety copy saved before the restore on 6 Oct 2026, 18:22? This will replace ALL current data with its contents. A safety copy of your current data will be saved first. Continue?'
+    );
+    expect(buttonsOf(0).map((b) => b.text)).toEqual(['Cancel', 'Restore']);
+    expect(mockRestore).not.toHaveBeenCalled();
+  });
+
+  it('restores from that snapshot file through the service, not the file picker', async () => {
+    await renderSettings();
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Restore safety copy 1 Oct 2026, 07:45' })
+    );
+    await act(async () => {
+      await buttonsOf(0).find((b) => b.text === 'Restore')?.onPress?.();
+    });
+
+    expect(mockRestore).toHaveBeenCalledTimes(1);
+    expect(mockRestore).toHaveBeenCalledWith(SNAPSHOT_OLDER.uri, {
+      onSnapshotFailed: expect.any(Function),
+    });
+    expect(jest.mocked(importBackup)).not.toHaveBeenCalled();
+  });
+
+  it('reloads the list after a restore, so the copy it has just saved shows up', async () => {
+    await renderSettings();
+    const saved = snapshot('2026-10-09T08:00:00.000Z', 100);
+    mockSnapshots.mockResolvedValue([saved, SNAPSHOT_NEWER, SNAPSHOT_OLDER]);
+
+    fireEvent.press(screen.getByRole('button', { name: RESTORE_NAME }));
+    await act(async () => {
+      await buttonsOf(0).find((b) => b.text === 'Restore')?.onPress?.();
+    });
+
+    expect(mockSnapshots).toHaveBeenCalledTimes(2);
+    expect(
+      screen.getByRole('button', { name: 'Restore safety copy 9 Oct 2026, 08:00' })
+    ).toBeTruthy();
+  });
+
+  it('reloads the list after a restore from a picked file', async () => {
+    jest.mocked(importBackup).mockResolvedValue(RESULT);
+    await renderSettings();
+    mockSnapshots.mockResolvedValue([snapshot('2026-10-09T08:00:00.000Z', 100)]);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Restore from backup' }));
+    await act(async () => {
+      await buttonsOf(0).find((b) => b.text === 'Restore')?.onPress?.();
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Share safety copy 9 Oct 2026, 08:00' })
+    ).toBeTruthy();
   });
 });
