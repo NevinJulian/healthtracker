@@ -89,6 +89,7 @@ import {
   type RestoreOptions,
   type RestoreResult,
 } from '../services/backup';
+import { exportCsv } from '../services/csvExport';
 import Card from '../components/Card';
 import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
@@ -1218,6 +1219,25 @@ export default function SettingsScreen() {
     }
   }
 
+  // ── Backup: CSV export ──────────────────────────────────────────────────
+
+  async function handleCsvExport() {
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      const { failed } = await exportCsv();
+      if (failed.length > 0) {
+        Alert.alert('CSV export incomplete', `Could not share: ${failed.join(', ')}.`);
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Something went wrong.';
+      Alert.alert('CSV export failed', message);
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
   // ── Backup: share an automatic backup ───────────────────────────────────
 
   async function handleAutoBackupShare(backup: AutoBackupEntry) {
@@ -1915,6 +1935,29 @@ export default function SettingsScreen() {
             <Text style={styles.backupRowTitle}>Back up data</Text>
             <Text style={styles.backupRowSubtitle}>
               Export all your data to a JSON file
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward-outline" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        <View style={styles.sectionDivider} />
+
+        {/* Export as CSV */}
+        <TouchableOpacity
+          style={[styles.backupRow, backupBusy && styles.backupRowDisabled]}
+          onPress={handleCsvExport}
+          disabled={backupBusy}
+          accessibilityLabel="Export as CSV"
+          accessibilityRole="button"
+          activeOpacity={0.7}
+        >
+          <View style={styles.backupIconChip}>
+            <Ionicons name="document-text-outline" size={18} color={Colors.skyDeep} />
+          </View>
+          <View style={styles.backupTextBlock}>
+            <Text style={styles.backupRowTitle}>Export as CSV</Text>
+            <Text style={styles.backupRowSubtitle}>
+              Workout sets, daily log and meals as three spreadsheet files
             </Text>
           </View>
           <Ionicons name="chevron-forward-outline" size={16} color={Colors.textMuted} />
