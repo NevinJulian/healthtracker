@@ -158,3 +158,151 @@ describe('parseIngredientLine unsure lines', () => {
     expect(parseIngredientLine('200 g -')).toEqual({ name: '200 g -', quantity: 0, unit: 'g' });
   });
 });
+
+const expectNameOnly = (line: string) =>
+  expect(parseIngredientLine(line)).toEqual({ name: line, quantity: 0, unit: 'g' });
+
+describe('parseIngredientLine allow-list', () => {
+  it('reads a hyphenated mixed number as a sum, not a range', () => {
+    expect(parseMeasure('flour', '1.5 cup').baseQuantity).toBe(360);
+    expect(parseIngredientLine('1-1/2 cups flour')).toEqual({ name: 'flour', quantity: 360, unit: 'g' });
+    expect(parseIngredientLine('2-1/4 cups flour')).toEqual({ name: 'flour', quantity: 540, unit: 'g' });
+  });
+
+  it.each([
+    ['1 ½ cups sugar', 'sugar', 360],
+    ['1½ cups sugar', 'sugar', 360],
+    ['1 1/2 cups sugar', 'sugar', 360],
+    ['1,5 kg Mehl', 'Mehl', 1500],
+    ['2-3 EL Öl', 'Öl', 37.5],
+    ['500 gramm Mehl', 'Mehl', 500],
+    ['1 Kilo Kartoffeln', 'Kartoffeln', 1000],
+    ['2 Esslöffel Öl', 'Öl', 30],
+    ['3 Teelöffel Zucker', 'Zucker', 15],
+    ['3 tbs sugar', 'sugar', 45],
+    ['2 Liter Wasser', 'Wasser', 2000],
+    ['200 Milliliter Milch', 'Milch', 200],
+    ['1 can (14.5 oz) diced tomatoes', '(14.5 oz) diced tomatoes', 1],
+    ['2 cups of flour', 'flour', 480],
+    ['2 Tassen von Reis', 'Reis', 480],
+    ['2 extra large eggs', 'extra large eggs', 2],
+    ['1 xl egg', 'xl egg', 1],
+    ['3 Eier (Größe M)', 'Eier (Größe M)', 3],
+    ['1 jar pasta sauce', 'jar pasta sauce', 1],
+    ['0,125 l Milch', 'Milch', 125],
+    ['0.500 kg Mehl', 'Mehl', 500],
+  ])('parses %s', (line, name, quantity) => {
+    const result = parseIngredientLine(line);
+    expect(result.name).toBe(name);
+    expect(result.quantity).toBeCloseTo(quantity, 2);
+  });
+
+  it.each([
+    '1,000 g flour',
+    '2,500 g sugar',
+    '1,000 ml milk',
+    '12,000 g Zucker',
+    '1/0 cup flour',
+    '3-2 cups flour',
+    '2-2 cups flour',
+    '1-2-3 cups flour',
+    '1 3/2 cups flour',
+    '1-1.000 g flour',
+    '8 fl oz milk',
+    '1 pint cream',
+    '1 quart stock',
+    '1 gallon water',
+    '1 qt water',
+    '2 pt cream',
+    '2 T butter',
+    '1 t salt',
+    '1 c flour',
+    '2 c sugar',
+    '1 stick butter',
+    '2 inches ginger',
+    '1 inch piece ginger',
+    '1 pkg yeast',
+    '1 package yeast',
+    '1 mug flour',
+    '1 gr. Zwiebel',
+    '1 Becher Sahne',
+    '1 Würfel Hefe',
+    '1 cup/240 ml milk',
+    '100 g/3.5 oz flour',
+  ])('keeps %s as a name without a quantity', (line) => {
+    expectNameOnly(line);
+  });
+});
+
+describe('parseIngredientLine invariants', () => {
+  const MEASURE_WORDS = [
+    'g', 'gram', 'grams', 'gramm', 'kg', 'kilo', 'kilogramm', 'kilogram', 'ml', 'milliliter', 'millilitre',
+    'l', 'L', 'liter', 'litre', 'dl', 'cl', 'cc', 'tsp', 'tsp.', 'TSP', 'teaspoon', 'teaspoons', 'tbsp',
+    'Tbsp.', 'TBSP', 'tablespoon', 'tablespoons', 'tb', 'tbs', 'Tbs', 'TBS', 'tbl', 'cup', 'cups', 'oz',
+    'oz.', 'ounce', 'ounces', 'lb', 'lbs', 'lbs.', 'pound', 'pounds', 'EL', 'EL.', 'Essl.', 'Esslöffel',
+    'TL', 'TL.', 'Teelöffel', 'Tasse', 'Tassen', 'clove', 'cloves', 'Zehe', 'Zehen', 'Dose', 'Päckchen',
+    'Bund', 'Scheibe', 'Stück', 'Stk.', 'head', 'bunch', 'sprig', 'slice', 'piece', 'can', 'tin', 'bag',
+    'pack', 'packet',
+    't', 'T', 't.', 'c', 'C', 'c.', 'fl', 'fl.', 'FL', 'floz', 'fluid', 'pt', 'pts', 'qt', 'qts', 'gal',
+    'gallon', 'gallons', 'pint', 'pints', 'quart', 'quarts', 'in', 'in.', 'inch', 'inches', 'stick',
+    'sticks', 'pkg', 'pkg.', 'pkt', 'package', 'packages', 'mug', 'glass', 'shot', 'drop', 'drops',
+    'splash', 'dash', 'drizzle', 'glug', 'knob', 'handful', 'gr', 'Gr', 'gr.', 'cube', 'bowl', 'spoon',
+    'spoonful', 'scoop', 'dollop', 'sheet', 'strip', 'mg', 'cm', 'mm', 'meter', 'ft', 'yard', 'Glas',
+    'Becher', 'Schuss', 'Spritzer', 'Tropfen', 'Würfel', 'Tafel', 'Riegel', 'Kugel', 'Löffel', 'Schale',
+    'Tüte', 'Beutel', 'Pfund', 'Pfd.', 'Unze', 'Zentimeter', 'Deziliter', 'Zentiliter',
+  ];
+  const QUANTITIES = ['1', '2', '1/2', '1 1/2'];
+
+  it('covers at least 80 words', () => {
+    expect(MEASURE_WORDS.length).toBeGreaterThanOrEqual(80);
+  });
+
+  it.each(MEASURE_WORDS)('never leaves the measure word %s in a counted name', (word) => {
+    for (const quantity of QUANTITIES) {
+      const line = `${quantity} ${word} flour`;
+      const result = parseIngredientLine(line);
+      const unitTaken = result.name === 'flour' && result.quantity > 0;
+      const unsure = result.quantity === 0 && result.name === line;
+      expect({ line, ok: unitTaken || unsure }).toEqual({ line, ok: true });
+    }
+  });
+
+  it.each([
+    '1 to 2 tablespoons oil',
+    '3 to 4 cups flour',
+    '1 and 1/2 cups flour',
+    '1 or 2 eggs',
+    '2 or 3 cloves garlic',
+    '1/2 cup plus 2 tablespoons sugar',
+    '1 tablespoon plus 1 teaspoon oil',
+    '1 cup + 2 tbsp flour',
+    '1 cup/240 ml milk',
+    '100 g/3.5 oz flour',
+    '2 x 400 g Dose Tomaten',
+    '2x400g Tomaten',
+    '3 × 125 g Mozzarella',
+    '2 bis 3 EL Öl',
+    '1 EL plus 1 TL Zucker',
+    '1 EL und 1 TL Zucker',
+    '2 oder 3 Zwiebeln',
+    '1 cup & 2 tbsp flour',
+    '1 EL + 1 TL Honig',
+    '200 g/7 oz butter',
+    '1 cup / 240 ml milk',
+    '1 1/2 cups plus 1 tbsp flour',
+    '2 tbsp + 1 tsp sugar',
+    '1/2 cup and 2 tbsp sugar',
+    '1 kg or 2 lb potatoes',
+    '500 g oder 1 Pfund Mehl',
+    '3 to 4 Zwiebeln',
+    '1 x 400 g can tomatoes',
+    '1 plus 2 eggs',
+    '1 cup to 2 cups water',
+    '1 TL bis 2 TL Salz',
+    '2 tbsp plus extra for the dish',
+    '4 - 5 to 6 cups flour',
+    '1 cup 240 ml milk',
+  ])('keeps %s as the whole line', (line) => {
+    expectNameOnly(line);
+  });
+});
