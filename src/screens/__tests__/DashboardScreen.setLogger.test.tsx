@@ -322,6 +322,37 @@ describe('DashboardScreen set logger last time', () => {
     expect(weight.props.value).toBe('60');
   });
 
+  it('fills reps and weight when the line is tapped, overwriting typed text, without logging', async () => {
+    mockGetLastSet.mockResolvedValue(previousSet({ reps: 8, weight_kg: 82.5 }));
+    const utils = await openLogger();
+    const [repsInput, weightInput] = loggerInputs(utils);
+    fireEvent.changeText(repsInput, '3');
+    fireEvent.changeText(weightInput, '20');
+    fireEvent.press(utils.getByLabelText('Use last time: 8 reps at 82.5 kg, yesterday'));
+    const [reps, weight] = loggerInputs(utils);
+    expect(reps.props.value).toBe('8');
+    expect(weight.props.value).toBe('82.5');
+    expect(mockLogWorkoutSet).not.toHaveBeenCalled();
+  });
+
+  it('fills the inputs with the Warm-up toggle selected and leaves the toggle alone', async () => {
+    mockGetLastSet.mockResolvedValue(previousSet());
+    const utils = await openLogger();
+    fireEvent.press(utils.getByLabelText('Warm-up'));
+    fireEvent.press(utils.getByLabelText('Use last time: 8 reps at 80 kg, yesterday'));
+    const [reps, weight] = loggerInputs(utils);
+    expect(reps.props.value).toBe('8');
+    expect(weight.props.value).toBe('80');
+    expect(utils.getByLabelText('Warm-up').props.accessibilityState.selected).toBe(true);
+  });
+
+  it('exposes the line as a button', async () => {
+    mockGetLastSet.mockResolvedValue(previousSet({ date: '2026-09-16' }));
+    const utils = await openLogger();
+    const line = utils.getByLabelText('Use last time: 8 reps at 80 kg, 3 days ago');
+    expect(line.props.accessibilityRole).toBe('button');
+  });
+
   it('shows no line, logs the error and stays usable when the read rejects', async () => {
     const failure = new Error('read failed');
     mockGetLastSet.mockRejectedValue(failure);
