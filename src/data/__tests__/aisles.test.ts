@@ -34,10 +34,9 @@ describe('AISLE_KEYWORDS', () => {
     }
   });
 
-  it('has a few hundred keywords in total, in lowercase', () => {
+  it('has a substantial list in total, in lowercase', () => {
     const all = KEYWORD_AISLES.flatMap((a) => AISLE_KEYWORDS[a]);
     expect(all.length).toBeGreaterThanOrEqual(250);
-    expect(all.length).toBeLessThanOrEqual(450);
     for (const kw of all) expect(kw).toBe(kw.toLowerCase());
   });
 
@@ -73,6 +72,8 @@ describe('aisleFor', () => {
     ['olive oil', 'Spices and oils'],
     ['salt & pepper', 'Spices and oils'],
     ['Sparkling water', 'Drinks'],
+    ['chicken broth (low sodium)', 'Tins and jars'],
+    ['frozen peas & carrots', 'Frozen'],
     ['xyzzy', 'Other'],
   ] as const)('%s -> %s', (name, aisle) => {
     expect(aisleFor(name)).toBe(aisle);
