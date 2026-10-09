@@ -60,8 +60,10 @@
         337,
         342
       ],
-      "current": 344,
-      "done": [],
+      "current": 337,
+      "done": [
+        344
+      ],
       "parked": []
     },
     "B": {
@@ -115,7 +117,7 @@
     "337": {
       "lane": "A",
       "kind": "feature",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "title": "last session's performance as a prefill on set inputs",
@@ -167,7 +169,7 @@
     "344": {
       "lane": "A",
       "kind": "feature",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "23623e3",
@@ -183,7 +185,8 @@
       "workOrder": "C:/git/ht-lanes/wo/344.md",
       "deviceCheck": "Expo Go: open a lift's set logger, log one Warm-up and two Working sets for one exercise. The warm-up row shows a Warm-up label, the working rows do not. Open Analytics: that exercise's PR and progression ignore the warm-up. Reopen the logger: the toggle is back on Working.",
       "notes": "WO ready, no PARK. Verified: last migration is v38 (schema.ts:824); writer _logWorkoutSetImpl database.ts:3251-3272, only caller DashboardScreen.tsx:674; SetLoggerModal :1283-1425; computePRs analyticsHelpers.ts:477, bestSetPerDay :544; no volume sum beyond computePRs.bestVolume. Backup path needs no source change: dumpTable is SELECT * and restore filters rows to the live PRAGMA table_info columns, so no file outside lane A changes. Design: v39 appended; logWorkoutSet gets optional setType ('warmup' written, else NULL; key omitted for working so existing toHaveBeenCalledWith stay valid); helpers skip set_type === 'warmup'; PRSummaryCard hasData = bestWeight !== null. Analyst picks: two-segment toggle between the Add set heading and the inputs, Pill label Warm-up (gold) in the set list, toggle state inside the modal. ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst also picked a warm-up-aware initial weight prefill (last non-warm-up set); removed, because the #344 decision does not mention the prefill and #337's decision says today's prefill from today's last set stays. | dev: 6 commits, 1403/108 per dev; WorkoutSetInput type added; toggle segments have role radio with labels Working / Warm-up; the Pill got accessibilityLabel 'Warm-up set' because Pill hides its text from the accessibility tree; prefill unchanged per the amendment; da6298c repairs a test the same branch added in a3f1fcd (no existing assertion touched). ORCHESTRATOR checked the migration file mechanically: git diff c698da2..10a3f39 -- src/db/schema.ts is 1 added line, 0 removed (v39 after v38) - not an abort condition. Tester and security dispatched in parallel.",
-      "securityReview": "APPROVE (c698da2..10a3f39, read through git): the INSERT binds all 8 values and only the literal 'warmup' or NULL can reach the column; v39 is a static string appended after v38, nothing before it changed; workout_set_log is created only in v33 and no path adds the column outside v39; restoreFromPayload never reads or writes schema_version (listUserTables excludes it), so v39 cannot hit a duplicate column at start-up; runMigrations wraps each migration and its version row in one transaction; the v37 replay for old backups touches only set_index and its index; restore still filters row keys against PRAGMA table_info of the live table; a restored set_type is bound as a value and only ever compared with === 'warmup', any other value counts as a working set; validatePayload still refuses a backup newer than the app; the failed-write Alert is unchanged. Notes: set_type is typed string | null, not a literal union; an older build opening a v39 database ignores the column."
+      "securityReview": "APPROVE (c698da2..10a3f39, read through git): the INSERT binds all 8 values and only the literal 'warmup' or NULL can reach the column; v39 is a static string appended after v38, nothing before it changed; workout_set_log is created only in v33 and no path adds the column outside v39; restoreFromPayload never reads or writes schema_version (listUserTables excludes it), so v39 cannot hit a duplicate column at start-up; runMigrations wraps each migration and its version row in one transaction; the v37 replay for old backups touches only set_index and its index; restore still filters row keys against PRAGMA table_info of the live table; a restored set_type is bound as a value and only ever compared with === 'warmup', any other value counts as a working set; validatePayload still refuses a backup newer than the app; the failed-write Alert is unchanged. Notes: set_type is typed string | null, not a literal union; an older build opening a v39 database ignores the column.",
+      "regressionProof": "tester APPROVE r0: with schema.ts + database.ts from a3f1fcd, 6 of 7 workoutSetType/backupRoundTrip tests fail on assertions (expected warmup, received undefined; expected version 39, received 38); with the helpers and the Analytics screen from a3f1fcd, 5 fail; with DashboardScreen.tsx from a3f1fcd, the toggle and label tests fail; each pass-before guard goes red under a one-line mutation. Real engine: a database stopped at v38 with two set rows migrates through initDatabase, both rows read NULL, v39 recorded once, a second start does not re-run it, index list identical before and after; writer stores warmup only for the exact string, NULL otherwise ('working' and 'WARMUP' forced through a cast store NULL); set_index 0..5, delete at 1, next is 6, no collision; restore of version-38 payloads with mixed rows gives NULL where the key is missing and leaves schema_version untouched; a rejected write logs nothing twice; unknown set_type values count as working and do not crash. Reader audit: computePRs (incl. bestVolume, the only weight x reps product) and bestSetPerDay (the chart source) filter warm-ups; getLoggedExercises and the N logged count do not rank or sum. SetLoggerModal is mounted only while activeSetLogger !== null, so the toggle resets on close. Prefill code untouched (amendment). No existing expect edited. typecheck passes at the test commit a3f1fcd. 1403/108 (tester reproduced)."
     },
     "347": {
       "lane": "B",
@@ -326,7 +329,9 @@
     "SMALL (#339 analyst): planned future daily_log rows (up to 7 days ahead) appear in daily_log.csv as rows of zeros",
     "SMALL (#337 analyst): the SetLoggerModal doc comment (DashboardScreen.tsx:1283-1284) says the weight is prefilled 'or 0 if none'; it is empty when there is none",
     "USER-HITTABLE? (#337 analyst): switching activeSetLogger directly from one exercise to another would reuse the same modal instance (no key), so typed inputs and the warm-up toggle would carry over; needs a way to switch without closing the modal first - the #344 tester is checking the mount condition",
-    "SMALL (#337 analyst): set history is keyed by the exact exercise name, so renaming an exercise in the plan loses its last-time line and its analytics history"
+    "SMALL (#337 analyst): set history is keyed by the exact exercise name, so renaming an exercise in the plan loses its last-time line and its analytics history",
+    "SMALL (#344 tester): the migration unit test 'leaves a row inserted before v39 as NULL' runs the v39 SQL directly, not through runMigrations (the tester covered the real path with a scratch test)",
+    "SMALL (#344 tester): an unrecognised set_type from a hand-edited backup silently counts as working"
   ],
   "log": [
     {
@@ -368,6 +373,10 @@
     {
       "at": "2026-10-09T07:47:26Z",
       "event": "#339 and #337 work orders ready (#337 starts when #344 is ready; lane C waits for lane A). #339: formula guard flagged for the human as outside the decision"
+    },
+    {
+      "at": "2026-10-09T07:49:09Z",
+      "event": "#344 ready (tester APPROVE r0, security APPROVE, 1403/108) -> lane A moves to #337, developer dispatched"
     }
   ],
   "aheadAnalysis": {
