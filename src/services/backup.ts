@@ -282,8 +282,17 @@ function parseSafetySnapshotName(name: string): Date | null {
   return safetySnapshotName(date) === name ? date : null;
 }
 
+function safetyDir(): string | null {
+  return documentDirectory ? `${documentDirectory}${SAFETY_DIR_NAME}` : null;
+}
+
 function readSafetyFolder(dir: string): Promise<BackupFolder> {
   return readBackupFolder(dir, parseSafetySnapshotName, SAFETY_TMP_RE);
+}
+
+/** Pre-restore safety snapshots on this device, newest first. */
+export function listSafetySnapshots(): Promise<SafetySnapshotEntry[]> {
+  return listBackupFolder(safetyDir(), readSafetyFolder);
 }
 
 /**
@@ -330,9 +339,8 @@ async function removeSafetyLeftovers(dir: string): Promise<void> {
  * ones.
  */
 async function pruneSafetySnapshots(now: Date): Promise<void> {
-  if (!documentDirectory) return;
-  const dir = `${documentDirectory}${SAFETY_DIR_NAME}`;
-  if (!(await getInfoAsync(dir)).exists) return;
+  const dir = safetyDir();
+  if (!dir || !(await getInfoAsync(dir)).exists) return;
 
   const { valid } = await readSafetyFolder(dir);
   const horizon = now.getTime() + CLOCK_SKEW_MS;
@@ -369,6 +377,25 @@ async function readBackupFolder(
   }
   valid.sort((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
   return { valid, leftovers };
+}
+
+async function listBackupFolder(
+  dir: string | null,
+  read: (dir: string) => Promise<BackupFolder>
+): Promise<AutoBackupEntry[]> {
+  if (!dir) return [];
+  const folder = await getInfoAsync(dir);
+  if (!folder.exists) return [];
+
+  const { valid } = await read(dir);
+  const entries: AutoBackupEntry[] = [];
+  for (const { name, time } of valid) {
+    const uri = `${dir}${name}`;
+    const info = await getInfoAsync(uri);
+    if (!info.exists) continue;
+    entries.push({ name, uri, createdAt: time, sizeBytes: info.size });
+  }
+  return entries;
 }
 
 async function writeThenMove(finalUri: string, content: string): Promise<void> {
@@ -533,9 +560,10 @@ async function performRestore(uri: string, options: RestoreOptions): Promise<Res
 /**
  * Share an existing file URI via the OS share sheet.
  * Used to let the user save the safety snapshot after a restore completes,
- * and to share an automatic backup.
+ * and to share an automatic backup or a listed safety snapshot.
  *
- * @param uri - A file:// URI returned by writeSafetySnapshot, exportBackup or listAutoBackups.
+ * @param uri - A file:// URI returned by writeSafetySnapshot, exportBackup,
+ *              listAutoBackups or listSafetySnapshots.
  * @param dialogTitle - Title of the share sheet.
  * @returns true when the share sheet was presented, false when sharing is unavailable.
  */
@@ -563,6 +591,8 @@ export interface AutoBackupEntry {
   createdAt: Date;
   sizeBytes: number;
 }
+
+export type SafetySnapshotEntry = AutoBackupEntry;
 
 const AUTO_DIR_NAME = 'auto-backups/';
 const AUTO_NAME_RE = /^healthtracker-auto-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z\.json$/;
@@ -645,19 +675,6 @@ async function performAutoBackup(now: Date): Promise<void> {
 }
 
 /** Automatic backups on this device, newest first. */
-export async function listAutoBackups(): Promise<AutoBackupEntry[]> {
-  const dir = autoBackupDir();
-  if (!dir) return [];
-  const folder = await getInfoAsync(dir);
-  if (!folder.exists) return [];
-
-  const { valid } = await readAutoBackupFolder(dir);
-  const entries: AutoBackupEntry[] = [];
-  for (const { name, time } of valid) {
-    const uri = `${dir}${name}`;
-    const info = await getInfoAsync(uri);
-    if (!info.exists) continue;
-    entries.push({ name, uri, createdAt: time, sizeBytes: info.size });
-  }
-  return entries;
+export function listAutoBackups(): Promise<AutoBackupEntry[]> {
+  return listBackupFolder(autoBackupDir(), readAutoBackupFolder);
 }
