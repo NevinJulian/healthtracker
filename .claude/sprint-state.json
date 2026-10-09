@@ -121,7 +121,9 @@
       "title": "last session's performance as a prefill on set inputs",
       "decisionSource": "owner comment 6070869800 on #337: last working set of the most recent session before today; line 'Last time: 80 kg x 8 · 3 days ago' above the inputs, tap fills both; placeholders while empty; 'yesterday' / 'N days ago'; no history = no line, empty inputs; today's prefill from today's last set stays; getLastSetForExercise(exercise, beforeDate) on the (exercise, date) index, LIMIT 1",
       "securityPlan": "required (new query in src/db)",
-      "workOrder": "C:/git/ht-lanes/wo/337.md"
+      "workOrder": "C:/git/ht-lanes/wo/337.md",
+      "deviceCheck": "Expo Go: open the logger for an exercise you logged on an earlier day. The line shows that session's last working set (not a warm-up), and tapping it fills both fields. An exercise you never logged shows no line.",
+      "notes": "WO ready (analysed on the snapshot of #344 at 10a3f39), no PARK, no file outside lane A, no migration. New getLastSetForExercise + exported WORKOUT_LAST_SET_SQL directly after getWorkoutHistory in database.ts: exercise = ? AND date < ? AND (set_type IS NULL OR set_type <> 'warmup') ORDER BY date DESC, set_index DESC LIMIT 1; an EXPLAIN QUERY PLAN test pins the (exercise, date) index. The modal gets a today prop (the Dashboard's render-time value, the one handleLogSet writes with), fetches in an effect with a cancelled flag, shows no line while loading or after a failed read. Analyst picks to repeat in the report: when the most recent earlier day holds only warm-ups the line shows the last working set of the next older day that has one (reading of 'last working set of the most recent session', warm-ups never count); line text 'Last time: 80 kg x 8' (U+00D7) with a middle dot and yesterday / N days ago, no month or year forms; weight printed like the set list (80, 82.5); the line sits between the toggle and the inputs; tapping overwrites typed text and does not log; with a set already logged today only Reps shows a placeholder; exercise names match exactly as stored."
     },
     "338": {
       "lane": "C",
@@ -145,7 +147,9 @@
       "title": "CSV export alongside the JSON backup",
       "decisionSource": "owner comment 6070878592 on #339: three files shared one after the other (workout_sets.csv, daily_log.csv, meals.csv), no zip, a dismissed sheet does not stop the next; 'Export as CSV' button below the JSON export; RFC 4180 quoting, UTF-8 with BOM, ISO dates, one header row, empty db = headers only; columns as listed in the comment (set_type working|warmup from #344); built in memory; unit tests for the escaping helper",
       "securityPlan": "required (filesystem, db reads, user text into files)",
-      "workOrder": "C:/git/ht-lanes/wo/339.md"
+      "workOrder": "C:/git/ht-lanes/wo/339.md",
+      "deviceCheck": "Expo Go: export, save the three files and open meals.csv in Google Sheets. Umlauts and recipe names with commas are intact. On Android also check that the three share sheets appear one after the other.",
+      "notes": "WO ready (ahead), no PARK, no file outside lane C, no migration. New src/services/csvExport.ts (pure escapeCsvField, buildCsv and three serialisers, separate from exportCsv which reads, writes and shares), three new unbounded ordered readers in database.ts next to their related readers, one button in SettingsScreen.tsx; backup.ts and App.tsx untouched (shareFile is not reused, it hardcodes the JSON mime type). Verified: created_at is stored as toISOString(); recipe macros are INTEGER and already per serving; recipes are only archived, never hard-deleted, so a missing recipe can only come from a restored backup (title and macros then written empty). daily_log exports date, body_weight, water_ml, walk_completed, hammer_completed, fasting_completed; left out: the two task labels, is_rest_day, is_meal_prep_day and both JSON columns. Analyst picks to repeat in the report: CRLF line ends with a final CRLF; NULL and non-finite numbers written empty, flags as 0/1; set_type written as working for anything that is not warmup; row order (sets by date, exercise, set_index; daily log by date, including the planned future rows; meals by date, meal type, id); files in cacheDirectory, overwritten each run; dialog title Save <filename>; partial failure shows CSV export incomplete naming the files, total failure CSV export failed, full success no message; the button shares backupBusy. FOR THE HUMAN, NOT IN THE DECISION: a FORMULA GUARD - a text field starting with = + - @ TAB or CR gets a leading apostrophe before quoting (numbers are never touched), so a recipe titled -5 min bowl is exported with an apostrophe in front. The decision says RFC 4180 quoting and that names stay intact; the guard is there because recipe titles can come from the web (TheMealDB, URL import) and a spreadsheet would run such a field as a formula. Easy to remove if a byte-faithful export is wanted. UNVERIFIED by the analyst: whether Sharing.shareAsync resolves only when the sheet is dismissed on Android (rescueExport already shares two files in sequence the same way)."
     },
     "342": {
       "lane": "A",
@@ -317,7 +321,12 @@
     "SMALL (#344 dev): the SetLoggerModal doc comment still says simple form to add a new set (reps + weight in kg) and does not mention the type toggle - for lane A cleanup",
     "SMALL (#344 dev): the set logger styles around setIndexText and setInputHeading use a raw fontSize: 9 (predates the sprint; token rule)",
     "SMALL (#344 dev + orchestrator): the shared Pill hides its text from the accessibility tree unless it gets an accessibilityLabel (same shape as the Button finding from sprint 4)",
-    "SMALL (#443 dev): the double-call test in saveDeadline renders a second editor while the first is still mounted; could be two tests"
+    "SMALL (#443 dev): the double-call test in saveDeadline renders a second editor while the first is still mounted; could be two tests",
+    "SMALL (#339 analyst): shareFile in backup.ts hardcodes the JSON mime type",
+    "SMALL (#339 analyst): planned future daily_log rows (up to 7 days ahead) appear in daily_log.csv as rows of zeros",
+    "SMALL (#337 analyst): the SetLoggerModal doc comment (DashboardScreen.tsx:1283-1284) says the weight is prefilled 'or 0 if none'; it is empty when there is none",
+    "USER-HITTABLE? (#337 analyst): switching activeSetLogger directly from one exercise to another would reuse the same modal instance (no key), so typed inputs and the warm-up toggle would carry over; needs a way to switch without closing the modal first - the #344 tester is checking the mount condition",
+    "SMALL (#337 analyst): set history is keyed by the exact exercise name, so renaming an exercise in the plan loses its last-time line and its analytics history"
   ],
   "log": [
     {
@@ -355,12 +364,16 @@
     {
       "at": "2026-10-09T07:45:58Z",
       "event": "#344 dev done (6 commits, tip 10a3f39, 1403/108 per dev); orchestrator verified schema.ts is +1/-0 against the base -> in_test; security APPROVE already in. Snapshot worktree read-a created at 10a3f39; analysts dispatched for #337 and #339. #443 developer stopped on an existing assertion (saveDeadline.test.tsx:95); orchestrator kept the assertion and changed the design detail (saving released after the write, a separate closing state blocks Save while the Alert is up); developer resumed"
+    },
+    {
+      "at": "2026-10-09T07:47:26Z",
+      "event": "#339 and #337 work orders ready (#337 starts when #344 is ready; lane C waits for lane A). #339: formula guard flagged for the human as outside the decision"
     }
   ],
   "aheadAnalysis": {
-    "337": "running (analyst reads the snapshot worktree C:/git/ht-lanes/read-a at 10a3f39)",
+    "337": "ready",
     "338": "ready",
-    "339": "running (analyst reads the snapshot worktree C:/git/ht-lanes/read-a at 10a3f39)",
+    "339": "ready",
     "342": "ready (amended)",
     "347": "ready",
     "348": "ready",
