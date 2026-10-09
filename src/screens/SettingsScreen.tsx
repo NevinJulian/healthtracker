@@ -84,7 +84,10 @@ import {
   importBackup,
   shareFile,
   listAutoBackups,
+  restoreBackupFromUri,
   type AutoBackupEntry,
+  type RestoreOptions,
+  type RestoreResult,
 } from '../services/backup';
 import Card from '../components/Card';
 import ScreenHeader from '../components/ScreenHeader';
@@ -1235,11 +1238,15 @@ export default function SettingsScreen() {
 
   // ── Backup: restore ─────────────────────────────────────────────────────
 
-  function handleBackupRestore() {
+  function confirmRestore(
+    title: string,
+    message: string,
+    restore: (options: RestoreOptions) => Promise<RestoreResult | null>
+  ) {
     if (backupBusy) return;
     Alert.alert(
-      'Restore from backup',
-      'This will replace ALL current data with the contents of the backup file. A safety copy of your current data will be saved first. Continue?',
+      title,
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -1248,7 +1255,7 @@ export default function SettingsScreen() {
           onPress: async () => {
             setBackupBusy(true);
             try {
-              const result = await importBackup({
+              const result = await restore({
                 onSnapshotFailed: async (errorMessage) => {
                   return new Promise<boolean>((resolve) => {
                     Alert.alert(
@@ -1304,10 +1311,27 @@ export default function SettingsScreen() {
               Alert.alert('Restore failed', message);
             } finally {
               setBackupBusy(false);
+              loadAutoBackups();
             }
           },
         },
       ]
+    );
+  }
+
+  function handleBackupRestore() {
+    confirmRestore(
+      'Restore from backup',
+      'This will replace ALL current data with the contents of the backup file. A safety copy of your current data will be saved first. Continue?',
+      importBackup
+    );
+  }
+
+  function handleAutoBackupRestore(backup: AutoBackupEntry) {
+    confirmRestore(
+      'Restore automatic backup',
+      `Restore the automatic backup from ${formatBackupTitle(backup.createdAt)}? This will replace ALL current data with its contents. A safety copy of your current data will be saved first. Continue?`,
+      (options) => restoreBackupFromUri(backup.uri, options)
     );
   }
 
@@ -1957,6 +1981,7 @@ export default function SettingsScreen() {
                     styles.autoBackupActionRestore,
                     backupBusy && styles.backupRowDisabled,
                   ]}
+                  onPress={() => handleAutoBackupRestore(backup)}
                   disabled={backupBusy}
                   accessibilityLabel={`Restore automatic backup ${title}`}
                   accessibilityRole="button"
