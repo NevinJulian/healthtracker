@@ -101,6 +101,12 @@ describe('fetchRecipePage', () => {
       expect(init.signal).toBeDefined();
     });
 
+    it('does not send stored cookies or credentials', async () => {
+      fetchMock.mockResolvedValue(fakeResponse({ chunks: [bytes(RECIPE_HTML)] }).response);
+      await fetchRecipePage('https://example.com/r');
+      expect(fetchMock.mock.calls[0][1].credentials).toBe('omit');
+    });
+
     it('rejects a redirect that ends on another scheme', async () => {
       fetchMock.mockResolvedValue(fakeResponse({ url: 'ftp://example.com/r', chunks: [bytes(RECIPE_HTML)] }).response);
       const err = await failure(fetchRecipePage('https://example.com/r'));
