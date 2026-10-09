@@ -560,6 +560,11 @@
     {
       "at": "2026-10-09T08:16:36Z",
       "event": "#348 security APPROVE on 3358f01 (tester still running). npm ci ok in worktree lane-c -> #338 in_dev, developer dispatched on lane C. CI test check on the pushed integration tip caea6aa (lane A merged) is in progress"
+    },
+    {
+      "at": "2026-10-09T08:16:46Z",
+      "event": "GitHub CI test check on integration caea6aa (lane A merged): completed success",
+      "sha": "caea6aa"
     }
   ],
   "aheadAnalysis": {
@@ -583,7 +588,7 @@
       "typecheck": "pass",
       "tests": 1460,
       "testSuites": 110,
-      "ci": "pending"
+      "ci": "caea6aa test: completed success (GitHub check-runs, read 2026-10-09T08:16Z)"
     }
   }
 }
