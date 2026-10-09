@@ -1632,6 +1632,7 @@ async function _addShoppingListItemImpl(name: string, total_quantity: number, un
       if (shoppingKey(line.ingredient_name) !== key) continue;
       const merged = mergedQuantity(line.total_quantity, line.unit, total_quantity, unit);
       if (merged === null) continue;
+      if (!Number.isFinite(merged)) break;
       await db.runAsync('UPDATE shopping_list SET total_quantity = ? WHERE id = ?', [merged, line.id]);
       return;
     }
