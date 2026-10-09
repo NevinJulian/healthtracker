@@ -3344,9 +3344,8 @@ export async function getLastSetForExercise(
   exercise: string,
   beforeDate: string
 ): Promise<WorkoutSet | null> {
-  void exercise;
-  void beforeDate;
-  return null;
+  const db = getDatabase();
+  return db.getFirstAsync<WorkoutSet>(WORKOUT_LAST_SET_SQL, [exercise, beforeDate]);
 }
 
 /**
