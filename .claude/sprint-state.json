@@ -245,15 +245,28 @@
     "352": {
       "lane": "D",
       "kind": "feature",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "45dbb7c",
+        "06b0f91",
+        "05a892b",
+        "7eb1e57",
+        "d5e331c",
+        "9f48d9b",
+        "2d5d0ec",
+        "a1c6510",
+        "76d752f",
+        "632b298",
+        "b087974"
+      ],
       "title": "import a recipe from a URL via schema.org JSON-LD",
       "decisionSource": "owner comment 6070883467 on #352: 'Import from URL' action on the Recipes screen with a small dialog; http/https only, 15 s timeout, at most 3 MB, non-2xx or non-HTML = clear error, reuse fetchJson hardening, no new package; every ld+json block incl. arrays and @graph, first object whose @type is or contains Recipe; map name, recipeIngredient, recipeInstructions (string, HowToStep, HowToSection), recipeYield (first number), totalTime or prepTime; unparsed ingredient lines kept as names; opens the editor prefilled, nothing saved until Save, macros from the editor's recompute; no-recipe message; no images, no page nutrition; only plain strings reach the editor",
       "securityPlan": "required by the decision (untrusted web pages)",
       "workOrder": "C:/git/ht-lanes/wo/352.md",
-      "notes": "WO draft received (ahead), sent back to the analyst to finalise: it called itself a first-pass draft, ran 1481 words, hedged on how tests fail before the code and had a garbled finding. Findings so far: fetchJson is JSON-only, so a separate HTML fetch module copies its timeout/abort pattern; the global fetch in SDK 57 is expo/fetch with a streaming body, so a real 3 MB cap works without a package; parseMeasure takes (name, measure), so a new line splitter src/nutrition/parseIngredientLine.ts is needed; recipe_library has no source column, so the source URL is not stored (would need a migration); the editor takes only {recipeId?} today, new param draft; rowsToIngredients (RecipeEditorScreen.tsx:87) drops rows with quantity <= 0, which would drop unparsed lines at Save, so the work order keeps named rows at quantity 0 (changes every save: analyst asked to verify the downstream consumers). | FINAL WO received. Stub pattern stated as a rule; German normalisation before parseMeasure written out (ca./circa, decimal comma, unit words such as EL/TL, vague words such as Prise/etwas give quantity 0 and keep the whole line as the name); parseMeasure.ts itself is not changed. EDITOR RULE (quantity 0): a row with a name is kept with its quantity or 0, Save still needs one row above 0, recompute and Open Food Facts lookups use only rows above 0. This also fixes a DATA-LOSS that exists today: opening and saving a Discover-imported recipe silently deletes its quantity-0 ingredients (rowsToIngredients, RecipeEditorScreen.tsx:89) - same root cause, lane D file, so it is fixed and tested inside #352 (sibling rule). Note the interaction: #442's new wording sends users to exactly that editor save.",
-      "deviceCheck": "Expo Go: import a recipe page from a big recipe site you use. The editor opens with title, ingredients, steps and servings, and saving computes macros. A news article URL shows the no-recipe message."
+      "notes": "WO draft received (ahead), sent back to the analyst to finalise: it called itself a first-pass draft, ran 1481 words, hedged on how tests fail before the code and had a garbled finding. Findings so far: fetchJson is JSON-only, so a separate HTML fetch module copies its timeout/abort pattern; the global fetch in SDK 57 is expo/fetch with a streaming body, so a real 3 MB cap works without a package; parseMeasure takes (name, measure), so a new line splitter src/nutrition/parseIngredientLine.ts is needed; recipe_library has no source column, so the source URL is not stored (would need a migration); the editor takes only {recipeId?} today, new param draft; rowsToIngredients (RecipeEditorScreen.tsx:87) drops rows with quantity <= 0, which would drop unparsed lines at Save, so the work order keeps named rows at quantity 0 (changes every save: analyst asked to verify the downstream consumers). | FINAL WO received. Stub pattern stated as a rule; German normalisation before parseMeasure written out (ca./circa, decimal comma, unit words such as EL/TL, vague words such as Prise/etwas give quantity 0 and keep the whole line as the name); parseMeasure.ts itself is not changed. EDITOR RULE (quantity 0): a row with a name is kept with its quantity or 0, Save still needs one row above 0, recompute and Open Food Facts lookups use only rows above 0. This also fixes a DATA-LOSS that exists today: opening and saving a Discover-imported recipe silently deletes its quantity-0 ingredients (rowsToIngredients, RecipeEditorScreen.tsx:89) - same root cause, lane D file, so it is fixed and tested inside #352 (sibling rule). Note the interaction: #442's new wording sends users to exactly that editor save. | dev: all five steps done, 11 commits, tip b087974, 1545/113 per dev (exit code read through PIPESTATUS). No existing test changed or failed; the RecipeEditorScreen suites stay green under the quantity-0 rule; a test covers a stored quantity-0 ingredient surviving Save Changes. Scan uses indexOf with cached lookups, tag stripping is a linear loop (the work order's <[^>]*> was quadratic on a run of <), walk bounded to depth 6 and 2000 nodes, own properties only. Hostile 3 MB pages all return in under 1000 ms; 3 MB of unclosed tags followed by one valid block gives no-recipe (the first tag swallows it into a block over 1 MB). parseMeasure needed no adjustment. Bodies are decoded as UTF-8 whatever the page's charset. application/xhtml+xml is accepted (Content-Type containing html). StyleSheet.absoluteFillObject is gone in RN 0.86, so the dialog scrim uses explicit absolute edges. 7eb1e57 only shrinks one of the developer's own new test cases.",
+      "deviceCheck": "Expo Go: import a recipe page from a big recipe site you use. The editor opens with title, ingredients, steps and servings, and saving computes macros. A news article URL shows the no-recipe message.",
+      "securityReview": "running in parallel with the tester on 45be56c..b087974 (required by the decision)"
     },
     "442": {
       "lane": "D",
@@ -380,7 +393,9 @@
     "SMALL (#347 tester + orchestrator): section headers render in capitals (MEAT AND FISH) through the existing categoryLabel textTransform; the decision writes them in sentence case; the new screen test checks the string, which jest does not uppercase",
     "SMALL (#347 tester): the tester counted 695 keyword entries including repeats inside a section; the developer reported 686 distinct",
     "SMALL (#337 tester): the two late-result tests in DashboardScreen.setLogger (result after close, result for another exercise) pass without the cancelled guard; they would need a direct switch from one exercise to another on a mounted modal to mean anything, and the UI cannot do that today",
-    "SMALL (#337 tester): with a wrong device clock (a stored date equal to or after today) the last-time line shows without the date part"
+    "SMALL (#337 tester): with a wrong device clock (a stored date equal to or after today) the last-time line shows without the date part",
+    "USER-HITTABLE? (#352 dev): fetchRecipePage decodes every body as UTF-8; a page served in ISO-8859-1 would give broken umlauts in the imported text - the tester classifies it",
+    "SMALL (#352 dev): redirects are checked for the scheme only, so a typed URL may be redirected to a host on the private network (the work order's known limit)"
   ],
   "log": [
     {
@@ -466,6 +481,10 @@
     {
       "at": "2026-10-09T08:02:12Z",
       "event": "#347 security APPROVE on round 2 (3871273); tester round 2 still running"
+    },
+    {
+      "at": "2026-10-09T08:05:37Z",
+      "event": "#352 dev done (11 commits in five steps, tip b087974; 1545/113 per dev) -> in_test, security in parallel (required by the decision)"
     }
   ],
   "aheadAnalysis": {
