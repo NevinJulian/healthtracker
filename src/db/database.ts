@@ -1833,8 +1833,29 @@ async function _copyMealToDatesImpl(planId: number, targetDates: string[]): Prom
   return result;
 }
 
-export async function copyDayToDate(fromDate: string, toDate: string): Promise<CopyMealsResult> {
-  return { copied: 0, skipped: 0 };
+/**
+ * Copies the Lunch and Dinner rows of one day into the empty slots of another
+ * day, under the same rules as copyMealToDates.
+ */
+export function copyDayToDate(fromDate: string, toDate: string): Promise<CopyMealsResult> {
+  return _enqueueWrite('copyDayToDate', () => _copyDayToDateImpl(fromDate, toDate));
+}
+
+async function _copyDayToDateImpl(fromDate: string, toDate: string): Promise<CopyMealsResult> {
+  const result: CopyMealsResult = { copied: 0, skipped: 0 };
+  if (fromDate === toDate || !isValidDateKey(fromDate) || !isValidDateKey(toDate)) return result;
+  const db = getDatabase();
+  await db.withTransactionAsync(async () => {
+    const sources = await db.getAllAsync<{ meal_type: string; recipe_id: string }>(
+      "SELECT meal_type, recipe_id FROM weekly_meal_plan WHERE date = ? AND meal_type IN ('Lunch', 'Dinner') ORDER BY id",
+      [fromDate]
+    );
+    for (const source of sources) {
+      if (await _insertCopyIfEmpty(db, toDate, source.meal_type, source.recipe_id)) result.copied++;
+      else result.skipped++;
+    }
+  });
+  return result;
 }
 
 async function _insertCopyIfEmpty(
