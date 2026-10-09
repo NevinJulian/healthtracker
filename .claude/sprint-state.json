@@ -1,36 +1,27 @@
 {
-  "sprint": 4,
-  "startedAt": "2026-10-07T20:11:02Z",
+  "sprint": 5,
+  "startedAt": "2026-10-09T07:24:29Z",
+  "status": "running",
   "integrationBranch": "sprint/auto-fixes",
-  "baseSha": "bbfe649",
+  "baseSha": "e4e6e3b",
   "baseline": {
     "typecheck": "pass",
-    "testSuites": 93,
-    "tests": 1118
+    "testSuites": 107,
+    "tests": 1387
   },
-  "frozenScope": [
-    427,
-    412,
-    430,
-    426,
-    423,
-    434,
-    411,
-    435,
-    432,
-    431,
-    424,
-    428,
-    422,
-    433,
-    429,
-    425,
-    437
-  ],
+  "frozenScope": [344, 337, 342, 444, 347, 348, 338, 339, 442, 443, 352],
   "excluded": {
-    "392": "feature, runs outside the sprint",
-    "396": "needs restore rework + cascade decision",
-    "436": "done by hand before this sprint (PR #440)"
+    "349": "sprint 6 (native package)",
+    "392": "sprint 6 (native package)",
+    "346": "sprint 6 (builds on #342)",
+    "351": "sprint 6 (builds on #342)",
+    "447": "sprint 6 (quick add, changes the daily totals)",
+    "350": "sprint 7 (dark mode)",
+    "353": "needs a development build",
+    "355": "needs a development build",
+    "396": "not part of the feature sprints",
+    "441": "not part of the feature sprints",
+    "445": "not part of the feature sprints"
   },
   "budget": {
     "maxRoundTripsPerIssue": 3,
@@ -38,1000 +29,131 @@
   },
   "worktreeRoot": "C:/git/ht-lanes",
   "orchestratorDecisions": [
-    "Step 0: the state file found at start was sprint 3's (startedAt 2026-10-06T17:01:16Z, status finished, merged to main as PR #438), older than 24 h, so sprint 4 starts fresh.",
-    "Each lane runs in its own git worktree at C:/git/ht-lanes/lane-<x> (outside the repo, so jest in the main checkout never sees the copies). A, B, D branch from sprint/auto-fixes now; C and E branch after lane A merges; F after every other lane merges.",
-    "Agents must not use git stash: the stash stack is shared across worktrees (2 pre-sprint human stashes exist).",
-    "Security review required for every lane A issue, every lane D issue (src/api), and any issue whose diff reaches src/db, backup.ts, src/api, the filesystem or external input; skip decisions recorded per issue.",
-    "After each integration push, read the real GitHub test check via the public REST check-runs endpoint (curl, read-only; gh CLI forbidden).",
-    "Work orders are saved verbatim at C:/git/ht-lanes/wo/<issue>.md (outside the repo) so a resumed session can re-dispatch without re-analysing."
+    "Step 0: /sprint was called with 'resume', but the state file found was sprint 4's (startedAt 2026-10-07T20:11:02Z, status finished, merged to main as PR #446), older than 24 h, and no sprint/auto-fixes branch existed locally or on origin. Nothing to resume, so sprint 5 starts fresh.",
+    "Each lane runs in its own git worktree at C:/git/ht-lanes/lane-<x> (outside the repo, so jest in the main checkout never sees the copies), with its own npm ci --legacy-peer-deps. A, B, D branch from sprint/auto-fixes now; C branches after lane A merges.",
+    "Agents must not use git stash: the stash stack is shared across worktrees and holds 2 pre-sprint human stashes. A pre-fix proof checks out the pre-fix source files by sha and restores them afterwards.",
+    "Work orders are saved verbatim at C:/git/ht-lanes/wo/<issue>.md (outside the repo) so a resumed session can re-dispatch without re-analysing.",
+    "Analysts for later issues of a lane run ahead, read-only on the main checkout, except #337 and #339, which read #344's real code and so wait until #344 is ready.",
+    "Tester and security run in parallel on the same commit range where security applies. An issue is ready only when both approve; a REJECT and a BLOCK in the same round count as one round trip.",
+    "State is committed on sprint/auto-fixes after every transition. The branch is pushed at lane-level events, not per state commit, because every push starts a CI run. After each integration merge push the real GitHub test check is read through the public REST check-runs endpoint (curl, read-only; gh CLI forbidden)."
   ],
   "lanes": {
     "A": {
-      "branch": "sprint/lane-a-db",
+      "name": "training",
+      "branch": "sprint/lane-a-training",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "merged",
-      "order": [
-        427,
-        412,
-        430
-      ],
+      "status": "pending",
+      "order": [344, 337, 342],
       "current": null,
-      "done": [
-        427,
-        412,
-        430
-      ],
-      "parked": [],
-      "mergeSha": "b9c8d54",
-      "cleanup": "0547089: removed (#412) from a describe title the lane added; re-wrapped the RESTORE_SET_INDEX_SQL doc line; corrected the precondition doc on the Migration type. schema.ts proven comment-only again (transpiled without comments: EQUAL to base, checked by the cleanup agent and by the orchestrator before the merge). No dead code found."
+      "done": [],
+      "parked": []
     },
     "B": {
-      "branch": "sprint/lane-b-start",
+      "name": "meals",
+      "branch": "sprint/lane-b-meals",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "merged",
-      "order": [
-        426,
-        423
-      ],
+      "status": "pending",
+      "order": [444, 347, 348],
       "current": null,
-      "done": [
-        426,
-        423
-      ],
-      "parked": [],
-      "mergeSha": "2860282",
-      "cleanup": "no changes needed (agent read all 8 files; left key={attempt}, the raw gap: 16 in styles.splash and the wal sharing order alone, as instructed)"
+      "done": [],
+      "parked": []
     },
     "C": {
-      "branch": "sprint/lane-c-dashboard",
+      "name": "data",
+      "branch": "sprint/lane-c-data",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "merged",
-      "waitsFor": "lane A merged",
-      "order": [
-        434,
-        411,
-        435,
-        432,
-        431
-      ],
+      "status": "pending",
+      "waitsFor": "lane A merged into sprint/auto-fixes (#339 exports #344's set type)",
+      "order": [338, 339],
       "current": null,
-      "done": [
-        434,
-        411,
-        435,
-        432,
-        431
-      ],
-      "parked": [],
-      "base": "4dea4c6",
-      "cleanup": "no changes needed, no commit (agent read all 12 files of the lane diff, +1620/-65; tsc --noUnusedLocals shows only the repo-wide import React convention; the helper the lane replaced, _isStoredJsonArray, has no reference left; no stale docblock, no debug output, no issue numbers in the lane's own comments or titles; 1271/99 before and after). Left alone on my instruction because they are #437's work: upsertAdditionalWorkouts and its tests, the local columns array in _logBodyMeasurementImpl, the const entry shadow in the Dashboard pills map",
-      "mergeSha": "802fa10"
+      "done": [],
+      "parked": []
     },
     "D": {
-      "branch": "sprint/lane-d-api",
+      "name": "recipes",
+      "branch": "sprint/lane-d-recipes",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "merged",
-      "order": [
-        424,
-        428
-      ],
+      "status": "pending",
+      "order": [442, 443, 352],
       "current": null,
-      "done": [
-        424,
-        428
-      ],
-      "parked": [],
-      "mergeSha": "c757d60",
-      "cleanup": "1daa125: two blank lines in RecipeEditorScreen.saveDeadline.test.tsx; no dead code, no wrong comments found"
-    },
-    "E": {
-      "branch": "sprint/lane-e-settings",
-      "worktree": "C:/git/ht-lanes/lane-e",
-      "status": "merged",
-      "waitsFor": "lane A merged",
-      "order": [
-        422,
-        433,
-        429
-      ],
-      "current": null,
-      "done": [
-        422,
-        433,
-        429
-      ],
-      "parked": [],
-      "base": "4dea4c6",
-      "mergeSha": "1951c66",
-      "cleanup": "f4ca973: one comment block above useDebouncedCommit corrected (commits read other state from latestRef, not from the render closure); nothing dead found; database.ts not touched"
-    },
-    "F": {
-      "branch": "sprint/lane-f-repo",
-      "worktree": "C:/git/ht-lanes/lane-f",
-      "status": "merged",
-      "waitsFor": "all other lanes merged",
-      "order": [
-        425,
-        437
-      ],
-      "current": null,
-      "done": [
-        425,
-        437
-      ],
-      "parked": [],
-      "base": "71e0259",
-      "cleanup": "2c30894: three comment-only edits (re-wrapped the over-long dailyLogUpserts.test.ts header line; removed history words from the restoreNullIsConsumed.test.ts header; re-flowed the runIdRef comment in MealPrepScreen.tsx that the lane had left ragged). Orchestrator verified all three files compile to identical output with comments stripped (acdc12c vs 2c30894) and read the diff. Nothing dead found; schema.ts, jest.config.js and __mocks__ not touched; 1387/107 before and after",
-      "mergeSha": "311191c"
+      "done": [],
+      "parked": []
     }
   },
   "issues": {
-    "411": {
-      "lane": "C",
-      "status": "merged",
-      "roundTrips": 1,
-      "commits": [
-        "380477c",
-        "7d05822",
-        "3bffb20",
-        "15ce90a",
-        "61493c6",
-        "1c88a00",
-        "204eaa1",
-        "e6acb7c"
-      ],
-      "deviceCheck": "With a corrupt exercises value on today's row (debug build or restored backup), open the Dashboard: the notice and button show in the Hammer card, no Alert. Tap Reset: template exercises appear unchecked, notice gone. Repeat for extra workouts (empty list after reset).",
-      "notes": "WO ready. | dev: mapLogRow adds unreadable?: CorruptJsonColumn[] (absent when empty); UnreadableNotice in the Hammer and Extra Workouts cards; resetInFlightRef guard. No existing assertion edited. | tester APPROVE r0, security APPROVE. Both independently noted that the new buttons pass the render-time today instead of the entry's own date (the Alert path uses err.date): after midnight without a reload the one-tap reset targets the new day. ORCHESTRATOR: a destructive action aimed by the wrong variable, one-line fix - sent back; counted as round trip 1 although both approved. Still open for the HUMAN: one tap, no confirmation; no busy state on the button; a hung loadToday keeps the guard set until remount; stale notice if the reload after a successful reset fails.",
-      "workOrder": "C:/git/ht-lanes/wo/411.md",
-      "decisionSource": "owner comment 3 on #411 (sprint 4): when a day loads and exercises/additional_workouts can't be read, the matching card shows 'This day's data can't be read' with a Reset this day button that runs the same reset as the Alert; no Alert on load",
-      "securityReview": "APPROVE (9454396..1c88a00, code read): button and Alert both go through resetCorruptDay -> resetCorruptDayColumn, which re-reads inside the write queue and refuses a column that is not corrupt, so a wrong flag cannot overwrite healthy data; raw text still saved in the same transaction before the UPDATE; column passed from the JSX is a literal; guard released in finally; a failed reset is never shown as success. NOTES FOR THE HUMAN: (1) the new button resets on ONE tap with no confirmation (the sprint-3 Alert was itself the confirmation) and the kept text can only be read back from a backup export; on a mixed row the good items and their ticks are replaced. The decision's wording is satisfied literally; the owner should confirm that one tap is intended. (2) the buttons pass the render-time today, not entry.date: after a midnight rollover without a reload the tap targets the new day (refused if that day is healthy -> misleading Reset failed; resets the wrong day only if both days are corrupt). (3) if the reset succeeds and the following loadToday fails, the stale notice stays and a second tap shows Reset failed although the reset happened.",
-      "regressionProof": "round 1: db flag tests fail with 380477c database.ts; 8/18 screen tests fail with 3bffb20 DashboardScreen.tsx (notice missing); double-press fails with 61493c6; real-engine probe: flag equals writer refusal for 15 values x 2 columns in all three readers, and reset refuses every valid value. Round 2 (204eaa1 + e6acb7c): both rollover cases fail on the pre-fix source with ('2026-09-20', column) instead of ('2026-09-19', column), pass at the tip; delta is exactly the two call sites; 1235/95 (tester reproduced)",
-      "mergeSha": "802fa10"
+    "344": {
+      "lane": "A", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "set types (warm-up / working) per set",
+      "decisionSource": "owner comment 6070858497 on #344: working + warm-up only, no RPE; migration v39 ADD COLUMN set_type TEXT (NULL = working, 'warmup'); two-option toggle above Add set, resets to Working on open; Warm-up label in today's list; warm-ups left out of computePRs, bestSetPerDay, progression chart, volume; backups carry the column",
+      "securityPlan": "required (src/db, migration, restore)"
     },
-    "412": {
-      "lane": "A",
-      "status": "merged",
-      "roundTrips": 0,
-      "commits": [
-        "12e52d6",
-        "06efae3",
-        "1bf52a9",
-        "88bcc98"
-      ],
-      "deviceCheck": "none (analyst: restore is a pure DB path covered by the sql.js suites)",
-      "notes": "WO ready. NOT comment-only: the refined decision was unimplemented. | dev: restoreFromPayload(payloadTables, backupSchemaVersion) - required param; <37 runs v37's precondition + sql looked up in MIGRATIONS (throws if missing); >=37 keeps RESTORE_SET_INDEX_SQL; all inside the restore transaction. 22 existing test calls got ', 38'; dev says no assertion changed. 12e52d6 alone does not typecheck (test-first artefact). backup.test.ts 'passes the backup file's schemaVersion' was added in the fix commit and never run red. validatePayload accepts negative/zero versions (they take the pre-v37 path). ORCHESTRATOR read the whole schema.ts diff (3 hunks): only // comment lines above v37 and the /** */ doc block above RESTORE_SET_INDEX_SQL (not a migration) changed; no version/sql/precondition line touched - NOT an abort condition. The proof grep in my brief was too narrow (it only exempted // lines).",
-      "workOrder": "C:/git/ht-lanes/wo/412.md",
-      "decisionSource": "owner comment 6026078786 on #412 (pass the backup schemaVersion into restoreFromPayload; pre-v37 backups get v37's renumber by (created_at,id); v37+ keeps the current rule; fix the stale // comment above v37)",
-      "regressionProof": "3 'version 36' tests fail with 12e52d6 database.ts+backup.ts, 17/17 at 88bcc98; MIGRATIONS proven unchanged mechanically: schema.ts at e46e8ac and 88bcc98 transpiled with removeComments are exactly equal (28497 chars); backup.test.ts schemaVersion test goes red under mutation (constant 38); 9 hostile pre-v37 payloads behave identically before and after, every throw rolls the whole restore back; index + next write checked after 36 / 37 / empty / absent table and back-to-back restores; 1125/94 (tester reproduced)",
-      "securityReview": "APPROVE (0f4c1f2..88bcc98): backupSchemaVersion is used only in the comparison >= 37, never interpolated; validatePayload requires a finite integer not above the current version (0 and negatives pass and take the pre-v37 renumber, the conservative path); strict if/else, both arms create the unique index, so no value skips both repairs; v37 SQL is static, lookup failure throws, schema_version is not written outside runMigrations; everything inside the one restore transaction, no catch-and-continue; no guard removed. A backup that lies about its version only gets the wrong set order.",
-      "mergeSha": "b9c8d54"
+    "337": {
+      "lane": "A", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "last session's performance as a prefill on set inputs",
+      "decisionSource": "owner comment 6070869800 on #337: last working set of the most recent session before today; line 'Last time: 80 kg x 8 · 3 days ago' above the inputs, tap fills both; placeholders while empty; 'yesterday' / 'N days ago'; no history = no line, empty inputs; today's prefill from today's last set stays; getLastSetForExercise(exercise, beforeDate) on the (exercise, date) index, LIMIT 1",
+      "securityPlan": "required (new query in src/db)"
     },
-    "422": {
-      "lane": "E",
-      "status": "merged",
-      "roundTrips": 0,
-      "commits": [
-        "1963a62",
-        "9f78f2c"
-      ],
-      "deviceCheck": "Settings: workout reminder on, set 08:00 to 08:02 with the steppers, leave and return, confirm a notification fires at 08:02 (or the next-trigger time in the OS list). Cold-start the app with the reminder on: still scheduled at the set time (reconcile path).",
-      "notes": "WO ready. Regex duplicated from the private parseTimeSetting in database.ts (no cross-lane edit). | dev: parseTimeString only; 4 new cases fail on the old code ('8abc:30xyz', '8:30', '08:30:00', '08:3'). No fixture edits were needed (all test time strings already HH:MM). Drift between the two parsers is NOT pinned by a test (notifications.test.ts mocks the database module; parseTimeSetting is private).",
-      "workOrder": "C:/git/ht-lanes/wo/422.md",
-      "decisionSource": "issue body (no comments); analyst chose the strict #414 regex in place, fallback {8,0} unchanged",
-      "regressionProof": "4 strict cases fail with 1963a62 notifications.ts, 21/21 at 9f78f2c; 24-string probe through the real db time getter and parseTimeString: 0 disagreements (incl. NBSP, BOM, zero-width space, full-width colon, 100 000-char input); no producer of a non-HH:MM time string in src/; no path hands raw stored text to parseTimeString; 1150/95 (tester reproduced)",
-      "securityReview": "skipped: parser tightening inside notifications.ts only; no db/api/backup/filesystem code in the diff, and the tester traced that the value only reaches it after the db reader's own strict validation",
-      "mergeSha": "1951c66"
+    "342": {
+      "lane": "A", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "EWMA-smoothed weight trend line",
+      "decisionSource": "owner comment 6070877036 on #342: alpha = 2/(10+1); trend moves only on weigh-in days, nothing interpolated; raw as faint dots, trend solid from the 5th weigh-in, computed over the longest loaded history; card shows kg/week = least-squares slope of the trend over the last 14 days when they hold >= 5 weigh-ins, else a dash; change figure uses trend values; helpers in analyticsHelpers.ts next to rollingAverage; plausibleWeights filters first",
+      "securityPlan": "skip if the diff stays in analyticsHelpers.ts and the Analytics screen; decide on the diff"
     },
-    "423": {
-      "lane": "B",
-      "status": "merged",
-      "roundTrips": 0,
-      "commits": [
-        "8b4f52f",
-        "226d580",
-        "1bfae51",
-        "162009f"
-      ],
-      "deviceCheck": "Dev build in Expo Go: add throw new Error('device test') at the top of any screen render (uncommitted). Open that screen: Something went wrong screen with error text, Retry, Save data, no-reset notice. Retry: crash screen again. Remove the throw, reload: screen works. Throw again, Save data: share sheet.",
-      "notes": "WO ready. Boundary sits outside NavigationContainer; start-failure JSX extracted into a shared RecoveryScreen. | dev: RecoveryScreen (owns saving/saveError/hasRescueWal/ScrollView/notices, optional beforeSave), AppErrorBoundary (class), shared formatErrorDetail, src/testUtils/coldRenderWait.ts (10 s, used by both App suites). | tester APPROVE r0. Findings: (A/D) the key bump on Retry is redundant - with it removed all 7 tests still pass, because the children are already unmounted while the fallback shows; behaviour correct, the mount-counter test does not prove the key. (B) DATA-LOSS RISK on the NEW path: Save data on the render-crash screen copies the db and, only after the first share sheet closes, the wal - while the database is OPEN and the app was live; the pair can be inconsistent (extends #441). Sent to security for a verdict. (C) a thrown non-Error shows only the generic text. Not covered by the boundary: onboarding branch, splash, the start-failure screen itself; a crash inside RecoveryScreen while it is the boundary's fallback unmounts the app (React semantics, not run). saveError is now cleared on every Retry press, including one the in-flight guard drops.",
-      "workOrder": "C:/git/ht-lanes/wo/423.md",
-      "decisionSource": "owner comment on #423 (boundary wraps the navigator, same recovery screen as a start failure, Retry remounts, no reset)",
-      "regressionProof": "7 render-crash tests fail with 1bfae51 App.tsx (no boundary), pass at 162009f; extraction 8b4f52f read line by line against the old start-failure branch (behaviour-preserving); App.startFailure.test.tsx diff is only the wait-constant import swap, 14/14 unchanged; crash-loop scratch test: one Retry = 2 renders, no loop; cold --no-cache runs: renderCrash 3/3, startFailure 3/3, both together with 2 workers 2/2, slowest test 3.3 s against a 10 s wait; 1136/94 (tester reproduced)",
-      "securityReview": "APPROVE (83e352d..162009f): live data is never at risk - the export only reads and copies the live files, the only deletes are of cache copies; Retry on the boundary only remounts children and cannot re-run init, migrations or clearRescueCopies; the boundary is only rendered after init has fully completed, so no beforeSave is needed there; the error text can quote SQL text or a stored value (own device, note only). The risk is confined to the exported COPY: db and wal are copied at different times while the connection is open; after Retry, syncRollingSchedule can write while a share sheet is still up. Missing recent commits: possible but unlikely; unreadable pair: possible but very unlikely (needs a checkpoint between the two copies); live data unharmed in every case. Recorded on #441.",
-      "mergeSha": "2860282"
+    "444": {
+      "lane": "B", "kind": "bug", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "MealPrep Remove confirm promises a refund that is not given",
+      "decisionSource": "owner comment 6070879398 on #444: confirm text depends on the inventory pointer; with a pointer unchanged, without one 'This meal will be removed from your nutrition history.'; the plan item on the screen gets consumed_from_inventory_id",
+      "securityPlan": "required (plan-item read in src/db changes shape)"
     },
-    "424": {
-      "lane": "D",
-      "status": "merged",
-      "roundTrips": 1,
-      "commits": [
-        "8f7c1ec",
-        "b4cc71a",
-        "8fbda56",
-        "e8e4b33",
-        "90a0067",
-        "f541707"
-      ],
-      "deviceCheck": "none",
-      "notes": "WO ready. Issue claim partly stale: a 429 is already not retried (fetchJson retries only >=500); what is missing is the pause. Clamp [1 s, 300 s] is an analyst pick. | dev: pausedUntil is its own early branch in takeSearchSlot; parseRetryAfterMs exported for tests. DEVIATION from the WO wording: only values containing a letter take the Date.parse path (bare Date.parse('-5') yields a valid year); ISO dates without a letter fall back to 60 s. | tester APPROVE r0 with two findings. (3) a later 429 from a lookup already in flight overwrites pausedUntil and can SHORTEN the pause (300 s then 1 s -> resumes after 1 s): contradicts the decision (exhausted until Retry-After has passed). ORCHESTRATOR: sent back to the developer for max() + a test; counted as round trip 1 although the tester approved. (4) a backward clock step stretches the pause by the step size (the WO's 'only up to the 300 s cap' was wrong): left to #428, whose work order already clamps the stored resume time on read.",
-      "workOrder": "C:/git/ht-lanes/wo/424.md",
-      "decisionSource": "owner comment on #424 (no immediate retry on 429; budget exhausted until Retry-After has passed, 60 s when missing or unreadable)",
-      "regressionProof": "round 1: fetchJson test fails with 8f7c1ec fetchJson.ts; openfoodfacts.retryAfter 16/16 fail with 8fbda56 openfoodfacts.ts; pass at e8e4b33. Round 2: 'keeps the longer pause' fails with 90a0067 openfoodfacts.ts, passes at f541707; mirror test proven a real guard by mutation; 5 probes (order, 300/1/60, missing header, expiry, first-value mutation) pass; 1137/94 (tester reproduced). 35-input Retry-After probe table all within [1000, 300000].",
-      "securityReview": "APPROVE (e46e8ac..f541707): parseRetryAfterMs can only return a value in [1000, 300000] and cannot throw; both regexes are linear; the raw header is read in exactly one place and never logged, rendered, persisted or used in SQL or a cache key; a paused/failed lookup is never cached; budget, abort handling, >=500 retry rule and User-Agent intact. True pause bound: 300 s after the last in-flight 429 arrives. Notes: backward clock step stretches the pause by the step (in-memory, acceptable interim, #428); a paused lookup looks like not found to the caller (#428).",
-      "mergeSha": "c757d60"
+    "347": {
+      "lane": "B", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "shopping list: combine duplicate ingredients and group by aisle",
+      "decisionSource": "owner comment 6070880122 on #347: merge at write time, no migration; into an existing unchecked line with the same normalised name and a compatible unit; checked lines never merged into; normalised = lowercase, trimmed, text before the first comma, spaces collapsed; g/kg and ml/l merge converted to the line's unit, other units only with themselves; existing lines not merged after the fact; aisles by keyword lookup in code (German + English), fixed section order, unmatched = Other; items alphabetical inside a section; units.ts may be used but not changed",
+      "securityPlan": "required (shopping-list writes in src/db)"
     },
-    "425": {
-      "lane": "F",
-      "status": "merged",
-      "roundTrips": 0,
-      "commits": [
-        "2f95a88",
-        "7b4c6cf"
-      ],
-      "deviceCheck": "none (test-only)",
-      "notes": "WO ready; lane F waits for lane C. Probe confirmed: jest-expo's preset setup.js:130 registers jest.mock('expo-file-system/legacy', factory), which wins over the moduleNameMapper target, so the repo file never executes (only jest.requireActual reaches it); the non-legacy expo-file-system mock is NOT shadowed. Work: delete the three directory constants from __mocks__/expo-file-system/legacy.js, pin the shadowing with one new test; jest.config.js untouched; inline-mock tests stay. The analyst corrected the orchestrator's suggested test (asserting defined strings would contradict the decision). | Baseline for the developer is now 1365/104 (the work order still says 1230/100: lane C merged after it was written). | dev: 2f95a88 test (2 tests: the requireActual key check failed first with the three names in the received array; the module-id pin passes before and after and also asserts downloadAsync, a key only the preset mock has), 7b4c6cf deletes the three constants and adds a 3-line header note saying the preset factory wins. 1365/104 -> 1367/105. npm test itself already runs under cross-env TZ=UTC, so the plain run is a UTC run. | tester APPROVE r0. Notes: a plain require of the repo mock path also returns the preset factory (only jest.requireActual reaches the file); the pin's failure message is a bare toBeUndefined.",
-      "workOrder": "C:/git/ht-lanes/wo/425.md",
-      "decisionSource": "owner comment on #425 (remove the shadowed values from the global mock; leave the jest config as it is; tests that need those paths mock them inline)",
-      "securityReview": "skipped: a jest mock file and one test; no app code, no db/api/backup/filesystem path",
-      "regressionProof": "test 1 fails with the mock file from 71e0259 (received key array starts with the three names), passes at 7b4c6cf; the module-id pin shown to be real: preset registration at jest-expo/src/preset/setup.js:130, keys only the preset has are downloadAsync, readDirectoryAsync, createDownloadResumable; the pin goes red when the repo file wins (jest.unmock) and when a simulated preset upgrade defines documentDirectory; stable alone, --no-cache twice, --runInBand, ordered after the backup/rescue/App suites, and in the full run; repo-wide grep: no reader ever got its value from the three deleted lines; diff is exactly two files; 1367/105 (tester reproduced). npm test is cross-env TZ=UTC jest, so a separate UTC run is redundant",
-      "mergeSha": "311191c"
+    "348": {
+      "lane": "B", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "copy meal, copy day, often cooked",
+      "decisionSource": "owner comment 6070880760 on #348: 'Copy to...' on a planned slot offers the next 7 days, same recipe into the same slot where empty, occupied skipped and counted, copies unticked; 'Copy day to...' copies Lunch and Dinner into the empty slots of one chosen day; Log Cooked Meal picker shows the 5 recipes with the highest cook events x 0.95^(days since last cooked) from cook_log in an 'Often cooked' section; quick add is #447, saved meals and time-of-day ranking not planned",
+      "securityPlan": "required (meal-plan writes in src/db)"
     },
-    "426": {
-      "lane": "B",
-      "status": "merged",
-      "roundTrips": 1,
-      "commits": [
-        "b1b1e3d",
-        "7fd00a4",
-        "3c8aae1",
-        "a6a96c0",
-        "8725051",
-        "5c87c23",
-        "bb24e4f",
-        "7d7c14f",
-        "3d4f4ef",
-        "b852951",
-        "832c7f1",
-        "17d6ca8",
-        "c6cd714",
-        "1979589",
-        "83e352d"
-      ],
-      "deviceCheck": "1) Normal start: no error screen, startup not slowed. 2) Dev build that throws in initDatabase: Retry, Save data and the notice reachable by scrolling at the largest font size. 3) Save data: two-files sentence, then two share sheets; save both to Files. 4) Kill and relaunch without the forced failure: cache copies are gone.",
-      "notes": "WO ready. Issue item 3 (closing the connection) is NOT done by this work order; the Save-waits-for-init rule covers the font-error case (analyst reading of the decision). | dev: 7 test/fix pairs. In-flight promise in a ref; clearRescueCopies().catch(() => {}) once in the mount effect; hasRescueWal from an effect when the failure screen shows. | tester APPROVE r0. COLD-CACHE RISK: `jest App.startFailure --no-cache` fails 3/3 at the first test (findByText default 1000 ms; first cold render took 2191 ms). Pre-existing (fails 2/2 at base e46e8ac, ~1.6 s) but this change adds ~500 ms. CI has no jest cache (test.yml caches npm only), so in CI it depends on which suites warmed the transform cache first. The dev's 'unmounted component' flake was never reproduced. ORCHESTRATOR: sent back for a test-only commit giving the first cold render an explicit timeout; counted as round trip 1 although the tester approved. HUMAN: if initDatabase never settles, Retry is a no-op and Save data spins forever (as decided: Save waits for init); only killing the app helps. hasRescueWal checks the LIVE wal once when the failure screen shows; export re-checks at save time, so the two-files sentence can be stale if the wal appears/disappears in between.",
-      "workOrder": "C:/git/ht-lanes/wo/426.md",
-      "decisionSource": "owner comment on #426 2026-10-06 (rescue copies deleted at the next app start; busy flag; Save data waits for init; scrolling screen; one WAL sentence; no full-storage special case)",
-      "regressionProof": "round 1: all 7 test/fix pairs proven (pre-fix source at each test commit fails, HEAD passes); the two never-red guards go red under mutation; warm 15/15; full suite twice 1129/93. Round 2 (83e352d, test-only): delta read line by line, matchers unchanged; a mutated matcher still fails (at 5044 ms); cold --no-cache 3/3 pass (first test 1943 / 3077 / 2136 ms), cold with two -t filters pass, warm 5/5; 1129/93 (tester reproduced).",
-      "securityReview": "APPROVE (e46e8ac..1979589): clearRescueCopies can only build the two cache URIs (no SQLite/ segment), so the live db is structurally unreachable, also with a null cacheDirectory; the mount-time delete cannot realistically overlap a user-tapped Save; Save now waits for migrations and seeds; no false success shown. Notes: HUMAN - #426 must ship together with #427 (until #427 lands, the old reset path is the one case where a deleted rescue copy could have been the only good copy; both are on this integration branch). Not determined: whether expo-sqlite checkpoints an idle open connection between the db copy and the wal copy (would lose recent transactions from the rescue pair, not corrupt it). The new two-files sentence raises an expectation the existing wal-after-db flow can break when the first share is cancelled (already a recorded finding).",
-      "mergeSha": "2860282"
+    "338": {
+      "lane": "C", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "automatic rotating local backups",
+      "decisionSource": "owner comment 6070877910 on #338: auto-backups folder in documentDirectory; written after a successful start when the newest is older than 24 h or none exists, in the background, failure only logged; newest 7 kept; Settings 'Automatic backups' list newest first with date, time, size, Share and Restore through the existing restore path; pre-restore safety snapshot moves to documentDirectory, newest 3 kept, header comment corrected; manual export unchanged",
+      "securityPlan": "required (backup.ts, filesystem)"
     },
-    "427": {
-      "lane": "A",
-      "status": "merged",
-      "roundTrips": 0,
-      "commits": [
-        "6ac1a39",
-        "0f4c1f2"
-      ],
-      "deviceCheck": "From the integration branch, launch the app on the phone with existing data: it starts normally with all history intact (the schema check passes through). The failing path is proven by the test only.",
-      "notes": "WO ready. No cross-lane need: App.tsx already renders err.message with Retry and Save data. | dev: resetIfIncompatibleSchema replaced by assertCompatibleSchema (throws, no close/delete/reopen); header trim is inside the fix commit. Error text: Your saved data uses an old format that this version cannot read: the daily_log table has no date column. Nothing was changed or deleted. Tap Save data to export a copy of your data. Dev says the old code failed the test's FIRST assertion via a raw SQLite error further into migrations (deleteDatabaseAsync is a jest.fn in the harness) - tester to confirm the not-deleted assertion fails on its own too.",
-      "workOrder": "C:/git/ht-lanes/wo/427.md",
-      "decisionSource": "owner comment on #427 2026-10-06 (don't delete, fail: initDatabase throws a named error, the #419 start-failure screen takes over)",
-      "regressionProof": "incompatibleSchema test fails with 6ac1a39 database.ts (received 'no such column: date'), passes at 0f4c1f2; tester scratch test proved the deleteDatabaseAsync-not-called assertion fails on its own on the pre-fix code (0 expected, 1 received); schema.ts byte-identical to base; 1119/94 (tester reproduced)",
-      "securityReview": "APPROVE: no deleteDatabaseAsync left in non-test src; throw is inside the try, catch closes once and rethrows, _db stays null; check runs before migrations, seeds and app_state writes; message is a static string. Notes: (A) PRAGMA journal_mode = WAL runs before the check, so on a rollback-journal db the header is rewritten although the message says nothing was changed (cosmetic; swap the order to make it literally true). (B) HUMAN: a user who really has this schema is blocked for good - Save data works, but there is no in-app way to proceed (as decided: fail, don't delete). Whether expo-sqlite's native close always checkpoints the WAL was not determined (does not affect the rescue copy).",
-      "mergeSha": "b9c8d54"
+    "339": {
+      "lane": "C", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "CSV export alongside the JSON backup",
+      "decisionSource": "owner comment 6070878592 on #339: three files shared one after the other (workout_sets.csv, daily_log.csv, meals.csv), no zip, a dismissed sheet does not stop the next; 'Export as CSV' button below the JSON export; RFC 4180 quoting, UTF-8 with BOM, ISO dates, one header row, empty db = headers only; columns as listed in the comment (set_type working|warmup from #344); built in memory; unit tests for the escaping helper",
+      "securityPlan": "required (filesystem, db reads, user text into files)"
     },
-    "428": {
-      "lane": "D",
-      "status": "merged",
-      "roundTrips": 0,
-      "commits": [
-        "cfcc2d7",
-        "1aa53ee",
-        "dbba380",
-        "fed105a",
-        "e5562a0",
-        "a670372",
-        "f19be0d",
-        "6dbd718",
-        "8d4e84a",
-        "dc84434",
-        "d4cb2c6"
-      ],
-      "deviceCheck": "Expo Go, editor: type 11+ distinct unusual ingredient names with quantities within one minute: a Not looked up line appears, not no data. Wait 60 s, tap Recompute: the line clears. Discover: import a recipe with 11+ unlisted ingredients: the Alert shows the not-looked-up sentence.",
-      "notes": "WO ready. Return type becomes OFFNutrition | null | 'not-looked-up'; user-facing wording is an analyst pick. | dev: 11 commits. Pause clamp = min(pausedUntil, now + 300 s) on read and in the 429 handler. 'not-looked-up' only when an attempt was refused and nothing was sent (budget or pause); a 5xx retry refused after the first request went out stays null. 4 truthiness checks on lookup results replaced by object checks (cache write, batch, importRecipe, editor). EXISTING ASSERTIONS CHANGED (dev: all pin the behaviour the decision replaces): 3x toBeNull -> toBe('not-looked-up') and one test title in openfoodfacts.budget.test.ts, 1x in openfoodfacts.retryAfter.test.ts, a type guard in computeWithOFF.test.ts - tester to judge each. Discover card suppresses the 'Macros computed from local data' line when only refused ingredients exist (not in the WO). Editor lookups are sequential, so one hanging ingredient leaves all later ones 'not looked up' at the deadline. Dev edited files with scripts and warns about CRLF/cp1252 - tester to check for mojibake.",
-      "workOrder": "C:/git/ht-lanes/wo/428.md",
-      "decisionSource": "owner comment on #428 2026-10-06 (refused/cut-off lookup = 'not looked up', separate from 'no data'; save-deadline fallback keeps every lookup that already succeeded; future timestamps dropped)",
-      "regressionProof": "all five test/fix pairs proven (pre-fix source at each test commit fails, HEAD passes; 8d4e84a is what turns the 4-of-5 editor test green); scratch import of 14 unlisted ingredients on the real modules: 10 fetched, 4 refused, macros finite, putOFFCache called 10 times and never with the sentinel; 1146/95 locally and with TZ=UTC (tester reproduced)",
-      "securityReview": "APPROVE (f541707..d4cb2c6): the sentinel is excluded before every sink (cache write only for real objects; three consumers branch on the string first; offOverrides typed OFFNutrition); no NaN/undefined can reach computeRecipeMacros or the recipe writers; aborted/late results cannot enter the fallback, the cache or another recipe; no lookup loop without user action; nothing removed. NOTES FOR THE HUMAN: (1) on the save-deadline path the new Not looked up banner is set on a screen that goBack()/replace() dismisses immediately, so the user never sees it and the recipe is saved with the cut-off ingredients counted as 0 without a visible notice (equally silent before this diff; not a regression) - filed as a new issue; (2) the Discover Alert says Try again in a minute, but a retry hits Already in your library and the zero-macro recipe stays - filed as a new issue.",
-      "mergeSha": "c757d60"
+    "442": {
+      "lane": "D", "kind": "bug", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "Discover import: not-looked-up recipe cannot be refreshed, alert says Try again in a minute",
+      "decisionSource": "owner comment 6070881544 on #442 (latest of 2): no re-import refresh; new alert and card text with a singular form, pointing at the editor; lookups that receive the 429 itself count as not looked up; reopening an imported recipe in Discover says 'In your library'; device check none",
+      "securityPlan": "required (src/api)"
     },
-    "429": {
-      "lane": "E",
-      "status": "merged",
-      "roundTrips": 1,
-      "commits": [
-        "5031c80",
-        "a6e0181",
-        "1832220",
-        "94bec62",
-        "ac2d93b",
-        "93b7d90",
-        "10fee64",
-        "7e43b76",
-        "e366ee3",
-        "88e3370"
-      ],
-      "deviceCheck": "Smoke: in Settings tap Recalculate with a full profile: Goals updated shows, values persist after leaving and returning.",
-      "notes": "WO ready. | dev: 9 commits; setNutritionGoals one insertion hunk; shared scheduleAfterSave on 6 handlers and (beyond the WO) the 6 stepper flush callbacks; Alert wording by the dev: Reminder not scheduled / Your setting was saved, but the reminder could not be scheduled. | tester APPROVE r0. GAP: the scheduleAfterSave behaviour in the six stepper flush callbacks has no committed test (the tester's 12 scratch tests passed and were deleted). ORCHESTRATOR: new behaviour without a committed test - sent back for a table-driven test only; counted as round trip 1 although the tester approved. HUMAN: when a meal reminder is switched OFF and cancelMealReminder fails, the alert says the reminder could not be scheduled (wording off for a cancel). Not done: a failed stepper write leaves the stepper showing the unsaved value until the next focus reload.",
-      "workOrder": "C:/git/ht-lanes/wo/429.md",
-      "decisionSource": "latest owner comment on #429 (one new database.ts function in one transaction; drop the unhandledRejection assertions and assert the handler's promise resolves; two messages; stepper writes get the same Alert)",
-      "securityReview": "APPROVE (code read at e366ee3): setNutritionGoals uses the same upsert text as setSetting, bound values, queue wrapper outside and withTransactionAsync inside, nothing enqueued from within; the first write cannot commit if the second fails; schema.ts untouched. Inputs from suggestGoals are clamped (finite, >= 1000 kcal / >= 50 g), and getNutritionGoals falls back to defaults for a non-finite stored value. scheduleAfterSave wraps only the scheduling call at all 12 call sites, so a write failure never enters it and is never reported as saved. Note: after a failed debounced stepper write the stepper shows the unsaved value until the next focus reload (the user is told it failed).",
-      "regressionProof": "round 1: four test/fix pairs proven; transaction removal red; real-engine attacks; one-hunk database.ts diff; mutation proof of the replaced assertions. Round 2 (88e3370, test-only, +161 lines): 12 tests over the six time-stepper commits; six single-line source mutations (bare scheduling call / swallowed write error for lunch, backup, cook-day) each turn exactly the targeted test red; fake timers restored; 1184/97 (tester reproduced)",
-      "mergeSha": "1951c66"
+    "443": {
+      "lane": "D", "kind": "bug", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "Recipe editor: save-deadline notice is set on a screen that closes at once",
+      "decisionSource": "owner comment 6070882693 on #443: Alert after the save and before the editor closes when ingredients were not looked up (deadline or aborted recompute), singular form, editor closes on dismiss; no Alert when every lookup finished; banner text 'Not looked up yet. Tap Recompute later.'; lookups stay sequential; device check none",
+      "securityPlan": "skip if the diff stays in RecipeEditorScreen.tsx and its tests; decide on the diff"
     },
-    "430": {
-      "lane": "A",
-      "status": "merged",
-      "roundTrips": 1,
-      "commits": [
-        "b4667d7",
-        "8cc6940",
-        "821b8aa",
-        "42459fd",
-        "3ed52df",
-        "f563c3e"
-      ],
-      "deviceCheck": "none",
-      "notes": "WO ready. Sibling spot included: getCookingTasks. | dev: private parseIngredients(raw, recipeId) at the four sites; warns with the recipe id, never the raw text. b4667d7 alone does not typecheck (fixed by 3ed52df). | tester REJECT r1: after 3ed52df removed the archived_at assertion, nothing proves the corrupt row was archived (getRecipesIncludingArchived selects every row), so 'archived corrupt row included' is only half tested. Fix itself sound. Sent back for one assertion (getRecipes() must not contain the archived id). Consumers traced by the tester: the editor blocks saving with no ingredients, so the corrupt text is only overwritten when the user re-enters ingredients; macros are separate columns (no 0 kcal); backup export reads raw rows (corrupt text exported intact). HUMAN: RecipeDetail 'add to shopping list' on a corrupt recipe adds zero items and still shows Added!.",
-      "workOrder": "C:/git/ht-lanes/wo/430.md",
-      "decisionSource": "owner comment on #430 (return the recipe with an empty ingredient list, and log it)",
-      "regressionProof": "round 1: 10/11 fail with b4667d7 database.ts; the cooking-task test fails with 821b8aa database.ts; 11/11 at 3ed52df; 14-value probe through all four readers. Round 2 (f563c3e, test-only, +4 lines): the new not.toContain('bad-1') assertion goes red when the deleteRecipe call is removed; both cases pinned (corrupt+active returned with []; corrupt+archived null from getRecipeById, present in getRecipesIncludingArchived); 1136/95 (tester reproduced).",
-      "securityReview": "APPROVE (88bcc98..3ed52df, source unchanged in round 2): no query text added; no path persists the substituted [] over the corrupt text unless the user types at least one ingredient (handleSave returns early on an empty list; createRecipe/updateRecipe have no other caller); macros are separate columns and never recomputed from an empty list; backup reads raw rows, so the corrupt text survives in a backup; warn logs a fixed string plus the id only. Notes: the editor gives no notice that ingredients were unreadable (blank row; retyping and saving replaces the corrupt text - as decided); restore does not validate the ingredients column (unchanged).",
-      "mergeSha": "b9c8d54"
-    },
-    "431": {
-      "lane": "C",
-      "status": "merged",
-      "roundTrips": 1,
-      "securityReview": "skipped: two screens, one presentational component and tests; nothing reaches src/db, backup, src/api, the filesystem or external input",
-      "regressionProof": "round 1: Dashboard 5 of 8 new tests fail with 794b62b DashboardScreen.tsx, Analytics 5 of 8 with 5f004d8 AnalyticsDashboardScreen.tsx (missing title / banner text), all pass at efc21bf; the empty-load and race tests that pass before the fix each go red under a source mutation; LoadErrorView tests red under 5 mutations; cold --no-cache runs clean (the tests use getBy after a flush, not findBy). Round 2 (5b620da, 5c3db95, acf001a): the 3 no-entry tests fail with 5b620da DashboardScreen.tsx (20 total in the file with the pattern, 3 failed), pass at the tip; the Analytics pin goes red with isCurrent() removed and green restored; reverse cases run (entry -> null load -> reject shows the error view; entry -> reject keeps data + banner); delta is +80/-1 in 3 files; 1271/99 locally and with TZ=UTC (tester reproduced)",
-      "commits": [
-        "e618a53",
-        "4b54e32",
-        "794b62b",
-        "ac7a9b1",
-        "5f004d8",
-        "efc21bf",
-        "5b620da",
-        "5c3db95",
-        "acf001a"
-      ],
-      "deviceCheck": "Debug build, force a load failure (temporary throw in getLogByDate / getWaterHistory). Cold start: error view; Retry works once the throw is removed. Then with data on screen, throw and refocus: banner appears and the data remains.",
-      "notes": "WO ready; last in lane C. New src/components/LoadErrorView.tsx (variant screen|banner); imported directly, src/components/index.ts untouched to avoid a lane B conflict. Strings are analyst picks. | dev (two runs: the first was cut off by the session ending after e618a53/4b54e32/794b62b; the second verified and committed the left-over Dashboard change unchanged as ac7a9b1, then did Analytics): six files only, +596 lines, no existing test touched. Dashboard 5 of 8 new tests fail without the fix, Analytics 5 of 8; in each file the empty-load test and the two race tests pass before the fix (tester to show they can fail). Dev says the banner disappears at every load start and comes back on failure (the WO clears loadError at load start) and did NOT compare with MealPrep's view. Analytics initial error view has no pull-to-refresh, Retry only. | tester APPROVE r0 (1267/99 locally and with TZ=UTC; cold --no-cache runs clean; every pre-passing test shown able to fail by mutation except one not run in isolation). Two things it asked me to rule on: (B) Dashboard - a first load that succeeds with NO row for today followed by a load that rejects sets loadError 'refresh', but the !entry branch renders no banner: the screen shows 'No entry for today - try reopening the app.' with no Retry, i.e. the exact silent failure and misleading text #431 is about (rare: sync normally creates today's row). (M3) Analytics - the isCurrent() condition on hasLoadedOnceRef can be deleted with all 8 tests green (superseded run A resolves late, run B rejects: the mutant shows the refresh banner over zeroed cards instead of the error view). ORCHESTRATOR: B is the issue's own bug left in one branch of a lane-owned file, and M3 is new logic without a test - sent back for both; counted as round trip 1 although the tester approved. RULING for B: when a load fails and there is no entry on screen, the Dashboard shows the screen variant (Couldn't load today + Retry), never the No-entry text and never the banner (its text says the last loaded data is showing, and there is none). HUMAN: the banner disappears while any load is pending and comes back on failure - identical to MealPrep (#401), so no divergence; the Dashboard's error view has no header (MealPrep and Analytics keep theirs), matching the Dashboard's own loading / no-entry states. | round 2: tester APPROVE. KNOWN RESIDUAL (HUMAN, read 5c3db95): the early return is now loadError && !entry while the banner is drawn only for 'refresh', so a FIRST load that fails after setEntry ran (entry on screen, hasLoadedOnceRef still false) shows no error at all; before round 2 it showed the error view. Only reachable if the code between setEntry and hasLoadedOnceRef = true throws (the tester built it with getWorkoutSetsForDay resolving null); not reachable in normal use. One-line cure if wanted: draw the banner for any loadError when an entry is on screen.",
-      "workOrder": "C:/git/ht-lanes/wo/431.md",
-      "decisionSource": "SPRINT.md §3 known pattern (#431 follows MealPrep's error view from #401, one shared component; MealPrep keeps its own)",
-      "mergeSha": "802fa10"
-    },
-    "432": {
-      "lane": "C",
-      "status": "merged",
-      "roundTrips": 0,
-      "commits": [
-        "70b708b",
-        "4d14ce6",
-        "2bfb01c",
-        "c74f347",
-        "0b66622",
-        "1cf3d03"
-      ],
-      "deviceCheck": "none (optional: Analytics measurements card N entries excludes blank entries, only visible if a device holds an all-NULL row)",
-      "notes": "WO ready. Two items kept by the owner decision. | dev: A - getBodyMeasurements adds an IS NOT NULL ... OR ... clause built from the existing MEASUREMENT_FIELDS const tuple (the const moved up above the function); B - toggleAdditionalWorkout throws a plain Error naming date and id after the strict read, inside the queued write. EXISTING TESTS REWRITTEN (HUMAN review): two in dailyLogUpserts.test.ts (own commit 2bfb01c: an unknown-id toggle now rejects; the 'row is created' and 'stored value unchanged' assertions kept) as authorised by the decision, and a THIRD the brief did not anticipate - bodyMeasurements.test.ts 'still returns a legacy all-NULL row from getBodyMeasurements' became 'skips a legacy all-NULL row ... and leaves it stored' inside the A test commit 70b708b. The Dashboard screen test passes without any source change (a pin: the catch already reloads on any error); its mock factory gained the real CorruptJsonError.",
-      "workOrder": "C:/git/ht-lanes/wo/432.md",
-      "decisionSource": "latest owner comment on #432 (logCookedMeal: no change; getBodyMeasurements skips all-NULL rows, no migration; inventory inner join: no change; toggleAdditionalWorkout rejects when the workout isn't found)",
-      "securityReview": "APPROVE (498da6c..1cf3d03, code read): the IS NOT NULL clause is built only from the module-level const tuple MEASUREMENT_FIELDS (five literals), sinceDateKey stays bound, the OR group is parenthesised next to the date filter; the measurement change is read-only (no migration, no DELETE) and no writer derives output from this reader; backup export reads raw rows; logBodyMeasurement finds its row by date and still updates a blank row in place. The toggle rejection reaches the caller, the queue chain continues, and only the complete INSERT OR IGNORE of the day row happens before the throw; the Dashboard catch reloads, so the tick reverts - one silent failure removed.",
-      "regressionProof": "A: 2 tests fail with 70b708b database.ts; B: 4 tests fail with c74f347 database.ts; all pass at 1cf3d03; the Dashboard pin goes red under two source mutations (reset offered for any error; no reload); scratch test on the real engine: each of the five columns alone keeps a row visible, 0 / 0.0 / -5 are values, inclusive date bound, COUNT(*) unchanged, queue continues after a rejected toggle incl. a write to another table; every rewritten existing assertion read line by line and judged the behaviour the decision replaces; 1249/96 (tester reproduced)",
-      "mergeSha": "802fa10"
-    },
-    "433": {
-      "lane": "E",
-      "status": "merged",
-      "roundTrips": 0,
-      "commits": [
-        "bb42bd8",
-        "0b52831",
-        "40c121b"
-      ],
-      "deviceCheck": "Notifications allowed: enable the weekly backup reminder, tap the Sat chip, then Wed immediately; background the app. Then step a meal time right after toggling it. Both reminders show the final day/time in the system's scheduled list (or fire there).",
-      "notes": "WO ready. Wider than the issue: 8 handler groups read stale state. | dev: module-level useLatestState(latestRef, key); the six setter names now refer to the wrappers; ref updated synchronously in the setter only. | tester APPROVE r0. HUMAN: the Recalculate case (P4) is only weakly proven - a real press cannot be stale at the instant the setter is called; the only reachable gap is a press between a post-await setProfile and its commit, which the test manufactures by invoking a captured old onPress. The fix there is harmless. Updaters now run eagerly once at the call site instead of inside React's render (a throwing updater would throw at the call site; none can).",
-      "workOrder": "C:/git/ht-lanes/wo/433.md",
-      "decisionSource": "issue body (no comments); analyst chose one mechanism: a latestRef updated by wrapped setters, read at call time",
-      "regressionProof": "12/12 new tests fail with bb42bd8 SettingsScreen.tsx and still fail with the refactor-only 0b52831, pass at 40c121b; the 7 existing SettingsScreen suites (70 tests) byte-unchanged and green at 0b52831 and at the tip; scratch interleavings (two updates in one tick, toggle + focus reload with the old value, reload + debounced flush) leave ref and rendered state in agreement; 1162/96 (tester reproduced). The dev reported 13 tests; the file has 12.",
-      "securityReview": "skipped: UI handlers reading fresh state only; no db/api/backup/filesystem code in the diff",
-      "mergeSha": "1951c66"
-    },
-    "434": {
-      "lane": "C",
-      "status": "merged",
-      "roundTrips": 1,
-      "commits": [
-        "a964ba2",
-        "3f7e0ce",
-        "9dfeeae",
-        "cdb29fb",
-        "dd9455e",
-        "54ca6a5",
-        "62eea8b",
-        "3a79e94",
-        "9454396"
-      ],
-      "deviceCheck": "On a Hermes release build (APK), run the corrupt-day Reset once (same steps as #411's check): it must complete. resetCorruptDayColumn now uses Object.hasOwn, which the tester could not confirm for this Hermes from the repo; if it were undefined every reset would throw.",
-      "notes": "WO ready. Final shape: strict predicate (every item an object with a string id) for writers and reset; parseExercises/parseAdditionalWorkouts unchanged from base (as the issue asks); mapLogRow drops bad items so the screens cannot crash on a null item (this is the remaining, narrowed departure from the issue's 'lenient reads stay as they are' - HUMAN to confirm). Tester APPROVE r0, sent back by the orchestrator (template write-back), APPROVE r2. KNOWN RESIDUAL (HUMAN): a weekday TEMPLATE holding an item without a string id (hand-edited backup) now produces days that refuse every write, and Reset this day rebuilds the same value from the same template, so those days stay stuck; before #434 such rows were writable. Not fixed: the fix sits in _buildDailyLogRowValues / getWeeklyTemplate (outside lane C) and needs a choice (drop the item, give it an id, or normalise on write).",
-      "workOrder": "C:/git/ht-lanes/wo/434.md",
-      "decisionSource": "issue body (no comments): item shape = object with a string id, in the shared predicate",
-      "regressionProof": "round 1: predicate 20/44, reads 6, column guard 4 fail on the pre-fix source, pass at 62eea8b; sync pin red under mutation; 25-value probe table; history back to d62f627 shows only string ids. Round 2 (3a79e94 + 9454396): the template describe fails 2/2 on the round-1 source, passes at the tip; parseExercises/parseAdditionalWorkouts extracted and diffed: identical to the lane base; template editor add/edit/delete simulation keeps an id-less item, byte-identical to base; getLogByDate/getDailyLogsBetween still return only well-shaped items for 11 probe values; one _isStoredItem shared by mapLogRow and the writers; 1196/95 (tester reproduced)",
-      "securityReview": "APPROVE (4dea4c6..9454396): reset SQL is static per key and Object.hasOwn also rejects __proto__/constructor; resetCorruptDayColumn re-reads the row and refuses valid data, so arbitrary column/date cannot overwrite anything; the raw text (good items included) is saved before the UPDATE in the same transaction; every writer of the two columns re-reads the stored text strictly, so a day with hidden items refuses every write; sync backfill never overwrites a wrong-item row; a null template item does not throw in the day builder (no startup loop). NOTE (HUMAN): a hand-edited template holding an item without a string id now makes every NEW day built from it corrupt by the new definition, and Reset rebuilds the same value from the same template - the alert repeats on every tick for those days; no data lost. Fix would sit in _buildDailyLogRowValues or getWeeklyTemplate (outside lane C).",
-      "mergeSha": "802fa10"
-    },
-    "435": {
-      "lane": "C",
-      "status": "merged",
-      "roundTrips": 1,
-      "commits": [
-        "a97580c",
-        "85f8d1b",
-        "009819e",
-        "2ae4770",
-        "c4efd09",
-        "7f944b2",
-        "498da6c"
-      ],
-      "deviceCheck": "Happy path only (a write failure cannot be forced on a phone): open Log measurements, enter waist 81, Save: modal closes, Waist pill shows 81 cm, no Alert. Force-close and reopen: value still there.",
-      "notes": "WO ready. ORCHESTRATOR RULING: scope = measurements modal + set logger; the 7 snap-back handlers are a recorded finding. | dev: handleSaveMeasurements / handleLogSet return Promise<boolean>; savingRef guard in MeasurementsModal; reps cleared only on success; a failed refresh after a successful write is log-only (also for the set logger, beyond the WO - judged correct by the tester: saying failed would invite a duplicate set). | tester APPROVE r0. One new test is VACUOUS: 'releases the guard when the refresh after a successful write rejects' still passes with the guard never released (the modal unmounts on close, so the second Save runs in a fresh modal). ORCHESTRATOR: this sprint's #429 exists because of vacuous assertions - sent back to make it able to fail or delete it; counted as round trip 1 although the tester approved. HUMAN: after write ok + refresh failure the pills / set list stay stale until the next load.",
-      "workOrder": "C:/git/ht-lanes/wo/435.md",
-      "decisionSource": "SPRINT.md §3 known pattern (#435 follows #404: an Alert, and the modal stays open)",
-      "securityReview": "skipped: Dashboard UI handlers only (Alert, modal stays open, in-flight ref); no db/api/backup/filesystem code in the diff",
-      "regressionProof": "round 1: 5/8 new tests fail on the pre-fix source, double-Save and set-logger tests fail at their test commits, 8/8 at 7f944b2; pins shown able to fail by mutation. Round 2 (498da6c, test-only, +9/-4): with the guard release removed the file shows 2 failed / 6 passed (the tester did not capture the names; the dev names the new test and the retry test), 8/8 restored; same mounted modal across both saves; 1243/96 (tester reproduced)",
-      "mergeSha": "802fa10"
-    },
-    "437": {
-      "lane": "F",
-      "status": "merged",
-      "roundTrips": 1,
-      "commits": [
-        "e97ff4a",
-        "3d18a6f",
-        "3ed58b7",
-        "ed6e07a",
-        "fa3d338",
-        "c82243d",
-        "625f4dd",
-        "99fd0a3",
-        "c4f8a5c",
-        "2da1ea7",
-        "b93f5d7",
-        "23324d5",
-        "e2df38a",
-        "0309f5a",
-        "95b4cbd",
-        "3b3bf0d",
-        "40f826f",
-        "5ec16ad",
-        "1ef2d16",
-        "edf7df2",
-        "acdc12c",
-        "2c30894"
-      ],
-      "deviceCheck": "From the integration branch in Expo Go or a dev build: (1) Settings > Backup: export, then restore that same file - success alert with non-zero rows, Meal prep plan and ticked meals unchanged, Dashboard loads (the new temp-table SQL has only run on sql.js so far, so this step matters). (2) Dashboard with a logged measurement: the pills show value, cm and date. (3) Settings: change a profile field and a reminder toggle, force-close, reopen: both persisted.",
-      "notes": "WO ready (24 checkbox rows: 15 DO, 3 ALREADY DONE, 6 LEAVE). ALREADY DONE: the v37 comment (via #412), the POST_RESTORE_STEPS comment (gone), the font-error-while-init-pending case in App.startFailure.test.tsx. LEAVE by the owner's decision: winter mapping, onboarding age keypad, MealPrep handleToggleConsumed guard, restore alert column names. LEAVE by the ANALYST (HUMAN: these two boxes stay unticked although the decision says do the tidy-ups and the cold-review items): Button.tsx raw 13 / 48 (no token has these values; a swap would restyle every button and tokens.ts is not on the checklist), and the #408 Remove confirm that promises a refund the db does not give (changing it is a behaviour change plus a product call on which batch to credit; the decision allows exactly one behaviour fix and names another) - the latter is filed as its own issue. DO: comment/doc edits (MealPrepScreen, three test titles, AppNavigator, five Jest 30 comments, two eslint-disable lines, the restoreFromPayload docblock), removal of upsertAdditionalWorkouts with 16 tests, MEASUREMENT_FIELDS reuse, pills rename, trackProfileWrite -> trackSettingWrite, three strengthened tests (importRecipe abort, extraWorkouts, corruptDay), the one behaviour fix (restore treats a NULL weekly_meal_plan.is_consumed as 0), and the RESTORE_SLOT_DEDUPE_SQL rewrite to one temp table (not a MIGRATIONS entry; riskiest, last, behind a characterisation test committed green on the old SQL). 17 commits planned. ORCHESTRATOR: the developer work is split into two dispatches on the same branch - part A (commits 1-13, comments / tidy-ups / tests) and part B (commits 14-17, the restore path) - so the restore changes get a fresh context; one tester and one security review over the whole issue afterwards. Expected count from the lane baseline 1367/105: -16 +5 +6 = 1362 tests, 107 suites. | dev part A (13 commits, tip e2df38a, 1351/105 = 1367 - 16): comment-only commits proven by transpiling each file with comments removed before and after (EQUAL for all, incl. jest.config.js and database.ts); 16 upsertAdditionalWorkouts tests deleted and listed; renames shown to be pure; strengthened tests go red under every named mutation. DEVIATIONS: (1) in the writers(db,date,column) list the upsert entry was removed, not replaced (add and toggle were already in it); (2) two work-order claims that the OLD test stays green under the named mutation were wrong (importRecipe: the literal mutation gives 4 calls and turns the old test red too, a variant with started = 1 gives 3 and discriminates; corruptDay: the old notice tests also go red) - the new tests are red in every case. Dev admits two slips where git checkout HEAD -- dropped uncommitted edits (redone and re-verified). Not run under an explicit TZ=UTC (npm test already sets it). | dev part B (5 commits, tip 5ec16ad, 1364/107 = 1351 + 5 + 8): 0309f5a failing NULL-is_consumed test; 95b4cbd an EXTRA test-only commit (the first test's daily_log row lacked two NOT NULL columns, so after the fix case 1 still failed on daily_log.walking_task - a test bug, fixed before the fix commit, no amend); 3b3bf0d the fix (one bound value in the _restoreFromPayload row loop: weekly_meal_plan.is_consumed === null -> 0); 40f826f 8 characterisation tests green on the old SQL and red under 4 SQL mutations; 5ec16ad RESTORE_SLOT_DEDUPE_SQL with one temp table (CREATE TEMP TABLE ... AS SELECT, plain DROP before the index line, following RESTORE_SET_INDEX_SQL). Dev proofs: MIGRATIONS field-by-field identical; 500 random datasets old vs new SQL on sql.js, 0 mismatches (472 with duplicates removed, 288 with a credited loser); no temp table left after a successful or a rolled-back restore; a later restore on the same connection works. ORCHESTRATOR checked the abort condition itself with its own script: MIGRATIONS (38 entries: version, sql, precondition source) is identical on main bbfe649, the integration branch, e2df38a and the lane F tip; the only exported SQL constant that changed is RESTORE_SLOT_DEDUPE_SQL; the array closes at schema.ts:827 and every changed line lies inside the template literal that starts at 836. I read the whole schema.ts diff: the same SELECT materialised once, both statements read from it. NOT an abort condition. | tester REJECT r1 at 5ec16ad (gates green 1364/107; MIGRATIONS identical; all 10 comment-only files EQUAL with comments stripped, jest.config.js deep-equal; own differential 712 datasets old vs new SQL, 0 mismatches, harness shown sensitive; NULL is_consumed matrix and the stale-pointer row traced by running: no fabricated inventory, no double debit; 95b4cbd judged a legitimate test repair; the three strengthened tests each shown stronger under a discriminating mutation). REASON: 625f4dd deleted the upsertAdditionalWorkouts row of the writers table in daily_log writers reject dates outside the valid range - as the WORK ORDER told it to - and that row was the only date-range coverage of the shared _readAdditionalWorkoutsForWrite, so addAdditionalWorkout and toggleAdditionalWorkout now have no date-range test (a mutation that swallows the date error and inserts the row passes all 169 tests of the file; 6 fail on the pre-removal state). The developer's remark that add and toggle were already in the list is true of a different list. ALSO REQUIRED by the orchestrator from the tester's findings: (2) deleting DROP TABLE restore_slot_survivors survives the whole suite (no test restores twice on one connection) although in the app the second restore of a session would then fail; (3) no characterisation case has a survivor sharing a batch with a consumed loser, or a batch with a consumed and an unconsumed loser, so a mutation of the UPDATE sub-select alone survives (the developer had claimed this was pinned); (4) in corruptDay the new arrange() arms a once-rejection before the notice assertion, so one failing assertion cascades into unrelated failures. All four are test-only. Sent back: items 1 and 4 to the part A developer, then 2 and 3 to the part B developer (same worktree, so one after the other). | round 2, first half (part A developer, test-only, tip edf7df2, 1382/107): 1ef2d16 adds addAdditionalWorkout and toggleAdditionalWorkout to the date-range writers table (+18 tests; toggle goes through a wrapper that swallows only its unknown-id rejection; under the tester's mutation 11 tests go red, 6 for toggle alone, 5 for add alone); edf7df2 moves arrange() after the notice assertion in the two it.each corruptDay tests (under the notice mutation 7 failures before, 6 after - exactly the notice-dependent ones; --randomize twice 20/20). | round 2, second half (part B developer, test-only, tip acdc12c, 1387/107): acdc12c adds to restoreSlotDedupe.test.ts three shared-batch cases (survivor and consumed loser on one batch credits once; consumed plus unconsumed loser on one batch credits once; two consumed losers of different slots credit twice) and a describe with two restores on one connection plus a rolled-back restore followed by a good one, each asserting an empty sqlite_temp_master. Dev evidence: with the DROP TABLE line deleted 2 tests go red (temp schema holds restore_slot_survivors); the SET-sub-select-only mutations turn exactly case a resp. case b red; the whole file is 13/13 green on the OLD SQL (schema.ts from 40f826f). One commit, not split. | tester APPROVE r2 at acdc12c after 1 round trip. Its notes: the throws-after-the-dedupe test pins that a later failure leaves no temp table and the next restore works, not the rollback of a live temp table (shown separately in round 1, clean); the add queue test is not vacuous (it fails whenever add stops rejecting a bad date; the developer's add-only mutation kept a rejection); the WHERE EXISTS clause of the dedupe UPDATE is a no-op optimisation. Process note: the tester found a scratch script of its own changed by someone else mid-run (agents share one scratchpad directory); it switched to uniquely named scripts.",
-      "decisionSource": "latest owner comment on #437 (6026263652): do the comments, docs and tidy-ups incl. the cold-review ones; upsertAdditionalWorkouts goes with its tests; the v37 comment is part of #412; of the behaviour notes only is_consumed NULL -> 0 on restore; the other four stay; the expo/src/winter mapping is not investigated",
-      "workOrder": "C:/git/ht-lanes/wo/437.md",
-      "securityReview": "APPROVE (7b4c6cf..5ec16ad, read from git objects, no tests run): the dedupe rewrite is semantically identical - the UPDATE writes only meal_inventory.portions_available while the survivors query reads only weekly_meal_plan and the set of meal_inventory ids; date and meal_type are NOT NULL so survivor_id cannot be NULL (and NOT IN with a NULL would behave as before); no affinity difference between the CTE and the CREATE TABLE AS SELECT for the comparisons used. The temp table is created and dropped inside the one restore transaction, a throw rolls the CREATE back, an already existing table of that name makes the restore fail and roll back (same as the RESTORE_SET_INDEX_SQL precedent); the payload cannot name it (restore only writes tables listed from sqlite_master). MIGRATIONS unchanged: both hunks lie after the closing bracket at line 827. NULL is_consumed: still a bound value, limited to that table/column/null; an unconsumed row that keeps an inventory pointer is inert - all three _creditPortion callers, the dedupe credit and the without-refund count require is_consumed = 1, and the next toggle or assign clears the pointer; no path fabricates inventory. upsertAdditionalWorkouts carried no guard of its own; the strict refusal lives in _readAdditionalWorkoutsForWrite, unchanged. MEASUREMENT_FIELDS is a const literal tuple, only its members reach SQL text. The new restoreFromPayload docblock describes only guards the code has. NOTES FOR THE HUMAN: (1) a backup with is_consumed null is now restored with no signal (before: a loud Restore failed); a skipped/warn entry would be a follow-up. (2) NOT CONFIRMED: how native expo-sqlite treats CREATE TEMP TABLE inside withTransactionAsync under WAL - the reasoning rests on the existing precedent; only a restore on a device settles it (it is step 1 of the device check). (3) no PRAGMA temp_store anywhere (same as the precedent).",
-      "regressionProof": "round 1 (5ec16ad): the NULL-is_consumed case fails with database.ts from 95b4cbd (NOT NULL constraint failed: weekly_meal_plan.is_consumed), 5/5 at the tip; all 10 comment-only files EQUAL with comments stripped, jest.config.js deep-equal when required; renames shown pure; each strengthened test goes red under a mutation that leaves its old version green; MIGRATIONS 38 vs 38 entries identical (tester, security and orchestrator independently); differential old vs new dedupe SQL on sql.js: 712 datasets (12 hand-built), 0 mismatches, harness reports 216 mismatches when one ordering is flipped; restore through restoreFromPayload leaves no temp table after success, after a throw past the dedupe and after a throw inside it. Round 2 (1ef2d16, edf7df2, acdc12c; test-only, three test files): the swallow-and-insert mutation on _readAdditionalWorkoutsForWrite now turns 12 tests red (6 for add alone, 6 for toggle alone); deleting the DROP TABLE line turns 2 tests red; the SET-only mutations turn exactly the shared-batch case a resp. b red; the WHERE EXISTS copy is shown to be a redundant filter (equivalent mutant); restoreSlotDedupe 13/13 also on the OLD SQL; corruptDay 7 -> 6 failures under the notice mutation, the unrelated test no longer cascades; three files with --randomize seeds 11-13: 220/220; 1387/107 (tester reproduced)",
-      "mergeSha": "311191c"
+    "352": {
+      "lane": "D", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "title": "import a recipe from a URL via schema.org JSON-LD",
+      "decisionSource": "owner comment 6070883467 on #352: 'Import from URL' action on the Recipes screen with a small dialog; http/https only, 15 s timeout, at most 3 MB, non-2xx or non-HTML = clear error, reuse fetchJson hardening, no new package; every ld+json block incl. arrays and @graph, first object whose @type is or contains Recipe; map name, recipeIngredient, recipeInstructions (string, HowToStep, HowToSection), recipeYield (first number), totalTime or prepTime; unparsed ingredient lines kept as names; opens the editor prefilled, nothing saved until Save, macros from the editor's recompute; no-recipe message; no images, no page nutrition; only plain strings reach the editor",
+      "securityPlan": "required by the decision (untrusted web pages)"
     }
   },
-  "foundDuringSprint": [
-    441,
-    442,
-    443,
-    444,
-    445
-  ],
-  "smallFindings": [
-    "filed as #445"
-  ],
-  "smallFindingsIssue": 445,
+  "foundDuringSprint": [],
+  "pendingFindings": [],
   "log": [
     {
-      "at": "2026-10-07T20:11:02Z",
-      "event": "preflight green on main bbfe649: tree clean, identity verified, typecheck pass, 1118 tests / 93 suites"
-    },
-    {
-      "at": "2026-10-07T20:20:00Z",
-      "event": "created and pushed sprint/auto-fixes from main",
-      "sha": "bbfe649"
-    },
-    {
-      "at": "2026-10-07T20:20:00Z",
-      "event": "scope frozen: 17 open issues from SPRINT.md §3 (all listed issues are open)"
-    },
-    {
-      "at": "2026-10-07T20:14:33Z",
-      "event": "worktrees a/b/d created at e46e8ac, npm ci running; analysts dispatched for #427 #426 #424 (current) and #412 #430 #423 #428 (ahead, read-only)"
-    },
-    {
-      "at": "2026-10-07T20:14:57Z",
-      "event": "npm ci ok in worktrees a/b/d; #423 work order ready (queued behind #426)"
-    },
-    {
-      "at": "2026-10-07T20:15:46Z",
-      "event": "#427 #426 #424 work orders ready, none parked -> in_dev (developers dispatched in worktrees a/b/d)"
-    },
-    {
-      "at": "2026-10-07T20:16:04Z",
-      "event": "all 7 lane A/B/D work orders ready, none parked; #427 #426 #424 in_dev"
-    },
-    {
-      "at": "2026-10-07T20:17:40Z",
-      "event": "analysts dispatched ahead (read-only) for lane C #434 #435 #432 #431 and lane E #422 #433 #429; #411 is analysed after #434 has landed on the lane branch; lanes C and E themselves still wait for lane A"
-    },
-    {
-      "at": "2026-10-07T20:18:13Z",
-      "event": "#427 in_test (1119/94 per dev)"
-    },
-    {
-      "at": "2026-10-07T20:18:28Z",
-      "event": "#422 work order ready (lane E waits for lane A)"
-    },
-    {
-      "at": "2026-10-07T20:18:47Z",
-      "event": "#432 and #435 work orders ready (lane C waits for lane A); ruled #435 sibling scope: 2 handlers in, 7 snap-back handlers deferred to findings"
-    },
-    {
-      "at": "2026-10-07T20:20:03Z",
-      "event": "#424 in_test (1135/94 per dev); work orders ready for #433 #434 #431 #429 - all 14 analysed so far, none parked (#411, #425, #437 still to analyse)"
-    },
-    {
-      "at": "2026-10-07T20:20:48Z",
-      "event": "#427 tester APPROVE r0 -> security (read-only, parallel); lane A -> #412 in_dev"
-    },
-    {
-      "at": "2026-10-07T20:21:29Z",
-      "event": "#427 ready (security APPROVE)"
-    },
-    {
-      "at": "2026-10-07T20:22:17Z",
-      "event": "#426 in_test (1129/93 per dev)"
-    },
-    {
-      "at": "2026-10-07T20:23:16Z",
-      "event": "#424 tester APPROVE r0, but orchestrator sent it back: a second in-flight 429 can shorten the pause (roundTrips=1) -> in_dev"
-    },
-    {
-      "at": "2026-10-07T20:25:37Z",
-      "event": "#424 round 2 (f541707, 1137/94 per dev) in_test; security started in parallel on e46e8ac..f541707 (read-only)"
-    },
-    {
-      "at": "2026-10-07T20:26:30Z",
-      "event": "#412 in_test (1125/94 per dev); orchestrator verified schema.ts diff is comment-only (no MIGRATIONS entry modified)"
-    },
-    {
-      "at": "2026-10-07T20:26:39Z",
-      "event": "#424 security APPROVE on f541707 (ran in parallel with the round-2 tester, whose verdict is still pending)"
-    },
-    {
-      "at": "2026-10-07T20:28:06Z",
-      "event": "#424 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane D -> #428 in_dev"
-    },
-    {
-      "at": "2026-10-07T20:29:57Z",
-      "event": "#426 tester APPROVE r0, but orchestrator sent it back for a cold-cache test timeout (roundTrips=1) -> in_dev; security started in parallel on e46e8ac..1979589 (read-only)"
-    },
-    {
-      "at": "2026-10-07T20:30:38Z",
-      "event": "#412 tester APPROVE r0 -> security (read-only, parallel); lane A -> #430 in_dev"
-    },
-    {
-      "at": "2026-10-07T20:31:01Z",
-      "event": "#426 security APPROVE on 1979589 (source change); the test-only timeout follow-up is still in dev"
-    },
-    {
-      "at": "2026-10-07T20:31:22Z",
-      "event": "#412 ready (security APPROVE)"
-    },
-    {
-      "at": "2026-10-07T20:32:20Z",
-      "event": "#426 round 2 (83e352d, test-only: 5 s wait on each test's first findBy; 1129/93 per dev) in_test"
-    },
-    {
-      "at": "2026-10-07T20:33:05Z",
-      "event": "#430 in_test (1136/95 per dev)"
-    },
-    {
-      "at": "2026-10-07T20:36:00Z",
-      "event": "#426 ready (tester APPROVE r2 after 1 round trip; security APPROVE stands, the round-2 delta is test-only); lane B -> #423 in_dev"
-    },
-    {
-      "at": "2026-10-07T20:36:22Z",
-      "event": "#430 REJECT r1 (archived-row case no longer pinned after the assertion was dropped) -> back to dev, roundTrips=1"
-    },
-    {
-      "at": "2026-10-07T20:37:50Z",
-      "event": "#428 in_test (1146/95 per dev)"
-    },
-    {
-      "at": "2026-10-07T20:38:09Z",
-      "event": "#430 round 2 (f563c3e, test-only: 4 assertions pinning archived + still returned; 1136/95 per dev) in_test; security APPROVE on the source diff"
-    },
-    {
-      "at": "2026-10-07T20:39:33Z",
-      "event": "#430 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane A out of issues (3 done, 0 parked) -> cleanup"
-    },
-    {
-      "at": "2026-10-07T20:42:06Z",
-      "event": "merged lane A into integration b9c8d54 (no conflicts); gates green: typecheck clean, 1136/95. #428 tester APPROVE r0 -> security. #423 in_test (1136/94 per dev). Lanes C and E unblocked",
-      "sha": "b9c8d54"
-    },
-    {
-      "at": "2026-10-07T20:43:30Z",
-      "event": "worktrees c/e created at 4dea4c6 (npm ci ok); lane C -> #434 in_dev, lane E -> #422 in_dev"
-    },
-    {
-      "at": "2026-10-07T20:44:22Z",
-      "event": "GitHub CI test check on integration 4dea4c6 (lane A merged): completed success. #428 ready (tester APPROVE r0, security APPROVE with 2 follow-up findings); lane D out of issues (2 done, 0 parked) -> cleanup"
-    },
-    {
-      "at": "2026-10-07T20:45:10Z",
-      "event": "filed #441 (rescue export wal after cancelled share), #442 (Discover re-import cannot refresh, misleading alert), #443 (editor save-deadline notice never seen); none worked. Remaining pendingFindings are SMALL and go into one collected issue at the end"
-    },
-    {
-      "at": "2026-10-07T20:45:34Z",
-      "event": "#422 in_test (1150/95 per dev)"
-    },
-    {
-      "at": "2026-10-07T20:46:25Z",
-      "event": "merged lane D into integration c757d60 (no conflicts); gates green: typecheck clean, 1164/97",
-      "sha": "c757d60"
-    },
-    {
-      "at": "2026-10-07T20:47:51Z",
-      "event": "#422 ready (tester APPROVE r0, security skipped); lane E -> #433 in_dev"
-    },
-    {
-      "at": "2026-10-07T20:48:30Z",
-      "event": "#423 tester APPROVE r0 -> security (orchestrator decision: not skipped, because Save data now runs against an open, live database on the render-crash screen)"
-    },
-    {
-      "at": "2026-10-07T20:49:10Z",
-      "event": "#434 in_test (1194/95 per dev)"
-    },
-    {
-      "at": "2026-10-07T20:50:57Z",
-      "event": "#423 ready (tester APPROVE r0, security APPROVE; export-copy skew on a live db recorded on #441); lane B out of issues (2 done, 0 parked) -> cleanup"
-    },
-    {
-      "at": "2026-10-07T20:52:19Z",
-      "event": "merged lane B into integration 2860282 (no conflicts); gates green: typecheck clean, 1182/98",
-      "sha": "2860282"
-    },
-    {
-      "at": "2026-10-07T20:54:19Z",
-      "event": "#433 in_test (1162/96 per dev)"
-    },
-    {
-      "at": "2026-10-07T20:55:51Z",
-      "event": "#434 tester APPROVE r0, but orchestrator sent it back: the read filter in the shared parsers reaches the template editor and creates a new silent write-back (roundTrips=1) -> in_dev"
-    },
-    {
-      "at": "2026-10-07T20:57:25Z",
-      "event": "#433 ready (tester APPROVE r0, security skipped); lane E -> #429 in_dev (last issue)"
-    },
-    {
-      "at": "2026-10-07T20:58:07Z",
-      "event": "#434 round 2 (9454396: parsers back to base, item filter in mapLogRow only; 1196/95 per dev) in_test; security started in parallel on 4dea4c6..9454396 (read-only)"
-    },
-    {
-      "at": "2026-10-07T20:58:18Z",
-      "event": "GitHub CI test check on integration fee2c49 (lanes A, D merged) and 1f6167f (lanes A, B, D merged): both completed success - the App render suites pass on CI's cold jest cache"
-    },
-    {
-      "at": "2026-10-07T20:59:20Z",
-      "event": "#434 security APPROVE on 9454396 (round-2 tester verdict still pending)"
-    },
-    {
-      "at": "2026-10-07T21:00:44Z",
-      "event": "#434 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane C -> #411 analysing (the analyst reads the lane branch with #434 on it)"
-    },
-    {
-      "at": "2026-10-07T21:12:29Z",
-      "event": "#411 work order ready -> in_dev; #429 in_test (1172/97 per dev)"
-    },
-    {
-      "at": "2026-10-07T21:13:45Z",
-      "event": "#429 security APPROVE on e366ee3 (ran in parallel with the tester, whose verdict is still pending)"
-    },
-    {
-      "at": "2026-10-07T21:17:23Z",
-      "event": "#411 in_test (1233/95 per dev); security started in parallel on 9454396..1c88a00 (read-only)"
-    },
-    {
-      "at": "2026-10-07T21:18:33Z",
-      "event": "#429 tester APPROVE r0 + security APPROVE, but orchestrator sent it back for committed tests of the six stepper flush callbacks (roundTrips=1) -> in_dev"
-    },
-    {
-      "at": "2026-10-07T21:18:48Z",
-      "event": "#411 security APPROVE on 1c88a00 (tester verdict still pending)"
-    },
-    {
-      "at": "2026-10-07T21:20:59Z",
-      "event": "#411 tester APPROVE r0 + security APPROVE, but orchestrator sent it back: the reset buttons must use the entry's date, not the render-time today (roundTrips=1) -> in_dev"
-    },
-    {
-      "at": "2026-10-07T21:21:13Z",
-      "event": "#429 round 2 (88e3370, test-only: describe.each over the six time stepper commits, 12 tests; 1184/97 per dev) in_test"
-    },
-    {
-      "at": "2026-10-07T21:22:23Z",
-      "event": "#411 round 2 (e6acb7c: both notice buttons pass entry.date; new test failed with ('2026-09-20', column) instead of ('2026-09-19', column); 1235/95 per dev) in_test"
-    },
-    {
-      "at": "2026-10-07T21:23:43Z",
-      "event": "#411 ready (tester APPROVE r2 after 1 round trip; security APPROVE on round 1, and the round-2 change is the one-line fix security itself suggested); lane C -> #435 in_dev"
-    },
-    {
-      "at": "2026-10-07T21:24:07Z",
-      "event": "#429 ready (tester APPROVE r2 after 1 round trip, security APPROVE); lane E out of issues (3 done, 0 parked) -> cleanup"
-    },
-    {
-      "at": "2026-10-07T21:27:24Z",
-      "event": "merged lane E into integration 1951c66 (no conflicts); gates green: typecheck clean, 1230/100. #435 in_test (1243/96 per dev)",
-      "sha": "1951c66"
-    },
-    {
-      "at": "2026-10-07T21:27:57Z",
-      "event": "analyst dispatched ahead for lane F #425 (read-only on the integration checkout; the mocks and jest config are not touched by lane C); #437 is analysed after lane C merges because its checklist names lane C files"
-    },
-    {
-      "at": "2026-10-07T21:28:55Z",
-      "event": "#425 work order ready (queued for lane F, which waits for lane C)"
-    },
-    {
-      "at": "2026-10-07T21:31:22Z",
-      "event": "#435 tester APPROVE r0, but orchestrator sent it back: one of the new tests is vacuous (roundTrips=1) -> in_dev"
-    },
-    {
-      "at": "2026-10-07T21:31:33Z",
-      "event": "GitHub CI test check on integration a7a4c74 (lanes A, B, D, E merged): completed success"
-    },
-    {
-      "at": "2026-10-07T21:32:49Z",
-      "event": "#435 round 2 (498da6c, test-only: the guard-release test now keeps the same modal mounted and goes red when the release is removed; 1243/96 per dev) in_test"
-    },
-    {
-      "at": "2026-10-07T21:34:04Z",
-      "event": "#435 ready (tester APPROVE r2 after 1 round trip, security skipped); lane C -> #432 in_dev"
-    },
-    {
-      "at": "2026-10-07T21:38:04Z",
-      "event": "#432 in_test (1249/96 per dev); security started in parallel on 498da6c..1cf3d03 (read-only)"
-    },
-    {
-      "at": "2026-10-07T21:38:39Z",
-      "event": "#432 security APPROVE on 1cf3d03 (tester verdict still pending)"
-    },
-    {
-      "at": "2026-10-07T21:42:40Z",
-      "event": "#432 ready (tester APPROVE r0, security APPROVE); lane C -> #431 in_dev (last issue)"
-    },
-    {
-      "at": "2026-10-08T06:38:43Z",
-      "event": "RESUMED by a fresh session after a 9 h gap (the previous session ended around 21:44Z while the #431 developer was running). Reconciled: all 17 frozen issues still open on GitHub; integration 29f5afa is 9 state-only commits ahead of origin; lane C worktree at 794b62b holds 3 unpushed #431 commits (e618a53 LoadErrorView tests, 4b54e32 LoadErrorView, 794b62b failing Dashboard tests) plus an UNCOMMITTED 14-line Dashboard fix in src/screens/DashboardScreen.tsx (copied to C:/git/ht-lanes/wo/431_DashboardScreen.wip.tsx); the Analytics half is not started. Identity verified. #431 stays in_dev with roundTrips 0: a new developer continues from the interrupted work (an interruption is not a tester rejection)"
-    },
-    {
-      "at": "2026-10-08T07:04:15Z",
-      "event": "#431 in_test (efc21bf, 1267/99 per dev; lane C pushed). Security SKIPPED for #431 by orchestrator decision: the diff is two screens, one presentational component and tests; nothing reaches src/db, backup, src/api, the filesystem or external input"
-    },
-    {
-      "at": "2026-10-08T07:10:50Z",
-      "event": "#431 tester APPROVE r0, but orchestrator sent it back: a failed load is still silent when the Dashboard has no entry on screen, and the Analytics hasLoadedOnceRef guard has no test (roundTrips=1) -> in_dev. Dry-run merge of lane C into integration (git merge-tree, in memory): clean; database.ts is the only file changed on both sides"
-    },
-    {
-      "at": "2026-10-08T07:12:52Z",
-      "event": "#431 round 2 (acf001a; 1271/99 per dev) in_test: 5c3db95 changes the Dashboard early return from loadError === 'initial' to loadError && !entry (one line), with 3 new tests that failed first; acf001a pins the Analytics hasLoadedOnceRef guard (red under the mutation, per dev). Orchestrator read the one-line fix and loadToday: all state is committed after the Promise.all and hasLoadedOnceRef is set in the same block, so 'initial' with an entry on screen is only reachable if the grouping loop throws - handed to the tester to confirm"
-    },
-    {
-      "at": "2026-10-08T07:15:19Z",
-      "event": "#431 ready (tester APPROVE r2 after 1 round trip, security skipped; 1271/99 locally and with TZ=UTC); lane C out of issues (5 done, 0 parked) -> cleanup"
-    },
-    {
-      "at": "2026-10-08T07:16:49Z",
-      "event": "lane C cleanup: nothing worth doing, no commit (tip stays acf001a, 1271/99) -> merging lane C into integration"
-    },
-    {
-      "at": "2026-10-08T07:18:08Z",
-      "event": "merged lane C into integration 802fa10 (no conflicts; database.ts auto-merged with lane E's setNutritionGoals); gates green: typecheck clean, 1365/104 (1230/100 before; lane C adds 135 tests / 4 suites, as on the lane). schema.ts untouched by lane C. Every lane except F is merged -> lane F unblocked",
-      "sha": "802fa10"
-    },
-    {
-      "at": "2026-10-08T07:19:58Z",
-      "event": "integration pushed at 71e0259; worktree f created at 71e0259 (npm ci ok); lane F -> #425 in_dev (work order from yesterday, new baseline 1365/104); analyst dispatched for #437 (read-only on the integration checkout, which now holds every other lane)"
-    },
-    {
-      "at": "2026-10-08T07:20:22Z",
-      "event": "GitHub CI test check on integration 71e0259 (all lanes except F merged): completed success (07:18:15Z-07:19:45Z). Housekeeping: the at-times of this session's earlier log entries were estimates that ran ahead of the clock; corrected to the commit times of the matching state commits"
-    },
-    {
-      "at": "2026-10-08T07:22:33Z",
-      "event": "#425 in_test (7b4c6cf, 1367/105 per dev; lane F pushed). Security SKIPPED for #425: test-only (a jest mock and one test file)"
-    },
-    {
-      "at": "2026-10-08T07:24:57Z",
-      "event": "#425 ready (tester APPROVE r0, security skipped; 1367/105); lane F -> #437 (analyst still running)"
-    },
-    {
-      "at": "2026-10-08T07:26:22Z",
-      "event": "#437 work order ready, not parked (15 DO, 3 already done, 6 leave) -> in_dev, part A (commits 1-13) dispatched on lane F at 7b4c6cf"
-    },
-    {
-      "at": "2026-10-08T07:26:56Z",
-      "event": "filed #444 (MealPrep Remove confirm promises a refund the db does not give for a NULL inventory pointer; the unticked #408 box of #437); not worked"
-    },
-    {
-      "at": "2026-10-08T07:34:38Z",
-      "event": "#437 part A done (13 commits, tip e2df38a, 1351/105 per dev; schema.ts untouched) -> part B (commits 14-17: is_consumed NULL -> 0 on restore, RESTORE_SLOT_DEDUPE_SQL to one temp table) dispatched; still in_dev"
-    },
-    {
-      "at": "2026-10-08T07:41:13Z",
-      "event": "#437 in_test (18 commits 7b4c6cf..5ec16ad, 1364/107 per dev); security started in parallel (read-only, from git objects) because the diff reaches src/db and the restore path. Orchestrator verified mechanically that MIGRATIONS is identical on main, integration and the lane F tip"
-    },
-    {
-      "at": "2026-10-08T07:43:43Z",
-      "event": "#437 security APPROVE on 5ec16ad (tester verdict still pending)"
-    },
-    {
-      "at": "2026-10-08T07:55:56Z",
-      "event": "#437 REJECT r1 (date-range coverage of add/toggleAdditionalWorkout lost with the deleted writers-table row; plus three test gaps the orchestrator wants closed: no double-restore test guarding the DROP TABLE, two missing dedupe characterisation cases, a failure cascade in corruptDay) -> back to dev, roundTrips=1. Security APPROVE stands for the source (all four items are test-only)"
-    },
-    {
-      "at": "2026-10-08T07:59:17Z",
-      "event": "#437 round 2, items 1 and 4 done (1ef2d16, edf7df2; 1382/107 per dev); items 2 and 3 (double-restore test, two dedupe characterisation cases) dispatched to the part B developer; still in_dev"
-    },
-    {
-      "at": "2026-10-08T08:01:37Z",
-      "event": "#437 round 2 complete (3 test-only commits 5ec16ad..acdc12c: 1ef2d16, edf7df2, acdc12c; 1387/107 per dev) -> in_test. Security APPROVE on 5ec16ad stands: the round-2 delta touches three test files only"
-    },
-    {
-      "at": "2026-10-08T08:06:16Z",
-      "event": "#437 ready (tester APPROVE r2 after 1 round trip; security APPROVE on 5ec16ad, the round-2 delta is three test files; 1387/107); lane F out of issues (2 done, 0 parked) -> cleanup"
-    },
-    {
-      "at": "2026-10-08T08:08:53Z",
-      "event": "lane F cleanup: 2c30894, comment-only in three files (verified by the orchestrator: identical output with comments stripped), 1387/107 unchanged -> merging lane F into integration"
-    },
-    {
-      "at": "2026-10-08T08:09:59Z",
-      "event": "merged lane F into integration 311191c (no conflicts); gates green: typecheck clean, 1387/107 (baseline on main 1118/93). All six lanes merged, 17 of 17 issues merged, 0 parked. MIGRATIONS on the merged branch re-checked against main bbfe649: 38 entries identical (version, sql, precondition); the only changed SQL constant is RESTORE_SLOT_DEDUPE_SQL. Diff against main without state file and report: 74 files, +4630 / -727",
-      "sha": "311191c"
-    },
-    {
-      "at": "2026-10-08T08:14:26Z",
-      "event": "GitHub CI test check on integration 36378f1 (all six lanes merged): completed success. Filed #445 (Sprint 4: small findings, 58 boxes); none worked. SPRINT_REPORT.md written. Sprint finished: 17 of 17 merged, 0 parked, no abort condition. NOT opened: the PR - the cold review and the device checks come first and belong to the human"
+      "at": "2026-10-09T07:27:09Z",
+      "event": "preflight ok: tree clean, user.email is the verified noreply address, main e4e6e3b typecheck pass and 1387 tests / 107 suites pass with --maxWorkers=2; sprint/auto-fixes created from e4e6e3b and pushed. Scope frozen: all 11 issues of SPRINT.md section 3 are open, each with an owner decision comment dated 2026-10-08"
     }
-  ],
-  "status": "finished",
-  "pendingFindings": [
-    "USER-HITTABLE (#423 analyst): OnboardingScreen branch in App.tsx is outside the error boundary the #423 decision asks for, so a render crash on first launch is still uncaught",
-    "USER-HITTABLE/DATA-LOSS (#426 analyst): rescueExport offers the wal only after the db share resolves; if the first share is cancelled or fails the wal is never offered",
-    "SMALL (#426 analyst): App.tsx hides Retry on any font error, with no way to re-attempt font loading",
-    "SMALL (#424 analyst): OFF_LOOKUP_CONCURRENCY lookups already past beforeAttempt still complete after a 429 (harmless)",
-    "USER-HITTABLE/DATA-LOSS (#428 analyst): re-importing a Discover recipe says Already in library (DiscoverDetailScreen.tsx:112), so a recipe saved with 0-macro not-looked-up ingredients cannot be refreshed by importing again",
-    "SMALL (#430 analyst): getBioForceLibrary (database.ts:1234) maps JSON.parse(r.data) unguarded; one bad row throws the whole list (needs hand-corrupted data)",
-    "SMALL (#412 analyst): the v37 precondition error text (schema.ts:811) still says skip v37 if already applied; it is a string inside the migration, so it stays",
-    "SMALL (#427 dev): database.ts header block (Fixes applied previously / Feature additions (issue #40)) carries issue numbers and history, against the comment rule",
-    "SMALL (#422 analyst): parseDaySetting/parseTimeSetting in database.ts are private, so the time rule is duplicated in notifications.ts and can drift; a shared export would remove it",
-    "SMALL (#435 analyst): 7 Dashboard handlers only log and reload on a write failure, with no message to the user: handleToggle :460, handleExerciseToggle :506, handleAddExtraWorkout :553, handleToggleExtraWorkout :573, handleToggleMeal :591, handleAddWater :603, handleDeleteSet :655 (suggested: shared reportSaveFailure helper + table-driven test)",
-    "SMALL (#435 analyst): MeasurementsModal.handleSave saves the valid fields even when another field is invalid, then stays open, so the user may re-save",
-    "SMALL (#432 analyst): toggleAdditionalWorkout still creates an empty daily_log row for the date before rejecting an unknown id (harmless: the Dashboard only toggles today's row)",
-    "SMALL (#431 analyst): Analytics loading starts false, so the first frame shows zeroed cards before the load begins",
-    "SMALL (#429 analyst): OnboardingScreen calls the two single goal writers, so it has the same partial-write exposure as Recalculate had",
-    "USER-HITTABLE (#429 analyst, from the issue body, not in the decision): Settings height and age text fields keep the typed value after a rejected write",
-    "SMALL (#433 analyst): trackProfileWrite name is misleading",
-    "SMALL (#424 dev): the comment above putCache in openfoodfacts.ts references #369 (comment rule)",
-    "SMALL (#434 analyst): lifting-history readers near database.ts:3249 were not checked for item-shape assumptions",
-    "SMALL (#427 tester): on the start-failure screen the error message likely appears twice on Hermes (App.tsx joins err.message with the first 8 stack lines, and the stack's first line repeats the message); not run on a device",
-    "SMALL (#427 tester): database.ts file header still lists issue-number history (#37, #38, #39)",
-    "SMALL (#427 security): initDatabase runs PRAGMA journal_mode = WAL before assertCompatibleSchema, so an old rollback-journal database gets its header rewritten although the error message says nothing was changed; running the check before the pragma would make the sentence literally true",
-    "SMALL (#426 tester): if cacheDirectory is null, clearRescueCopies builds a 'null...' path (the delete is idempotent and the rejection swallowed)",
-    "SMALL (#412 tester): new describe block title carries an issue number (restoreFromPayload() by backup schema version (#412)) - handed to lane A cleanup",
-    "SMALL (#412 tester): RESTORE_SET_INDEX_SQL doc comment has one over-long line after the edit - handed to lane A cleanup",
-    "SMALL (#412 tester): schema.ts:433 precondition doc still says restoreFromPayload's post-restore replay runs the precondition; now true only for pre-v37 backups - handed to lane A cleanup (comment on the Migration type, not inside a migration)",
-    "SMALL (#412 tester): no repo test pins MIGRATIONS version/sql against a known-good copy; the work order asked for a test or script and only a one-off script was run",
-    "SMALL (#426 tester r2): cold first render of the App suites takes 1.9-3.1 s on this machine against a 5 s wait (margin 1.6x-2.5x); a slower CI runner or two App suites cold at once could eat it",
-    "SMALL (#430 tester): RecipeDetail add-to-shopping-list on a recipe with unreadable ingredients adds zero shopping items and still shows the Added! alert (needs corrupt data)",
-    "SMALL (#430 tester): a stored ingredients array with garbage items ([null], [1,\"a\"]) passes through the readers unfiltered; RecipeEditor ingredientsToRows and RecipeDetail ing.name would crash on a null item (pre-existing, needs corrupt data)",
-    "SMALL (#430 security): the recipe editor shows a blank ingredient row for a recipe whose ingredients were unreadable, with no notice; retyping and saving replaces the stored text (as decided; a banner would help)",
-    "SMALL (lane A cleanup): the restoreFromPayload docblock in database.ts no longer sits directly above the function (it is above RENUMBER_MIGRATION_VERSION / runSetIndexRepair)",
-    "SMALL (lane A cleanup): src/db/testHelpers/sqljsExpoAdapter.ts line 35 doc comment still mentions deleteDatabaseAsync",
-    "SMALL (lane A cleanup): // Test-only tripwire (#369) and another (#369) remain in the restoreFromPayload body (old history comments)",
-    "SMALL (#428 tester): the OFF budget treats a device clock step as a free reset (20 requests with a 1 ms backward step); inherent to the owner's decision to drop future timestamps",
-    "SMALL (#428 tester): the Discover not-looked-up test only exercises count 2; the sentence is a literal ingredient(s) with no singular branch",
-    "USER-HITTABLE/DATA-LOSS (#428 security): RecipeEditor save-deadline fallback sets the Not looked up banner and then navigates away at once (goBack / replace RecipeDetail), so the notice is never seen; the recipe is saved with cut-off ingredients counted as 0. Same when the pending recompute resolves null after an abort by a newer run or an unmount. Needs a decision: Alert before navigating, or stay on the screen",
-    "USER-HITTABLE (#428 tester + security, extends the #428 analyst finding): the Discover import Alert says Try again in a minute, but importing again answers Already in your library (INSERT OR IGNORE), so the zero-macro recipe cannot be refreshed that way; the only fix today is Edit + Save in the editor",
-    "SMALL (#422 dev): notifications.test.ts header comment still carries an issue number (#309)",
-    "SMALL (lane D cleanup): in RecipeEditorScreen.saveDeadline.test.tsx the fillIngredients helper is declared mid-describe and the first new test duplicates its body inline",
-    "SMALL (lane D cleanup): openfoodfacts.ts header says the network is hit once per unique ingredient name; failures are not cached, so that was already loose",
-    "SMALL (#423 tester): key={attempt} bump in AppErrorBoundary is redundant (children are unmounted while the fallback shows); the mount-counter test passes without it",
-    "SMALL (#423 tester): a thrown non-Error (string, null, object) shows only Unknown error while rendering the app; a thrown string's text is lost (same on the start path)",
-    "SMALL (#423 tester): a render crash inside RecoveryScreen while it is the boundary's own fallback propagates to the root and unmounts the app (no boundary above); the start-failure screen and the splash are not inside any boundary either",
-    "SMALL (lane B): styles.splash in App.tsx still has a raw gap: 16 (predates the sprint; token rule)",
-    "SMALL (#434 tester): a daily_log item holding a ~2000-deep nested object makes the writer throw RangeError (stack overflow; stored text unchanged; needs hand-edited data)",
-    "SMALL (#434 tester): the sync pin test covers wrong-item rows inside the backfill window only, not outside it",
-    "SMALL (#434 orchestrator): a weekday template whose stored array holds null or id-less items produces daily_log rows that the new predicate calls corrupt, and Reset this day rebuilds from the same template (needs a hand-edited backup; pre-existing shape of the #411 reset)",
-    "SMALL but read it (#434 tester r2 + security): after #434 a weekday template holding an item without a string id makes every new day built from it un-editable, and Reset this day does not unstick it (the fresh row is rebuilt from the same template). Needs a hand-edited backup. Options: the day builder drops or gives ids to such items, or the template is normalised on write",
-    "SMALL (#411 analyst): a second Reset this day after a successful one can still show Reset failed across screens/races, because the db throws not corrupt; only a UI in-flight guard is added in #411",
-    "SMALL (#429 dev): a debounced stepper write that fails now alerts but the stepper keeps showing the unsaved value",
-    "SMALL (#411 dev): the shared Button sets importantForAccessibility=no-hide-descendants on its title Text, so the visible label is hidden from assistive-tech text queries (tests must use includeHiddenElements or the accessibility label)",
-    "SMALL (#429 tester): switching a meal reminder off with cancelMealReminder failing shows Your setting was saved, but the reminder could not be scheduled - wrong wording for a cancel",
-    "SMALL (#411 tester/security): if the reload after a successful Reset this day fails, the old entry and its notice stay on screen; a second tap shows Reset failed although the reset happened (needs two failures in a row)",
-    "SMALL (#411 tester): the Reset this day notice button has no busy/disabled state, and a loadToday that never settles keeps the in-flight guard set until the screen remounts",
-    "SMALL (lane E cleanup): setNutritionGoals inlines the app_state upsert instead of going through setSetting, so a future change to setSetting would not reach it",
-    "SMALL (lane E cleanup): pre-existing (#313) and other (#NNN) history comments remain in SettingsScreen.tsx",
-    "SMALL (#435 dev): SetLoggerModal.handleAdd disables Add through saving state, not a ref, so a same-tick double tap can log a set twice",
-    "SMALL (#435 dev): CLAUDE.md does not need a suite count, but any doc that quotes one is stale (96 suites on lane C)",
-    "SMALL (#425 analyst): all of __mocks__/expo-file-system/legacy.js is dead under jest (the preset factory wins): e.g. the repo mock's getInfoAsync exists:false is never seen, the preset's resolves exists:true. Deleting the file or overriding the preset properly needs an owner call",
-    "SMALL (#425 analyst): backup.ts cacheDirectory ?? '' hides in its tests that the directory is undefined under jest",
-    "SMALL (#425 analyst): CLAUDE.md Testing setup says moduleNameMapper stubs expo-file-system/legacy; for that module the jest-expo preset mock wins",
-    "SMALL (#435 tester): measurements modal race - save pending, Cancel, reopen and type, then the old save resolves: the old handleSave calls onClose and closes the NEW modal, losing the typed text (same shape as before this sprint)",
-    "SMALL (#435 tester): after a successful measurement or set write whose refresh read fails, the pills / set list show stale values until the next load (no message; data is saved)",
-    "SMALL (#435 tester r2): MeasurementsModal.handleSave sends all five fields on every Save, so after a partial failure (one invalid field) the valid field is written twice (idempotent upsert; existing behaviour)",
-    "SMALL (#431 tester): Analytics - a refresh that fails after an earlier step already committed (e.g. weight history) shows the new weight next to old nutrition data under a banner that says Showing the last loaded data (follows the work order's partial-commit rule)",
-    "SMALL (#431 tester): Analytics - pressing Retry on the initial error view clears the error at once, and until the retry settles the header and zeroed cards show (no loading state; extends the #431 analyst finding that loading starts false)",
-    "SMALL (#431 tester): Dashboard - navigating away while the very first load is in flight leaves the spinner up until the next focus load (run id bumped, finally skipped); same before #431",
-    "SMALL (#431 tester): Analytics still calls console.error('Failed to load analytics') for a load that rejects after unmount (log only, no state write)",
-    "SMALL (#431 tester): the Dashboard initial error view is a bare centred view without a header, while MealPrep's and the Analytics one keep ScreenHeader; LoadErrorView has its own errorTitle/errorSub styles instead of MealPrep's emptyTitle/emptySub (values not compared)",
-    "SMALL (#431 tester): Button forwards the press event to onPress, and LoadErrorView passes onRetry straight through, so the load functions receive the event as an argument (harmless today: loadToday and loadData take no parameters)",
-    "SMALL (#431 tester r2): Dashboard - a first load that throws after setEntry ran (only if the set-grouping loop throws, e.g. getWorkoutSetsForDay resolving a non-array) leaves loadError 'initial' with an entry on screen, and neither the error view (loadError && !entry) nor the banner ('refresh' only) is drawn; before round 2 of #431 this case showed the error view. Needs a malformed db result",
-    "SMALL (lane C cleanup): older comments in lane C files still carry issue numbers and history, outside the lane's own hunks: DashboardScreen.tsx near lines 312, 393 (#330, #304) and 673 (#317); database.ts near 825 (#305) and the upsertExerciseCompleted docblock near 1017 (#319)",
-    "SMALL (#425 tester): the module-id pin in fileSystemLegacyMock.test.ts fails with a bare Expected undefined message when a jest-expo upgrade starts to define documentDirectory; a custom message would say what to revisit",
-    "USER-HITTABLE (#437 analyst, from the sprint-3 cold review): MealPrep Remove confirm (MealPrepScreen.tsx:513-516) promises that an eaten meal goes back to the inventory, but _creditPortion is a no-op when consumed_from_inventory_id is NULL (one portion assigned to two slots, both ticked), so nothing is credited - left unticked in #437, to be filed as its own issue",
-    "SMALL (#437 analyst): Button.tsx raw borderRadius 13 and minHeight 48 stay (no token has these values) - a box of #437 left unticked",
-    "SMALL (#437 analyst): schema.ts:748, the // comment above migration 36, still says lane D's #317 will append v37",
-    "SMALL (#437 analyst): more issue-number comments remain in database.ts (e.g. near 1826 and 2703) and MealPrepScreen.focus.test.tsx:127 has (#329) in a title",
-    "SMALL (#437 analyst): App.tsx:94 shows the init error over the font error when both exist",
-    "SMALL (#437 analyst): a NULL in any other NOT NULL column of a hand-edited backup still aborts the whole restore (same class as the is_consumed case #437 fixes)",
-    "SMALL (#437 dev A): issue-number comments beyond #437's rows remain in MealPrepScreen.focus.test.tsx (lines 16, 127), DashboardScreen.measurements.test.tsx (6, 60), the dailyLogUpserts.test.ts header (#305 history) and many places in database.ts (e.g. near 99, 290-305, 450, 621, 759, 945-1023, and a #369 comment inside restoreFromPayload)",
-    "SMALL (#437 security): a backup row with a NULL is_consumed is now restored as 0 without a console.warn or an entry in the skipped report; the old behaviour was a loud Restore failed (needs a hand-edited or foreign backup)",
-    "SMALL (#437 tester r2): in RESTORE_SLOT_DEDUPE_SQL the WHERE EXISTS clause of the UPDATE is redundant with the SET expression (rows it filters out would get +0), so any weakening of it is invisible to tests - a candidate for simplification, not a bug",
-    "SMALL (#437 tester): hand-edited is_consumed values such as 'yes', '', 2 or -1 are stored raw by restore (unchanged); the UI tests for truthiness and shows such a row as eaten while toggleMealConsumed and removeMealFromPlan test === 1 and treat it as not consumed",
-    "SMALL (#437 tester): the dailyLogUpserts.test.ts header line runs past 100 columns after the edit, and its (#305) history mention predates the sprint",
-    "SMALL (#437 tester): the reworded notifications.test.ts comment states that the dynamic import does not evaluate in this suite, so the call throws - a factual claim nobody probed",
-    "SMALL (lane F cleanup): more older issue-number comments and titles next to lines the lane touched: SettingsScreen.tsx near 1019 (#281) above trackSettingWrite, MealPrepScreen.focus.test.tsx describe title (#329), notifications.test.ts describe title and section comment (#309), dailyLogUpserts.test.ts lines 1 and 23 (#305); many *.test.tsx files carry an unused import React (tsconfig does not enable noUnusedLocals)"
-  ],
-  "findingsFiled": {
-    "441": "rescueExport: wal only offered after the db share resolves (covers the pendingFindings entries from the #426 analyst/tester/security about the wal and the two-files sentence)",
-    "442": "Discover import: Already in library blocks a refresh, Alert says Try again in a minute (covers the #428 analyst + tester/security entries)",
-    "443": "Recipe editor: save-deadline Not looked up notice is set on a screen that closes at once (covers the #428 security entry)",
-    "444": "MealPrep Remove confirm promises a refund that is not given for a meal ticked without stock (covers the pendingFindings entry from the #437 analyst; an unticked box of #437)",
-    "445": "Sprint 4: small findings - 58 checkboxes collected from pendingFindings (everything not covered by #441-#444 and not resolved inside the sprint)"
-  },
-  "finishedAt": "2026-10-08T08:14:26Z",
-  "final": {
-    "integrationCodeTip": "311191c",
-    "typecheck": "pass",
-    "tests": 1387,
-    "testSuites": 107,
-    "baselineTests": 1118,
-    "baselineSuites": 93,
-    "merged": 17,
-    "parked": 0,
-    "blockedLanes": 0,
-    "ciOnPushedTip": "36378f1 test: success",
-    "prOpened": false,
-    "outstandingForHuman": [
-      "cold review (/code-review on main...sprint/auto-fixes in a fresh session)",
-      "device checks in SPRINT_REPORT.md section 7",
-      "open the PR via the GitHub MCP (command in SPRINT_REPORT.md section 5)"
-    ]
-  }
+  ]
 }
