@@ -19,6 +19,7 @@ jest.mock('../../db/database', () => ({
   getRecipes: jest.fn().mockResolvedValue([]),
   getRecipesIncludingArchived: jest.fn().mockResolvedValue([]),
   copyMealToDates: jest.fn().mockResolvedValue({ copied: 0, skipped: 0 }),
+  copyDayToDate: jest.fn().mockResolvedValue({ copied: 0, skipped: 0 }),
   toISODate: jest.fn(() => '2026-09-19'),
   resetCookEmptyNotified: jest.fn().mockResolvedValue(undefined),
 }));
@@ -33,6 +34,7 @@ import {
   getRecipesIncludingArchived,
   getWeeklyMealPlan,
   copyMealToDates,
+  copyDayToDate,
   Recipe,
   WeeklyMealPlanItem,
 } from '../../db/database';
@@ -41,6 +43,7 @@ const mockGetRecipes = jest.mocked(getRecipes);
 const mockGetRecipesIncludingArchived = jest.mocked(getRecipesIncludingArchived);
 const mockGetWeeklyMealPlan = jest.mocked(getWeeklyMealPlan);
 const mockCopyMealToDates = jest.mocked(copyMealToDates);
+const mockCopyDayToDate = jest.mocked(copyDayToDate);
 
 const TODAY = '2026-09-19';
 
@@ -208,5 +211,114 @@ describe('MealPrepScreen copy a meal', () => {
     await act(async () => {
       resolveCopy({ copied: 1, skipped: 0 });
     });
+  });
+});
+
+describe('MealPrepScreen copy a day', () => {
+  let alertSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockGetRecipes.mockResolvedValue([makeRecipe('r1', 'Chicken Bowl')]);
+    mockGetRecipesIncludingArchived.mockResolvedValue([makeRecipe('r1', 'Chicken Bowl')]);
+    mockGetWeeklyMealPlan.mockResolvedValue([plan(7, TODAY, 'Lunch', 'r1')]);
+    mockCopyDayToDate.mockResolvedValue({ copied: 0, skipped: 0 });
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+  });
+
+  it('offers Copy day only on days with a planned meal', async () => {
+    const { getAllByLabelText } = await renderScreen();
+
+    expect(getAllByLabelText('Copy day to…')).toHaveLength(1);
+  });
+
+  it('offers no Copy day on an empty week', async () => {
+    mockGetWeeklyMealPlan.mockResolvedValue([]);
+    const { queryByLabelText } = await renderScreen();
+
+    expect(queryByLabelText('Copy day to…')).toBeNull();
+  });
+
+  it('offers the six other visible days as single-select rows and never the source day', async () => {
+    const { getByLabelText, queryByLabelText } = await renderScreen();
+
+    fireEvent.press(getByLabelText('Copy day to…'));
+
+    expect(queryByLabelText(chooserLabel(0))).toBeNull();
+    for (let i = 1; i <= 6; i++) {
+      expect(getByLabelText(chooserLabel(i)).props.accessibilityRole).toBe('radio');
+    }
+  });
+
+  it('disables Copy until a day is chosen and keeps only the last choice', async () => {
+    const { getByLabelText } = await renderScreen();
+
+    fireEvent.press(getByLabelText('Copy day to…'));
+    expect(getByLabelText('Copy').props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.press(getByLabelText(chooserLabel(1)));
+    fireEvent.press(getByLabelText(chooserLabel(2)));
+
+    expect(getByLabelText(chooserLabel(1)).props.accessibilityState.checked).toBe(false);
+    expect(getByLabelText(chooserLabel(2)).props.accessibilityState.checked).toBe(true);
+    expect(getByLabelText('Copy').props.accessibilityState.disabled).toBe(false);
+  });
+
+  it('copies the day to the chosen day, reports the result and reloads the plan', async () => {
+    mockCopyDayToDate.mockResolvedValue({ copied: 1, skipped: 1 });
+    const { getByLabelText, queryByLabelText } = await renderScreen();
+    mockGetWeeklyMealPlan.mockClear();
+
+    fireEvent.press(getByLabelText('Copy day to…'));
+    fireEvent.press(getByLabelText(chooserLabel(2)));
+    await act(async () => {
+      fireEvent.press(getByLabelText('Copy'));
+    });
+    await flush();
+
+    expect(mockCopyDayToDate).toHaveBeenCalledTimes(1);
+    expect(mockCopyDayToDate).toHaveBeenCalledWith(TODAY, '2026-09-21');
+    expect(mockCopyMealToDates).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledWith('Copied', 'Copied 1 meal. Skipped 1 already planned.');
+    expect(mockGetWeeklyMealPlan).toHaveBeenCalled();
+    expect(queryByLabelText(chooserLabel(2))).toBeNull();
+  });
+
+  it('shows the nothing-copied message', async () => {
+    mockCopyDayToDate.mockResolvedValue({ copied: 0, skipped: 2 });
+    const { getByLabelText } = await renderScreen();
+
+    fireEvent.press(getByLabelText('Copy day to…'));
+    fireEvent.press(getByLabelText(chooserLabel(1)));
+    await act(async () => {
+      fireEvent.press(getByLabelText('Copy'));
+    });
+    await flush();
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Nothing copied',
+      'Nothing copied: all 2 slots are already planned.'
+    );
+  });
+
+  it('shows the error alert and never the success text when the copy fails', async () => {
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockCopyDayToDate.mockRejectedValue(new Error('boom'));
+    const { getByLabelText } = await renderScreen();
+
+    fireEvent.press(getByLabelText('Copy day to…'));
+    fireEvent.press(getByLabelText(chooserLabel(1)));
+    await act(async () => {
+      fireEvent.press(getByLabelText('Copy'));
+    });
+    await flush();
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy).toHaveBeenCalledWith('Error', 'Failed to copy. Please try again.');
+    errSpy.mockRestore();
   });
 });
