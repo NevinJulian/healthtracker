@@ -16,7 +16,8 @@
  *     on restore — that table is managed exclusively by runMigrations().
  *   - Restore is all-or-nothing via db.withTransactionAsync().
  *   - Before any restore, a safety snapshot of the current data is written
- *     to cacheDirectory so an accidental restore is always recoverable (#293).
+ *     to safety-snapshots/ in documentDirectory; the newest SAFETY_KEEP are
+ *     kept, older ones are pruned, and the snapshot is lost on uninstall.
  *   - After a successful restore, scheduled OS notifications are resynced to
  *     the restored settings (#310): cancelAllScheduledNotificationsAsync()
  *     runs first, then reconcileScheduledNotifications(). cancelAll (rather
@@ -35,8 +36,12 @@ import * as Sharing from 'expo-sharing';
 import Notifications from './expoNotifications';
 import {
   cacheDirectory,
+  documentDirectory,
   writeAsStringAsync,
   readAsStringAsync,
+  makeDirectoryAsync,
+  readDirectoryAsync,
+  deleteAsync,
 } from 'expo-file-system/legacy';
 import {
   getCurrentSchemaVersion,
@@ -61,7 +66,7 @@ export interface BackupPayload {
 export interface RestoreResult {
   tablesRestored: number;
   rowsRestored: number;
-  /** URI of the pre-restore safety snapshot written to cache. */
+  /** URI of the pre-restore safety snapshot, empty when the caller restored without one. */
   safetySnapshotUri: string;
   /**
    * Per-table report of rows/columns dropped by restoreFromPayload's column
@@ -258,28 +263,60 @@ export async function exportBackup(): Promise<string> {
  *
  * Example: "2026-06-14T18-05-30"
  */
+const SAFETY_DIR_NAME = 'safety-snapshots/';
+const SAFETY_NAME_RE = /^healthtracker-pre-restore-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json$/;
+
 function safeTimestamp(): string {
   return new Date().toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, '');
 }
 
 /**
- * Write a safety snapshot of the current DB state to cacheDirectory and
- * return its URI.
+ * Write a safety snapshot of the current DB state to safety-snapshots/ in
+ * documentDirectory and return its URI, then prune to the newest SAFETY_KEEP.
  *
- * Called automatically by importBackup() before wiping any data so that a
- * mistaken restore is always recoverable. The snapshot uses the same payload
- * format as a regular export — it can be shared or imported as a normal
- * backup file.
+ * Called automatically before a restore wipes any data. The snapshot uses the
+ * same payload format as a regular export, so it can be shared or imported as
+ * a normal backup file. It survives the OS clearing the cache, not an
+ * uninstall.
  *
  * @throws When the file write fails (caller decides whether to abort restore).
+ *         A failed prune is logged and never thrown.
  */
 export async function writeSafetySnapshot(): Promise<string> {
   const payload = await buildBackupPayload();
   const json = JSON.stringify(payload, null, 2);
+  const dir = `${documentDirectory ?? ''}${SAFETY_DIR_NAME}`;
   const fileName = `healthtracker-pre-restore-${safeTimestamp()}.json`;
-  const fileUri = `${cacheDirectory ?? ''}${fileName}`;
+  const fileUri = `${dir}${fileName}`;
+  await makeDirectoryAsync(dir, { intermediates: true });
   await writeAsStringAsync(fileUri, json);
+  if (documentDirectory) {
+    try {
+      await pruneSafetySnapshots(dir);
+    } catch (err) {
+      console.warn('[Backup] Failed to prune safety snapshots:', err);
+    }
+  }
   return fileUri;
+}
+
+async function pruneSafetySnapshots(dir: string): Promise<void> {
+  const names = (await readDirectoryAsync(dir))
+    .filter((name) => SAFETY_NAME_RE.test(name))
+    .sort()
+    .reverse();
+  for (const name of names.slice(SAFETY_KEEP)) {
+    await deleteMatching(dir, name, SAFETY_NAME_RE);
+  }
+}
+
+async function deleteMatching(dir: string, name: string, pattern: RegExp): Promise<void> {
+  if (!pattern.test(name)) return;
+  try {
+    await deleteAsync(`${dir}${name}`, { idempotent: true });
+  } catch (err) {
+    console.warn(`[Backup] Failed to delete ${name}:`, err);
+  }
 }
 
 // ─── Import (restore) ────────────────────────────────────────────────────────
@@ -290,7 +327,7 @@ export async function writeSafetySnapshot(): Promise<string> {
  * tables transactionally.
  *
  * Safety snapshot behaviour:
- *   - Written to cacheDirectory before any data is modified.
+ *   - Written to documentDirectory before any data is modified.
  *   - If the write fails the user is asked whether to continue; the restore
  *     is aborted when they say no.
  *   - The returned RestoreResult includes the snapshot URI so the caller can
