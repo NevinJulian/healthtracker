@@ -213,17 +213,22 @@
     "444": {
       "lane": "B",
       "kind": "bug",
-      "status": "analysing",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "title": "MealPrep Remove confirm promises a refund that is not given",
       "decisionSource": "owner comment 6070879398 on #444: confirm text depends on the inventory pointer; with a pointer unchanged, without one 'This meal will be removed from your nutrition history.'; the plan item on the screen gets consumed_from_inventory_id",
-      "securityPlan": "required (plan-item read in src/db changes shape)",
-      "workOrder": "C:/git/ht-lanes/wo/444.md"
+      "securityPlan": "skip if the diff is MealPrepScreen.tsx plus tests as the work order says (a text branch on a field already loaded); decide on the diff",
+      "workOrder": "C:/git/ht-lanes/wo/444.md",
+      "deviceCheck": "Expo Go: cook one portion of a recipe, assign it to two slots and tick both. Removing the second one shows the text without the inventory sentence. (Also remove the first, which has a pointer, and see the old text.)",
+      "notes": "WO ready, no PARK. Claim verified: confirmRemove (MealPrepScreen.tsx:510-521) shows the refund sentence for every eaten row; _creditPortion is a no-op on a NULL pointer. The plan item already carries consumed_from_inventory_id (type at database.ts:92-106, loader is SELECT *), so no database.ts source change is needed: one text branch in MealPrepScreen.tsx plus tests. The db-level test is a contract pin that passes today by design; the screen test is the fail-then-pass proof. Siblings: none."
     }
   },
   "foundDuringSprint": [],
-  "pendingFindings": [],
+  "pendingFindings": [
+    "SMALL (#444 analyst): WeeklyMealPlanItem.is_consumed is typed boolean but getWeeklyMealPlan returns raw 0/1 (database.ts:1719); truthy checks work, === true would not",
+    "SMALL (#444 analyst): a non-NULL consumed_from_inventory_id whose batch row is gone (after a restore, or devStress369.ts:174) still gets the refund text and no credit; the decision keeps the text"
+  ],
   "log": [
     {
       "at": "2026-10-09T07:27:09Z",
@@ -236,6 +241,10 @@
     {
       "at": "2026-10-09T07:31:58Z",
       "event": "npm ci ok in worktrees a/b/d (exit 0 each, 488 top-level packages, same as the main checkout)"
+    },
+    {
+      "at": "2026-10-09T07:32:37Z",
+      "event": "#444 work order ready (no PARK, no database.ts source change needed) -> in_dev, developer dispatched on lane B"
     }
   ],
   "aheadAnalysis": {
