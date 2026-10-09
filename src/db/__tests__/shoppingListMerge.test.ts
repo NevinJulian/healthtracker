@@ -153,3 +153,54 @@ describe('shopping list merge on add', () => {
     expect(rows[0].total_quantity).toBe(0.3);
   });
 });
+
+describe('shopping list merge edge cases', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty'])(
+    'merges the same name with the unit "%s" into a finite sum',
+    async (unit) => {
+      const db = await freshDb();
+      await db.addShoppingListItem('Thing', 1, unit);
+      await db.addShoppingListItem('Thing', 2, unit);
+
+      const rows = await db.getShoppingListItems();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].total_quantity).toBe(3);
+      expect(rows[0].unit).toBe(unit);
+    }
+  );
+
+  it('adds a new line when the merged sum would overflow, leaving the first line unchanged', async () => {
+    const db = await freshDb();
+    await db.addShoppingListItem('Rice', 1e308, 'g');
+    await db.addShoppingListItem('Rice', 1e308, 'g');
+
+    const rows = await db.getShoppingListItems();
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.total_quantity)).toEqual([1e308, 1e308]);
+  });
+
+  it('adds a new line when a unit conversion would overflow', async () => {
+    const db = await freshDb();
+    await db.addShoppingListItem('Rice', 1, 'g');
+    await db.addShoppingListItem('Rice', 1e306, 'kg');
+
+    const rows = await db.getShoppingListItems();
+    expect(rows).toHaveLength(2);
+    expect(rows.find((r) => r.unit === 'g')?.total_quantity).toBe(1);
+  });
+
+  it('never changes an existing line for a non-finite quantity', async () => {
+    const db = await freshDb();
+    await db.addShoppingListItem('Rice', 100, 'g');
+    await db.addShoppingListItem('Rice', Infinity, 'g').catch(() => undefined);
+    await db.addShoppingListItem('Rice', NaN, 'g').catch(() => undefined);
+
+    const rows = await db.getShoppingListItems();
+    const first = rows.find((r) => r.id === Math.min(...rows.map((x) => x.id)));
+    expect(first?.total_quantity).toBe(100);
+  });
+});

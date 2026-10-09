@@ -56,3 +56,18 @@ describe('mergedQuantity', () => {
     expect(mergedQuantity(2, 'whole', 150, 'g')).toBeNull();
   });
 });
+
+describe('inherited property names as units', () => {
+  it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty'])('%s merges only with itself and never yields NaN', (unit) => {
+    expect(unitsCompatible(unit, unit)).toBe(true);
+    expect(mergedQuantity(1, unit, 2, unit)).toBe(3);
+    expect(mergedQuantity(1, unit, 2, 'g')).toBeNull();
+    expect(mergedQuantity(1, 'g', 2, unit)).toBeNull();
+  });
+});
+
+describe('mergedQuantity overflow', () => {
+  it('returns a non-finite result as such so the caller can refuse it', () => {
+    expect(Number.isFinite(mergedQuantity(1e308, 'g', 1e308, 'g') as number)).toBe(false);
+  });
+});
