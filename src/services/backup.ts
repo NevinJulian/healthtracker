@@ -260,6 +260,7 @@ export async function exportBackup(): Promise<string> {
 
 const SAFETY_DIR_NAME = 'safety-snapshots/';
 const SAFETY_NAME_RE = /^healthtracker-pre-restore-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json$/;
+const SAFETY_TMP_RE = /^healthtracker-pre-restore-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json\.tmp$/;
 
 /**
  * Produce a filename-safe ISO-ish timestamp for use in filenames.
@@ -281,6 +282,10 @@ function safeTimestamp(): string {
  * a normal backup file. It survives the OS clearing the cache, not an
  * uninstall.
  *
+ * The snapshot is written to a temporary name and moved into place, so a
+ * failed write leaves no partial snapshot. A temporary file left behind by an
+ * interrupted write is removed by the next call.
+ *
  * @throws When the file write fails (caller decides whether to abort restore).
  *         A failed prune is logged and never thrown.
  */
@@ -291,7 +296,8 @@ export async function writeSafetySnapshot(): Promise<string> {
   const fileName = `healthtracker-pre-restore-${safeTimestamp()}.json`;
   const fileUri = `${dir}${fileName}`;
   await makeDirectoryAsync(dir, { intermediates: true });
-  await writeAsStringAsync(fileUri, json);
+  if (documentDirectory) await removeSafetyLeftovers(dir);
+  await writeThenMove(fileUri, json);
   if (documentDirectory) {
     try {
       await pruneSafetySnapshots(dir, fileName);
@@ -300,6 +306,31 @@ export async function writeSafetySnapshot(): Promise<string> {
     }
   }
   return fileUri;
+}
+
+async function removeSafetyLeftovers(dir: string): Promise<void> {
+  try {
+    for (const name of await readDirectoryAsync(dir)) {
+      await deleteMatching(dir, name, SAFETY_TMP_RE);
+    }
+  } catch (err) {
+    console.warn('[Backup] Failed to remove temporary safety snapshots:', err);
+  }
+}
+
+async function writeThenMove(finalUri: string, content: string): Promise<void> {
+  const tmpUri = `${finalUri}.tmp`;
+  try {
+    await writeAsStringAsync(tmpUri, content);
+    await moveAsync({ from: tmpUri, to: finalUri });
+  } catch (err) {
+    try {
+      await deleteAsync(tmpUri, { idempotent: true });
+    } catch (cleanupErr) {
+      console.warn('[Backup] Failed to remove temporary backup file:', cleanupErr);
+    }
+    throw err;
+  }
 }
 
 async function pruneSafetySnapshots(dir: string, justWritten: string): Promise<void> {
@@ -564,20 +595,7 @@ async function performAutoBackup(now: Date): Promise<void> {
   const payload = await buildBackupPayload();
   if (restoreInProgress) return;
 
-  const finalName = autoBackupName(now);
-  const finalUri = `${dir}${finalName}`;
-  const tmpUri = `${finalUri}.tmp`;
-  try {
-    await writeAsStringAsync(tmpUri, JSON.stringify(payload, null, 2));
-    await moveAsync({ from: tmpUri, to: finalUri });
-  } catch (err) {
-    try {
-      await deleteAsync(tmpUri, { idempotent: true });
-    } catch (cleanupErr) {
-      console.warn('[Backup] Failed to remove temporary backup file:', cleanupErr);
-    }
-    throw err;
-  }
+  await writeThenMove(`${dir}${autoBackupName(now)}`, JSON.stringify(payload, null, 2));
 
   try {
     const after = await readAutoBackupFolder(dir);
