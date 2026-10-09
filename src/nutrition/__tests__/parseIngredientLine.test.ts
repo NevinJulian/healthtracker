@@ -97,3 +97,64 @@ describe('parseIngredientLine English units', () => {
     expect(parseIngredientLine(line)).toEqual({ name: line, quantity: 0, unit: 'g' });
   });
 });
+
+describe('parseIngredientLine unsure lines', () => {
+  it.each([
+    '1.000 g Mehl',
+    '2.500 kg Kartoffeln',
+    '12.000 g Zucker',
+    '1.000.000 g Salz',
+  ])('keeps dot-grouped %s as a name without a quantity', (line) => {
+    expect(parseIngredientLine(line)).toEqual({ name: line, quantity: 0, unit: 'g' });
+  });
+
+  it.each([
+    ['0.125 l Milch', 125, 'ml', 'Milch'],
+    ['1.5 kg Mehl', 1500, 'g', 'Mehl'],
+    ['2.25 cups sugar', 540, 'g', 'sugar'],
+    ['1.0005 kg Mehl', 1000.5, 'g', 'Mehl'],
+  ])('reads %s as a decimal', (line, quantity, unit, name) => {
+    expect(parseIngredientLine(line)).toEqual({ name, quantity, unit });
+  });
+
+  it.each([
+    ["1'000 g Mehl"],
+    ['1’000 g Mehl'],
+  ])('reads the apostrophe-grouped %s as 1000', (line) => {
+    expect(parseIngredientLine(line)).toEqual({ name: 'Mehl', quantity: 1000, unit: 'g' });
+  });
+
+  it.each([
+    ['99999999999999999999 g Mehl'],
+    [`${'9'.repeat(190)} g Mehl`],
+    ['100001 g Mehl'],
+  ])('keeps an absurd quantity as a name without a quantity', (line) => {
+    expect(parseIngredientLine(line)).toEqual({ name: line, quantity: 0, unit: 'g' });
+  });
+
+  it('accepts a quantity at the limit', () => {
+    expect(parseIngredientLine('100000 g Mehl')).toEqual({ name: 'Mehl', quantity: 100000, unit: 'g' });
+  });
+
+  it.each([
+    '2 x 400 g Dose Tomaten',
+    '2x400g Tomaten',
+    '3 × 125 g Mozzarella',
+  ])('keeps the multiplier form %s as a name without a quantity', (line) => {
+    expect(parseIngredientLine(line)).toEqual({ name: line, quantity: 0, unit: 'g' });
+  });
+
+  it('removes leading punctuation from the name', () => {
+    expect(parseIngredientLine('1 TL, gestr. Backpulver')).toEqual({
+      name: 'gestr. Backpulver',
+      quantity: 5,
+      unit: 'g',
+    });
+    expect(parseIngredientLine('2 EL: - Öl')).toEqual({ name: 'Öl', quantity: 30, unit: 'g' });
+  });
+
+  it('keeps the whole line when only punctuation is left', () => {
+    expect(parseIngredientLine('1 TL,')).toEqual({ name: '1 TL,', quantity: 0, unit: 'g' });
+    expect(parseIngredientLine('200 g -')).toEqual({ name: '200 g -', quantity: 0, unit: 'g' });
+  });
+});
