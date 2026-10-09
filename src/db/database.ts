@@ -20,6 +20,7 @@ import * as SQLite from 'expo-sqlite';
 import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, RESTORE_SLOT_DEDUPE_SQL, RESTORE_SET_INDEX_SQL, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
 import { recipes } from '../data/recipes';
+import { shoppingKey, mergedQuantity } from '../data/shoppingMerge';
 import { NUTRITION_GOALS, NutritionGoals } from '../nutrition/goals';
 import type { Sex, ActivityLevel, GoalType } from '../nutrition/tdee';
 import {
@@ -1622,6 +1623,20 @@ export function addShoppingListItem(name: string, total_quantity: number, unit: 
 
 async function _addShoppingListItemImpl(name: string, total_quantity: number, unit: string): Promise<void> {
   const db = getDatabase();
+  const key = shoppingKey(name);
+  if (key !== '' && Number.isFinite(total_quantity)) {
+    const open = await db.getAllAsync<{ id: number; ingredient_name: string; total_quantity: number; unit: string }>(
+      'SELECT id, ingredient_name, total_quantity, unit FROM shopping_list WHERE is_checked = 0 ORDER BY id ASC'
+    );
+    for (const line of open) {
+      if (shoppingKey(line.ingredient_name) !== key) continue;
+      const merged = mergedQuantity(line.total_quantity, line.unit, total_quantity, unit);
+      if (merged === null) continue;
+      if (!Number.isFinite(merged)) break;
+      await db.runAsync('UPDATE shopping_list SET total_quantity = ? WHERE id = ?', [merged, line.id]);
+      return;
+    }
+  }
   await db.runAsync(
     'INSERT INTO shopping_list (ingredient_name, total_quantity, unit, is_checked) VALUES (?, ?, ?, 0)',
     [name, total_quantity, unit]
@@ -1783,6 +1798,82 @@ async function _assignMealToPlanImpl(date: string, meal_type: string, recipe_id:
       );
     }
   });
+}
+
+export interface CopyMealsResult {
+  copied: number;
+  skipped: number;
+}
+
+/**
+ * Copies a planned meal into the same slot on each target date where that
+ * slot is empty. Copies start unticked with no inventory pointer and never
+ * touch meal_inventory. Occupied slots are counted as skipped and left as
+ * they are; the source date and malformed or duplicate dates are ignored.
+ */
+export function copyMealToDates(planId: number, targetDates: string[]): Promise<CopyMealsResult> {
+  return _enqueueWrite('copyMealToDates', () => _copyMealToDatesImpl(planId, targetDates));
+}
+
+async function _copyMealToDatesImpl(planId: number, targetDates: string[]): Promise<CopyMealsResult> {
+  const db = getDatabase();
+  const result: CopyMealsResult = { copied: 0, skipped: 0 };
+  await db.withTransactionAsync(async () => {
+    const source = await db.getFirstAsync<{ date: string; meal_type: string; recipe_id: string }>(
+      'SELECT date, meal_type, recipe_id FROM weekly_meal_plan WHERE id = ?',
+      [planId]
+    );
+    if (!source) return;
+    const targets = new Set(targetDates.filter((d) => isValidDateKey(d) && d !== source.date));
+    for (const date of targets) {
+      if (await _insertCopyIfEmpty(db, date, source.meal_type, source.recipe_id)) result.copied++;
+      else result.skipped++;
+    }
+  });
+  return result;
+}
+
+/**
+ * Copies the Lunch and Dinner rows of one day into the empty slots of another
+ * day, under the same rules as copyMealToDates.
+ */
+export function copyDayToDate(fromDate: string, toDate: string): Promise<CopyMealsResult> {
+  return _enqueueWrite('copyDayToDate', () => _copyDayToDateImpl(fromDate, toDate));
+}
+
+async function _copyDayToDateImpl(fromDate: string, toDate: string): Promise<CopyMealsResult> {
+  const result: CopyMealsResult = { copied: 0, skipped: 0 };
+  if (fromDate === toDate || !isValidDateKey(fromDate) || !isValidDateKey(toDate)) return result;
+  const db = getDatabase();
+  await db.withTransactionAsync(async () => {
+    const sources = await db.getAllAsync<{ meal_type: string; recipe_id: string }>(
+      "SELECT meal_type, recipe_id FROM weekly_meal_plan WHERE date = ? AND meal_type IN ('Lunch', 'Dinner') ORDER BY id",
+      [fromDate]
+    );
+    for (const source of sources) {
+      if (await _insertCopyIfEmpty(db, toDate, source.meal_type, source.recipe_id)) result.copied++;
+      else result.skipped++;
+    }
+  });
+  return result;
+}
+
+async function _insertCopyIfEmpty(
+  db: SQLite.SQLiteDatabase,
+  date: string,
+  meal_type: string,
+  recipe_id: string
+): Promise<boolean> {
+  const occupied = await db.getFirstAsync<{ id: number }>(
+    'SELECT id FROM weekly_meal_plan WHERE date = ? AND meal_type = ? LIMIT 1',
+    [date, meal_type]
+  );
+  if (occupied) return false;
+  await db.runAsync(
+    'INSERT INTO weekly_meal_plan (date, meal_type, recipe_id, is_consumed, consumed_from_inventory_id) VALUES (?, ?, ?, 0, NULL)',
+    [date, meal_type, recipe_id]
+  );
+  return true;
 }
 
 export function removeMealFromPlan(id: number): Promise<void> {
@@ -2297,6 +2388,71 @@ export async function getMostCookedRecipes(limit: number = 5): Promise<CookedRec
     totalPortions: r.total_portions ?? 0,
     cookEvents: r.cook_events ?? 0,
   }));
+}
+
+export interface OftenCookedInput {
+  recipe_id: string;
+  title: string;
+  cook_events: number;
+  last_date: string;
+}
+
+export interface OftenCookedRecipe {
+  recipe_id: string;
+  title: string;
+  cookEvents: number;
+  score: number;
+}
+
+const OFTEN_COOKED_DECAY = 0.95;
+
+/**
+ * Orders recipes by cook events weighted by recency: events times 0.95 per
+ * day since the last cook. A future last date counts as today; a malformed
+ * one scores 0. Ties go to the later last date, then title, then id.
+ */
+export function rankOftenCooked(
+  rows: OftenCookedInput[],
+  today: string,
+  limit: number = 5
+): OftenCookedRecipe[] {
+  if (!(limit > 0)) return [];
+  return rows
+    .map((r) => {
+      const days = isValidDateKey(r.last_date) ? Math.max(0, _daysBetweenKey(r.last_date, today)) : null;
+      const score = days === null ? 0 : r.cook_events * Math.pow(OFTEN_COOKED_DECAY, days);
+      return { r, score };
+    })
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (a.r.last_date < b.r.last_date ? 1 : a.r.last_date > b.r.last_date ? -1 : 0) ||
+        a.r.title.localeCompare(b.r.title) ||
+        (a.r.recipe_id < b.r.recipe_id ? -1 : a.r.recipe_id > b.r.recipe_id ? 1 : 0)
+    )
+    .slice(0, limit)
+    .map(({ r, score }) => ({
+      recipe_id: r.recipe_id,
+      title: r.title,
+      cookEvents: r.cook_events,
+      score,
+    }));
+}
+
+export async function getOftenCookedRecipes(
+  limit: number = 5,
+  today: string = toISODate()
+): Promise<OftenCookedRecipe[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<OftenCookedInput>(
+    `SELECT cl.recipe_id AS recipe_id, r.title AS title,
+            COUNT(*) AS cook_events, MAX(cl.date) AS last_date
+     FROM cook_log cl
+     JOIN recipe_library r ON cl.recipe_id = r.id
+     WHERE r.archived_at IS NULL
+     GROUP BY cl.recipe_id, r.title`
+  );
+  return rankOftenCooked(rows, today, limit);
 }
 
 export interface InventorySnapshot {

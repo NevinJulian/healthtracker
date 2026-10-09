@@ -240,6 +240,26 @@ describe('toggleMealConsumed() inventory correctness (#302)', () => {
     );
     expect(plan?.is_consumed).toBe(0);
   });
+
+  it('getWeeklyMealPlan returns a pointer for the tick that found stock and null for the one that did not', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    await db.logCookedMeal(RECIPE_ID, 1);
+    await db.assignMealToPlan('2024-06-01', 'lunch', RECIPE_ID);
+    await db.assignMealToPlan('2024-06-01', 'dinner', RECIPE_ID);
+    const lunchId = await planRowId(db, '2024-06-01', 'lunch');
+    const dinnerId = await planRowId(db, '2024-06-01', 'dinner');
+
+    await db.toggleMealConsumed(lunchId, true);
+    await db.toggleMealConsumed(dinnerId, true);
+
+    const plan = await db.getWeeklyMealPlan();
+    const lunch = plan.find((p) => p.id === lunchId);
+    const dinner = plan.find((p) => p.id === dinnerId);
+    expect(lunch?.consumed_from_inventory_id).not.toBeNull();
+    expect(dinner?.consumed_from_inventory_id).toBeNull();
+  });
 });
 
 describe('migration v34 (#302)', () => {

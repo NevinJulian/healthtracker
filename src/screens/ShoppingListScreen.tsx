@@ -1,11 +1,8 @@
 /**
  * ShoppingListScreen
  *
- * Verdure redesign: Unit 9 (#243)
- *
- * Behaviour-preserving restyle only. All DB queries and mutations are unchanged.
- * Items are grouped by inferred category (Produce, Protein, Dairy, Pantry, Drinks,
- * Other) for a cleaner browse experience per DESIGN.md §5.
+ * Items are grouped into aisle sections (see data/aisles.ts), sorted by name inside
+ * each, with checked items last.
  */
 import React from 'react';
 import {
@@ -33,107 +30,28 @@ import {
   ScreenHeader,
 } from '../components';
 import { iconChipIconColor } from '../components/IconChip';
-
-// ─── Category inference ───────────────────────────────────────────────────────
-
-type CategoryKey = 'Produce' | 'Protein' | 'Dairy' | 'Pantry' | 'Drinks' | 'Other';
+import { Aisle, AisleGroup, groupByAisle } from '../data/aisles';
+import { formatQuantity } from '../data/formatQuantity';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
-interface CategoryMeta {
-  label: CategoryKey;
-  /** Accent family for IconChip + header tint */
+interface AisleMeta {
   accent: 'sage' | 'clay' | 'sky' | 'gold';
-  /** Ionicons outline icon name for the category */
   icon: IoniconsName;
 }
 
-const CATEGORIES: CategoryMeta[] = [
-  { label: 'Produce',  accent: 'sage', icon: 'leaf-outline' },
-  { label: 'Protein',  accent: 'clay', icon: 'barbell-outline' },
-  { label: 'Dairy',    accent: 'sky',  icon: 'water-outline' },
-  { label: 'Pantry',   accent: 'gold', icon: 'archive-outline' },
-  { label: 'Drinks',   accent: 'sky',  icon: 'cafe-outline' },
-  { label: 'Other',    accent: 'sage', icon: 'cart-outline' },
-];
-
-const PRODUCE_KEYWORDS = [
-  'broccoli', 'spinach', 'kale', 'lettuce', 'salad', 'avocado', 'tomato',
-  'cucumber', 'pepper', 'courgette', 'zucchini', 'carrot', 'onion', 'garlic',
-  'mushroom', 'celery', 'leek', 'asparagus', 'bean', 'pea', 'corn', 'potato',
-  'sweet potato', 'beetroot', 'radish', 'cabbage', 'cauliflower', 'herb',
-  'basil', 'parsley', 'coriander', 'mint', 'lime', 'lemon', 'orange', 'apple',
-  'banana', 'berry', 'blueberry', 'strawberry', 'raspberry', 'mango', 'pineapple',
-  'ginger', 'tenderstem', 'pak choi', 'bok choy', 'spring onion', 'shallot',
-  'fennel', 'artichoke', 'fruit', 'vegetable', 'veg',
-];
-
-const PROTEIN_KEYWORDS = [
-  'chicken', 'beef', 'pork', 'lamb', 'turkey', 'duck', 'venison', 'salmon',
-  'tuna', 'cod', 'haddock', 'mackerel', 'prawns', 'shrimp', 'egg', 'eggs',
-  'tofu', 'tempeh', 'seitan', 'mince', 'steak', 'fillet', 'breast', 'thigh',
-  'loin', 'ribs', 'sausage', 'bacon', 'ham', 'protein powder', 'whey',
-];
-
-const DAIRY_KEYWORDS = [
-  'milk', 'cream', 'butter', 'cheese', 'cheddar', 'mozzarella', 'parmesan',
-  'feta', 'brie', 'yogurt', 'yoghurt', 'greek yogurt', 'quark', 'cottage',
-  'ricotta', 'cream cheese', 'sour cream', 'creme fraiche', 'ghee',
-];
-
-const DRINKS_KEYWORDS = [
-  'water', 'juice', 'milk alternative', 'oat milk', 'almond milk', 'soy milk',
-  'coconut water', 'tea', 'coffee', 'kombucha', 'sparkling', 'soda', 'broth',
-  'stock',
-];
-
-const PANTRY_KEYWORDS = [
-  'oil', 'olive oil', 'coconut oil', 'vinegar', 'sauce', 'paste', 'flour',
-  'sugar', 'honey', 'syrup', 'salt', 'pepper', 'spice', 'herb', 'seasoning',
-  'quinoa', 'rice', 'pasta', 'oat', 'lentil', 'chickpea', 'nut',
-  'almond', 'cashew', 'walnut', 'seed', 'chia', 'flax', 'tahini', 'peanut',
-  'canned', 'tinned', 'can of', 'tin of', 'tomato puree', 'stock cube',
-  'breadcrumb', 'wrap', 'bread', 'tortilla', 'cracker', 'cereal', 'granola',
-];
-
-function inferCategory(ingredientName: string): CategoryKey {
-  const lower = ingredientName.toLowerCase();
-
-  if (DRINKS_KEYWORDS.some((kw) => lower.includes(kw))) return 'Drinks';
-  if (DAIRY_KEYWORDS.some((kw) => lower.includes(kw))) return 'Dairy';
-  if (PROTEIN_KEYWORDS.some((kw) => lower.includes(kw))) return 'Protein';
-  if (PRODUCE_KEYWORDS.some((kw) => lower.includes(kw))) return 'Produce';
-  if (PANTRY_KEYWORDS.some((kw) => lower.includes(kw))) return 'Pantry';
-
-  return 'Other';
-}
-
-// ─── Group items by category ──────────────────────────────────────────────────
-
-interface CategoryGroup {
-  meta: CategoryMeta;
-  items: ShoppingListItem[];
-}
-
-function groupByCategory(items: ShoppingListItem[]): CategoryGroup[] {
-  const map = new Map<CategoryKey, ShoppingListItem[]>();
-
-  for (const item of items) {
-    const key = inferCategory(item.ingredient_name);
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(item);
-  }
-
-  // Preserve the canonical category order
-  const result: CategoryGroup[] = [];
-  for (const cat of CATEGORIES) {
-    const grpItems = map.get(cat.label);
-    if (grpItems && grpItems.length > 0) {
-      result.push({ meta: cat, items: grpItems });
-    }
-  }
-  return result;
-}
+const AISLE_META: Record<Aisle, AisleMeta> = {
+  Produce: { accent: 'sage', icon: 'leaf-outline' },
+  'Meat and fish': { accent: 'clay', icon: 'fish-outline' },
+  'Dairy and eggs': { accent: 'sky', icon: 'water-outline' },
+  Bakery: { accent: 'gold', icon: 'pizza-outline' },
+  Pantry: { accent: 'sage', icon: 'basket-outline' },
+  'Tins and jars': { accent: 'clay', icon: 'archive-outline' },
+  Frozen: { accent: 'sky', icon: 'snow-outline' },
+  'Spices and oils': { accent: 'gold', icon: 'flame-outline' },
+  Drinks: { accent: 'sage', icon: 'cafe-outline' },
+  Other: { accent: 'clay', icon: 'cart-outline' },
+};
 
 // ─── Checkbox ─────────────────────────────────────────────────────────────────
 
@@ -159,7 +77,7 @@ function ShoppingItemRow({
   onToggle: () => void;
 }) {
   const qtyStr =
-    `${item.total_quantity.toFixed(1).replace(/\.0$/, '')} ${item.unit}`.trim();
+    `${formatQuantity(item.total_quantity)} ${item.unit}`.trim();
 
   return (
     <TouchableOpacity
@@ -187,10 +105,11 @@ function CategorySection({
   group,
   onToggle,
 }: {
-  group: CategoryGroup;
+  group: AisleGroup;
   onToggle: (id: number, current: boolean) => void;
 }) {
-  const { meta, items } = group;
+  const { aisle, items } = group;
+  const meta = AISLE_META[aisle];
 
   const iconNode = (
     <Ionicons name={meta.icon} size={14} color={iconChipIconColor(meta.accent)} />
@@ -198,15 +117,11 @@ function CategorySection({
 
   return (
     <View style={styles.categorySection}>
-      {/* Category header */}
       <View style={styles.categoryHeader}>
         <IconChip icon={iconNode} accent={meta.accent} size={28} />
-        <Text style={styles.categoryLabel}>
-          {meta.label.toUpperCase()}
-        </Text>
+        <Text style={styles.categoryLabel}>{aisle}</Text>
       </View>
 
-      {/* Items card */}
       <Card style={styles.itemsCard}>
         {items.map((item, idx) => (
           <View key={item.id}>
@@ -266,7 +181,7 @@ export default function ShoppingListScreen() {
   const checkedCount = items.filter((i) => i.is_checked).length;
   const progress = totalCount > 0 ? checkedCount / totalCount : 0;
   const hasCompleted = checkedCount > 0;
-  const groups = groupByCategory(items);
+  const groups = groupByAisle(items);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -320,10 +235,9 @@ export default function ShoppingListScreen() {
             </Text>
           </View>
         ) : (
-          /* Category groups */
           groups.map((group) => (
             <CategorySection
-              key={group.meta.label}
+              key={group.aisle}
               group={group}
               onToggle={handleToggle}
             />

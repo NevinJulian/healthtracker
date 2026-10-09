@@ -20,8 +20,11 @@ import {
   assignMealToPlan,
   toggleMealConsumed,
   removeMealFromPlan,
+  copyMealToDates,
+  copyDayToDate,
   getRecipes,
   getRecipesIncludingArchived,
+  getOftenCookedRecipes,
   Recipe,
   MealInventoryWithRecipe,
   WeeklyMealPlanItem,
@@ -30,6 +33,7 @@ import {
 } from '../db/database';
 import { checkAndNotifyEmptyInventory } from '../services/notifications';
 import { addDays as addDaysKey } from '../utils/dates';
+import { copyResultMessage, CopyResult } from '../data/copyResult';
 import {
   Card,
   Row,
@@ -43,6 +47,15 @@ import { iconChipIconColor } from '../components/IconChip';
 // ─── Helpers ──────────────────────────────────────────────────
 
 const logDbError = (err: any) => console.error('[MealPrepScreen] DB Error:', err);
+
+async function loadOftenCookedIds(): Promise<string[]> {
+  try {
+    return (await getOftenCookedRecipes()).map((r) => r.recipe_id);
+  } catch (err) {
+    console.warn('[MealPrepScreen] getOftenCookedRecipes failed:', err);
+    return [];
+  }
+}
 
 // ─── Verdure circle checkbox (24px, sage when done) ───────────
 
@@ -88,8 +101,15 @@ export default function MealPrepScreen() {
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ date: string; meal_type: string } | null>(null);
 
+  const [copyMealTarget, setCopyMealTarget] = useState<{ planId: number; title: string; date: string } | null>(
+    null
+  );
+
+  const [copyDaySource, setCopyDaySource] = useState<string | null>(null);
+
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [planRecipes, setPlanRecipes] = useState<Recipe[]>([]);
+  const [oftenCookedIds, setOftenCookedIds] = useState<string[]>([]);
 
   // Tracks whether the screen has completed its first load. Post-action
   // refreshes (handleLogCookedMeal, handleAssignMeal, handleToggleConsumed)
@@ -125,17 +145,19 @@ export default function MealPrepScreen() {
       setLoading(true);
     }
     try {
-      const [inv, plan, allRecipes, allPlanRecipes] = await Promise.all([
+      const [inv, plan, allRecipes, allPlanRecipes, oftenIds] = await Promise.all([
         getMealInventory(),
         getWeeklyMealPlan(),
         getRecipes(),
         getRecipesIncludingArchived(),
+        loadOftenCookedIds(),
       ]);
       if (!mountedRef.current || runIdRef.current !== runId) return;
       setInventory(inv);
       setWeeklyPlan(plan);
       setRecipes(allRecipes);
       setPlanRecipes(allPlanRecipes);
+      setOftenCookedIds(oftenIds);
       hasLoadedOnceRef.current = true;
     } catch (err) {
       if (!mountedRef.current || runIdRef.current !== runId) return;
@@ -225,6 +247,33 @@ export default function MealPrepScreen() {
       }
       loadData();
     });
+  };
+
+  const runCopy = async (copy: () => Promise<CopyResult>, close: () => void) => {
+    await runGuarded(async () => {
+      try {
+        const result = await copy();
+        close();
+        loadData();
+        const { title, message } = copyResultMessage(result);
+        Alert.alert(title, message);
+      } catch (err) {
+        logDbError(err);
+        Alert.alert('Error', 'Failed to copy. Please try again.');
+      }
+    });
+  };
+
+  const handleCopyMeal = async (dates: string[]) => {
+    if (!copyMealTarget) return;
+    const { planId } = copyMealTarget;
+    await runCopy(() => copyMealToDates(planId, dates), () => setCopyMealTarget(null));
+  };
+
+  const handleCopyDay = async (dates: string[]) => {
+    if (!copyDaySource || dates.length !== 1) return;
+    const from = copyDaySource;
+    await runCopy(() => copyDayToDate(from, dates[0]), () => setCopyDaySource(null));
   };
 
   const handleToggleConsumed = async (planId: number, currentVal: boolean) => {
@@ -391,6 +440,7 @@ export default function MealPrepScreen() {
                   recipe={lunchRecipe ?? null}
                   onToggleConsumed={(id, val) => handleToggleConsumed(id, val)}
                   onRemove={handleRemoveMeal}
+                  onCopy={(planId, title) => setCopyMealTarget({ planId, title, date: dateStr })}
                   onAssign={() => {
                     setAssignTarget({ date: dateStr, meal_type: 'Lunch' });
                     setAssignModalVisible(true);
@@ -403,12 +453,27 @@ export default function MealPrepScreen() {
                   recipe={dinnerRecipe ?? null}
                   onToggleConsumed={(id, val) => handleToggleConsumed(id, val)}
                   onRemove={handleRemoveMeal}
+                  onCopy={(planId, title) => setCopyMealTarget({ planId, title, date: dateStr })}
                   onAssign={() => {
                     setAssignTarget({ date: dateStr, meal_type: 'Dinner' });
                     setAssignModalVisible(true);
                   }}
                 />
               </View>
+
+              {(lunchPlan || dinnerPlan) && (
+                <View style={styles.assignBtnWrap}>
+                  <TouchableOpacity
+                    style={styles.assignBtn}
+                    onPress={() => setCopyDaySource(dateStr)}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel="Copy day to…"
+                  >
+                    <Text style={styles.assignBtnText}>Copy day to…</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Daily total footer — only when something is consumed */}
               {(totalKcal > 0 || totalProtein > 0) && (
@@ -474,6 +539,7 @@ export default function MealPrepScreen() {
           visible={logModalVisible}
           onClose={() => setLogModalVisible(false)}
           recipes={recipes}
+          oftenCookedIds={oftenCookedIds}
           onSave={handleLogCookedMeal}
           saving={saving}
         />
@@ -486,6 +552,27 @@ export default function MealPrepScreen() {
         onSave={handleAssignMeal}
         saving={saving}
       />
+
+      {copyMealTarget && (
+        <CopyTargetModal
+          title={`Copy ${copyMealTarget.title} to…`}
+          multiple
+          targets={copyTargetsFor(copyMealTarget.date)}
+          saving={saving}
+          onClose={() => setCopyMealTarget(null)}
+          onConfirm={handleCopyMeal}
+        />
+      )}
+
+      {copyDaySource && (
+        <CopyTargetModal
+          title="Copy day to…"
+          targets={copyTargetsFor(copyDaySource)}
+          saving={saving}
+          onClose={() => setCopyDaySource(null)}
+          onConfirm={handleCopyDay}
+        />
+      )}
     </View>
   );
 }
@@ -498,6 +585,7 @@ function MealSlot({
   recipe,
   onToggleConsumed,
   onRemove,
+  onCopy,
   onAssign,
 }: {
   label: string;
@@ -505,14 +593,19 @@ function MealSlot({
   recipe: Recipe | null;
   onToggleConsumed: (id: number, current: boolean) => void;
   onRemove: (id: number) => void;
+  onCopy: (id: number, title: string) => void;
   onAssign: () => void;
 }) {
-  const confirmRemove = (planId: number, eaten: boolean) => {
+  const confirmRemove = (planId: number, eaten: boolean, refunds: boolean) => {
+    let message = 'Remove this meal from your plan?';
+    if (eaten) {
+      message = refunds
+        ? 'This portion will go back to your inventory and the meal will be removed from your nutrition history.'
+        : 'This meal will be removed from your nutrition history.';
+    }
     Alert.alert(
       'Remove meal',
-      eaten
-        ? 'This portion will go back to your inventory and the meal will be removed from your nutrition history.'
-        : 'Remove this meal from your plan?',
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Remove', style: 'destructive', onPress: () => onRemove(planId) },
@@ -562,8 +655,17 @@ function MealSlot({
             )}
           </View>
           <TouchableOpacity
+            style={styles.copyBtn}
+            onPress={() => onCopy(plan.id, recipe?.title ?? label)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Copy ${recipe?.title ?? label} to…`}
+          >
+            <Ionicons name="copy-outline" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.removeBtn}
-            onPress={() => confirmRemove(plan.id, plan.is_consumed)}
+            onPress={() => confirmRemove(plan.id, plan.is_consumed, plan.consumed_from_inventory_id != null)}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel={`Remove ${recipe?.title ?? label} from plan`}
@@ -593,6 +695,100 @@ function MealSlot({
   );
 }
 
+// ─── Copy chooser ─────────────────────────────────────────────
+
+interface CopyTarget {
+  date: string;
+  label: string;
+}
+
+function copyTargetsFor(sourceDate: string): CopyTarget[] {
+  const todayStr = toISODate();
+  const targets: CopyTarget[] = [];
+  for (let i = 0; i < 7; i++) {
+    const date = addDaysKey(todayStr, i);
+    if (date === sourceDate) continue;
+    const [y, mo, dy] = date.split('-').map(Number);
+    const label =
+      i === 0
+        ? 'Today'
+        : i === 1
+          ? 'Tomorrow'
+          : new Date(y, mo - 1, dy).toLocaleDateString(undefined, {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            });
+    targets.push({ date, label });
+  }
+  return targets;
+}
+
+function CopyTargetModal({ title, multiple = false, targets, saving, onClose, onConfirm }: {
+  title: string;
+  multiple?: boolean;
+  targets: CopyTarget[];
+  saving: boolean;
+  onClose: () => void;
+  onConfirm: (dates: string[]) => void;
+}) {
+  const [chosen, setChosen] = useState<string[]>([]);
+
+  const choose = (date: string) =>
+    setChosen((prev) => {
+      if (!multiple) return [date];
+      return prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date];
+    });
+
+  const orderedChoice = targets.filter((t) => chosen.includes(t.date)).map((t) => t.date);
+
+  return (
+    <Modal visible animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalSheet}>
+          <Text style={styles.modalTitle}>{title}</Text>
+
+          <FlatList
+            style={styles.modalList}
+            data={targets}
+            keyExtractor={(t) => t.date}
+            renderItem={({ item }) => {
+              const isSelected = chosen.includes(item.date);
+              return (
+                <TouchableOpacity
+                  style={[styles.recipeOpt, isSelected && styles.recipeOptSelected]}
+                  onPress={() => choose(item.date)}
+                  disabled={saving}
+                  activeOpacity={0.75}
+                  accessibilityRole={multiple ? 'checkbox' : 'radio'}
+                  accessibilityLabel={item.label}
+                  accessibilityState={{ checked: isSelected }}
+                >
+                  <Text style={[styles.recipeOptText, isSelected && styles.recipeOptTextSelected]}>
+                    {item.label}
+                  </Text>
+                  {isSelected && <View style={styles.recipeCheckDot} />}
+                </TouchableOpacity>
+              );
+            }}
+          />
+
+          <View style={styles.modalBtnRow}>
+            <Button title="Cancel" variant="ghost" onPress={onClose} style={styles.modalBtnHalf} />
+            <Button
+              title="Copy"
+              variant="primary"
+              onPress={() => onConfirm(orderedChoice)}
+              disabled={orderedChoice.length === 0 || saving}
+              style={styles.modalBtnHalf}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── MacroChip helper ─────────────────────────────────────────
 
 function MacroChip({ label, value }: { label: string; value: string }) {
@@ -606,10 +802,33 @@ function MacroChip({ label, value }: { label: string; value: string }) {
 
 // ─── Log Meal Modal ───────────────────────────────────────────
 
-function LogMealModal({ visible, onClose, recipes, onSave, saving }: {
+type PickerItem =
+  | { kind: 'header'; key: string; text: string }
+  | { kind: 'recipe'; key: string; recipe: Recipe };
+
+function pickerItems(recipes: Recipe[], oftenCookedIds: string[]): PickerItem[] {
+  const byId = new Map(recipes.map((r) => [r.id, r]));
+  const often = oftenCookedIds.flatMap((id) => {
+    const recipe = byId.get(id);
+    return recipe ? [recipe] : [];
+  });
+  const oftenSet = new Set(often.map((r) => r.id));
+  const rest = recipes.filter((r) => !oftenSet.has(r.id));
+  const toItem = (recipe: Recipe): PickerItem => ({ kind: 'recipe', key: recipe.id, recipe });
+  if (often.length === 0) return rest.map(toItem);
+  return [
+    { kind: 'header', key: 'header-often', text: 'Often cooked' },
+    ...often.map(toItem),
+    { kind: 'header', key: 'header-all', text: 'All recipes' },
+    ...rest.map(toItem),
+  ];
+}
+
+function LogMealModal({ visible, onClose, recipes, oftenCookedIds, onSave, saving }: {
   visible: boolean;
   onClose: () => void;
   recipes: Recipe[];
+  oftenCookedIds: string[];
   onSave: (recipe_id: string, portions: number) => void;
   saving: boolean;
 }) {
@@ -636,9 +855,13 @@ function LogMealModal({ visible, onClose, recipes, onSave, saving }: {
 
           <FlatList
             style={styles.modalList}
-            data={recipes}
-            keyExtractor={(r) => r.id}
-            renderItem={({ item }) => {
+            data={pickerItems(recipes, oftenCookedIds)}
+            keyExtractor={(i) => i.key}
+            renderItem={({ item: entry }) => {
+              if (entry.kind === 'header') {
+                return <Text style={styles.pickerSectionHeader}>{entry.text}</Text>;
+              }
+              const item = entry.recipe;
               const isSelected = selectedRecipeId === item.id;
               return (
                 <TouchableOpacity
@@ -886,6 +1109,9 @@ const styles = StyleSheet.create({
   assignedText: {
     flex: 1,
   },
+  copyBtn: {
+    padding: Spacing.xs,
+  },
   removeBtn: {
     padding: Spacing.xs,
     marginRight: Spacing.sm,
@@ -1124,6 +1350,15 @@ const styles = StyleSheet.create({
   },
   modalList: {
     maxHeight: 260,
+  },
+  pickerSectionHeader: {
+    fontFamily: Typography.label,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: Colors.textMuted,
+    paddingTop: Spacing.sm,
   },
   recipeOpt: {
     flexDirection: 'row',
