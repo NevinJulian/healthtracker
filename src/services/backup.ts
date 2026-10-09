@@ -330,9 +330,9 @@ async function removeSafetyLeftovers(dir: string): Promise<void> {
  * newest SAFETY_KEEP. Age and "newest" are read from the file name. Snapshots
  * dated more than an hour ahead of `now` are never deleted and do not count
  * toward SAFETY_KEEP, so a clock that was once set ahead cannot push out real
- * ones.
+ * ones. `keepUri`, the file just restored from, is never deleted.
  */
-async function pruneSafetySnapshots(now: Date): Promise<void> {
+async function pruneSafetySnapshots(now: Date, keepUri: string): Promise<void> {
   const dir = safetyDir();
   if (!dir || !(await getInfoAsync(dir)).exists) return;
 
@@ -341,7 +341,8 @@ async function pruneSafetySnapshots(now: Date): Promise<void> {
   const cutoff = now.getTime() - SAFETY_KEEP_DAYS * DAY_MS;
   const counted = valid.filter((entry) => entry.time.getTime() <= horizon);
   for (const entry of counted.slice(SAFETY_KEEP)) {
-    if (entry.time.getTime() < cutoff) await deleteMatching(dir, entry.name, SAFETY_NAME_RE);
+    if (entry.time.getTime() >= cutoff || `${dir}${entry.name}` === keepUri) continue;
+    await deleteMatching(dir, entry.name, SAFETY_NAME_RE);
   }
 }
 
@@ -530,7 +531,7 @@ async function performRestore(uri: string, options: RestoreOptions): Promise<Res
   // Best-effort from here on: a failure must not turn a successful restore
   // into a reported failure.
   try {
-    await pruneSafetySnapshots(new Date());
+    await pruneSafetySnapshots(new Date(), uri);
   } catch (err) {
     console.warn('[Backup] Failed to prune safety snapshots:', err);
   }
