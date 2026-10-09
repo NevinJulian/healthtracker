@@ -141,6 +141,7 @@ export default function RecipeEditorScreen() {
   // ── Loading / saving state ────────────────────────────────────────────────
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const recomputeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -149,7 +150,15 @@ export default function RecipeEditorScreen() {
   const resolvedLookups = useRef<Record<string, OFFNutrition>>({});
   const noDataLookups = useRef<Set<string>>(new Set());
 
-  useEffect(() => () => lookupController.current?.abort(), []);
+  const mounted = useRef(true);
+
+  useEffect(
+    () => () => {
+      mounted.current = false;
+      lookupController.current?.abort();
+    },
+    [],
+  );
 
   // ── Load existing recipe in edit mode ────────────────────────────────────
 
@@ -342,6 +351,7 @@ export default function RecipeEditorScreen() {
   // ── Save ──────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
+    if (closing) return;
     // Validation
     if (!title.trim()) {
       Alert.alert('Validation', 'Please enter a recipe title.');
@@ -383,21 +393,16 @@ export default function RecipeEditorScreen() {
         clearTimeout(deadline);
       }
       if (settled === 'timeout') lookupController.current?.abort();
-      let finalMacros = settled === 'timeout' ? null : settled;
-      if (finalMacros === null) {
-        const fallback = computeRecipeMacros(
-          validIngredients,
-          numServings,
-          Object.keys(resolvedLookups.current).length > 0 ? resolvedLookups.current : undefined,
-        );
-        finalMacros = fallback.macros;
-        if (settled === 'timeout') {
-          const cutOff = new Set(
-            fallback.unmatchedIngredients.filter((n) => !noDataLookups.current.has(n)),
-          );
-          showUnmatched(fallback.unmatchedIngredients, cutOff);
-        }
-      }
+      const computed = computeRecipeMacros(
+        validIngredients,
+        numServings,
+        Object.keys(resolvedLookups.current).length > 0 ? resolvedLookups.current : undefined,
+      );
+      const finalMacros = settled === 'timeout' || settled === null ? computed.macros : settled;
+      const notLookedUp = computed.unmatchedIngredients.filter(
+        (n) => !noDataLookups.current.has(n),
+      );
+      showUnmatched(computed.unmatchedIngredients, new Set(notLookedUp));
 
       const recipe: Recipe = {
         id: isEdit ? recipeId : `custom-${Date.now()}`,
@@ -416,10 +421,36 @@ export default function RecipeEditorScreen() {
 
       if (isEdit) {
         await updateRecipe(recipe);
-        navigation.goBack();
       } else {
         await createRecipe(recipe);
-        navigation.replace('RecipeDetail', { recipeId: recipe.id });
+      }
+
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        if (!mounted.current) return;
+        setClosing(false);
+        if (isEdit) {
+          navigation.goBack();
+        } else {
+          navigation.replace('RecipeDetail', { recipeId: recipe.id });
+        }
+      };
+
+      if (notLookedUp.length === 0) {
+        finish();
+      } else {
+        setClosing(true);
+        const count = notLookedUp.length;
+        const message =
+          count === 1
+            ? "1 ingredient couldn't be looked up and counts as 0. Open and save the recipe again later to look it up."
+            : `${count} ingredients couldn't be looked up and count as 0. Open and save the recipe again later to look them up.`;
+        Alert.alert('Saved', message, [{ text: 'OK', onPress: finish }], {
+          cancelable: true,
+          onDismiss: finish,
+        });
       }
     } catch {
       Alert.alert('Error', 'Failed to save recipe. Please try again.');
@@ -719,13 +750,13 @@ export default function RecipeEditorScreen() {
             title={saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Recipe'}
             variant="primary"
             onPress={handleSave}
-            disabled={saving}
+            disabled={saving || closing}
           />
           <Button
             title="Cancel"
             variant="ghost"
             onPress={() => navigation.goBack()}
-            disabled={saving}
+            disabled={saving || closing}
           />
         </View>
 
