@@ -104,8 +104,10 @@
         443,
         352
       ],
-      "current": 442,
-      "done": [],
+      "current": 443,
+      "done": [
+        442
+      ],
       "parked": []
     }
   },
@@ -211,7 +213,7 @@
     "442": {
       "lane": "D",
       "kind": "bug",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "711b910",
@@ -225,12 +227,13 @@
       "workOrder": "C:/git/ht-lanes/wo/442.md",
       "deviceCheck": "none (decision item 5: the limit cannot be reached on purpose in Expo Go, tests cover it)",
       "notes": "WO ready, no PARK, no file outside lane D. Claim verified: notLookedUpSentence (DiscoverDetailScreen.tsx:55-57) is the only source of the Try again in a minute text; a lookup that got the 429 itself returns null at openfoodfacts.ts:189 after setting pausedUntil; the sentinel is never cached. Fix: return 'not-looked-up' in the 429 branch; new singular/plural sentences; In your library subtitle. Existing assertions that change (they pin the replaced behaviour): retryAfter.test.ts:56,74,88 (toBeNull on the 429 receiver) and notLookedUp.test.tsx:47,77,81 (old sentence). Side effect to watch: in the editor, 429 receivers move from the no-data branch into the Not looked up banner (wording is #443's). ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst picked In your library for every no-warning case, which would also change a fresh clean import; decision item 4 is only about a recipe already in the library, so the subtitle is shown only when the load effect found the recipe or dbImportRecipe returned false, and a fresh clean import keeps Macros computed from local data. | dev: 4 commits, 1393/108 per dev. fetchFromOFF returns the sentinel after the 429 branch sets the pause; one sentence function for Alert and card; new alreadyInLibrary state set in exactly two places. Existing assertions changed as listed in the work order (retryAfter.test.ts:56,74,88 toBeNull -> 'not-looked-up'; the NOT_LOOKED_UP constant at notLookedUp.test.tsx:47). BEYOND THE WORK ORDER: the already-in-library effect's dynamic import('../db/database') was replaced by a static import of getRecipeById, because under jest the dynamic import throws and the empty catch swallowed it, so the reopen path could not be tested; same module is already imported statically in that file. Tester asked to judge it.",
-      "securityReview": "APPROVE (c698da2..d0c057d, read through git): the only new network-derived value is the constant sentinel returned after the pause is set; the sentinel is excluded before every sink (cache write only for real objects, importRecipe and the editor branch on the string first, batch keeps objects only), no NaN path; a 429 or any failure is never cached; budget, pause formula (longer wins, 1-300 s clamp, 60 s default), abort handling and the 5xx retry are untouched; the import is still INSERT OR IGNORE and never overwrites; a failed import is never shown as In your library. Note: a 5xx first attempt whose retry is refused locally still resolves null (unchanged)."
+      "securityReview": "APPROVE (c698da2..d0c057d, read through git): the only new network-derived value is the constant sentinel returned after the pause is set; the sentinel is excluded before every sink (cache write only for real objects, importRecipe and the editor branch on the string first, batch keeps objects only), no NaN path; a 429 or any failure is never cached; budget, pause formula (longer wins, 1-300 s clamp, 60 s default), abort handling and the 5xx retry are untouched; the import is still INSERT OR IGNORE and never overwrites; a failed import is never shown as In your library. Note: a 5xx first attempt whose retry is refused locally still resolves null (unchanged).",
+      "regressionProof": "tester APPROVE r0: with openfoodfacts.ts from 711b910, 12 of 22 retryAfter tests fail (the 429 receiver resolves null), all pass at d0c057d; with DiscoverDetailScreen.tsx from 5f0b565, 4 of 5 Discover tests fail (both sentences, both In your library cases), the fresh-clean-import guard passes before and after by design; the three edited assertions and the wording constant judged legitimate (they pinned 429 receiver = no data and the old sentence), nothing else weakened; sentinel never reaches the cache, a truthiness check or computeRecipeMacros; pause tests untouched and green; with the dynamic import put back the found-on-load test fails, so the static import was needed and is behaviour-preserving; 1393/108 (tester reproduced). Gap: the tester did not see the in-flight Promise.all assertion in its own red list (the developer reported two array-diff failures there); it sits inside tests that were red."
     },
     "443": {
       "lane": "D",
       "kind": "bug",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "title": "Recipe editor: save-deadline notice is set on a screen that closes at once",
@@ -260,7 +263,10 @@
       "regressionProof": "tester APPROVE r0: with MealPrepScreen.tsx from c698da2 the new screen test fails (old sentence received), 34/34 at 14194af; the db pin (passes before by design) goes red under a mutation of the no-stock branch in _toggleMealConsumedImpl; sql.js scratch run: removing the no-pointer meal leaves inventory at 0 (new text true), removing the pointer meal restores it to 1 (old text true); condition != null matches _creditPortion exactly; one call site; no existing assertion edited; 1390/107 (tester reproduced)"
     }
   },
-  "foundDuringSprint": [],
+  "foundDuringSprint": [
+    449,
+    450
+  ],
   "pendingFindings": [
     "SMALL (#444 analyst): WeeklyMealPlanItem.is_consumed is typed boolean but getWeeklyMealPlan returns raw 0/1 (database.ts:1719); truthy checks work, === true would not",
     "SMALL (#444 analyst): a non-NULL consumed_from_inventory_id whose batch row is gone (after a restore, or devStress369.ts:174) still gets the refund text and no credit; the decision keeps the text",
@@ -294,7 +300,9 @@
     "DATA-LOSS (#352 analyst): opening a Discover-imported recipe in the editor and saving it silently deletes every ingredient stored with quantity 0 (vague measures), because rowsToIngredients (RecipeEditorScreen.tsx:89) drops rows with quantity <= 0. Fixed inside #352 by its editor rule (same root cause, lane D file). MUST be filed as its own issue if #352 is parked, because #442's new wording tells users to open the recipe in the editor and save it",
     "USER-HITTABLE (#352 analyst): an ingredient stored with quantity 0 (Discover imports already produce them) is shown as '0 g' in RecipeDetailScreen.tsx:224 and is put on the shopping list as a 0-quantity line such as 'Salt 0 g' (_addRecipeToShoppingListImpl, database.ts:1961-1963) - to be filed as its own issue",
     "SMALL (#352 analyst): parseMeasure misreads: '1 pinch' -> 1 whole (pinch is not in detectUnit, parseMeasure.ts:275-319; expected a vague 0), '1,5 kg' -> 6000 g (splits on the comma at :275 and adds the parts at :121; expected 1500 g), '1 EL' -> 1 whole (:191; expected 15 g). No TheMealDB measure in the repo is confirmed to hit them; the new URL import normalises before calling parseMeasure",
-    "SMALL (#352 analyst): src/db/__tests__/recipeHelpers.test.ts:80-92 asserts the drop of quantity-0 rows against a local copy of the function, so it neither fails nor guards"
+    "SMALL (#352 analyst): src/db/__tests__/recipeHelpers.test.ts:80-92 asserts the drop of quantity-0 rows against a local copy of the function, so it neither fails nor guards",
+    "SMALL (#442 tester): if the load-time getRecipeById check resolved after a fresh import had finished, alreadyInLibrary would flip a clean import's card to In your library; warnings still show; needs a window of milliseconds",
+    "SMALL (#442 tester): RecipeEditorScreen.tsx:663 still says try Recompute in a minute (#443 owns it)"
   ],
   "log": [
     {
@@ -324,6 +332,10 @@
     {
       "at": "2026-10-09T07:41:05Z",
       "event": "#444 ready (tester APPROVE r0, security skipped, 1390/107) -> lane B moves to #347, developer dispatched. #442 security APPROVE on d0c057d (tester still running). #352 work order finalised by the analyst"
+    },
+    {
+      "at": "2026-10-09T07:42:14Z",
+      "event": "#442 ready (tester APPROVE r0, security APPROVE, 1393/108) -> lane D moves to #443, developer dispatched. Filed #449 (backup export not transactional) and #450 (quantity-0 ingredients shown as 0 g / on the shopping list), label found-during-sprint; neither is worked. Orchestrator amendment appended to the #352 work order: the ld+json script scan must be linear (indexOf, stop at the first unclosed tag), because the regex in rule 2 is quadratic on a hostile 3 MB page"
     }
   ],
   "aheadAnalysis": {
@@ -335,5 +347,9 @@
     "348": "ready",
     "352": "ready (finalised by the analyst; orchestrator reads it before dispatch)",
     "443": "ready"
+  },
+  "findingsFiled": {
+    "449": "Backup export reads the tables one by one, not in one transaction (the #338 analyst's DATA-LOSS finding; claim checked by the orchestrator at backup.ts:190-197 and database.ts:2596)",
+    "450": "Ingredients stored with quantity 0 show as '0 g' in the recipe detail and go on the shopping list as a 0-quantity line (the #352 analyst's USER-HITTABLE finding)"
   }
 }
