@@ -42,6 +42,8 @@ import {
   makeDirectoryAsync,
   readDirectoryAsync,
   deleteAsync,
+  moveAsync,
+  getInfoAsync,
 } from 'expo-file-system/legacy';
 import {
   getCurrentSchemaVersion,
@@ -453,10 +455,127 @@ export interface AutoBackupEntry {
   sizeBytes: number;
 }
 
-export async function runAutoBackupIfDue(_now: Date = new Date()): Promise<void> {}
+const AUTO_DIR_NAME = 'auto-backups/';
+const AUTO_NAME_RE = /^healthtracker-auto-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z\.json$/;
+const AUTO_TMP_RE = /^healthtracker-auto-\d{8}T\d{6}Z\.json\.tmp$/;
+const AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const AUTO_CLOCK_SKEW_MS = 60 * 60 * 1000;
 
+let autoBackupInFlight: Promise<void> | null = null;
+let restoreInProgress = false;
+
+function autoBackupDir(): string | null {
+  return documentDirectory ? `${documentDirectory}${AUTO_DIR_NAME}` : null;
+}
+
+function autoBackupName(date: Date): string {
+  const stamp = date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  return `healthtracker-auto-${stamp}.json`;
+}
+
+function parseAutoBackupName(name: string): Date | null {
+  const match = AUTO_NAME_RE.exec(name);
+  if (!match) return null;
+  const [y, mo, d, h, mi, s] = match.slice(1).map(Number);
+  const date = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  return autoBackupName(date) === name ? date : null;
+}
+
+async function readAutoBackupFolder(
+  dir: string
+): Promise<{ valid: { name: string; time: Date }[]; leftovers: string[] }> {
+  const names = await readDirectoryAsync(dir);
+  const valid: { name: string; time: Date }[] = [];
+  const leftovers: string[] = [];
+  for (const name of names) {
+    const time = parseAutoBackupName(name);
+    if (time) valid.push({ name, time });
+    else if (AUTO_TMP_RE.test(name)) leftovers.push(name);
+  }
+  valid.sort((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
+  return { valid, leftovers };
+}
+
+/**
+ * Write an automatic backup into auto-backups/ in documentDirectory when none
+ * exists or the newest is at least 24 hours old, then keep the newest
+ * AUTO_BACKUP_KEEP. Concurrent calls share one run; nothing runs during a
+ * restore.
+ *
+ * A backup is written to a temporary name and moved into place, so a partial
+ * file is never listed or restored. "Newest" is read from the file name.
+ * Files dated more than an hour ahead of `now` are ignored for the due check
+ * and never pruned, so a clock set back cannot block backups.
+ *
+ * @throws When the write fails; the caller logs it.
+ */
+export function runAutoBackupIfDue(now: Date = new Date()): Promise<void> {
+  if (autoBackupInFlight) return autoBackupInFlight;
+  const run = performAutoBackup(now).finally(() => {
+    autoBackupInFlight = null;
+  });
+  autoBackupInFlight = run;
+  return run;
+}
+
+async function performAutoBackup(now: Date): Promise<void> {
+  if (restoreInProgress) return;
+  const dir = autoBackupDir();
+  if (!dir) throw new Error('No document directory available for automatic backups.');
+
+  await makeDirectoryAsync(dir, { intermediates: true });
+  const { valid, leftovers } = await readAutoBackupFolder(dir);
+  for (const name of leftovers) await deleteMatching(dir, name, AUTO_TMP_RE);
+
+  const horizon = now.getTime() + AUTO_CLOCK_SKEW_MS;
+  const newest = valid.find((entry) => entry.time.getTime() <= horizon);
+  if (newest && now.getTime() - newest.time.getTime() < AUTO_INTERVAL_MS) return;
+
+  const payload = await buildBackupPayload();
+  if (restoreInProgress) return;
+
+  const finalName = autoBackupName(now);
+  const finalUri = `${dir}${finalName}`;
+  const tmpUri = `${finalUri}.tmp`;
+  try {
+    await writeAsStringAsync(tmpUri, JSON.stringify(payload, null, 2));
+    await moveAsync({ from: tmpUri, to: finalUri });
+  } catch (err) {
+    try {
+      await deleteAsync(tmpUri, { idempotent: true });
+    } catch (cleanupErr) {
+      console.warn('[Backup] Failed to remove temporary backup file:', cleanupErr);
+    }
+    throw err;
+  }
+
+  try {
+    const after = await readAutoBackupFolder(dir);
+    const counted = after.valid.filter((entry) => entry.time.getTime() <= horizon);
+    for (const entry of counted.slice(AUTO_BACKUP_KEEP)) {
+      await deleteMatching(dir, entry.name, AUTO_NAME_RE);
+    }
+  } catch (err) {
+    console.warn('[Backup] Failed to prune automatic backups:', err);
+  }
+}
+
+/** Automatic backups on this device, newest first. */
 export async function listAutoBackups(): Promise<AutoBackupEntry[]> {
-  return [];
+  const dir = autoBackupDir();
+  if (!dir) return [];
+  const folder = await getInfoAsync(dir);
+  if (!folder.exists) return [];
+
+  const { valid } = await readAutoBackupFolder(dir);
+  const entries: AutoBackupEntry[] = [];
+  for (const { name, time } of valid) {
+    const uri = `${dir}${name}`;
+    const info = await getInfoAsync(uri);
+    if (!info.exists) continue;
+    entries.push({ name, uri, createdAt: time, sizeBytes: info.size });
+  }
+  return entries;
 }
 
 export async function restoreBackupFromUri(
