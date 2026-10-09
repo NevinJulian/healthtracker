@@ -152,15 +152,33 @@
     "338": {
       "lane": "C",
       "kind": "feature",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "58ed095",
+        "1159bd8",
+        "5265a1b",
+        "7b403cb",
+        "5071407",
+        "3cb297d",
+        "6f82e6e",
+        "92da621",
+        "d4c1f71",
+        "6dfa160",
+        "b5a54f6",
+        "88000bd",
+        "7db3ccd",
+        "1d69df8",
+        "15ed805",
+        "7243da4"
+      ],
       "title": "automatic rotating local backups",
       "decisionSource": "owner comment 6070877910 on #338: auto-backups folder in documentDirectory; written after a successful start when the newest is older than 24 h or none exists, in the background, failure only logged; newest 7 kept; Settings 'Automatic backups' list newest first with date, time, size, Share and Restore through the existing restore path; pre-restore safety snapshot moves to documentDirectory, newest 3 kept, header comment corrected; manual export unchanged",
       "securityPlan": "required (backup.ts, filesystem)",
       "workOrder": "C:/git/ht-lanes/wo/338.md",
       "deviceCheck": "Expo Go: after a start, Settings lists one automatic backup. Share opens the share sheet. Restoring it works and your data is still there.",
-      "notes": "WO ready (ahead), no PARK, no file outside lane C. backup.ts uses expo-file-system/legacy throughout; tests need an inline jest.mock with an in-memory file map (rescueExport.test.ts is the pattern). Design: healthtracker-auto-YYYYMMDDTHHmmssZ.json under documentDirectory/auto-backups, newest decided by name, write to .tmp then moveAsync, prune pattern-matching files only (newest 7), files dated more than 1 h ahead ignored for the 24 h check; in-flight guard and a restoreInProgress flag; restoreBackupFromUri(uri, options) extracted from importBackup; safety snapshots to documentDirectory/safety-snapshots (newest 3); runAutoBackupIfDue().catch(log) after setDbReady(true) in App.tsx; shareFile gets an optional dialogTitle. Analyst picks to repeat in the report: section title, row format '8 Oct 2026, 14:03', sizes B/KB/MB with one decimal, text buttons Share and Restore, empty-state text, a restore confirm that names the backup."
+      "notes": "WO ready (ahead), no PARK, no file outside lane C. backup.ts uses expo-file-system/legacy throughout; tests need an inline jest.mock with an in-memory file map (rescueExport.test.ts is the pattern). Design: healthtracker-auto-YYYYMMDDTHHmmssZ.json under documentDirectory/auto-backups, newest decided by name, write to .tmp then moveAsync, prune pattern-matching files only (newest 7), files dated more than 1 h ahead ignored for the 24 h check; in-flight guard and a restoreInProgress flag; restoreBackupFromUri(uri, options) extracted from importBackup; safety snapshots to documentDirectory/safety-snapshots (newest 3); runAutoBackupIfDue().catch(log) after setDbReady(true) in App.tsx; shareFile gets an optional dialogTitle. Analyst picks to repeat in the report: section title, row format '8 Oct 2026, 14:03', sizes B/KB/MB with one decimal, text buttons Share and Restore, empty-state text, a restore confirm that names the backup. | dev: all steps done, 16 commits, tip 7243da4, 1527/113 per dev with both exit codes 0; App and Settings suites three times, identical. File names healthtracker-auto-YYYYMMDDTHHmmssZ.json under documentDirectory/auto-backups/, written to <name>.tmp and moved; the pattern is anchored and the parsed date must round-trip to the same name; every delete goes through deleteMatching(dir, name, pattern) with its own try/catch; newest by name; due when none or the newest (dated at most now + 1 h) is at least 24 h old; newest 7 kept after a successful move; leftover .tmp removed at the start of each run; in-flight promise; restoreInProgress flag checked at the start and again after the payload is built. Safety snapshots under documentDirectory/safety-snapshots/, newest 3, pruned in their own try/catch. restoreBackupFromUri returns RestoreResult; importBackup is the picker plus that call, its tests untouched. No existing assertion changed; mocks extended in three existing test files. DEVIATION from the work order, for the tester and the human: the App.tsx call sits in an effect that fires once dbReady && fontsLoaded && !showFailure, not directly after setDbReady(true), so it does not run when a font error shows the recovery screen. BEYOND the work order: the manual restore handler was folded into a shared confirmRestore(title, message, restore); Share failure titles are the developer's pick (Share failed / Sharing unavailable). The sql.js round-trip test was added after its code (never red; the dev checked it fails when the backup returns early) and ignores one app_state marker the notification resync writes.",
+      "securityReview": "running in parallel with the tester on caea6aa..7243da4"
     },
     "339": {
       "lane": "C",
@@ -481,7 +499,10 @@
     "SMALL, for the HUMAN (#352 orchestrator): the existing parseMeasure turns a volume into grams at 1 ml = 1 g whatever the ingredient, so an imported '1 1/2 cups flour' becomes 360 g of flour (real weight about 190 g); the URL import inherits this from the TheMealDB import path, and macros for cup-measured dry goods come out too high",
     "SMALL (#352 tester r2): '1 (14.5 oz) can diced tomatoes' and '1 stick (113 g) butter' give 1 whole with the bracket in the name (count right, name untidy)",
     "SMALL (#352 tester r2): one bbcgoodfood line arrives from the page itself as '2 olive oil plus extra for the dish' (the site's own data lacks the unit), so it imports as 2 whole",
-    "SMALL (#352 tester r2): swissmilk.ch has no JSON-LD recipe block, so it gives the no-recipe message"
+    "SMALL (#352 tester r2): swissmilk.ch has no JSON-LD recipe block, so it gives the no-recipe message",
+    "SMALL (#338 dev): comments with issue numbers remain next to lines the lane touched: backup.ts line 9 (#293), SettingsScreen.tsx (#302, #310, #277, #293) - for lane C cleanup where they sit in the lane's hunks",
+    "SMALL (#338 dev): restoreInProgress is a boolean, so two overlapping restores would clear it early; the Settings busy flag prevents an overlap",
+    "SMALL (#338 dev): old safety snapshots already in cacheDirectory are never pruned (as decided: left alone)"
   ],
   "log": [
     {
@@ -631,6 +652,10 @@
     {
       "at": "2026-10-09T08:29:41Z",
       "event": "#352 tester REJECT r2 at e8c7cbd: the line parser still gives confident wrong values for common English forms (1-1/2 cups, fl oz / pint / quart, T / t / c / tbs, 'to', 'and', 'plus', the US thousands comma) -> ROUND TRIP 2, developer resumed for the last attempt with an allow-list design and two generated invariant tests"
+    },
+    {
+      "at": "2026-10-09T08:35:11Z",
+      "event": "#338 dev done (16 commits, tip 7243da4; 1527/113 per dev, exit codes 0) -> in_test, security in parallel"
     }
   ],
   "aheadAnalysis": {
