@@ -91,6 +91,9 @@ const writeAsyncMock = jest.mocked(FileSystem.writeAsStringAsync);
 const moveAsyncMock = jest.mocked(FileSystem.moveAsync);
 
 const SAFETY_DIR = 'file:///document/safety-snapshots/';
+const NOW = new Date(Date.UTC(2026, 9, 8, 14, 3, 0));
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
 
 function snapshotName(date: Date): string {
   const stamp = date.toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, '');
@@ -99,6 +102,16 @@ function snapshotName(date: Date): string {
 
 function safetyFiles(): string[] {
   return [...files.keys()].filter((uri) => uri.startsWith(SAFETY_DIR)).sort();
+}
+
+function daysAgo(days: number): Date {
+  return new Date(NOW.getTime() - days * DAY);
+}
+
+function seedSnapshot(date: Date): string {
+  const uri = `${SAFETY_DIR}${snapshotName(date)}`;
+  files.set(uri, { content: 'old', mtime: 1 });
+  return uri;
 }
 
 beforeEach(() => {
@@ -169,37 +182,15 @@ describe('writeSafetySnapshot', () => {
     expect(safetyFiles()).toEqual([uri]);
   });
 
-  it('keeps only the newest 3 snapshots', async () => {
+  it('deletes no other snapshot, however many and however old they are', async () => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
-    const base = Date.UTC(2026, 9, 8, 12, 0, 0);
-    const written: string[] = [];
-    for (let i = 0; i < 5; i++) {
-      jest.setSystemTime(base + i * 60_000);
-      written.push(await writeSafetySnapshot());
-    }
-
-    expect([...files.keys()].filter((uri) => uri.startsWith(SAFETY_DIR)).sort()).toEqual(
-      written.slice(2).sort()
-    );
-  });
-
-  it('never prunes the snapshot it just wrote, even when three others are dated later', async () => {
-    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
-    const now = Date.UTC(2026, 9, 8, 12, 0, 0);
-    jest.setSystemTime(now);
-    const day = 24 * 3_600_000;
-    const later = [now + day, now + 2 * day, now + 365 * day].map(
-      (time) => `${SAFETY_DIR}${snapshotName(new Date(time))}`
-    );
-    for (const uri of later) files.set(uri, { content: 'old', mtime: 1 });
+    jest.setSystemTime(NOW);
+    const old = [10, 20, 30, 40, 50].map((days) => seedSnapshot(daysAgo(days)));
 
     const uri = await writeSafetySnapshot();
 
-    expect(uri).toBe(`${SAFETY_DIR}${snapshotName(new Date(now))}`);
-    expect(files.has(uri)).toBe(true);
-    expect([...files.keys()].filter((key) => key.startsWith(SAFETY_DIR)).sort()).toEqual(
-      [uri, later[1], later[2]].sort()
-    );
+    expect(safetyFiles()).toEqual([uri, ...old].sort());
+    expect(deleteAsync).not.toHaveBeenCalled();
   });
 
   it('does not delete the snapshot of the same second when written twice', async () => {
@@ -213,56 +204,9 @@ describe('writeSafetySnapshot', () => {
     expect(files.has(second)).toBe(true);
     expect(deleteAsync).not.toHaveBeenCalled();
   });
-
-  it('leaves files that are not snapshots, and files outside the folder, alone', async () => {
-    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
-    const cacheFile = 'file:///cache/healthtracker-pre-restore-2026-01-01T00-00-00.json';
-    const foreign = `${SAFETY_DIR}notes.txt`;
-    const lookalike = `${SAFETY_DIR}healthtracker-pre-restore-2026-01-01T00-00-00.json.bak`;
-    for (const uri of [cacheFile, foreign, lookalike]) {
-      files.set(uri, { content: 'x', mtime: 1 });
-    }
-    const base = Date.UTC(2026, 9, 8, 12, 0, 0);
-    for (let i = 0; i < 5; i++) {
-      jest.setSystemTime(base + i * 60_000);
-      await writeSafetySnapshot();
-    }
-
-    const snapshots = [...files.keys()].filter((uri) =>
-      /\/safety-snapshots\/healthtracker-pre-restore-[\d-]+T[\d-]+\.json$/.test(uri)
-    );
-    expect(snapshots).toHaveLength(3);
-    expect(files.has(cacheFile)).toBe(true);
-    expect(files.has(foreign)).toBe(true);
-    expect(files.has(lookalike)).toBe(true);
-    expect(deleteAsync).not.toHaveBeenCalledWith(cacheFile, expect.anything());
-    expect(deleteAsync).not.toHaveBeenCalledWith(foreign, expect.anything());
-    expect(deleteAsync).not.toHaveBeenCalledWith(lookalike, expect.anything());
-  });
-
-  it('still returns the snapshot uri when pruning an old snapshot fails', async () => {
-    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
-    const base = Date.UTC(2026, 9, 8, 12, 0, 0);
-    for (let i = 0; i < 3; i++) {
-      files.set(`${SAFETY_DIR}${snapshotName(new Date(base + i * 60_000))}`, {
-        content: 'old',
-        mtime: 1,
-      });
-    }
-    deleteAsync.mockRejectedValueOnce(new Error('disk error'));
-    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    jest.setSystemTime(base + 10 * 60_000);
-
-    const uri = await writeSafetySnapshot();
-
-    expect(uri).toBe(`${SAFETY_DIR}${snapshotName(new Date(base + 10 * 60_000))}`);
-    expect(files.has(uri)).toBe(true);
-  });
 });
 
 const AUTO_DIR = 'file:///document/auto-backups/';
-const NOW = new Date(Date.UTC(2026, 9, 8, 14, 3, 0));
-const HOUR = 3_600_000;
 const AUTO_NAME = /^healthtracker-auto-\d{8}T\d{6}Z\.json$/;
 
 const readDirMock = jest.mocked(FileSystem.readDirectoryAsync);
@@ -718,5 +662,177 @@ describe('restoreBackupFromUri', () => {
     await runAutoBackupIfDue(NOW);
 
     expect(autoFiles()).toEqual([`${AUTO_DIR}${autoName(NOW)}`]);
+  });
+
+  describe('pruning safety snapshots', () => {
+    const fresh = `${SAFETY_DIR}${snapshotName(NOW)}`;
+
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      jest.setSystemTime(NOW);
+    });
+
+    it('keeps every snapshot from the last 7 days, however many there are', async () => {
+      const recent = [1, 2, 3, 4, 5, 6].map((days) => seedSnapshot(daysAgo(days)));
+
+      await restoreBackupFromUri(SOURCE);
+
+      expect(safetyFiles()).toEqual([fresh, ...recent].sort());
+      expect(deleteAsync).not.toHaveBeenCalled();
+    });
+
+    it('deletes snapshots older than 7 days once three newer ones exist', async () => {
+      const recent = [1, 2].map((days) => seedSnapshot(daysAgo(days)));
+      [8, 9, 30].forEach((days) => seedSnapshot(daysAgo(days)));
+
+      await restoreBackupFromUri(SOURCE);
+
+      expect(safetyFiles()).toEqual([fresh, ...recent].sort());
+    });
+
+    it('keeps a snapshot exactly 7 days old and deletes one a second older', async () => {
+      const recent = [1, 2].map((days) => seedSnapshot(daysAgo(days)));
+      const onTheLine = seedSnapshot(daysAgo(7));
+      seedSnapshot(new Date(daysAgo(7).getTime() - 1000));
+
+      await restoreBackupFromUri(SOURCE);
+
+      expect(safetyFiles()).toEqual([fresh, ...recent, onTheLine].sort());
+    });
+
+    it('always keeps the newest 3, even when they are older than 7 days', async () => {
+      const old = [10, 20, 30, 40].map((days) => seedSnapshot(daysAgo(days)));
+
+      await restoreBackupFromUri(SOURCE);
+
+      expect(safetyFiles()).toEqual([fresh, old[0], old[1]].sort());
+    });
+
+    it('keeps the newest 3 when no snapshot could be written and the caller continues', async () => {
+      const old = [10, 20, 30, 40].map((days) => seedSnapshot(daysAgo(days)));
+      writeAsyncMock.mockRejectedValueOnce(new Error('disk full'));
+
+      await restoreBackupFromUri(SOURCE, { onSnapshotFailed: async () => true });
+
+      expect(safetyFiles()).toEqual(old.slice(0, 3).sort());
+    });
+
+    it('deletes nothing until the restore has succeeded', async () => {
+      const old = [10, 20, 30, 40].map((days) => seedSnapshot(daysAgo(days)));
+      let presentDuringRestore: string[] = [];
+      restoreFromPayload.mockImplementation(async () => {
+        presentDuringRestore = safetyFiles();
+        return { tablesRestored: 2, rowsRestored: 2 };
+      });
+
+      await restoreBackupFromUri(SOURCE);
+
+      expect(presentDuringRestore).toEqual([fresh, ...old].sort());
+    });
+
+    it('deletes nothing when the restore fails', async () => {
+      const old = [10, 20, 30, 40].map((days) => seedSnapshot(daysAgo(days)));
+      restoreFromPayload.mockRejectedValue(new Error('constraint'));
+
+      await expect(restoreBackupFromUri(SOURCE)).rejects.toThrow('Restore failed');
+
+      expect(safetyFiles()).toEqual([fresh, ...old].sort());
+      expect(deleteAsync).not.toHaveBeenCalled();
+    });
+
+    it('deletes nothing when the restore is aborted because the snapshot failed', async () => {
+      const old = [10, 20, 30, 40].map((days) => seedSnapshot(daysAgo(days)));
+      writeAsyncMock.mockRejectedValueOnce(new Error('disk full'));
+
+      await expect(restoreBackupFromUri(SOURCE)).rejects.toThrow('Restore aborted');
+
+      expect(safetyFiles()).toEqual([...old].sort());
+    });
+
+    it('never deletes a snapshot dated ahead of the clock, and does not count it toward the 3', async () => {
+      const ahead = [1, 2, 365].map((days) => seedSnapshot(daysAgo(-days)));
+      const old = [10, 20, 30].map((days) => seedSnapshot(daysAgo(days)));
+
+      await restoreBackupFromUri(SOURCE);
+
+      expect(safetyFiles()).toEqual([fresh, ...ahead, old[0], old[1]].sort());
+    });
+
+    it('leaves files that are not snapshots, and files outside the folder, alone', async () => {
+      const others = [
+        'file:///cache/healthtracker-pre-restore-2026-01-01T00-00-00.json',
+        `${SAFETY_DIR}notes.txt`,
+        `${SAFETY_DIR}healthtracker-pre-restore-2026-01-01T00-00-00.json.bak`,
+        `${SAFETY_DIR}healthtracker-pre-restore-2026-13-41T25-00-00.json`,
+        `${AUTO_DIR}${autoName(daysAgo(40))}`,
+      ];
+      for (const uri of others) files.set(uri, { content: 'keep', mtime: 1 });
+      const old = [10, 20, 30, 40].map((days) => seedSnapshot(daysAgo(days)));
+
+      await restoreBackupFromUri(SOURCE);
+
+      expect(deletedUris().sort()).toEqual([old[2], old[3]].sort());
+      for (const uri of others) expect(files.has(uri)).toBe(true);
+    });
+
+    it('never deletes a name that is not a plain snapshot name', async () => {
+      const valid = [10, 20, 30, 40, 50].map((days) => snapshotName(daysAgo(days)));
+      const hostile = [
+        '../healthtracker-pre-restore-2020-01-01T00-00-00.json',
+        '..',
+        'sub/healthtracker-pre-restore-2020-01-01T00-00-00.json',
+        'healthtracker-pre-restore-2020-01-01T00-00-00.json/../../SQLite/healthtracker.db',
+        'healthtracker-pre-restore-2020-13-41T25-00-00.json',
+      ];
+      readDirMock.mockResolvedValue([...hostile, ...valid]);
+
+      await restoreBackupFromUri(SOURCE);
+
+      const deleted = deletedUris();
+      expect(deleted.length).toBeGreaterThan(0);
+      for (const uri of deleted) {
+        expect(uri.startsWith(SAFETY_DIR)).toBe(true);
+        expect(valid).toContain(uri.slice(SAFETY_DIR.length));
+      }
+    });
+
+    it('still reports the restore as done and deletes the others when one delete fails', async () => {
+      const old = [10, 20, 30, 40, 50].map((days) => seedSnapshot(daysAgo(days)));
+      deleteAsync.mockRejectedValueOnce(new Error('locked'));
+      jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const result = await restoreBackupFromUri(SOURCE);
+
+      expect(result.safetySnapshotUri).toBe(fresh);
+      expect(old.slice(2).filter((uri) => files.has(uri))).toHaveLength(1);
+      expect(deleteAsync).toHaveBeenCalledTimes(3);
+    });
+
+    it('still reports the restore as done when the folder cannot be read', async () => {
+      const old = [10, 20, 30, 40].map((days) => seedSnapshot(daysAgo(days)));
+      restoreFromPayload.mockImplementation(async () => {
+        readDirMock.mockRejectedValueOnce(new Error('unreadable'));
+        return { tablesRestored: 2, rowsRestored: 2 };
+      });
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const result = await restoreBackupFromUri(SOURCE);
+
+      expect(result.tablesRestored).toBe(2);
+      expect(safetyFiles()).toEqual([fresh, ...old].sort());
+      expect(warn).toHaveBeenCalledWith(
+        '[Backup] Failed to prune safety snapshots:',
+        expect.any(Error)
+      );
+    });
+
+    it('logs no warning on a first restore, when no snapshot folder exists yet', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      await restoreBackupFromUri(SOURCE);
+
+      expect(safetyFiles()).toEqual([fresh]);
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 });
