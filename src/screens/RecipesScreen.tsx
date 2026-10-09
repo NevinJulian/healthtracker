@@ -143,7 +143,7 @@ export default function RecipesScreen() {
   };
 
   const startImport = async () => {
-    if (importBusy || importUrl.trim() === '') return;
+    if (importRequest.current !== null || importUrl.trim() === '') return;
     const controller = new AbortController();
     importRequest.current = controller;
     setImportBusy(true);
