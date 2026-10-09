@@ -87,12 +87,18 @@ const fsMock = FileSystem as unknown as typeof FileSystem & {
 const files = fsMock.__files;
 const dirs = fsMock.__dirs;
 const deleteAsync = jest.mocked(FileSystem.deleteAsync);
+const writeAsyncMock = jest.mocked(FileSystem.writeAsStringAsync);
+const moveAsyncMock = jest.mocked(FileSystem.moveAsync);
 
 const SAFETY_DIR = 'file:///document/safety-snapshots/';
 
 function snapshotName(date: Date): string {
   const stamp = date.toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, '');
   return `healthtracker-pre-restore-${stamp}.json`;
+}
+
+function safetyFiles(): string[] {
+  return [...files.keys()].filter((uri) => uri.startsWith(SAFETY_DIR)).sort();
 }
 
 beforeEach(() => {
@@ -117,6 +123,50 @@ describe('writeSafetySnapshot', () => {
     expect(FileSystem.makeDirectoryAsync).toHaveBeenCalledWith(SAFETY_DIR, {
       intermediates: true,
     });
+  });
+
+  it('writes under a temporary name first and only then moves it into place', async () => {
+    const uri = await writeSafetySnapshot();
+
+    expect(writeAsyncMock.mock.calls.map(([written]) => written)).toEqual([`${uri}.tmp`]);
+    expect(moveAsyncMock).toHaveBeenCalledWith({ from: `${uri}.tmp`, to: uri });
+    expect(safetyFiles()).toEqual([uri]);
+  });
+
+  it('rejects and leaves no file behind when the write stops halfway', async () => {
+    writeAsyncMock.mockImplementationOnce(async (uri: string) => {
+      files.set(uri, { content: '{"format": "healthtracker-ba', mtime: 1 });
+      throw new Error('disk full');
+    });
+
+    await expect(writeSafetySnapshot()).rejects.toThrow('disk full');
+
+    expect(safetyFiles()).toEqual([]);
+  });
+
+  it('rejects and leaves no file behind when moving it into place fails', async () => {
+    moveAsyncMock.mockRejectedValueOnce(new Error('move failed'));
+
+    await expect(writeSafetySnapshot()).rejects.toThrow('move failed');
+
+    expect(safetyFiles()).toEqual([]);
+  });
+
+  it('still rejects with the write error when the temporary file cannot be removed', async () => {
+    writeAsyncMock.mockRejectedValueOnce(new Error('disk full'));
+    deleteAsync.mockRejectedValueOnce(new Error('locked'));
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(writeSafetySnapshot()).rejects.toThrow('disk full');
+  });
+
+  it('removes a temporary file left behind by an interrupted write', async () => {
+    const leftover = `${SAFETY_DIR}${snapshotName(new Date(Date.UTC(2026, 9, 1, 8, 0, 0)))}.tmp`;
+    files.set(leftover, { content: '{"format":', mtime: 1 });
+
+    const uri = await writeSafetySnapshot();
+
+    expect(safetyFiles()).toEqual([uri]);
   });
 
   it('keeps only the newest 3 snapshots', async () => {
@@ -215,8 +265,6 @@ const NOW = new Date(Date.UTC(2026, 9, 8, 14, 3, 0));
 const HOUR = 3_600_000;
 const AUTO_NAME = /^healthtracker-auto-\d{8}T\d{6}Z\.json$/;
 
-const writeAsyncMock = jest.mocked(FileSystem.writeAsStringAsync);
-const moveAsyncMock = jest.mocked(FileSystem.moveAsync);
 const readDirMock = jest.mocked(FileSystem.readDirectoryAsync);
 const defaultReadDir = readDirMock.getMockImplementation();
 
@@ -640,7 +688,7 @@ describe('restoreBackupFromUri', () => {
     expect(files.get(autoUri)?.content).toBe(payloadJson());
     expect(deletedUris()).not.toContain(autoUri);
     expect(writeAsyncMock.mock.calls.map(([uri]) => uri)).not.toContain(autoUri);
-    expect(moveAsyncMock).not.toHaveBeenCalled();
+    expect(moveAsyncMock.mock.calls.flatMap(([{ from, to }]) => [from, to])).not.toContain(autoUri);
   });
 
   it('keeps automatic backups from running while a restore is in progress', async () => {
