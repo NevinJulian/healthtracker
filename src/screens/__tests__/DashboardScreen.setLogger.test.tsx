@@ -353,6 +353,36 @@ describe('DashboardScreen set logger last time', () => {
     expect(line.props.accessibilityRole).toBe('button');
   });
 
+  it('shows last time as placeholders while both inputs are empty', async () => {
+    mockGetLastSet.mockResolvedValue(previousSet({ reps: 8, weight_kg: 82.5 }));
+    const utils = await openLogger();
+    const [reps, weight] = loggerInputs(utils);
+    expect(reps.props.placeholder).toBe('8');
+    expect(weight.props.placeholder).toBe('82.5');
+    expect(reps.props.value).toBe('');
+    expect(weight.props.value).toBe('');
+  });
+
+  it('keeps the dash placeholders without history', async () => {
+    const utils = await openLogger();
+    const [reps, weight] = loggerInputs(utils);
+    expect(reps.props.placeholder).toBe('—');
+    expect(weight.props.placeholder).toBe('—');
+  });
+
+  it('gives the reps placeholder only when today already has a set, until weight is cleared', async () => {
+    jest.mocked(getWorkoutSetsForDay).mockResolvedValue([
+      previousSet({ id: 5, date: mockToday, set_index: 0, weight_kg: 60, reps: 5 }),
+    ]);
+    mockGetLastSet.mockResolvedValue(previousSet({ reps: 8, weight_kg: 80 }));
+    const utils = await openLogger();
+    const [reps, weight] = loggerInputs(utils);
+    expect(reps.props.placeholder).toBe('8');
+    expect(weight.props.value).toBe('60');
+    fireEvent.changeText(weight, '');
+    expect(loggerInputs(utils)[1].props.placeholder).toBe('80');
+  });
+
   it('shows no line, logs the error and stays usable when the read rejects', async () => {
     const failure = new Error('read failed');
     mockGetLastSet.mockRejectedValue(failure);
