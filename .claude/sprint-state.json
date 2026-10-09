@@ -54,16 +54,17 @@
       "name": "training",
       "branch": "sprint/lane-a-training",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "in_progress",
+      "status": "cleanup",
       "order": [
         344,
         337,
         342
       ],
-      "current": 342,
+      "current": null,
       "done": [
         344,
-        337
+        337,
+        342
       ],
       "parked": []
     },
@@ -170,7 +171,7 @@
     "342": {
       "lane": "A",
       "kind": "feature",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "9ebf5a4",
@@ -188,7 +189,8 @@
       "workOrder": "C:/git/ht-lanes/wo/342.md",
       "deviceCheck": "Expo Go: the Analytics weight card shows faint dots and a smooth solid line, and the kg/week figure has the sign you'd expect from your last two weeks. Also toggle 30d/90d: the line must not restart at the left edge.",
       "notes": "WO ready (ahead), no PARK, no database.ts change: the screen already loads getWeightHistory(30) and (90); the trend is computed over history90. The card draws View bars today, no line primitive and no chart package: bars are replaced by dots (percent positioning by calendar day) and a line made of rotated 2px View segments sized from onLayout. Helpers ewmaTrend, visibleTrend, weightRatePerWeek (window = last 14 days counted back from today, x = calendar days, slope x 7), formatWeightRate (U+2212 minus, 0.0 without sign, dash), weightChange for the Weight tile (the card itself has no change figure). ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst's weightChange fell back to the raw last-minus-first whenever the first weigh-in of the 30-day set has index < 4, i.e. for every user in the first month; the decision says trend values, not raw ones, so the tile now uses the earliest and latest weigh-ins of the 30-day set that have a shown trend value and shows a dash otherwise. The existing assertion weightResilience.test.tsx:151-165 (+5.0 from two raw points) therefore changes, keeping its intent. HUMAN: with more than 90 days of data the trend is seeded at the 90-day edge, so early values differ slightly from a full-history trend. | dev: 8 commits in 4 test/code pairs, tip ef7012b, 1460/110 per dev, exit codes 0. The work order's hand values matched the implementation. The dev corrected an expectation in its OWN new test inside the code commit ef7012b (it had written the trend value where the change belongs); the tester recomputes it independently. The rate uses every trend point in the 14-day window, including the first four weigh-ins the chart does not draw (the decision says at least 5 weigh-ins). The one existing assertion named by the amendment changed: weightResilience tile test, rows [9999, 70, 75] and +5.0 became the outlier plus six plausible weigh-ins and +1.5, with a second test without the outlier. Min/Max text still from raw plausible weights.",
-      "securityReview": "skipped: the diff 57d39b3..ef7012b is analyticsHelpers.ts and AnalyticsDashboardScreen.tsx plus tests - pure arithmetic over weights the screen already loads and View-based drawing; no database, backup, api or filesystem code, no external input, no write path"
+      "securityReview": "skipped: the diff 57d39b3..ef7012b is analyticsHelpers.ts and AnalyticsDashboardScreen.tsx plus tests - pure arithmetic over weights the screen already loads and View-based drawing; no database, backup, api or filesystem code, no external input, no write path",
+      "regressionProof": "tester APPROVE r0: with the stub sources (9ebf5a4, bd6570e, 37659ba, b852bfa) and the tests at the tip, each step's tests are red on assertions (4 for the trend helpers, 13 at the rate step, all 6 chart tests, 10 at the card/tile step), all green at ef7012b. Numbers recomputed in plain node without the app's code: trends 80, 80, 80, 80, 81.8182, 83.3058, 84.5229; the gap series gives the same values as consecutive days; a trend falling 0.1 kg per day on days 0, 1, 3, 7, 13 gives -0.7 kg/week; tile change 2.7047 shown as +2.7; the expectation the developer corrected in its own test is right (30 weigh-ins of 80 then 10 of 90: change 8.656 = 10 - 10*(9/11)^10; the first version had the trend value itself); the changed tile test's +1.5 is 83.3058 - 81.8182. Eleven one-line mutations each turn a test red (alpha, the 5-point threshold both ways, the rate's minimum, the zero-variance guard, signed zero, future points, segments before layout, the 90-day plausibility filter). Chart: 10 daily points give 10 dots and 5 segments; 40 points give 35 segments at 90 days and 29 at 30 days (the line is cut, not restarted); widths 0, -5 and NaN give no segments and no crash; a flat range does not divide by zero. Only the one tile assertion named by the amendment changed among existing expects, and it still proves its point. Only the five reported files changed. typecheck passes at the stub commit b852bfa. 1460/110, exit 0 (tester reproduced). Two defensive checks survive mutation (the finite check in formatWeightRate, the 30-day plausibility filter in weightChange)."
     },
     "344": {
       "lane": "A",
@@ -416,7 +418,11 @@
     "SMALL (#352 security): parseIngredientLine has no upper bound on a quantity ('99999999999999999999 g Mehl' gives 1e20, shown in the field before Save); a cap would be tidy",
     "SMALL (#352 security): fetchRecipePage does not pass credentials: 'omit'; expo/fetch defaults to include, so cookies the app's own store holds for the typed host are sent back to that host",
     "SMALL (#352 security): lone surrogates and some invisible characters (U+2060, U+061C) survive the parser's clean-up",
-    "SMALL (#352 security): a literal '<' in recipe prose can swallow text up to the next '>' in stripTags; '1-2-3-4-5 EL x' becomes 1.5 whole with the rest in the name"
+    "SMALL (#352 security): a literal '<' in recipe prose can swallow text up to the next '>' in stripTags; '1-2-3-4-5 EL x' becomes 1.5 whole with the rest in the name",
+    "SMALL (#342 tester): the Weight tile prints a small negative trend change as '-0.0' (toFixed(1) with an ASCII hyphen, as before the sprint); the card's rate guards signed zero, the tile does not",
+    "SMALL, for the HUMAN (#342 tester): a user with exactly five weigh-ins in the last 14 days (80, 80, 80, 80, 90) sees +2.5 kg/week, because the rate uses every trend point in the window including the first four the chart does not draw; correct per the decision's wording (at least 5 weigh-ins), noisy for a new user",
+    "SMALL (#342 tester): weightChange maps trends by date, so duplicate dates in one history would collapse (getWeightHistory returns one row per date)",
+    "SMALL (#342 tester): the Number.isFinite guard in formatWeightRate and the 30-day plausibility filter in weightChange guard nothing a test can observe"
   ],
   "log": [
     {
@@ -514,6 +520,10 @@
     {
       "at": "2026-10-09T08:08:09Z",
       "event": "#352 security APPROVE on b087974 with five notes (tester still running)"
+    },
+    {
+      "at": "2026-10-09T08:11:33Z",
+      "event": "#342 ready (tester APPROVE r0, security skipped, 1460/110). Lane A is out of issues (3 done, 0 parked) -> cleanup dispatched over c698da2..ef7012b"
     }
   ],
   "aheadAnalysis": {
