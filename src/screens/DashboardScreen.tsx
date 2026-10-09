@@ -1432,9 +1432,19 @@ function SetLoggerModal({
               })}
             </View>
             {previous && (
-              <Text style={styles.lastTimeText}>
-                {`Last time: ${previous.weight_kg} kg × ${previous.reps}${when ? ` · ${when}` : ''}`}
-              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setRepsInput(String(previous.reps));
+                  setWeightInput(String(previous.weight_kg));
+                }}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Use last time: ${previous.reps} reps at ${previous.weight_kg} kg${when ? `, ${when}` : ''}`}
+              >
+                <Text style={styles.lastTimeText}>
+                  {`Last time: ${previous.weight_kg} kg × ${previous.reps}${when ? ` · ${when}` : ''}`}
+                </Text>
+              </TouchableOpacity>
             )}
             <View style={styles.setInputRow}>
               <View style={styles.setInputField}>
