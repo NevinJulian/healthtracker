@@ -121,6 +121,37 @@ describe('writeSafetySnapshot', () => {
     );
   });
 
+  it('never prunes the snapshot it just wrote, even when three others are dated later', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+    const now = Date.UTC(2026, 9, 8, 12, 0, 0);
+    jest.setSystemTime(now);
+    const day = 24 * 3_600_000;
+    const later = [now + day, now + 2 * day, now + 365 * day].map(
+      (time) => `${SAFETY_DIR}${snapshotName(new Date(time))}`
+    );
+    for (const uri of later) files.set(uri, { content: 'old', mtime: 1 });
+
+    const uri = await writeSafetySnapshot();
+
+    expect(uri).toBe(`${SAFETY_DIR}${snapshotName(new Date(now))}`);
+    expect(files.has(uri)).toBe(true);
+    expect([...files.keys()].filter((key) => key.startsWith(SAFETY_DIR)).sort()).toEqual(
+      [uri, later[1], later[2]].sort()
+    );
+  });
+
+  it('does not delete the snapshot of the same second when written twice', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+    jest.setSystemTime(Date.UTC(2026, 9, 8, 12, 0, 0));
+
+    const first = await writeSafetySnapshot();
+    const second = await writeSafetySnapshot();
+
+    expect(second).toBe(first);
+    expect(files.has(second)).toBe(true);
+    expect(deleteAsync).not.toHaveBeenCalled();
+  });
+
   it('leaves files that are not snapshots, and files outside the folder, alone', async () => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
     const cacheFile = 'file:///cache/healthtracker-pre-restore-2026-01-01T00-00-00.json';
