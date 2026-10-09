@@ -7,6 +7,11 @@ export interface ParsedIngredientLine {
 }
 
 const MAX_LINE_LENGTH = 500;
+const MAX_QUANTITY = 100000;
+const DOT_GROUPED = /(?:^|[^\d.,])[1-9]\d{0,2}(?:\.\d{3})+(?!\d)/;
+const APOSTROPHE_GROUPED = /^\d{1,3}(?:['’]\d{3})+(?!\d)/;
+const MULTIPLIER = /^\s*[x×]\s*\d/i;
+const LEADING_FILLER = /^[\s,.:\-–—]+/;
 const FRACTIONS = '½¼¾⅓⅔⅛⅜⅝⅞';
 
 const SINGLE = String.raw`(?:\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?(?:\s+\d+\s*\/\s*\d+|\s*[${FRACTIONS}])?|[${FRACTIONS}])`;
@@ -71,12 +76,15 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
       return nameOnly(whole);
     }
 
-    const rest = whole.replace(LEADING_APPROX, '');
+    const rest = whole
+      .replace(LEADING_APPROX, '')
+      .replace(APOSTROPHE_GROUPED, (grouped) => grouped.replace(/['’]/g, ''));
     const qty = LEADING_QUANTITY.exec(rest);
-    if (!qty) return nameOnly(whole);
+    if (!qty || DOT_GROUPED.test(qty[1])) return nameOnly(whole);
 
     const quantityText = qty[1].replace(/(\d),(\d)/g, '$1.$2');
     let afterQuantity = rest.slice(qty[0].length);
+    if (MULTIPLIER.test(afterQuantity)) return nameOnly(whole);
 
     let unit = '';
     let factor = 1;
@@ -96,12 +104,14 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
       }
     }
 
-    const name = afterQuantity.trim();
+    const name = afterQuantity.replace(LEADING_FILLER, '').trim();
     if (name === '') return nameOnly(whole);
 
     const parsed = parseMeasure(name, `${quantityText} ${unit}`.trim());
     const quantity = Math.round(parsed.baseQuantity * factor * 100) / 100;
-    if (!Number.isFinite(quantity) || quantity <= 0) return nameOnly(whole);
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > MAX_QUANTITY) {
+      return nameOnly(whole);
+    }
 
     return { name, quantity, unit: parsed.unit };
   } catch {
