@@ -90,7 +90,7 @@
     "C": {
       "name": "data",
       "branch": "sprint/lane-c-data",
-      "worktree": "C:/git/ht-lanes/lane-c",
+      "worktree": "C:/git/ht-lanes/lane-c (created at caea6aa, npm ci running)",
       "status": "in_progress",
       "waitsFor": "lane A merged into sprint/auto-fixes (#339 exports #344's set type)",
       "order": [
@@ -251,15 +251,29 @@
     "348": {
       "lane": "B",
       "kind": "feature",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "1c88e43",
+        "877e742",
+        "0e6e388",
+        "6a25227",
+        "a47912e",
+        "930bf4f",
+        "1637168",
+        "05ff77d",
+        "421aada",
+        "0efe49a",
+        "d47ed9b",
+        "3358f01"
+      ],
       "title": "copy meal, copy day, often cooked",
       "decisionSource": "owner comment 6070880760 on #348: 'Copy to...' on a planned slot offers the next 7 days, same recipe into the same slot where empty, occupied skipped and counted, copies unticked; 'Copy day to...' copies Lunch and Dinner into the empty slots of one chosen day; Log Cooked Meal picker shows the 5 recipes with the highest cook events x 0.95^(days since last cooked) from cook_log in an 'Often cooked' section; quick add is #447, saved meals and time-of-day ranking not planned",
       "securityPlan": "required (meal-plan writes in src/db)",
       "workOrder": "C:/git/ht-lanes/wo/348.md",
       "deviceCheck": "Expo Go: plan Lunch on day 1 and on day 2 (a different recipe), copy day 1's lunch to days 2, 3 and 4. Expect 'Copied 2 meals. Skipped 1 already planned.', days 3 and 4 filled and unticked, day 2 unchanged. Then open Log Cooked Meal: your usual recipes sit under Often cooked at the top, each once.",
-      "notes": "WO ready (ahead), no PARK, no migration. Verified: a slot is (date, meal_type) with a unique index (schema.ts:729) that restore drops briefly, so the copy SELECTs for emptiness inside its transaction; assignMealToPlan (database.ts:1760) checks no stock and moves no inventory (stock is a UI-only rule in AssignMealModal, MealPrepScreen.tsx:710); cook_log is one row per cook event. New: copyMealToDates(planId, dates), copyDayToDate(from, to) next to assignMealToPlan; rankOftenCooked + getOftenCookedRecipes next to getMostCookedRecipes. Analyst picks to repeat in the report: 'the next 7 days' = the 7 days the screen shows (today..today+6) minus the source day, so at most 6 targets; a copy does no stock check (the manual assign UI requires stock); result wording via Alert; section recipes are removed from the full list, which gets an All recipes header only when the section shows; archived recipes excluded; ties by later last date, then title, then id."
+      "notes": "WO ready (ahead), no PARK, no migration. Verified: a slot is (date, meal_type) with a unique index (schema.ts:729) that restore drops briefly, so the copy SELECTs for emptiness inside its transaction; assignMealToPlan (database.ts:1760) checks no stock and moves no inventory (stock is a UI-only rule in AssignMealModal, MealPrepScreen.tsx:710); cook_log is one row per cook event. New: copyMealToDates(planId, dates), copyDayToDate(from, to) next to assignMealToPlan; rankOftenCooked + getOftenCookedRecipes next to getMostCookedRecipes. Analyst picks to repeat in the report: 'the next 7 days' = the 7 days the screen shows (today..today+6) minus the source day, so at most 6 targets; a copy does no stock check (the manual assign UI requires stock); result wording via Alert; section recipes are removed from the full list, which gets an All recipes header only when the section shows; archived recipes excluded; ties by later last date, then title, then id. | dev: all six steps done, 12 commits, tip 3358f01, 1550/117 per dev (jest exit code NOT captured; the tester captures it). copyMealToDates and copyDayToDate next to assignMealToPlan, each one queue unit with one transaction, emptiness checked by a SELECT inside it, shared private _insertCopyIfEmpty; rankOftenCooked pure with today as an argument, getOftenCookedRecipes next to getMostCookedRecipes. BEYOND THE WORK ORDER: copyResultMessage lives in a new src/data/copyResult.ts (the MealPrep suites mock the database module, so a helper there would be undefined in screen tests); a malformed last-cooked date scores 0 and ranks last. Two existing MealPrep suites gained one mock line each; no existing expect changed. The dev edited some files with sed and node scripts against the brief; the tester checks the diff for CR and mojibake. The new Copy day pill reuses assignBtnWrap (flex: 1); layout not checked on a device.",
+      "securityReview": "running in parallel with the tester on 3871273..3358f01"
     },
     "352": {
       "lane": "D",
@@ -429,7 +443,9 @@
     "SMALL, for the HUMAN (#342 tester): a user with exactly five weigh-ins in the last 14 days (80, 80, 80, 80, 90) sees +2.5 kg/week, because the rate uses every trend point in the window including the first four the chart does not draw; correct per the decision's wording (at least 5 weigh-ins), noisy for a new user",
     "SMALL (#342 tester): weightChange maps trends by date, so duplicate dates in one history would collapse (getWeightHistory returns one row per date)",
     "SMALL (#342 tester): the Number.isFinite guard in formatWeightRate and the 30-day plausibility filter in weightChange guard nothing a test can observe",
-    "SMALL (lane A cleanup): older issue numbers remain outside the lane's hunks in analyticsHelpers.ts (section headers near lines 308 and 442: #322, #283; the plausibleWeights docblock; a comment that says lane D)"
+    "SMALL (lane A cleanup): older issue numbers remain outside the lane's hunks in analyticsHelpers.ts (section headers near lines 308 and 442: #322, #283; the plausibleWeights docblock; a comment that says lane D)",
+    "SMALL (#348 dev): a tick on a copied meal whose recipe has no stock debits nothing and keeps a NULL pointer (existing behaviour for any planned meal without stock)",
+    "SMALL (#348 dev): the Copy day to... pill reuses assignBtnWrap, which has flex: 1; harmless in the day card's column, layout to be confirmed in the device check"
   ],
   "log": [
     {
@@ -536,6 +552,10 @@
       "at": "2026-10-09T08:14:32Z",
       "event": "lane A cleanup 9e4c73f (comment-only, read by the orchestrator) -> merged lane A into integration da4e89a (no conflicts, 23 files, +1309/-90); gates green on the integration branch: typecheck exit 0, 1460 tests / 110 suites, exit 0 (baseline on main 1387/107). Lane C unblocked",
       "sha": "da4e89a"
+    },
+    {
+      "at": "2026-10-09T08:15:46Z",
+      "event": "#348 dev done (12 commits in six steps, tip 3358f01; 1550/117 per dev, exit code not captured) -> in_test, security in parallel. Integration pushed at caea6aa; worktree lane-c created at caea6aa, npm ci running; snapshot worktree read-a removed"
     }
   ],
   "aheadAnalysis": {
