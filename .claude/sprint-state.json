@@ -430,7 +430,9 @@
     449,
     450,
     451,
-    452
+    452,
+    453,
+    454
   ],
   "pendingFindings": [
     "SMALL (#444 analyst): WeeklyMealPlanItem.is_consumed is typed boolean but getWeeklyMealPlan returns raw 0/1 (database.ts:1719); truthy checks work, === true would not",
@@ -754,6 +756,10 @@
     {
       "at": "2026-10-09T08:58:48Z",
       "event": "#339 ready (tester APPROVE r0, security APPROVE, 1600/118). Lane C is out of issues (2 done, 0 parked, 1 round trip on #338) -> cleanup dispatched over caea6aa..c8bd38a (29 commits)"
+    },
+    {
+      "at": "2026-10-09T08:59:35Z",
+      "event": "Filed #453 (shopping list: singular and plural names stay separate lines) and #454 (parseMeasure: volumes become grams at 1 ml = 1 g); label found-during-sprint; neither is worked"
     }
   ],
   "aheadAnalysis": {
@@ -770,7 +776,9 @@
     "449": "Backup export reads the tables one by one, not in one transaction (the #338 analyst's DATA-LOSS finding; claim checked by the orchestrator at backup.ts:190-197 and database.ts:2596)",
     "450": "Ingredients stored with quantity 0 show as '0 g' in the recipe detail and go on the shopping list as a 0-quantity line (the #352 analyst's USER-HITTABLE finding)",
     "451": "Recipe editor: tapping Recompute or editing a row while a save is pending saves the recipe with partial macros (the #443 analyst's finding, reproduced by the #443 tester: 0/0/0/0 saved instead of 10 kcal / 3 g protein; present before the sprint)",
-    "452": "Recipe editor: saving a recipe silently deletes its ingredients that have quantity 0 (DATA-LOSS, present before the sprint; the tested fix sits in the parked #352 commit 76d752f; #442's new wording sends users to exactly that save)"
+    "452": "Recipe editor: saving a recipe silently deletes its ingredients that have quantity 0 (DATA-LOSS, present before the sprint; the tested fix sits in the parked #352 commit 76d752f; #442's new wording sends users to exactly that save)",
+    "453": "Shopping list: singular and plural names of the same ingredient stay separate lines (the #347 analyst's USER-HITTABLE finding; the decision has no plural handling)",
+    "454": "parseMeasure turns volumes into grams at 1 ml = 1 g for every ingredient ('1 1/2 cups flour' = 360 g), plus fl oz read as 1 ml and three misreads; on main today through the Discover import; found while #352 was tested"
   },
   "integration": {
     "afterLaneA": {
