@@ -54,7 +54,7 @@
       "name": "training",
       "branch": "sprint/lane-a-training",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "cleanup",
+      "status": "merged",
       "order": [
         344,
         337,
@@ -66,7 +66,9 @@
         337,
         342
       ],
-      "parked": []
+      "parked": [],
+      "mergeSha": "da4e89a",
+      "cleanup": "9e4c73f: comment-only edits in two files (10 insertions, 13 deletions): the logWorkoutSet docblock lost its issue number and history and gained the setType note; the Analytics file header and one WeightTrendCard comment were corrected. No dead code found (the old bar-chart styles are still used by the strength chart). schema.ts untouched. 1460/110 before and after. ORCHESTRATOR read the whole cleanup diff: every hunk sits inside a comment block; schema.ts against the base is +1/-0 (the v39 line)."
     },
     "B": {
       "name": "meals",
@@ -89,15 +91,16 @@
       "name": "data",
       "branch": "sprint/lane-c-data",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "pending",
+      "status": "in_progress",
       "waitsFor": "lane A merged into sprint/auto-fixes (#339 exports #344's set type)",
       "order": [
         338,
         339
       ],
-      "current": null,
+      "current": 338,
       "done": [],
-      "parked": []
+      "parked": [],
+      "base": "da4e89a"
     },
     "D": {
       "name": "recipes",
@@ -121,7 +124,7 @@
     "337": {
       "lane": "A",
       "kind": "feature",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "acf0a79",
@@ -140,7 +143,8 @@
       "deviceCheck": "Expo Go: open the logger for an exercise you logged on an earlier day. The line shows that session's last working set (not a warm-up), and tapping it fills both fields. An exercise you never logged shows no line.",
       "notes": "WO ready (analysed on the snapshot of #344 at 10a3f39), no PARK, no file outside lane A, no migration. New getLastSetForExercise + exported WORKOUT_LAST_SET_SQL directly after getWorkoutHistory in database.ts: exercise = ? AND date < ? AND (set_type IS NULL OR set_type <> 'warmup') ORDER BY date DESC, set_index DESC LIMIT 1; an EXPLAIN QUERY PLAN test pins the (exercise, date) index. The modal gets a today prop (the Dashboard's render-time value, the one handleLogSet writes with), fetches in an effect with a cancelled flag, shows no line while loading or after a failed read. Analyst picks to repeat in the report: when the most recent earlier day holds only warm-ups the line shows the last working set of the next older day that has one (reading of 'last working set of the most recent session', warm-ups never count); line text 'Last time: 80 kg x 8' (U+00D7) with a middle dot and yesterday / N days ago, no month or year forms; weight printed like the set list (80, 82.5); the line sits between the toggle and the inputs; tapping overwrites typed text and does not log; with a set already logged today only Reps shows a placeholder; exercise names match exactly as stored. | dev: 8 commits in 4 test/code pairs, tip 57d39b3, 1426/109 per dev. Ten DashboardScreen.*.test.tsx mocks gained getLastSetForExercise; no existing assertion changed. The index test passed already at the stub commit (the SQL constant came with the stub); tester asked for a mutation proof. The SetLoggerModal doc comment was corrected.",
       "securityReview": "APPROVE (10a3f39..57d39b3, read through git): WORKOUT_LAST_SET_SQL is a constant, exercise and beforeDate are bound, read-only, LIMIT 1; stored reps and weight_kg only reach template strings, String() and placeholder props; tapping the line only sets the two inputs, the user still presses Add and handleAdd's validation (integer reps 1-100, finite weight 0.5-500) is unchanged; logWorkoutSet, handleLogSet and the delete path are not in the diff; the read's failure is caught and logged and cannot block or fake a write; a malformed stored date gives no 'when' text and no crash. Note: the reviewer did not re-check that set_type exists before the query runs (v39 from #344 on this branch; the tester's real-engine suite covers it).",
-      "regressionProof": "tester APPROVE r0: with database.ts from acf0a79 (stub), 6 workoutLastSet tests fail on assertions; with DashboardScreen.tsx from c6a6547, 9 setLogger tests fail (line text, tap, button role, placeholders, rejected read); all pass at 57d39b3. By-design tests proven by mutation: lower(exercise) turns 'exact name only' and the index test red, date <= ? turns 'ignores today' red, a '' prefill turns the today-prefill test red, a '0' fallback turns the no-history test red. Real engine: a warm-up as the last set of the day returns the working set before it; a warm-up-only day with nothing older returns null; unknown set_type values count as working; a trailing space or a quote in the name returns null (bound values). EXPLAIN QUERY PLAN: SEARCH ... USING INDEX idx_workout_set_log_exercise_date (exercise=? AND date<?). One read per open, none per add. Only an import line changed in existing tests; the midnight suite is untouched and green. typecheck passes at the stub commit. 1426/109, exit 0 (tester reproduced). GAP: the two late-result screen tests guard nothing - with the cancelled check or the reset removed all 31 setLogger tests stay green, because close unmounts the modal and nothing can switch exercise behind the overlay; the behaviour is correct, the guard is unreachable through the UI."
+      "regressionProof": "tester APPROVE r0: with database.ts from acf0a79 (stub), 6 workoutLastSet tests fail on assertions; with DashboardScreen.tsx from c6a6547, 9 setLogger tests fail (line text, tap, button role, placeholders, rejected read); all pass at 57d39b3. By-design tests proven by mutation: lower(exercise) turns 'exact name only' and the index test red, date <= ? turns 'ignores today' red, a '' prefill turns the today-prefill test red, a '0' fallback turns the no-history test red. Real engine: a warm-up as the last set of the day returns the working set before it; a warm-up-only day with nothing older returns null; unknown set_type values count as working; a trailing space or a quote in the name returns null (bound values). EXPLAIN QUERY PLAN: SEARCH ... USING INDEX idx_workout_set_log_exercise_date (exercise=? AND date<?). One read per open, none per add. Only an import line changed in existing tests; the midnight suite is untouched and green. typecheck passes at the stub commit. 1426/109, exit 0 (tester reproduced). GAP: the two late-result screen tests guard nothing - with the cancelled check or the reset removed all 31 setLogger tests stay green, because close unmounts the modal and nothing can switch exercise behind the overlay; the behaviour is correct, the guard is unreachable through the UI.",
+      "mergeSha": "da4e89a"
     },
     "338": {
       "lane": "C",
@@ -171,7 +175,7 @@
     "342": {
       "lane": "A",
       "kind": "feature",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "9ebf5a4",
@@ -190,12 +194,13 @@
       "deviceCheck": "Expo Go: the Analytics weight card shows faint dots and a smooth solid line, and the kg/week figure has the sign you'd expect from your last two weeks. Also toggle 30d/90d: the line must not restart at the left edge.",
       "notes": "WO ready (ahead), no PARK, no database.ts change: the screen already loads getWeightHistory(30) and (90); the trend is computed over history90. The card draws View bars today, no line primitive and no chart package: bars are replaced by dots (percent positioning by calendar day) and a line made of rotated 2px View segments sized from onLayout. Helpers ewmaTrend, visibleTrend, weightRatePerWeek (window = last 14 days counted back from today, x = calendar days, slope x 7), formatWeightRate (U+2212 minus, 0.0 without sign, dash), weightChange for the Weight tile (the card itself has no change figure). ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst's weightChange fell back to the raw last-minus-first whenever the first weigh-in of the 30-day set has index < 4, i.e. for every user in the first month; the decision says trend values, not raw ones, so the tile now uses the earliest and latest weigh-ins of the 30-day set that have a shown trend value and shows a dash otherwise. The existing assertion weightResilience.test.tsx:151-165 (+5.0 from two raw points) therefore changes, keeping its intent. HUMAN: with more than 90 days of data the trend is seeded at the 90-day edge, so early values differ slightly from a full-history trend. | dev: 8 commits in 4 test/code pairs, tip ef7012b, 1460/110 per dev, exit codes 0. The work order's hand values matched the implementation. The dev corrected an expectation in its OWN new test inside the code commit ef7012b (it had written the trend value where the change belongs); the tester recomputes it independently. The rate uses every trend point in the 14-day window, including the first four weigh-ins the chart does not draw (the decision says at least 5 weigh-ins). The one existing assertion named by the amendment changed: weightResilience tile test, rows [9999, 70, 75] and +5.0 became the outlier plus six plausible weigh-ins and +1.5, with a second test without the outlier. Min/Max text still from raw plausible weights.",
       "securityReview": "skipped: the diff 57d39b3..ef7012b is analyticsHelpers.ts and AnalyticsDashboardScreen.tsx plus tests - pure arithmetic over weights the screen already loads and View-based drawing; no database, backup, api or filesystem code, no external input, no write path",
-      "regressionProof": "tester APPROVE r0: with the stub sources (9ebf5a4, bd6570e, 37659ba, b852bfa) and the tests at the tip, each step's tests are red on assertions (4 for the trend helpers, 13 at the rate step, all 6 chart tests, 10 at the card/tile step), all green at ef7012b. Numbers recomputed in plain node without the app's code: trends 80, 80, 80, 80, 81.8182, 83.3058, 84.5229; the gap series gives the same values as consecutive days; a trend falling 0.1 kg per day on days 0, 1, 3, 7, 13 gives -0.7 kg/week; tile change 2.7047 shown as +2.7; the expectation the developer corrected in its own test is right (30 weigh-ins of 80 then 10 of 90: change 8.656 = 10 - 10*(9/11)^10; the first version had the trend value itself); the changed tile test's +1.5 is 83.3058 - 81.8182. Eleven one-line mutations each turn a test red (alpha, the 5-point threshold both ways, the rate's minimum, the zero-variance guard, signed zero, future points, segments before layout, the 90-day plausibility filter). Chart: 10 daily points give 10 dots and 5 segments; 40 points give 35 segments at 90 days and 29 at 30 days (the line is cut, not restarted); widths 0, -5 and NaN give no segments and no crash; a flat range does not divide by zero. Only the one tile assertion named by the amendment changed among existing expects, and it still proves its point. Only the five reported files changed. typecheck passes at the stub commit b852bfa. 1460/110, exit 0 (tester reproduced). Two defensive checks survive mutation (the finite check in formatWeightRate, the 30-day plausibility filter in weightChange)."
+      "regressionProof": "tester APPROVE r0: with the stub sources (9ebf5a4, bd6570e, 37659ba, b852bfa) and the tests at the tip, each step's tests are red on assertions (4 for the trend helpers, 13 at the rate step, all 6 chart tests, 10 at the card/tile step), all green at ef7012b. Numbers recomputed in plain node without the app's code: trends 80, 80, 80, 80, 81.8182, 83.3058, 84.5229; the gap series gives the same values as consecutive days; a trend falling 0.1 kg per day on days 0, 1, 3, 7, 13 gives -0.7 kg/week; tile change 2.7047 shown as +2.7; the expectation the developer corrected in its own test is right (30 weigh-ins of 80 then 10 of 90: change 8.656 = 10 - 10*(9/11)^10; the first version had the trend value itself); the changed tile test's +1.5 is 83.3058 - 81.8182. Eleven one-line mutations each turn a test red (alpha, the 5-point threshold both ways, the rate's minimum, the zero-variance guard, signed zero, future points, segments before layout, the 90-day plausibility filter). Chart: 10 daily points give 10 dots and 5 segments; 40 points give 35 segments at 90 days and 29 at 30 days (the line is cut, not restarted); widths 0, -5 and NaN give no segments and no crash; a flat range does not divide by zero. Only the one tile assertion named by the amendment changed among existing expects, and it still proves its point. Only the five reported files changed. typecheck passes at the stub commit b852bfa. 1460/110, exit 0 (tester reproduced). Two defensive checks survive mutation (the finite check in formatWeightRate, the 30-day plausibility filter in weightChange).",
+      "mergeSha": "da4e89a"
     },
     "344": {
       "lane": "A",
       "kind": "feature",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "commits": [
         "23623e3",
@@ -212,7 +217,8 @@
       "deviceCheck": "Expo Go: open a lift's set logger, log one Warm-up and two Working sets for one exercise. The warm-up row shows a Warm-up label, the working rows do not. Open Analytics: that exercise's PR and progression ignore the warm-up. Reopen the logger: the toggle is back on Working.",
       "notes": "WO ready, no PARK. Verified: last migration is v38 (schema.ts:824); writer _logWorkoutSetImpl database.ts:3251-3272, only caller DashboardScreen.tsx:674; SetLoggerModal :1283-1425; computePRs analyticsHelpers.ts:477, bestSetPerDay :544; no volume sum beyond computePRs.bestVolume. Backup path needs no source change: dumpTable is SELECT * and restore filters rows to the live PRAGMA table_info columns, so no file outside lane A changes. Design: v39 appended; logWorkoutSet gets optional setType ('warmup' written, else NULL; key omitted for working so existing toHaveBeenCalledWith stay valid); helpers skip set_type === 'warmup'; PRSummaryCard hasData = bestWeight !== null. Analyst picks: two-segment toggle between the Add set heading and the inputs, Pill label Warm-up (gold) in the set list, toggle state inside the modal. ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst also picked a warm-up-aware initial weight prefill (last non-warm-up set); removed, because the #344 decision does not mention the prefill and #337's decision says today's prefill from today's last set stays. | dev: 6 commits, 1403/108 per dev; WorkoutSetInput type added; toggle segments have role radio with labels Working / Warm-up; the Pill got accessibilityLabel 'Warm-up set' because Pill hides its text from the accessibility tree; prefill unchanged per the amendment; da6298c repairs a test the same branch added in a3f1fcd (no existing assertion touched). ORCHESTRATOR checked the migration file mechanically: git diff c698da2..10a3f39 -- src/db/schema.ts is 1 added line, 0 removed (v39 after v38) - not an abort condition. Tester and security dispatched in parallel.",
       "securityReview": "APPROVE (c698da2..10a3f39, read through git): the INSERT binds all 8 values and only the literal 'warmup' or NULL can reach the column; v39 is a static string appended after v38, nothing before it changed; workout_set_log is created only in v33 and no path adds the column outside v39; restoreFromPayload never reads or writes schema_version (listUserTables excludes it), so v39 cannot hit a duplicate column at start-up; runMigrations wraps each migration and its version row in one transaction; the v37 replay for old backups touches only set_index and its index; restore still filters row keys against PRAGMA table_info of the live table; a restored set_type is bound as a value and only ever compared with === 'warmup', any other value counts as a working set; validatePayload still refuses a backup newer than the app; the failed-write Alert is unchanged. Notes: set_type is typed string | null, not a literal union; an older build opening a v39 database ignores the column.",
-      "regressionProof": "tester APPROVE r0: with schema.ts + database.ts from a3f1fcd, 6 of 7 workoutSetType/backupRoundTrip tests fail on assertions (expected warmup, received undefined; expected version 39, received 38); with the helpers and the Analytics screen from a3f1fcd, 5 fail; with DashboardScreen.tsx from a3f1fcd, the toggle and label tests fail; each pass-before guard goes red under a one-line mutation. Real engine: a database stopped at v38 with two set rows migrates through initDatabase, both rows read NULL, v39 recorded once, a second start does not re-run it, index list identical before and after; writer stores warmup only for the exact string, NULL otherwise ('working' and 'WARMUP' forced through a cast store NULL); set_index 0..5, delete at 1, next is 6, no collision; restore of version-38 payloads with mixed rows gives NULL where the key is missing and leaves schema_version untouched; a rejected write logs nothing twice; unknown set_type values count as working and do not crash. Reader audit: computePRs (incl. bestVolume, the only weight x reps product) and bestSetPerDay (the chart source) filter warm-ups; getLoggedExercises and the N logged count do not rank or sum. SetLoggerModal is mounted only while activeSetLogger !== null, so the toggle resets on close. Prefill code untouched (amendment). No existing expect edited. typecheck passes at the test commit a3f1fcd. 1403/108 (tester reproduced)."
+      "regressionProof": "tester APPROVE r0: with schema.ts + database.ts from a3f1fcd, 6 of 7 workoutSetType/backupRoundTrip tests fail on assertions (expected warmup, received undefined; expected version 39, received 38); with the helpers and the Analytics screen from a3f1fcd, 5 fail; with DashboardScreen.tsx from a3f1fcd, the toggle and label tests fail; each pass-before guard goes red under a one-line mutation. Real engine: a database stopped at v38 with two set rows migrates through initDatabase, both rows read NULL, v39 recorded once, a second start does not re-run it, index list identical before and after; writer stores warmup only for the exact string, NULL otherwise ('working' and 'WARMUP' forced through a cast store NULL); set_index 0..5, delete at 1, next is 6, no collision; restore of version-38 payloads with mixed rows gives NULL where the key is missing and leaves schema_version untouched; a rejected write logs nothing twice; unknown set_type values count as working and do not crash. Reader audit: computePRs (incl. bestVolume, the only weight x reps product) and bestSetPerDay (the chart source) filter warm-ups; getLoggedExercises and the N logged count do not rank or sum. SetLoggerModal is mounted only while activeSetLogger !== null, so the toggle resets on close. Prefill code untouched (amendment). No existing expect edited. typecheck passes at the test commit a3f1fcd. 1403/108 (tester reproduced).",
+      "mergeSha": "da4e89a"
     },
     "347": {
       "lane": "B",
@@ -422,7 +428,8 @@
     "SMALL (#342 tester): the Weight tile prints a small negative trend change as '-0.0' (toFixed(1) with an ASCII hyphen, as before the sprint); the card's rate guards signed zero, the tile does not",
     "SMALL, for the HUMAN (#342 tester): a user with exactly five weigh-ins in the last 14 days (80, 80, 80, 80, 90) sees +2.5 kg/week, because the rate uses every trend point in the window including the first four the chart does not draw; correct per the decision's wording (at least 5 weigh-ins), noisy for a new user",
     "SMALL (#342 tester): weightChange maps trends by date, so duplicate dates in one history would collapse (getWeightHistory returns one row per date)",
-    "SMALL (#342 tester): the Number.isFinite guard in formatWeightRate and the 30-day plausibility filter in weightChange guard nothing a test can observe"
+    "SMALL (#342 tester): the Number.isFinite guard in formatWeightRate and the 30-day plausibility filter in weightChange guard nothing a test can observe",
+    "SMALL (lane A cleanup): older issue numbers remain outside the lane's hunks in analyticsHelpers.ts (section headers near lines 308 and 442: #322, #283; the plausibleWeights docblock; a comment that says lane D)"
   ],
   "log": [
     {
@@ -524,6 +531,11 @@
     {
       "at": "2026-10-09T08:11:33Z",
       "event": "#342 ready (tester APPROVE r0, security skipped, 1460/110). Lane A is out of issues (3 done, 0 parked) -> cleanup dispatched over c698da2..ef7012b"
+    },
+    {
+      "at": "2026-10-09T08:14:32Z",
+      "event": "lane A cleanup 9e4c73f (comment-only, read by the orchestrator) -> merged lane A into integration da4e89a (no conflicts, 23 files, +1309/-90); gates green on the integration branch: typecheck exit 0, 1460 tests / 110 suites, exit 0 (baseline on main 1387/107). Lane C unblocked",
+      "sha": "da4e89a"
     }
   ],
   "aheadAnalysis": {
@@ -540,5 +552,14 @@
     "449": "Backup export reads the tables one by one, not in one transaction (the #338 analyst's DATA-LOSS finding; claim checked by the orchestrator at backup.ts:190-197 and database.ts:2596)",
     "450": "Ingredients stored with quantity 0 show as '0 g' in the recipe detail and go on the shopping list as a 0-quantity line (the #352 analyst's USER-HITTABLE finding)",
     "451": "Recipe editor: tapping Recompute or editing a row while a save is pending saves the recipe with partial macros (the #443 analyst's finding, reproduced by the #443 tester: 0/0/0/0 saved instead of 10 kcal / 3 g protein; present before the sprint)"
+  },
+  "integration": {
+    "afterLaneA": {
+      "mergeSha": "da4e89a",
+      "typecheck": "pass",
+      "tests": 1460,
+      "testSuites": 110,
+      "ci": "pending"
+    }
   }
 }
