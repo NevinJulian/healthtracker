@@ -388,12 +388,33 @@ export function weightRatePerWeek(
   points: { date: string; trend: number }[],
   todayISO: string
 ): number | null {
-  return null;
+  const inWindow = points.filter((p) => {
+    const age = dateDiffDays(p.date, todayISO);
+    return age >= 0 && age < RATE_WINDOW_DAYS;
+  });
+  if (inWindow.length < RATE_MIN_POINTS) return null;
+
+  const origin = inWindow[0].date;
+  const xs = inWindow.map((p) => dateDiffDays(origin, p.date));
+  const n = xs.length;
+  const meanX = xs.reduce((s, x) => s + x, 0) / n;
+  const meanY = inWindow.reduce((s, p) => s + p.trend, 0) / n;
+  let sxx = 0;
+  let sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sxx += (xs[i] - meanX) ** 2;
+    sxy += (xs[i] - meanX) * (inWindow[i].trend - meanY);
+  }
+  if (sxx === 0) return null;
+  return (sxy / sxx) * 7;
 }
 
 /** "+0.4 kg/week", "−0.4 kg/week" (U+2212), "0.0 kg/week", or "—" when null. */
 export function formatWeightRate(kgPerWeek: number | null): string {
-  return '';
+  if (kgPerWeek === null || !Number.isFinite(kgPerWeek)) return '—';
+  const r = Math.round(kgPerWeek * 10) / 10;
+  if (r === 0) return '0.0 kg/week';
+  return r > 0 ? `+${r.toFixed(1)} kg/week` : `−${Math.abs(r).toFixed(1)} kg/week`;
 }
 
 // ─────────────────────────────────────────────
