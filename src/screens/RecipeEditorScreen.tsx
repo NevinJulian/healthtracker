@@ -86,12 +86,19 @@ function newKey(): string {
 
 function rowsToIngredients(rows: IngredientRow[]): RecipeIngredient[] {
   return rows
-    .filter((r) => r.name.trim() !== '' && parseFloat(r.quantity) > 0)
-    .map((r) => ({
-      name: r.name.trim(),
-      baseQuantity: parseFloat(r.quantity) || 0,
-      unit: r.unit,
-    }));
+    .filter((r) => r.name.trim() !== '')
+    .map((r) => {
+      const quantity = parseFloat(r.quantity);
+      return {
+        name: r.name.trim(),
+        baseQuantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 0,
+        unit: r.unit,
+      };
+    });
+}
+
+function withQuantity(ingredients: RecipeIngredient[]): RecipeIngredient[] {
+  return ingredients.filter((i) => i.baseQuantity > 0);
 }
 
 function ingredientsToRows(ingredients: RecipeIngredient[]): IngredientRow[] {
@@ -235,7 +242,7 @@ export default function RecipeEditorScreen() {
   }, [ingredients, servings]);
 
   const recomputeMacros = (): Promise<ComputedMacros | null> => {
-    const validIngredients = rowsToIngredients(ingredients);
+    const validIngredients = withQuantity(rowsToIngredients(ingredients));
     const numServings = Math.max(1, parseInt(servings, 10) || 1);
     const result = runMacroRecompute(validIngredients, numServings);
     latestRecompute.current = { inputs: macroInputsKey(validIngredients, numServings), result };
@@ -358,7 +365,8 @@ export default function RecipeEditorScreen() {
       return;
     }
 
-    const validIngredients = rowsToIngredients(ingredients);
+    const storedIngredients = rowsToIngredients(ingredients);
+    const validIngredients = withQuantity(storedIngredients);
     if (validIngredients.length === 0) {
       Alert.alert('Validation', 'Please add at least one ingredient with a quantity.');
       return;
@@ -414,7 +422,7 @@ export default function RecipeEditorScreen() {
         fat: finalMacros.fat,
         prepTimeMinutes: numPrepTime,
         defaultServings: numServings,
-        ingredients: validIngredients,
+        ingredients: storedIngredients,
         instructions: instructions.trim(),
         freezerTips: freezerTips.trim(),
       };
