@@ -644,6 +644,30 @@ describe('MealPrepScreen remove planned meal', () => {
     expect(alertSpy.mock.calls[0][1]).toBe(pendingMessage);
   });
 
+  it('omits the inventory sentence for an eaten plan that debited nothing', async () => {
+    mockGetWeeklyMealPlan.mockResolvedValue([{ ...eatenLunch, consumed_from_inventory_id: null }]);
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(utils.getByLabelText('Remove Chicken Bowl from plan'));
+
+    expect(alertSpy.mock.calls[0][1]).toBe(
+      'This meal will be removed from your nutrition history.'
+    );
+    expect(alertSpy.mock.calls[0][1]).not.toContain('inventory');
+    expect(confirmButton('Remove').style).toBe('destructive');
+  });
+
+  it('shows the simple confirm for a plan that was not eaten and has no pointer', async () => {
+    mockGetWeeklyMealPlan.mockResolvedValue([{ ...pendingLunch, consumed_from_inventory_id: null }]);
+    const utils = render(<MealPrepScreen />);
+    await flushMicrotasks();
+
+    fireEvent.press(utils.getByLabelText('Remove Chicken Bowl from plan'));
+
+    expect(alertSpy.mock.calls[0][1]).toBe(pendingMessage);
+  });
+
   it('removes the plan once on confirm, reloads, and the slot shows Assign again', async () => {
     const utils = render(<MealPrepScreen />);
     await flushMicrotasks();
