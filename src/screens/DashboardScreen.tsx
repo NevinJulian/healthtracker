@@ -1454,7 +1454,7 @@ function SetLoggerModal({
                   value={repsInput}
                   onChangeText={setRepsInput}
                   keyboardType="number-pad"
-                  placeholder="—"
+                  placeholder={previous ? String(previous.reps) : '—'}
                   placeholderTextColor={Colors.textMuted}
                   returnKeyType="next"
                   selectTextOnFocus
@@ -1467,7 +1467,7 @@ function SetLoggerModal({
                   value={weightInput}
                   onChangeText={setWeightInput}
                   keyboardType="decimal-pad"
-                  placeholder="—"
+                  placeholder={previous ? String(previous.weight_kg) : '—'}
                   placeholderTextColor={Colors.textMuted}
                   returnKeyType="done"
                   selectTextOnFocus
