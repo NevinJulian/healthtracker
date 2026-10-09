@@ -16,7 +16,8 @@
  *     on restore — that table is managed exclusively by runMigrations().
  *   - Restore is all-or-nothing via db.withTransactionAsync().
  *   - Before any restore, a safety snapshot of the current data is written
- *     to cacheDirectory so an accidental restore is always recoverable (#293).
+ *     to safety-snapshots/ in documentDirectory; the newest SAFETY_KEEP are
+ *     kept, older ones are pruned, and the snapshot is lost on uninstall.
  *   - After a successful restore, scheduled OS notifications are resynced to
  *     the restored settings (#310): cancelAllScheduledNotificationsAsync()
  *     runs first, then reconcileScheduledNotifications(). cancelAll (rather
@@ -35,8 +36,14 @@ import * as Sharing from 'expo-sharing';
 import Notifications from './expoNotifications';
 import {
   cacheDirectory,
+  documentDirectory,
   writeAsStringAsync,
   readAsStringAsync,
+  makeDirectoryAsync,
+  readDirectoryAsync,
+  deleteAsync,
+  moveAsync,
+  getInfoAsync,
 } from 'expo-file-system/legacy';
 import {
   getCurrentSchemaVersion,
@@ -61,7 +68,7 @@ export interface BackupPayload {
 export interface RestoreResult {
   tablesRestored: number;
   rowsRestored: number;
-  /** URI of the pre-restore safety snapshot written to cache. */
+  /** URI of the pre-restore safety snapshot, empty when the caller restored without one. */
   safetySnapshotUri: string;
   /**
    * Per-table report of rows/columns dropped by restoreFromPayload's column
@@ -77,6 +84,15 @@ export interface RestoreResult {
    * Present only when such rows were actually restored (#310).
    */
   consumedMealsWithoutRefund?: number;
+}
+
+export interface RestoreOptions {
+  /**
+   * Called when the safety-snapshot write fails. Receives the error message.
+   * Should return true to proceed with the restore anyway, false to abort.
+   * Defaults to always aborting (returns false) when omitted.
+   */
+  onSnapshotFailed?: (errorMessage: string) => Promise<boolean>;
 }
 
 // ─── Pure helpers (exported for unit tests) ──────────────────────────────────
@@ -242,6 +258,9 @@ export async function exportBackup(): Promise<string> {
 
 // ─── Safety snapshot (pre-restore) ───────────────────────────────────────────
 
+const SAFETY_DIR_NAME = 'safety-snapshots/';
+const SAFETY_NAME_RE = /^healthtracker-pre-restore-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json$/;
+
 /**
  * Produce a filename-safe ISO-ish timestamp for use in filenames.
  * Replaces ':' with '-' and strips milliseconds so the name is readable on
@@ -254,23 +273,52 @@ function safeTimestamp(): string {
 }
 
 /**
- * Write a safety snapshot of the current DB state to cacheDirectory and
- * return its URI.
+ * Write a safety snapshot of the current DB state to safety-snapshots/ in
+ * documentDirectory and return its URI, then prune to the newest SAFETY_KEEP.
  *
- * Called automatically by importBackup() before wiping any data so that a
- * mistaken restore is always recoverable. The snapshot uses the same payload
- * format as a regular export — it can be shared or imported as a normal
- * backup file.
+ * Called automatically before a restore wipes any data. The snapshot uses the
+ * same payload format as a regular export, so it can be shared or imported as
+ * a normal backup file. It survives the OS clearing the cache, not an
+ * uninstall.
  *
  * @throws When the file write fails (caller decides whether to abort restore).
+ *         A failed prune is logged and never thrown.
  */
 export async function writeSafetySnapshot(): Promise<string> {
   const payload = await buildBackupPayload();
   const json = JSON.stringify(payload, null, 2);
+  const dir = `${documentDirectory ?? ''}${SAFETY_DIR_NAME}`;
   const fileName = `healthtracker-pre-restore-${safeTimestamp()}.json`;
-  const fileUri = `${cacheDirectory ?? ''}${fileName}`;
+  const fileUri = `${dir}${fileName}`;
+  await makeDirectoryAsync(dir, { intermediates: true });
   await writeAsStringAsync(fileUri, json);
+  if (documentDirectory) {
+    try {
+      await pruneSafetySnapshots(dir, fileName);
+    } catch (err) {
+      console.warn('[Backup] Failed to prune safety snapshots:', err);
+    }
+  }
   return fileUri;
+}
+
+async function pruneSafetySnapshots(dir: string, justWritten: string): Promise<void> {
+  const others = (await readDirectoryAsync(dir))
+    .filter((name) => name !== justWritten && SAFETY_NAME_RE.test(name))
+    .sort()
+    .reverse();
+  for (const name of others.slice(SAFETY_KEEP - 1)) {
+    await deleteMatching(dir, name, SAFETY_NAME_RE);
+  }
+}
+
+async function deleteMatching(dir: string, name: string, pattern: RegExp): Promise<void> {
+  if (!pattern.test(name)) return;
+  try {
+    await deleteAsync(`${dir}${name}`, { idempotent: true });
+  } catch (err) {
+    console.warn(`[Backup] Failed to delete ${name}:`, err);
+  }
 }
 
 // ─── Import (restore) ────────────────────────────────────────────────────────
@@ -281,7 +329,7 @@ export async function writeSafetySnapshot(): Promise<string> {
  * tables transactionally.
  *
  * Safety snapshot behaviour:
- *   - Written to cacheDirectory before any data is modified.
+ *   - Written to documentDirectory before any data is modified.
  *   - If the write fails the user is asked whether to continue; the restore
  *     is aborted when they say no.
  *   - The returned RestoreResult includes the snapshot URI so the caller can
@@ -299,14 +347,7 @@ export async function writeSafetySnapshot(): Promise<string> {
  *          DB restore transaction fails.
  */
 export async function importBackup(
-  options: {
-    /**
-     * Called when the safety-snapshot write fails. Receives the error message.
-     * Should return true to proceed with the restore anyway, false to abort.
-     * Defaults to always aborting (returns false) when omitted.
-     */
-    onSnapshotFailed?: (errorMessage: string) => Promise<boolean>;
-  } = {}
+  options: RestoreOptions = {}
 ): Promise<RestoreResult | null> {
   const result = await DocumentPicker.getDocumentAsync({
     type: 'application/json',
@@ -318,8 +359,33 @@ export async function importBackup(
     return null;
   }
 
-  const asset = result.assets[0];
-  const rawJson = await readAsStringAsync(asset.uri);
+  return restoreBackupFromUri(result.assets[0].uri, options);
+}
+
+/**
+ * Restore from a backup file already on the device: parse and validate it,
+ * write a safety snapshot, restore all tables transactionally, then resync
+ * notifications. The source file is only read. Automatic backups do not run
+ * while this is in progress.
+ *
+ * @throws When the file is invalid, the schema is incompatible, the safety
+ *         snapshot fails and the caller declines to continue, or the DB
+ *         restore transaction fails.
+ */
+export async function restoreBackupFromUri(
+  uri: string,
+  options: RestoreOptions = {}
+): Promise<RestoreResult> {
+  restoreInProgress = true;
+  try {
+    return await performRestore(uri, options);
+  } finally {
+    restoreInProgress = false;
+  }
+}
+
+async function performRestore(uri: string, options: RestoreOptions): Promise<RestoreResult> {
+  const rawJson = await readAsStringAsync(uri);
 
   let parsed: unknown;
   try {
@@ -386,18 +452,158 @@ export async function importBackup(
 
 /**
  * Share an existing file URI via the OS share sheet.
- * Used to let the user save the safety snapshot after a restore completes.
+ * Used to let the user save the safety snapshot after a restore completes,
+ * and to share an automatic backup.
  *
- * @param uri - A file:// URI returned by writeSafetySnapshot or exportBackup.
+ * @param uri - A file:// URI returned by writeSafetySnapshot, exportBackup or listAutoBackups.
+ * @param dialogTitle - Title of the share sheet.
  * @returns true when the share sheet was presented, false when sharing is unavailable.
  */
-export async function shareFile(uri: string): Promise<boolean> {
+export async function shareFile(
+  uri: string,
+  dialogTitle = 'Save your safety backup'
+): Promise<boolean> {
   const sharingAvailable = await Sharing.isAvailableAsync();
   if (!sharingAvailable) return false;
   await Sharing.shareAsync(uri, {
     mimeType: 'application/json',
-    dialogTitle: 'Save your safety backup',
+    dialogTitle,
     UTI: 'public.json',
   });
   return true;
+}
+
+// ─── Automatic backups ───────────────────────────────────────────────────────
+
+export const AUTO_BACKUP_KEEP = 7;
+export const SAFETY_KEEP = 3;
+
+export interface AutoBackupEntry {
+  name: string;
+  uri: string;
+  createdAt: Date;
+  sizeBytes: number;
+}
+
+const AUTO_DIR_NAME = 'auto-backups/';
+const AUTO_NAME_RE = /^healthtracker-auto-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z\.json$/;
+const AUTO_TMP_RE = /^healthtracker-auto-\d{8}T\d{6}Z\.json\.tmp$/;
+const AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const AUTO_CLOCK_SKEW_MS = 60 * 60 * 1000;
+
+let autoBackupInFlight: Promise<void> | null = null;
+let restoreInProgress = false;
+
+function autoBackupDir(): string | null {
+  return documentDirectory ? `${documentDirectory}${AUTO_DIR_NAME}` : null;
+}
+
+function autoBackupName(date: Date): string {
+  const stamp = date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  return `healthtracker-auto-${stamp}.json`;
+}
+
+function parseAutoBackupName(name: string): Date | null {
+  const match = AUTO_NAME_RE.exec(name);
+  if (!match) return null;
+  const [y, mo, d, h, mi, s] = match.slice(1).map(Number);
+  const date = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  return autoBackupName(date) === name ? date : null;
+}
+
+async function readAutoBackupFolder(
+  dir: string
+): Promise<{ valid: { name: string; time: Date }[]; leftovers: string[] }> {
+  const names = await readDirectoryAsync(dir);
+  const valid: { name: string; time: Date }[] = [];
+  const leftovers: string[] = [];
+  for (const name of names) {
+    const time = parseAutoBackupName(name);
+    if (time) valid.push({ name, time });
+    else if (AUTO_TMP_RE.test(name)) leftovers.push(name);
+  }
+  valid.sort((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
+  return { valid, leftovers };
+}
+
+/**
+ * Write an automatic backup into auto-backups/ in documentDirectory when none
+ * exists or the newest is at least 24 hours old, then keep the newest
+ * AUTO_BACKUP_KEEP. Concurrent calls share one run; nothing runs during a
+ * restore.
+ *
+ * A backup is written to a temporary name and moved into place, so a partial
+ * file is never listed or restored. "Newest" is read from the file name.
+ * Files dated more than an hour ahead of `now` are ignored for the due check
+ * and never pruned, so a clock set back cannot block backups.
+ *
+ * @throws When the write fails; the caller logs it.
+ */
+export function runAutoBackupIfDue(now: Date = new Date()): Promise<void> {
+  if (autoBackupInFlight) return autoBackupInFlight;
+  const run = performAutoBackup(now).finally(() => {
+    autoBackupInFlight = null;
+  });
+  autoBackupInFlight = run;
+  return run;
+}
+
+async function performAutoBackup(now: Date): Promise<void> {
+  if (restoreInProgress) return;
+  const dir = autoBackupDir();
+  if (!dir) throw new Error('No document directory available for automatic backups.');
+
+  await makeDirectoryAsync(dir, { intermediates: true });
+  const { valid, leftovers } = await readAutoBackupFolder(dir);
+  for (const name of leftovers) await deleteMatching(dir, name, AUTO_TMP_RE);
+
+  const horizon = now.getTime() + AUTO_CLOCK_SKEW_MS;
+  const newest = valid.find((entry) => entry.time.getTime() <= horizon);
+  if (newest && now.getTime() - newest.time.getTime() < AUTO_INTERVAL_MS) return;
+
+  const payload = await buildBackupPayload();
+  if (restoreInProgress) return;
+
+  const finalName = autoBackupName(now);
+  const finalUri = `${dir}${finalName}`;
+  const tmpUri = `${finalUri}.tmp`;
+  try {
+    await writeAsStringAsync(tmpUri, JSON.stringify(payload, null, 2));
+    await moveAsync({ from: tmpUri, to: finalUri });
+  } catch (err) {
+    try {
+      await deleteAsync(tmpUri, { idempotent: true });
+    } catch (cleanupErr) {
+      console.warn('[Backup] Failed to remove temporary backup file:', cleanupErr);
+    }
+    throw err;
+  }
+
+  try {
+    const after = await readAutoBackupFolder(dir);
+    const counted = after.valid.filter((entry) => entry.time.getTime() <= horizon);
+    for (const entry of counted.slice(AUTO_BACKUP_KEEP)) {
+      await deleteMatching(dir, entry.name, AUTO_NAME_RE);
+    }
+  } catch (err) {
+    console.warn('[Backup] Failed to prune automatic backups:', err);
+  }
+}
+
+/** Automatic backups on this device, newest first. */
+export async function listAutoBackups(): Promise<AutoBackupEntry[]> {
+  const dir = autoBackupDir();
+  if (!dir) return [];
+  const folder = await getInfoAsync(dir);
+  if (!folder.exists) return [];
+
+  const { valid } = await readAutoBackupFolder(dir);
+  const entries: AutoBackupEntry[] = [];
+  for (const { name, time } of valid) {
+    const uri = `${dir}${name}`;
+    const info = await getInfoAsync(uri);
+    if (!info.exists) continue;
+    entries.push({ name, uri, createdAt: time, sizeBytes: info.size });
+  }
+  return entries;
 }

@@ -1205,6 +1205,24 @@ export async function getWeightHistory(days: number): Promise<{ date: string; we
   return rows.map((r) => ({ date: r.date, weight: r.body_weight }));
 }
 
+export interface DailyLogExportRow {
+  date: string;
+  body_weight: number | null;
+  water_ml: number | null;
+  walk_completed: number | null;
+  hammer_completed: number | null;
+  fasting_completed: number | null;
+}
+
+export async function getAllDailyLogForExport(): Promise<DailyLogExportRow[]> {
+  const db = getDatabase();
+  return db.getAllAsync<DailyLogExportRow>(
+    `SELECT date, body_weight, water_ml, walk_completed, hammer_completed, fasting_completed
+     FROM daily_log
+     ORDER BY date`
+  );
+}
+
 // ─────────────────────────────────────────────
 // Weekly Template CRUD
 // ─────────────────────────────────────────────
@@ -1732,6 +1750,31 @@ async function _logCookedMealImpl(recipe_id: string, portions: number): Promise<
 export async function getWeeklyMealPlan(): Promise<WeeklyMealPlanItem[]> {
   const db = getDatabase();
   return await db.getAllAsync<WeeklyMealPlanItem>('SELECT * FROM weekly_meal_plan');
+}
+
+export interface MealExportRow {
+  date: string;
+  meal_type: string;
+  recipe_title: string | null;
+  calories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+  is_consumed: number | null;
+}
+
+export async function getAllMealsForExport(): Promise<MealExportRow[]> {
+  const db = getDatabase();
+  return db.getAllAsync<MealExportRow>(
+    `SELECT p.date AS date, p.meal_type AS meal_type, r.title AS recipe_title,
+            r.calories AS calories, r.protein AS protein, r.carbs AS carbs, r.fat AS fat,
+            p.is_consumed AS is_consumed
+     FROM weekly_meal_plan p
+     LEFT JOIN recipe_library r ON r.id = p.recipe_id
+     ORDER BY p.date,
+              CASE p.meal_type WHEN 'breakfast' THEN 0 WHEN 'lunch' THEN 1 WHEN 'dinner' THEN 2 ELSE 3 END,
+              p.id`
+  );
 }
 
 export interface MealPlanWithRecipe extends WeeklyMealPlanItem {
@@ -3480,6 +3523,25 @@ export async function getWorkoutHistory(
     return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SINCE_SQL, [exercise, sinceDateKey]);
   }
   return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SQL, [exercise]);
+}
+
+export interface WorkoutSetExportRow {
+  date: string;
+  exercise: string;
+  set_index: number;
+  set_type: string | null;
+  reps: number | null;
+  weight_kg: number | null;
+  created_at: string | null;
+}
+
+export async function getAllWorkoutSetsForExport(): Promise<WorkoutSetExportRow[]> {
+  const db = getDatabase();
+  return db.getAllAsync<WorkoutSetExportRow>(
+    `SELECT date, exercise, set_index, set_type, reps, weight_kg, created_at
+     FROM workout_set_log
+     ORDER BY date, exercise, set_index`
+  );
 }
 
 export const WORKOUT_LAST_SET_SQL = `SELECT * FROM workout_set_log
