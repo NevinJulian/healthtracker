@@ -45,13 +45,21 @@ jest.mock('../../db/database', () => ({
   getLatestMeasurements: jest.fn(() => Promise.resolve(null)),
   logWorkoutSet: jest.fn(() => Promise.resolve(undefined)),
   getWorkoutSetsForDay: jest.fn(() => Promise.resolve([])),
+  getLastSetForExercise: jest.fn(() => Promise.resolve(null)),
   deleteWorkoutSet: jest.fn(() => Promise.resolve(undefined)),
 }));
 
 import DashboardScreen from '../DashboardScreen';
-import { getLogByDate, logWorkoutSet, getWorkoutSetsForDay } from '../../db/database';
+import {
+  getLogByDate,
+  logWorkoutSet,
+  getWorkoutSetsForDay,
+  getLastSetForExercise,
+  type WorkoutSet,
+} from '../../db/database';
 
 const mockGetLogByDate = jest.mocked(getLogByDate);
+const mockGetLastSet = jest.mocked(getLastSetForExercise);
 const mockLogWorkoutSet = jest.mocked(logWorkoutSet);
 
 async function flushMicrotasks() {
@@ -231,6 +239,138 @@ describe('DashboardScreen set logger set types', () => {
     const utils = await openLogger();
     expect(utils.getByText('5 reps @ 60 kg')).toBeTruthy();
     expect(utils.queryAllByLabelText('Warm-up set')).toHaveLength(0);
+  });
+});
+
+function previousSet(overrides: Partial<WorkoutSet> = {}): WorkoutSet {
+  return {
+    id: 90,
+    date: '2026-09-18',
+    exercise: 'Squat',
+    set_index: 2,
+    reps: 8,
+    weight_kg: 80,
+    set_type: null,
+    created_at: '2026-09-18T10:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('DashboardScreen set logger last time', () => {
+  let errorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetLogByDate.mockResolvedValue({
+      ...mockEntry,
+      exercises: [
+        ...mockEntry.exercises,
+        { id: 'ex2', name: 'Bench', sets: '3', reps: '10', videoUrl: '', completed: false },
+      ],
+    });
+    mockLogWorkoutSet.mockResolvedValue(undefined);
+    jest.mocked(getWorkoutSetsForDay).mockResolvedValue([]);
+    mockGetLastSet.mockResolvedValue(null);
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  async function openLogger(name = 'Squat') {
+    const utils = render(<DashboardScreen />);
+    await flushMicrotasks();
+    fireEvent.press(utils.getByLabelText(`Log sets for ${name}`));
+    await flushMicrotasks();
+    return utils;
+  }
+
+  it('asks for the last set of the opened exercise before today', async () => {
+    await openLogger();
+    expect(mockGetLastSet).toHaveBeenCalledWith('Squat', mockToday);
+  });
+
+  it('shows yesterday for a set from the day before', async () => {
+    mockGetLastSet.mockResolvedValue(previousSet({ date: '2026-09-18' }));
+    const utils = await openLogger();
+    expect(utils.getByText('Last time: 80 kg × 8 · yesterday')).toBeTruthy();
+  });
+
+  it('shows N days ago and keeps fractional weights', async () => {
+    mockGetLastSet.mockResolvedValue(previousSet({ date: '2026-09-16', weight_kg: 82.5, reps: 6 }));
+    const utils = await openLogger();
+    expect(utils.getByText('Last time: 82.5 kg × 6 · 3 days ago')).toBeTruthy();
+  });
+
+  it('shows no line and leaves the inputs empty without history', async () => {
+    const utils = await openLogger();
+    expect(utils.queryByText(/Last time/)).toBeNull();
+    const [reps, weight] = loggerInputs(utils);
+    expect(reps.props.value).toBe('');
+    expect(weight.props.value).toBe('');
+  });
+
+  it('keeps the weight prefilled from the last set logged today', async () => {
+    jest.mocked(getWorkoutSetsForDay).mockResolvedValue([
+      previousSet({ id: 5, date: mockToday, set_index: 0, weight_kg: 60, reps: 5 }),
+    ]);
+    mockGetLastSet.mockResolvedValue(previousSet());
+    const utils = await openLogger();
+    const [reps, weight] = loggerInputs(utils);
+    expect(reps.props.value).toBe('');
+    expect(weight.props.value).toBe('60');
+  });
+
+  it('shows no line, logs the error and stays usable when the read rejects', async () => {
+    const failure = new Error('read failed');
+    mockGetLastSet.mockRejectedValue(failure);
+    const utils = await openLogger();
+    expect(utils.queryByText(/Last time/)).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith('getLastSetForExercise error', failure);
+    const [repsInput, weightInput] = loggerInputs(utils);
+    fireEvent.changeText(repsInput, '5');
+    fireEvent.changeText(weightInput, '70');
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Add set'));
+    });
+    expect(mockLogWorkoutSet).toHaveBeenCalledWith(mockToday, 'Squat', { reps: 5, weightKg: 70 });
+  });
+
+  it('drops a late result for an exercise that is no longer open', async () => {
+    let resolveSquat: (set: WorkoutSet | null) => void = () => {};
+    mockGetLastSet.mockImplementation((name) =>
+      name === 'Squat'
+        ? new Promise<WorkoutSet | null>((resolve) => {
+            resolveSquat = resolve;
+          })
+        : Promise.resolve(null)
+    );
+    const utils = await openLogger('Squat');
+    fireEvent.press(utils.getByLabelText('Close set logger'));
+    fireEvent.press(utils.getByLabelText('Log sets for Bench'));
+    await flushMicrotasks();
+    await act(async () => {
+      resolveSquat(previousSet());
+    });
+    expect(utils.queryByText(/Last time/)).toBeNull();
+  });
+
+  it('drops a late result after the logger closed', async () => {
+    let resolveSquat: (set: WorkoutSet | null) => void = () => {};
+    mockGetLastSet.mockImplementation(
+      () =>
+        new Promise<WorkoutSet | null>((resolve) => {
+          resolveSquat = resolve;
+        })
+    );
+    const utils = await openLogger('Squat');
+    fireEvent.press(utils.getByLabelText('Close set logger'));
+    await act(async () => {
+      resolveSquat(previousSet());
+    });
+    expect(utils.queryByText(/Last time/)).toBeNull();
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 });
 
