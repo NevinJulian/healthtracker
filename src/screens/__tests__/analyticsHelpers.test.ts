@@ -28,6 +28,7 @@ import {
   visibleTrend,
   weightRatePerWeek,
   formatWeightRate,
+  weightChange,
 } from '../analyticsHelpers';
 
 // ─── computeStreaks ───────────────────────────────────────────────────────────
@@ -948,5 +949,47 @@ describe('formatWeightRate', () => {
 
   it('shows a dash when there is no rate', () => {
     expect(formatWeightRate(null)).toBe('—');
+  });
+});
+
+// ─── weightChange ─────────────────────────────────────────────────────────────
+
+describe('weightChange', () => {
+  const utcDay = (n: number) =>
+    new Date(Date.UTC(2024, 0, 1 + n)).toISOString().slice(0, 10);
+  const series = (weights: number[]) =>
+    weights.map((weight, i) => ({ date: utcDay(i), weight }));
+
+  it('is the trend change between the 5th and the last weigh-in', () => {
+    const history = series([80, 80, 80, 80, 90, 90, 90]);
+    expect(weightChange(history, history) as number).toBeCloseTo(2.7047, 4);
+  });
+
+  it('is null with one shown trend value, and with fewer than five weigh-ins', () => {
+    const five = series([80, 80, 80, 80, 90]);
+    expect(weightChange(five, five)).toBeNull();
+    const four = series([80, 80, 80, 90]);
+    expect(weightChange(four, four)).toBeNull();
+    expect(weightChange([], [])).toBeNull();
+  });
+
+  it('never falls back to a raw difference', () => {
+    const history = series([70, 75]);
+    expect(weightChange(history, history)).toBeNull();
+  });
+
+  it('takes the trend values from the 90-day series, not a restart at the 30-day edge', () => {
+    const history90 = series([...Array(30).fill(80), ...Array(10).fill(90)]);
+    const history30 = history90.slice(10);
+    expect(weightChange(history90, history30) as number).toBeCloseTo(
+      90 - 10 * Math.pow(9 / 11, 10),
+      6
+    );
+  });
+
+  it('ignores implausible weights', () => {
+    const clean = series([80, 80, 80, 80, 90, 90, 90]);
+    const withOutlier = [{ date: '2023-12-31', weight: 9999 }, ...clean];
+    expect(weightChange(withOutlier, withOutlier) as number).toBeCloseTo(2.7047, 4);
   });
 });

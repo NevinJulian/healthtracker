@@ -33,12 +33,16 @@ jest.mock('@react-navigation/native', () => ({
 // ─── Mock ../../db/database ─────────────────────────────────────────────────
 // getWeightHistory(30) and getWeightHistory(90) both return the same series
 // here: an implausible 9999 kg row at the FRONT (so a naive first-vs-last
-// delta is corrupted) plus two plausible rows.
-const mockWeightRows = [
-  { date: '2024-06-01', weight: 9999 },
-  { date: '2024-06-05', weight: 70 },
-  { date: '2024-06-10', weight: 75 },
+// delta is corrupted) plus six plausible rows.
+const mockPlausibleRows = [
+  { date: '2024-06-05', weight: 80 },
+  { date: '2024-06-06', weight: 80 },
+  { date: '2024-06-07', weight: 80 },
+  { date: '2024-06-08', weight: 80 },
+  { date: '2024-06-09', weight: 90 },
+  { date: '2024-06-10', weight: 90 },
 ];
+let mockWeightRows = [{ date: '2024-06-01', weight: 9999 }, ...mockPlausibleRows];
 
 jest.mock('../../db/database', () => ({
   toISODate: jest.fn(() => '2024-06-15'),
@@ -148,21 +152,36 @@ describe('AnalyticsDashboardScreen — weight delta ignores implausible points (
     latestFocusEffect = null;
   });
 
-  it('the weight-delta metric tile is computed from valid points only', async () => {
-    const { getByText, queryByText } = render(<AnalyticsDashboardScreen />);
+  afterEach(() => {
+    mockWeightRows = [{ date: '2024-06-01', weight: 9999 }, ...mockPlausibleRows];
+  });
 
+  async function renderScreen() {
+    const utils = render(<AnalyticsDashboardScreen />);
     expect(latestFocusEffect).not.toBeNull();
     act(() => {
       latestFocusEffect!();
     });
     await flush();
     await flush();
+    return utils;
+  }
+
+  it('the weight-delta metric tile is computed from valid points only', async () => {
+    const { getByText, queryByText } = await renderScreen();
 
     // mockWeightRows (used for both the 30- and 90-day window) is
-    // [9999, 70, 75]. A naive last-minus-first delta over the raw array
-    // would be 75 - 9999 = -9924.0. Filtered through plausibleWeights, the
-    // valid points are [70, 75], so the delta must be +5.0.
-    expect(getByText('+5.0')).toBeTruthy();
-    expect(queryByText('-9924.0')).toBeNull();
+    // [9999, 80, 80, 80, 80, 90, 90]. A naive last-minus-first delta over the
+    // raw array would be 90 - 9999. Filtered through plausibleWeights, the
+    // trend at the 5th and 6th valid weigh-in is 81.8182 and 83.3058, so the
+    // tile must show +1.5.
+    expect(getByText('+1.5')).toBeTruthy();
+    expect(queryByText('-9909.0')).toBeNull();
+  });
+
+  it('shows the same tile figure without the outlier', async () => {
+    mockWeightRows = [...mockPlausibleRows];
+    const { getByText } = await renderScreen();
+    expect(getByText('+1.5')).toBeTruthy();
   });
 });

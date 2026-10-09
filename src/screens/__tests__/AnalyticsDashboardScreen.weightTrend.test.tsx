@@ -15,7 +15,7 @@ import { WeightTrendCard } from '../AnalyticsDashboardScreen';
 
 type Pt = { date: string; weight: number };
 
-const day = (n: number) => `2024-02-${String(n).padStart(2, '0')}`;
+const day = (n: number) => new Date(Date.UTC(2024, 1, n)).toISOString().slice(0, 10);
 
 const daily = (count: number, firstDay = 1): Pt[] =>
   Array.from({ length: count }, (_, i) => ({
@@ -88,5 +88,54 @@ describe('WeightTrendCard chart', () => {
     layOut(utils);
     expect(utils.queryAllByTestId(/^weight-dot-/)).toHaveLength(9);
     expect(utils.queryAllByTestId(/^trend-seg-/)).toHaveLength(4);
+  });
+});
+
+describe('WeightTrendCard rate', () => {
+  const flat = (count: number, firstDay = 1): Pt[] =>
+    Array.from({ length: count }, (_, i) => ({ date: day(firstDay + i), weight: 80 }));
+
+  it('shows the kg/week rate once the last 14 days hold 5 weigh-ins', () => {
+    const history = daily(10);
+    const utils = render(
+      <WeightTrendCard history30={history} history90={history} todayISO={day(10)} />
+    );
+    expect(utils.getByLabelText('Weight trend rate').props.children).toMatch(
+      /^[+−]?\d+\.\d kg\/week$/
+    );
+  });
+
+  it('shows an unsigned zero for a flat trend', () => {
+    const history = flat(10);
+    const utils = render(
+      <WeightTrendCard history30={history} history90={history} todayISO={day(10)} />
+    );
+    expect(utils.getByText('0.0 kg/week')).toBeTruthy();
+  });
+
+  it('shows a dash alone with only 3 weigh-ins', () => {
+    const history = daily(3);
+    const utils = render(
+      <WeightTrendCard history30={history} history90={history} todayISO={day(3)} />
+    );
+    expect(utils.getByLabelText('Weight trend rate').props.children).toBe('—');
+  });
+
+  it('shows a dash when the weigh-ins are older than 14 days', () => {
+    const history = flat(10);
+    const utils = render(
+      <WeightTrendCard history30={history} history90={history} todayISO={day(28)} />
+    );
+    expect(utils.getByLabelText('Weight trend rate').props.children).toBe('—');
+  });
+
+  it('does not change when switching between 30d and 90d', () => {
+    const history90 = flat(40);
+    const history30 = history90.slice(10);
+    const utils = render(
+      <WeightTrendCard history30={history30} history90={history90} todayISO={day(30)} />
+    );
+    fireEvent.press(utils.getByLabelText('Show 90 day history'));
+    expect(utils.getByText('0.0 kg/week')).toBeTruthy();
   });
 });

@@ -135,6 +135,7 @@ export function WeightTrendCard({
 }: {
   history30: { date: string; weight: number }[];
   history90: { date: string; weight: number }[];
+  todayISO?: string;
 }) {
   const [window, setWindow] = useState<WeightWindow>(30);
   const [chartWidth, setChartWidth] = useState(0);

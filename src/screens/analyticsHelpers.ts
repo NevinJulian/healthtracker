@@ -376,6 +376,18 @@ export function visibleTrend<T>(points: T[]): T[] {
   return points.slice(TREND_MIN_POINTS - 1);
 }
 
+/**
+ * Change in trend over the 30-day set: trend at its last weigh-in minus trend
+ * at its earliest weigh-in that has a shown trend value, both taken from the
+ * trend over the 90-day history. Null when fewer than two have one.
+ */
+export function weightChange(
+  history90: { date: string; weight: number }[],
+  history30: { date: string; weight: number }[]
+): number | null {
+  return null;
+}
+
 export const RATE_WINDOW_DAYS = 14;
 export const RATE_MIN_POINTS = 5;
 
