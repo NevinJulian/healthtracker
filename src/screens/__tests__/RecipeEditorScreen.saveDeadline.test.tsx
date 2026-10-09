@@ -164,7 +164,7 @@ describe('RecipeEditorScreen save deadline', () => {
     await fillIngredients(utils, ['zzz empty', 'zzz refused']);
 
     expect(utils.getByText('Estimated (no data): zzz empty')).toBeTruthy();
-    expect(utils.getByText('Not looked up (try Recompute in a minute): zzz refused')).toBeTruthy();
+    expect(utils.getByText('Not looked up yet. Tap Recompute later. (zzz refused)')).toBeTruthy();
   });
 
   it('shows the ingredient cut off by the save deadline as not looked up', async () => {
@@ -181,7 +181,7 @@ describe('RecipeEditorScreen save deadline', () => {
       await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
     });
 
-    expect(utils.getByText('Not looked up (try Recompute in a minute): zzz hanging')).toBeTruthy();
+    expect(utils.getByText('Not looked up yet. Tap Recompute later. (zzz hanging)')).toBeTruthy();
     expect(utils.getByText('Estimated (no data): zzz empty')).toBeTruthy();
   });
 });

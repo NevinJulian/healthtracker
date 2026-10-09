@@ -660,7 +660,7 @@ export default function RecipeEditorScreen() {
                   {estimatedIngredients.length > 0 && notLookedUpIngredients.length > 0 && '\n'}
                   {notLookedUpIngredients.length > 0 && (
                     <Text>
-                      Not looked up (try Recompute in a minute): {notLookedUpIngredients.join(', ')}
+                      Not looked up yet. Tap Recompute later. ({notLookedUpIngredients.join(', ')})
                     </Text>
                   )}
                 </Text>
