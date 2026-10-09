@@ -118,6 +118,25 @@ describe('RecipesScreen import from URL', () => {
     expect(pending).toHaveLength(1);
   });
 
+  it('starts one request when submitted twice in the same tick', async () => {
+    const pending = deferFetches();
+    const utils = await renderScreen();
+    await openDialog(utils);
+    await typeUrl(utils, 'https://example.com/r');
+    await act(async () => {
+      const input = utils.getByPlaceholderText('https://...');
+      fireEvent(input, 'submitEditing');
+      fireEvent(input, 'submitEditing');
+    });
+
+    expect(pending).toHaveLength(1);
+    expect(pending[0].signal?.aborted).toBe(false);
+    await act(async () => {
+      pending[0].resolve(DRAFT);
+    });
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+  });
+
   it('closes and opens the editor with the draft on success', async () => {
     const pending = deferFetches();
     const utils = await renderScreen();
