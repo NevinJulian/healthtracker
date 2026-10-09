@@ -457,7 +457,7 @@ async function performRestore(uri: string, options: RestoreOptions): Promise<Res
  * @param uri - A file:// URI returned by writeSafetySnapshot or exportBackup.
  * @returns true when the share sheet was presented, false when sharing is unavailable.
  */
-export async function shareFile(uri: string): Promise<boolean> {
+export async function shareFile(uri: string, _dialogTitle?: string): Promise<boolean> {
   const sharingAvailable = await Sharing.isAvailableAsync();
   if (!sharingAvailable) return false;
   await Sharing.shareAsync(uri, {

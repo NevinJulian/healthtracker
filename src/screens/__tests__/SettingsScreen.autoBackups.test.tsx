@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, screen, act, fireEvent } from '@testing-library/react-native';
 
 jest.mock('@react-navigation/native', () => ({
@@ -73,9 +74,15 @@ jest.mock('../../services/backup', () => ({
 }));
 
 import SettingsScreen from '../SettingsScreen';
-import { exportBackup, listAutoBackups, type AutoBackupEntry } from '../../services/backup';
+import {
+  exportBackup,
+  listAutoBackups,
+  shareFile,
+  type AutoBackupEntry,
+} from '../../services/backup';
 
 const mockList = jest.mocked(listAutoBackups);
+const mockShare = jest.mocked(shareFile);
 
 function entry(iso: string, sizeBytes: number): AutoBackupEntry {
   const createdAt = new Date(iso);
@@ -179,5 +186,89 @@ describe('SettingsScreen automatic backups list', () => {
     expect(
       screen.getByRole('button', { name: 'Restore automatic backup 8 Oct 2026, 14:03', disabled: true })
     ).toBeTruthy();
+  });
+});
+
+describe('SettingsScreen automatic backup share', () => {
+  const SHARE_NAME = 'Share automatic backup 8 Oct 2026, 14:03';
+  let alertSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    mockList.mockResolvedValue([NEWER, OLDER]);
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    alertSpy.mockRestore();
+  });
+
+  it('shares the chosen backup file with the backup dialog title', async () => {
+    mockShare.mockResolvedValue(true);
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: SHARE_NAME }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockShare).toHaveBeenCalledTimes(1);
+    expect(mockShare).toHaveBeenCalledWith(NEWER.uri, 'Save your HealthTracker backup');
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('shares the other backup when its own button is pressed', async () => {
+    mockShare.mockResolvedValue(true);
+    await renderSettings();
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Share automatic backup 7 Oct 2026, 09:05' })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockShare).toHaveBeenCalledWith(OLDER.uri, 'Save your HealthTracker backup');
+  });
+
+  it('tells the user when sharing is unavailable', async () => {
+    mockShare.mockResolvedValue(false);
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: SHARE_NAME }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith('Sharing unavailable', expect.any(String));
+  });
+
+  it('reports a failed share', async () => {
+    mockShare.mockRejectedValue(new Error('file vanished'));
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: SHARE_NAME }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith('Share failed', 'file vanished');
+  });
+
+  it('blocks the other backup actions while the share sheet is opening and frees them after', async () => {
+    let finish: (shared: boolean) => void = () => undefined;
+    mockShare.mockReturnValue(new Promise<boolean>((resolve) => { finish = resolve; }));
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: SHARE_NAME }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(
+      screen.getByRole('button', { name: 'Back up data', disabled: true })
+    ).toBeTruthy();
+
+    await act(async () => {
+      finish(true);
+    });
+    expect(screen.queryByRole('button', { name: 'Back up data', disabled: true })).toBeNull();
   });
 });

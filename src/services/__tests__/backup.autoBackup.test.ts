@@ -61,8 +61,10 @@ jest.mock('../notifications', () => ({
 }));
 
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import * as db from '../../db/database';
 import {
+  shareFile,
   writeSafetySnapshot,
   runAutoBackupIfDue,
   listAutoBackups,
@@ -453,6 +455,36 @@ describe('listAutoBackups', () => {
     const list = await listAutoBackups();
 
     expect(list.map((entry) => entry.uri)).toEqual([kept]);
+  });
+});
+
+describe('shareFile', () => {
+  it('keeps the safety backup dialog title by default', async () => {
+    await shareFile('file:///a.json');
+
+    expect(Sharing.shareAsync).toHaveBeenCalledWith('file:///a.json', {
+      mimeType: 'application/json',
+      dialogTitle: 'Save your safety backup',
+      UTI: 'public.json',
+    });
+  });
+
+  it('uses the dialog title it is given', async () => {
+    await shareFile('file:///a.json', 'Save your HealthTracker backup');
+
+    expect(Sharing.shareAsync).toHaveBeenCalledWith('file:///a.json', {
+      mimeType: 'application/json',
+      dialogTitle: 'Save your HealthTracker backup',
+      UTI: 'public.json',
+    });
+  });
+
+  it('returns false and shares nothing when sharing is unavailable', async () => {
+    jest.mocked(Sharing.isAvailableAsync).mockResolvedValueOnce(false);
+
+    await expect(shareFile('file:///a.json', 'Title')).resolves.toBe(false);
+
+    expect(Sharing.shareAsync).not.toHaveBeenCalled();
   });
 });
 
