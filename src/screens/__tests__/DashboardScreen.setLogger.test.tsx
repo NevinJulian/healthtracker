@@ -184,7 +184,7 @@ describe('DashboardScreen set logger set types', () => {
       setType: 'warmup',
     });
 
-    fireEvent.press(utils.getByText('Done'));
+    fireEvent.press(utils.getByLabelText('Close set logger'));
     fireEvent.press(utils.getByLabelText('Log sets for Squat'));
     expect(utils.getByLabelText('Working').props.accessibilityState.selected).toBe(true);
     expect(utils.getByLabelText('Warm-up').props.accessibilityState.selected).toBe(false);
