@@ -44,14 +44,17 @@ const MEAL = {
 };
 
 const NOT_LOOKED_UP =
-  '2 ingredient(s) were not looked up (too many requests); their macros count as 0. Try again in a minute.';
+  "2 ingredients couldn't be looked up right now and count as 0. Open the recipe in the editor later and save it to look them up.";
+const NOT_LOOKED_UP_ONE =
+  "1 ingredient couldn't be looked up right now and counts as 0. Open the recipe in the editor later and save it to look it up.";
 
 describe('DiscoverDetailScreen import with refused lookups', () => {
   let alertSpy: jest.SpyInstance;
+  let answers: Record<string, unknown>;
 
   beforeEach(() => {
     mockFetchMeal.mockReset().mockResolvedValue(MEAL);
-    const answers: Record<string, unknown> = {
+    answers = {
       'zzz found': { kcal: 40, protein: 10, carbs: 0, fat: 0 },
       'zzz no data': null,
       'zzz refused one': 'not-looked-up',
@@ -79,5 +82,21 @@ describe('DiscoverDetailScreen import with refused lookups', () => {
 
     expect(utils.getByText(/Macros estimated — 1 ingredient had no nutritional data/)).toBeTruthy();
     expect(utils.getByText(NOT_LOOKED_UP)).toBeTruthy();
+    expect(message).not.toMatch(/minute/);
+    expect(utils.queryByText(/minute/)).toBeNull();
+  });
+
+  it('uses the singular sentence for one not-looked-up ingredient', async () => {
+    answers['zzz refused two'] = { kcal: 10, protein: 1, carbs: 1, fat: 1 };
+    const utils = render(<DiscoverDetailScreen />);
+    await waitFor(() => utils.getByLabelText('Import to my recipes'));
+    fireEvent.press(utils.getByLabelText('Import to my recipes'));
+    await waitFor(() => utils.getByText('Added to your library'));
+
+    const [, message] = alertSpy.mock.calls[0];
+    expect(message).toContain(NOT_LOOKED_UP_ONE);
+    expect(message).toContain('1 ingredient(s) had no nutritional data.');
+    expect(utils.getByText(NOT_LOOKED_UP_ONE)).toBeTruthy();
+    expect(utils.queryByText(/minute/)).toBeNull();
   });
 });
