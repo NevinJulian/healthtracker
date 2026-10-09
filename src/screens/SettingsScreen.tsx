@@ -79,7 +79,13 @@ import {
   formatTimeString,
   parseTimeString,
 } from '../services/notifications';
-import { exportBackup, importBackup, shareFile } from '../services/backup';
+import {
+  exportBackup,
+  importBackup,
+  shareFile,
+  listAutoBackups,
+  type AutoBackupEntry,
+} from '../services/backup';
 import Card from '../components/Card';
 import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
@@ -426,6 +432,21 @@ const MAX_SKIPPED_TABLES_SHOWN = 5;
 const MAX_SKIPPED_COLUMNS_SHOWN = 5;
 const MAX_SKIPPED_NAME_LENGTH = 40;
 
+const BYTES_PER_KB = 1024;
+const BYTES_PER_MB = BYTES_PER_KB * 1024;
+
+function formatBackupTitle(date: Date): string {
+  const day = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `${day}, ${time}`;
+}
+
+function formatBackupSize(bytes: number): string {
+  if (bytes < BYTES_PER_KB) return `${bytes} B`;
+  if (bytes < BYTES_PER_MB) return `${(bytes / BYTES_PER_KB).toFixed(1)} KB`;
+  return `${(bytes / BYTES_PER_MB).toFixed(1)} MB`;
+}
+
 function truncateName(name: string): string {
   const points = Array.from(name);
   return points.length > MAX_SKIPPED_NAME_LENGTH
@@ -480,6 +501,29 @@ export default function SettingsScreen() {
 
   // Backup state
   const [backupBusy, setBackupBusy] = useState(false);
+  const [autoBackups, setAutoBackups] = useState<AutoBackupEntry[] | null>(null);
+  const [autoBackupsFailed, setAutoBackupsFailed] = useState(false);
+  const autoBackupsLoadSeq = useRef(0);
+
+  const loadAutoBackups = useCallback(async () => {
+    const seq = ++autoBackupsLoadSeq.current;
+    try {
+      const list = await listAutoBackups();
+      if (seq !== autoBackupsLoadSeq.current) return;
+      setAutoBackups(list);
+      setAutoBackupsFailed(false);
+    } catch (err) {
+      console.warn('[Settings] Could not list automatic backups:', err);
+      if (seq !== autoBackupsLoadSeq.current) return;
+      setAutoBackupsFailed(true);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAutoBackups();
+    }, [loadAutoBackups])
+  );
 
   // Nutrition goals — seeded from NUTRITION_GOALS defaults until DB is loaded
   const [goalCalories, setGoalCalories] = useState(1800);
@@ -1859,6 +1903,57 @@ export default function SettingsScreen() {
 
         <View style={styles.sectionDivider} />
 
+        {/* Automatic backups */}
+        <Text style={styles.backupRowTitle}>Automatic backups</Text>
+        <Text style={styles.backupRowSubtitle}>
+          Saved on this device once a day when you open the app. The newest 7 are kept.
+        </Text>
+        {autoBackupsFailed ? (
+          <Text style={styles.autoBackupMessage}>Could not read the automatic backups.</Text>
+        ) : autoBackups !== null && autoBackups.length === 0 ? (
+          <Text style={styles.autoBackupMessage}>
+            No automatic backups yet. The first one is saved the next time you open the app.
+          </Text>
+        ) : (
+          (autoBackups ?? []).map((backup) => {
+            const title = formatBackupTitle(backup.createdAt);
+            return (
+              <View key={backup.name} style={styles.autoBackupRow}>
+                <View style={styles.backupTextBlock}>
+                  <Text style={styles.backupRowTitle}>{title}</Text>
+                  <Text style={styles.backupRowSubtitle}>{formatBackupSize(backup.sizeBytes)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.autoBackupAction, backupBusy && styles.backupRowDisabled]}
+                  disabled={backupBusy}
+                  accessibilityLabel={`Share automatic backup ${title}`}
+                  accessibilityRole="button"
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.autoBackupActionLabel}>Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.autoBackupAction,
+                    styles.autoBackupActionRestore,
+                    backupBusy && styles.backupRowDisabled,
+                  ]}
+                  disabled={backupBusy}
+                  accessibilityLabel={`Restore automatic backup ${title}`}
+                  accessibilityRole="button"
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.autoBackupActionLabel, styles.autoBackupActionLabelRestore]}>
+                    Restore
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })
+        )}
+
+        <View style={styles.sectionDivider} />
+
         {/* ── Backup reminder (#293) ──────────────────────────── */}
         <View style={styles.sectionLabelRow}>
           <Ionicons name="shield-checkmark-outline" size={16} color={Colors.skyDeep} />
@@ -2213,6 +2308,35 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
+  },
+  autoBackupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  autoBackupMessage: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    marginTop: Spacing.md,
+  },
+  autoBackupAction: {
+    backgroundColor: Colors.skyTint,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  autoBackupActionRestore: {
+    backgroundColor: Colors.clayTint,
+  },
+  autoBackupActionLabel: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.skyDeep,
+  },
+  autoBackupActionLabelRestore: {
+    color: Colors.clayDeep,
   },
 
   // ── Profile section (#281) ──────────────────────────────────────────────
