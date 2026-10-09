@@ -318,19 +318,29 @@ describe('RecipeEditorScreen save deadline', () => {
       expect(mockReplace).toHaveBeenCalledTimes(1);
     });
 
-    it('keeps Save disabled while the Alert is up and frees it after the answer', async () => {
+    it('keeps Save disabled but not labelled Saving while the Alert is up', async () => {
       hangOn(['zzz hanging']);
       const utils = render(<RecipeEditorScreen />);
       await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
       await saveAndWaitForDeadline(utils);
 
       expect(alertSpy).toHaveBeenCalledTimes(1);
-      expect(utils.getByLabelText('Saving…')).toBeTruthy();
+      expect(utils.queryByLabelText('Saving…')).toBeNull();
+      const save = utils.getByLabelText('Create Recipe');
+      expect(save.props.accessibilityState.disabled).toBe(true);
+      expect(utils.getByLabelText('Cancel').props.accessibilityState.disabled).toBe(true);
+
+      await act(async () => {
+        fireEvent.press(save);
+        await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
+      });
+      expect(mockCreateRecipe).toHaveBeenCalledTimes(1);
+      expect(alertSpy).toHaveBeenCalledTimes(1);
 
       await act(async () => {
         buttons()[0].onPress!();
       });
-      expect(utils.queryByLabelText('Saving…')).toBeNull();
+      expect(mockReplace).toHaveBeenCalledTimes(1);
     });
 
     it('does not navigate when the screen was closed before the Alert was answered', async () => {
