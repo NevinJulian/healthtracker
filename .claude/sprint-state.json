@@ -232,6 +232,10 @@
     {
       "at": "2026-10-09T07:31:42Z",
       "event": "worktrees a/b/d created at c698da2 (npm ci running); analysts dispatched for #344 #444 #442 (current) and #347 #348 #443 #352 #342 #338 (ahead, read-only on the main checkout)"
+    },
+    {
+      "at": "2026-10-09T07:31:58Z",
+      "event": "npm ci ok in worktrees a/b/d (exit 0 each, 488 top-level packages, same as the main checkout)"
     }
   ],
   "aheadAnalysis": {
