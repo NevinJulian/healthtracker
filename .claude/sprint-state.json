@@ -192,13 +192,15 @@
     "442": {
       "lane": "D",
       "kind": "bug",
-      "status": "analysing",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "title": "Discover import: not-looked-up recipe cannot be refreshed, alert says Try again in a minute",
       "decisionSource": "owner comment 6070881544 on #442 (latest of 2): no re-import refresh; new alert and card text with a singular form, pointing at the editor; lookups that receive the 429 itself count as not looked up; reopening an imported recipe in Discover says 'In your library'; device check none",
       "securityPlan": "required (src/api)",
-      "workOrder": "C:/git/ht-lanes/wo/442.md"
+      "workOrder": "C:/git/ht-lanes/wo/442.md",
+      "deviceCheck": "none (decision item 5: the limit cannot be reached on purpose in Expo Go, tests cover it)",
+      "notes": "WO ready, no PARK, no file outside lane D. Claim verified: notLookedUpSentence (DiscoverDetailScreen.tsx:55-57) is the only source of the Try again in a minute text; a lookup that got the 429 itself returns null at openfoodfacts.ts:189 after setting pausedUntil; the sentinel is never cached. Fix: return 'not-looked-up' in the 429 branch; new singular/plural sentences; In your library subtitle. Existing assertions that change (they pin the replaced behaviour): retryAfter.test.ts:56,74,88 (toBeNull on the 429 receiver) and notLookedUp.test.tsx:47,77,81 (old sentence). Side effect to watch: in the editor, 429 receivers move from the no-data branch into the Not looked up banner (wording is #443's). ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst picked In your library for every no-warning case, which would also change a fresh clean import; decision item 4 is only about a recipe already in the library, so the subtitle is shown only when the load effect found the recipe or dbImportRecipe returned false, and a fresh clean import keeps Macros computed from local data."
     },
     "443": {
       "lane": "D",
@@ -227,7 +229,11 @@
   "foundDuringSprint": [],
   "pendingFindings": [
     "SMALL (#444 analyst): WeeklyMealPlanItem.is_consumed is typed boolean but getWeeklyMealPlan returns raw 0/1 (database.ts:1719); truthy checks work, === true would not",
-    "SMALL (#444 analyst): a non-NULL consumed_from_inventory_id whose batch row is gone (after a restore, or devStress369.ts:174) still gets the refund text and no credit; the decision keeps the text"
+    "SMALL (#444 analyst): a non-NULL consumed_from_inventory_id whose batch row is gone (after a restore, or devStress369.ts:174) still gets the refund text and no credit; the decision keeps the text",
+    "SMALL (#442 analyst): DiscoverDetailScreen.tsx:131 still says ingredient(s) in the no-data note of the import Alert; the decision gave a singular form only for the not-looked-up text",
+    "SMALL (#442 analyst): DiscoverDetailScreen.tsx:160 uses a dynamic import() of ../db/database although importRecipe is already imported statically from it at :17",
+    "SMALL (#442 analyst + orchestrator): after a fresh clean import the card says Macros computed from local data even when Open Food Facts supplied values; the decision does not touch that wording, so it stays",
+    "SMALL (#442 analyst): a 5xx first attempt whose retry is refused by a pause still returns null (no data), not not-looked-up; it is not a 429 receiver, so the decision does not cover it"
   ],
   "log": [
     {
@@ -245,6 +251,10 @@
     {
       "at": "2026-10-09T07:32:37Z",
       "event": "#444 work order ready (no PARK, no database.ts source change needed) -> in_dev, developer dispatched on lane B"
+    },
+    {
+      "at": "2026-10-09T07:33:41Z",
+      "event": "#442 work order ready (no PARK); orchestrator amendment narrows the In your library subtitle to recipes already in the library -> in_dev, developer dispatched on lane D"
     }
   ],
   "aheadAnalysis": {
