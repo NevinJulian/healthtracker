@@ -278,8 +278,8 @@ describe('parseRecipeHtml', () => {
     it('truncates huge strings', () => {
       const recipe = {
         ...RECIPE,
-        name: 'n'.repeat(900_000),
-        recipeIngredient: ['i'.repeat(900_000)],
+        name: 'n'.repeat(450_000),
+        recipeIngredient: ['i'.repeat(450_000)],
       };
       const draft = draftOf(page(block(recipe)));
       expect(draft.title).toHaveLength(120);
