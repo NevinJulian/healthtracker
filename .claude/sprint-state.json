@@ -74,16 +74,17 @@
       "name": "meals",
       "branch": "sprint/lane-b-meals",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "in_progress",
+      "status": "cleanup",
       "order": [
         444,
         347,
         348
       ],
-      "current": 348,
+      "current": null,
       "done": [
         444,
-        347
+        347,
+        348
       ],
       "parked": []
     },
@@ -251,7 +252,7 @@
     "348": {
       "lane": "B",
       "kind": "feature",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "1c88e43",
@@ -273,7 +274,8 @@
       "workOrder": "C:/git/ht-lanes/wo/348.md",
       "deviceCheck": "Expo Go: plan Lunch on day 1 and on day 2 (a different recipe), copy day 1's lunch to days 2, 3 and 4. Expect 'Copied 2 meals. Skipped 1 already planned.', days 3 and 4 filled and unticked, day 2 unchanged. Then open Log Cooked Meal: your usual recipes sit under Often cooked at the top, each once.",
       "notes": "WO ready (ahead), no PARK, no migration. Verified: a slot is (date, meal_type) with a unique index (schema.ts:729) that restore drops briefly, so the copy SELECTs for emptiness inside its transaction; assignMealToPlan (database.ts:1760) checks no stock and moves no inventory (stock is a UI-only rule in AssignMealModal, MealPrepScreen.tsx:710); cook_log is one row per cook event. New: copyMealToDates(planId, dates), copyDayToDate(from, to) next to assignMealToPlan; rankOftenCooked + getOftenCookedRecipes next to getMostCookedRecipes. Analyst picks to repeat in the report: 'the next 7 days' = the 7 days the screen shows (today..today+6) minus the source day, so at most 6 targets; a copy does no stock check (the manual assign UI requires stock); result wording via Alert; section recipes are removed from the full list, which gets an All recipes header only when the section shows; archived recipes excluded; ties by later last date, then title, then id. | dev: all six steps done, 12 commits, tip 3358f01, 1550/117 per dev (jest exit code NOT captured; the tester captures it). copyMealToDates and copyDayToDate next to assignMealToPlan, each one queue unit with one transaction, emptiness checked by a SELECT inside it, shared private _insertCopyIfEmpty; rankOftenCooked pure with today as an argument, getOftenCookedRecipes next to getMostCookedRecipes. BEYOND THE WORK ORDER: copyResultMessage lives in a new src/data/copyResult.ts (the MealPrep suites mock the database module, so a helper there would be undefined in screen tests); a malformed last-cooked date scores 0 and ranks last. Two existing MealPrep suites gained one mock line each; no existing expect changed. The dev edited some files with sed and node scripts against the brief; the tester checks the diff for CR and mojibake. The new Copy day pill reuses assignBtnWrap (flex: 1); layout not checked on a device.",
-      "securityReview": "APPROVE (3871273..3358f01, read through git; tests not run by the reviewer): every value bound; dates validated with isValidDateKey like the neighbours; no UPDATE, DELETE or INSERT OR REPLACE in the new code, each insert guarded by a SELECT in the same transaction; the diff removes 0 lines from database.ts; each exported function is one queue unit with one transaction, the Impl functions call only a helper that opens no transaction; a failure part-way rolls back the whole call; two copies racing for one slot are serialised by the write queue, and a restore (which drops and recreates the unique index) is itself a queue unit, so a copy cannot run in that gap; copies never read or write meal_inventory and never copy the tick or the pointer, so a copied row cannot be credited for a portion that was never debited; a failed copy shows the Error alert and keeps the chooser open, the Copied alert comes only after the write resolved; the quiet catch wraps only the often-cooked read; the ranking cannot produce NaN (malformed date scores 0, future date clamped). Notes: the db functions accept past dates (only the screen limits targets to today..today+6); a copy still inserts when the source recipe is no longer in the library (assignMealToPlan behaves the same); loadData after a copy is not awaited."
+      "securityReview": "APPROVE (3871273..3358f01, read through git; tests not run by the reviewer): every value bound; dates validated with isValidDateKey like the neighbours; no UPDATE, DELETE or INSERT OR REPLACE in the new code, each insert guarded by a SELECT in the same transaction; the diff removes 0 lines from database.ts; each exported function is one queue unit with one transaction, the Impl functions call only a helper that opens no transaction; a failure part-way rolls back the whole call; two copies racing for one slot are serialised by the write queue, and a restore (which drops and recreates the unique index) is itself a queue unit, so a copy cannot run in that gap; copies never read or write meal_inventory and never copy the tick or the pointer, so a copied row cannot be credited for a portion that was never debited; a failed copy shows the Error alert and keeps the chooser open, the Copied alert comes only after the write resolved; the quiet catch wraps only the often-cooked read; the ranking cannot produce NaN (malformed date scores 0, future date clamped). Notes: the db functions accept past dates (only the screen limits targets to today..today+6); a copy still inserts when the source recipe is no longer in the library (assignMealToPlan behaves the same); loadData after a copy is not awaited.",
+      "regressionProof": "tester APPROVE r0: each step's tests are red on the stub or pre-feature source (18 of 19 for the copy db step, 17 of 18 for the copy UI, 3 for copy-day db, 6 for copy-day UI, 9 of 16 for the ranking, 2 of 5 for the picker) and green at 3358f01; each data-protecting guard goes red under its own one-line mutation (unknown plan id, same day, malformed date, source-date filter). Real engine: a call with a free target, an occupied target, a duplicate, 'bad', an impossible date and the source day returns {copied: 1, skipped: 1} and the occupied rows equal their pre-copy state; copies from a ticked source with a pointer are unticked with a NULL pointer and meal_inventory is identical before and after; Promise.all of two meal copies and a day copy to the same target gives one row; the same with the unique index dropped first still gives one row (sql.js adapter only, not expo-sqlite on a device). Often cooked scratch run: events count, not portions; a future date is clamped; a garbage date scores 0 and ranks last; archived and unknown recipes are absent; the score is always finite. database.ts diff is 141 additions and 0 removals, new functions next to their neighbours; no existing expect edited; diff has no CR and no mojibake although the developer used scripts for some edits. typecheck passes at the stub commit a47912e. 1550/117, exit 0 (the tester's is the first captured exit code)."
     },
     "352": {
       "lane": "D",
@@ -456,7 +458,12 @@
     "SMALL (#352 tester): the first Recipe node wins even when it is empty, so [{\"@type\":\"Recipe\"}, {full recipe}] in one block gives no-recipe (follows the work order)",
     "SMALL (#352 tester): a BOM, an HTML comment or CDATA inside a JSON-LD block makes it unparseable, so it is skipped; some sites do that",
     "SMALL (#352 tester): StyleSheet.absoluteFill still exists in RN 0.86.3 (only absoluteFillObject is gone), so the dialog scrim's four explicit edges were not needed",
-    "SMALL (#352 tester): behaviour change by design: a named row with a blank quantity next to real rows used to be dropped on save and is now stored with quantity 0"
+    "SMALL (#352 tester): behaviour change by design: a named row with a blank quantity next to real rows used to be dropped on save and is now stored with quantity 0",
+    "SMALL (#348 tester): no test asserts that Cancel in either chooser performs no write (the code only calls onClose)",
+    "SMALL (#348 tester): the Often cooked and All recipes headers in the picker are plain Text without accessibilityRole=header",
+    "SMALL (#348 tester): copyTargetsFor calls toISODate() when the chooser opens; if midnight passes with the screen open the source day is not excluded and the chooser lists 7 rows (the db function still filters the source date)",
+    "SMALL, for the HUMAN (#348 tester + security): copying a slot whose recipe is archived copies the archived recipe (the plan already keeps archived recipes visible), and the db functions accept any valid date - only the screen limits targets to today..today+6",
+    "SMALL (#348 tester): one raw letterSpacing: 0.5 in the new picker header style (the same raw value exists in the Dashboard and Analytics screens)"
   ],
   "log": [
     {
@@ -580,6 +587,10 @@
     {
       "at": "2026-10-09T08:19:24Z",
       "event": "#352 tester REJECT r0 on b087974: English unit words lost in the line parser (14 of 14 English lines wrong, two real pages confirm), '1.000 g' read as 1 g, no cap on quantities -> ROUND TRIP 1, a fresh developer dispatched with five parser fixes and two hardening items"
+    },
+    {
+      "at": "2026-10-09T08:19:41Z",
+      "event": "#348 ready (tester APPROVE r0, security APPROVE, 1550/117). Lane B is out of issues (3 done, 0 parked, 1 round trip on #347) -> cleanup dispatched over c698da2..3358f01 (27 commits, 20 files, +2211/-120)"
     }
   ],
   "aheadAnalysis": {
