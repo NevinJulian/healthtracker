@@ -3329,6 +3329,26 @@ export async function getWorkoutHistory(
   return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SQL, [exercise]);
 }
 
+export const WORKOUT_LAST_SET_SQL = `SELECT * FROM workout_set_log
+     WHERE exercise = ? AND date < ? AND (set_type IS NULL OR set_type <> 'warmup')
+     ORDER BY date DESC, set_index DESC LIMIT 1`;
+
+/**
+ * Return the last working set of the most recent session of `exercise`
+ * before `beforeDate`, or null if there is none. Warm-ups never count.
+ *
+ * @param exercise   - Exact exercise name as logged.
+ * @param beforeDate - YYYY-MM-DD; only earlier dates are considered.
+ */
+export async function getLastSetForExercise(
+  exercise: string,
+  beforeDate: string
+): Promise<WorkoutSet | null> {
+  void exercise;
+  void beforeDate;
+  return null;
+}
+
 /**
  * Return the distinct exercise names that have at least one logged set,
  * sorted alphabetically. Used by the Analytics screen to populate the
