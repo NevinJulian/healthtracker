@@ -25,6 +25,7 @@ import OnboardingScreen from './src/screens/OnboardingScreen';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import RecoveryScreen, { formatErrorDetail } from './src/components/RecoveryScreen';
 import { clearRescueCopies } from './src/services/rescueExport';
+import { runAutoBackupIfDue } from './src/services/backup';
 import { Colors, Typography } from './src/theme/tokens';
 import {
   configureNotificationHandler,
@@ -83,6 +84,12 @@ export default function App() {
   }, [runInit]);
 
   const showFailure = Boolean(error || fontError);
+  const started = dbReady && fontsLoaded && !showFailure;
+
+  useEffect(() => {
+    if (!started) return;
+    runAutoBackupIfDue().catch((err) => console.warn('[App] Auto-backup failed:', err));
+  }, [started]);
 
   const retry = () => {
     if (initInFlight.current) return;

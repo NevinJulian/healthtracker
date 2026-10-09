@@ -22,6 +22,9 @@ jest.mock('../services/rescueExport', () => ({
   hasRescueWal: jest.fn(() => Promise.resolve(false)),
   clearRescueCopies: jest.fn(() => Promise.resolve()),
 }));
+jest.mock('../services/backup', () => ({
+  runAutoBackupIfDue: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('../db/devStress369', () => ({ installStress369: jest.fn() }));
 jest.mock('../services/notifications', () => ({
   configureNotificationHandler: jest.fn(),
