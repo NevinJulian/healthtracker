@@ -31,6 +31,7 @@ import {
 } from '../components';
 import { iconChipIconColor } from '../components/IconChip';
 import { Aisle, AisleGroup, groupByAisle } from '../data/aisles';
+import { formatQuantity } from '../data/formatQuantity';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -76,7 +77,7 @@ function ShoppingItemRow({
   onToggle: () => void;
 }) {
   const qtyStr =
-    `${item.total_quantity.toFixed(1).replace(/\.0$/, '')} ${item.unit}`.trim();
+    `${formatQuantity(item.total_quantity)} ${item.unit}`.trim();
 
   return (
     <TouchableOpacity
