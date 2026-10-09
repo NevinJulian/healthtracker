@@ -191,15 +191,23 @@
     "347": {
       "lane": "B",
       "kind": "feature",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "a866883",
+        "53058f3",
+        "1c92118",
+        "455b5db",
+        "6455c65",
+        "87e59fd"
+      ],
       "title": "shopping list: combine duplicate ingredients and group by aisle",
       "decisionSource": "owner comment 6070880122 on #347: merge at write time, no migration; into an existing unchecked line with the same normalised name and a compatible unit; checked lines never merged into; normalised = lowercase, trimmed, text before the first comma, spaces collapsed; g/kg and ml/l merge converted to the line's unit, other units only with themselves; existing lines not merged after the fact; aisles by keyword lookup in code (German + English), fixed section order, unmatched = Other; items alphabetical inside a section; units.ts may be used but not changed",
       "securityPlan": "required (shopping-list writes in src/db)",
       "workOrder": "C:/git/ht-lanes/wo/347.md",
       "deviceCheck": "Expo Go: add two recipes that share an ingredient (e.g. two with olive oil or garlic cloves). The list shows one line with the summed amount, under its section.",
-      "notes": "WO ready (ahead), no PARK. The merge goes inside _addShoppingListItemImpl (database.ts:1623), so the single-item path and addRecipeToShoppingList (one transaction, loops the Impl) both get it and RecipeDetailScreen.tsx (lane D, the only caller) does not change. units.ts covers neither kg nor l (convertToGrams returns 0 for both), so the factors live in a new src/data/shoppingMerge.ts; aisles in a new src/data/aisles.ts (about 250-350 keywords, longest match wins, keywords of 3 chars or fewer match as whole words). The screen already groups by 6 inferred categories; those keyword lists are replaced. Analyst picks to repeat in the report: the merged line keeps its own name and unit, sum rounded to 3 decimals; merge target is the lowest-id unchecked compatible line; inside a section unchecked items come first and checked ones last, each part alphabetical (the decision says alphabetical inside each section; checked-last is today's behaviour, kept); empty key or non-finite quantity inserts as today."
+      "notes": "WO ready (ahead), no PARK. The merge goes inside _addShoppingListItemImpl (database.ts:1623), so the single-item path and addRecipeToShoppingList (one transaction, loops the Impl) both get it and RecipeDetailScreen.tsx (lane D, the only caller) does not change. units.ts covers neither kg nor l (convertToGrams returns 0 for both), so the factors live in a new src/data/shoppingMerge.ts; aisles in a new src/data/aisles.ts (about 250-350 keywords, longest match wins, keywords of 3 chars or fewer match as whole words). The screen already groups by 6 inferred categories; those keyword lists are replaced. Analyst picks to repeat in the report: the merged line keeps its own name and unit, sum rounded to 3 decimals; merge target is the lowest-id unchecked compatible line; inside a section unchecked items come first and checked ones last, each part alphabetical (the decision says alphabetical inside each section; checked-last is today's behaviour, kept); empty key or non-finite quantity inserts as today. | dev: 6 commits, tip 87e59fd, 1449/111 per dev (gates read through a pipe, exit codes not captured: the tester captures them). Merge inside _addShoppingListItemImpl: select open lines by id, match key and unit in JS, UPDATE with the sum rounded to 3 decimals, else INSERT; calls no queued function. aisles.ts holds 686 keywords (work order guide was 250-350; kept because longest-match needs explicit compounds), none in two sections, 0 of 201 seeded names in Other. shoppingMerge.test.ts was committed with its module and was never red (tester asked for mutation proof). No existing assertion changed; ShoppingListScreen had no test file before. The dev dropped an upper bound on the keyword count from its own new test. Known misfiles: egg (for meatballs) and oat flour (for meatballs) land in Meat and fish through the keyword meat.",
+      "securityReview": "running in parallel with the tester on 14194af..87e59fd"
     },
     "348": {
       "lane": "B",
@@ -337,7 +345,9 @@
     "USER-HITTABLE? (#337 analyst): switching activeSetLogger directly from one exercise to another would reuse the same modal instance (no key), so typed inputs and the warm-up toggle would carry over; needs a way to switch without closing the modal first - the #344 tester is checking the mount condition",
     "SMALL (#337 analyst): set history is keyed by the exact exercise name, so renaming an exercise in the plan loses its last-time line and its analytics history",
     "SMALL (#344 tester): the migration unit test 'leaves a row inserted before v39 as NULL' runs the v39 SQL directly, not through runMigrations (the tester covered the real path with a scratch test)",
-    "SMALL (#344 tester): an unrecognised set_type from a hand-edited backup silently counts as working"
+    "SMALL (#344 tester): an unrecognised set_type from a hand-edited backup silently counts as working",
+    "SMALL (#347 dev): bracketed qualifiers steer the aisle lookup: 'egg (for meatballs)' and 'oat flour (for meatballs)' land in Meat and fish; the normalised key cuts at the first comma only",
+    "SMALL (#347 dev): getShoppingListItems still orders by is_checked, id DESC; the screen re-sorts, so the SQL order is unused"
   ],
   "log": [
     {
@@ -387,6 +397,10 @@
     {
       "at": "2026-10-09T07:49:21Z",
       "event": "#443 dev done (9dd5480, 1c6136e, b37248a, 45be56c; 1402/108 per dev) -> in_test, security in parallel (the save path changed)"
+    },
+    {
+      "at": "2026-10-09T07:50:45Z",
+      "event": "#347 dev done (6 commits, tip 87e59fd; 1449/111 per dev) -> in_test, security in parallel"
     }
   ],
   "aheadAnalysis": {
