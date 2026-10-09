@@ -39,6 +39,7 @@ import {
 } from '../db/database';
 import { computeRecipeMacros, ComputeIngredient } from '../nutrition/computeMacros';
 import { lookupNutrition, OFFNutrition } from '../api/openfoodfacts';
+import type { RecipeDraft } from '../api/recipeHtml';
 import { normaliseIngredientName } from '../nutrition/units';
 import { NUTRITION_TABLE } from '../nutrition/nutritionTable';
 import { Card, Button, ScreenHeader } from '../components';
@@ -86,12 +87,52 @@ function newKey(): string {
 
 function rowsToIngredients(rows: IngredientRow[]): RecipeIngredient[] {
   return rows
-    .filter((r) => r.name.trim() !== '' && parseFloat(r.quantity) > 0)
-    .map((r) => ({
-      name: r.name.trim(),
-      baseQuantity: parseFloat(r.quantity) || 0,
-      unit: r.unit,
-    }));
+    .filter((r) => r.name.trim() !== '')
+    .map((r) => {
+      const quantity = parseFloat(r.quantity);
+      return {
+        name: r.name.trim(),
+        baseQuantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 0,
+        unit: r.unit,
+      };
+    });
+}
+
+function withQuantity(ingredients: RecipeIngredient[]): RecipeIngredient[] {
+  return ingredients.filter((i) => i.baseQuantity > 0);
+}
+
+function draftRows(draft: RecipeDraft): IngredientRow[] {
+  const rows = draft.ingredients.map((ing) => ({
+    key: newKey(),
+    name: ing.name,
+    quantity: ing.quantity > 0 ? String(ing.quantity) : '',
+    unit: ing.unit,
+  }));
+  return rows.length > 0 ? rows : [{ key: newKey(), name: '', quantity: '', unit: 'g' }];
+}
+
+function readDraft(params: unknown): RecipeDraft | null {
+  if (typeof params !== 'object' || params === null) return null;
+  const { recipeId, draft } = params as { recipeId?: unknown; draft?: unknown };
+  if (recipeId || typeof draft !== 'object' || draft === null) return null;
+  const d = draft as Partial<RecipeDraft>;
+  if (typeof d.title !== 'string' || typeof d.instructions !== 'string') return null;
+  if (!Array.isArray(d.ingredients)) return null;
+  return {
+    title: d.title,
+    servings: typeof d.servings === 'number' ? d.servings : null,
+    prepMinutes: typeof d.prepMinutes === 'number' ? d.prepMinutes : null,
+    instructions: d.instructions,
+    ingredients: d.ingredients.filter(
+      (i): i is RecipeDraft['ingredients'][number] =>
+        typeof i === 'object' &&
+        i !== null &&
+        typeof i.name === 'string' &&
+        typeof i.quantity === 'number' &&
+        typeof i.unit === 'string',
+    ),
+  };
 }
 
 function ingredientsToRows(ingredients: RecipeIngredient[]): IngredientRow[] {
@@ -114,18 +155,23 @@ export default function RecipeEditorScreen() {
   const navigation = useNavigation<any>();
   const { recipeId } = route.params ?? {};
   const isEdit = Boolean(recipeId);
+  const [draft] = useState(() => readDraft(route.params));
 
   // ── Form state ────────────────────────────────────────────────────────────
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(draft?.title ?? '');
   const [category, setCategory] = useState('Fresh & Fridge');
   const [customCategory, setCustomCategory] = useState('');
   const [showCustomCategory, setShowCustomCategory] = useState(false);
-  const [servings, setServings] = useState(DEFAULT_SERVINGS);
-  const [prepTime, setPrepTime] = useState(DEFAULT_PREP);
-  const [ingredients, setIngredients] = useState<IngredientRow[]>([
-    { key: newKey(), name: '', quantity: '', unit: 'g' },
-  ]);
-  const [instructions, setInstructions] = useState('');
+  const [servings, setServings] = useState(
+    draft?.servings != null ? String(draft.servings) : DEFAULT_SERVINGS,
+  );
+  const [prepTime, setPrepTime] = useState(
+    draft?.prepMinutes != null ? String(draft.prepMinutes) : DEFAULT_PREP,
+  );
+  const [ingredients, setIngredients] = useState<IngredientRow[]>(() =>
+    draft ? draftRows(draft) : [{ key: newKey(), name: '', quantity: '', unit: 'g' }],
+  );
+  const [instructions, setInstructions] = useState(draft?.instructions ?? '');
   const [freezerTips, setFreezerTips] = useState('');
 
   // ── Category picker state ─────────────────────────────────────────────────
@@ -235,7 +281,7 @@ export default function RecipeEditorScreen() {
   }, [ingredients, servings]);
 
   const recomputeMacros = (): Promise<ComputedMacros | null> => {
-    const validIngredients = rowsToIngredients(ingredients);
+    const validIngredients = withQuantity(rowsToIngredients(ingredients));
     const numServings = Math.max(1, parseInt(servings, 10) || 1);
     const result = runMacroRecompute(validIngredients, numServings);
     latestRecompute.current = { inputs: macroInputsKey(validIngredients, numServings), result };
@@ -358,7 +404,8 @@ export default function RecipeEditorScreen() {
       return;
     }
 
-    const validIngredients = rowsToIngredients(ingredients);
+    const storedIngredients = rowsToIngredients(ingredients);
+    const validIngredients = withQuantity(storedIngredients);
     if (validIngredients.length === 0) {
       Alert.alert('Validation', 'Please add at least one ingredient with a quantity.');
       return;
@@ -414,7 +461,7 @@ export default function RecipeEditorScreen() {
         fat: finalMacros.fat,
         prepTimeMinutes: numPrepTime,
         defaultServings: numServings,
-        ingredients: validIngredients,
+        ingredients: storedIngredients,
         instructions: instructions.trim(),
         freezerTips: freezerTips.trim(),
       };
