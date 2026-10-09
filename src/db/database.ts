@@ -1204,6 +1204,15 @@ export async function getWeightHistory(days: number): Promise<{ date: string; we
   return rows.map((r) => ({ date: r.date, weight: r.body_weight }));
 }
 
+export interface DailyLogExportRow {
+  date: string;
+  body_weight: number | null;
+  water_ml: number | null;
+  walk_completed: number | null;
+  hammer_completed: number | null;
+  fasting_completed: number | null;
+}
+
 // ─────────────────────────────────────────────
 // Weekly Template CRUD
 // ─────────────────────────────────────────────
@@ -1717,6 +1726,17 @@ async function _logCookedMealImpl(recipe_id: string, portions: number): Promise<
 export async function getWeeklyMealPlan(): Promise<WeeklyMealPlanItem[]> {
   const db = getDatabase();
   return await db.getAllAsync<WeeklyMealPlanItem>('SELECT * FROM weekly_meal_plan');
+}
+
+export interface MealExportRow {
+  date: string;
+  meal_type: string;
+  recipe_title: string | null;
+  calories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+  is_consumed: number | null;
 }
 
 export interface MealPlanWithRecipe extends WeeklyMealPlanItem {
@@ -3324,6 +3344,16 @@ export async function getWorkoutHistory(
     return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SINCE_SQL, [exercise, sinceDateKey]);
   }
   return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SQL, [exercise]);
+}
+
+export interface WorkoutSetExportRow {
+  date: string;
+  exercise: string;
+  set_index: number;
+  set_type: string | null;
+  reps: number | null;
+  weight_kg: number | null;
+  created_at: string | null;
 }
 
 export const WORKOUT_LAST_SET_SQL = `SELECT * FROM workout_set_log
