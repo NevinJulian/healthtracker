@@ -3229,7 +3229,16 @@ export interface WorkoutSet {
   set_index: number;
   reps: number;
   weight_kg: number;
+  /** `'warmup'` for a warm-up set; null (or absent) for a working set. */
+  set_type?: string | null;
   created_at: string;
+}
+
+/** Details of one set to log. Omit `setType` for a working set. */
+export interface WorkoutSetInput {
+  reps: number;
+  weightKg: number;
+  setType?: 'warmup';
 }
 
 /**
@@ -3251,7 +3260,7 @@ export interface WorkoutSet {
 export function logWorkoutSet(
   date: string,
   exercise: string,
-  set: { reps: number; weightKg: number }
+  set: WorkoutSetInput
 ): Promise<void> {
   return _enqueueWrite('logWorkoutSet', () => _logWorkoutSetImpl(date, exercise, set));
 }
@@ -3259,7 +3268,7 @@ export function logWorkoutSet(
 async function _logWorkoutSetImpl(
   date: string,
   exercise: string,
-  set: { reps: number; weightKg: number }
+  set: WorkoutSetInput
 ): Promise<void> {
   const db = getDatabase();
   const createdAt = new Date().toISOString();

@@ -436,6 +436,7 @@ export interface WorkoutSetSlice {
   exercise: string;
   reps: number;
   weight_kg: number;
+  set_type?: string | null;
 }
 
 export interface PRRecord {
