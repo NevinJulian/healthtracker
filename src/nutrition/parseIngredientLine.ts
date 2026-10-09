@@ -13,7 +13,24 @@ const SINGLE = String.raw`(?:\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?(?:\s+\d+\s*\/\s*\d+|
 const LEADING_QUANTITY = new RegExp(String.raw`^(${SINGLE}(?:\s*[-–]\s*${SINGLE})?)`);
 const LEADING_APPROX = /^(?:ca\.?|circa|~)\s*/i;
 const UNIT_WORD = /^\s*([A-Za-zÄÖÜäöüß]+)\.?(?![A-Za-zÄÖÜäöüß])/;
-const VAGUE = /(?:^|[^a-zäöüß])(?:prisen?|msp|messerspitze|schuss|handvoll|etwas|nach\s+geschmack|evtl)(?![a-zäöüß])/i;
+const VAGUE =
+  /(?:^|[^a-zäöüß])(?:prisen?|msp|messerspitze|schuss|handvoll|etwas|nach\s+geschmack|evtl|pinch(?:es)?|to\s+taste|for\s+serving|as\s+needed)(?![a-zäöüß])/i;
+
+const ENGLISH_UNITS: ReadonlyMap<string, string> = new Map(
+  [
+    'g', 'gram', 'gr', 'kg', 'kilogram', 'ml', 'milliliter', 'millilitre', 'cc',
+    'l', 'liter', 'litre', 'tsp', 'teaspoon', 'tbsp', 'tablespoon', 'tbl', 'cup',
+    'oz', 'ounce', 'lb', 'pound', 'floz', 'clove', 'head', 'bulb', 'bunch', 'sprig',
+    'stalk', 'piece', 'slice', 'can', 'tin', 'packet', 'pack', 'bag',
+  ].map((word) => [word, word] as const),
+);
+
+function englishUnit(word: string): string | undefined {
+  const lower = word.toLowerCase();
+  const exact = ENGLISH_UNITS.get(lower);
+  if (exact !== undefined) return exact;
+  return lower.length > 2 && lower.endsWith('s') ? ENGLISH_UNITS.get(lower.slice(0, -1)) : undefined;
+}
 
 const UNIT_WORDS: Record<string, { unit: string; factor: number }> = {
   el: { unit: 'tbsp', factor: 1 },
@@ -68,9 +85,13 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
       const known = Object.prototype.hasOwnProperty.call(UNIT_WORDS, word[1].toLowerCase())
         ? UNIT_WORDS[word[1].toLowerCase()]
         : undefined;
+      const english = known ? undefined : englishUnit(word[1]);
       if (known) {
         unit = known.unit;
         factor = known.factor;
+        afterQuantity = afterQuantity.slice(word[0].length);
+      } else if (english !== undefined) {
+        unit = english;
         afterQuantity = afterQuantity.slice(word[0].length);
       }
     }
