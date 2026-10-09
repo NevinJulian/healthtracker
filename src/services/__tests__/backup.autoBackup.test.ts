@@ -864,6 +864,16 @@ describe('restoreBackupFromUri', () => {
       expect(safetyFiles()).toEqual([fresh, ...ahead, old[0], old[1]].sort());
     });
 
+    it('never deletes the snapshot it has just restored from', async () => {
+      const old = [10, 20, 30, 40].map((days) => seedSnapshot(daysAgo(days)));
+      files.set(old[3], { content: payloadJson(), mtime: 1 });
+
+      await restoreBackupFromUri(old[3]);
+
+      expect(files.get(old[3])?.content).toBe(payloadJson());
+      expect(safetyFiles()).toEqual([fresh, old[0], old[1], old[3]].sort());
+    });
+
     it('leaves files that are not snapshots, and files outside the folder, alone', async () => {
       const others = [
         'file:///cache/healthtracker-pre-restore-2026-01-01T00-00-00.json',
