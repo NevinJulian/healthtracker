@@ -16,8 +16,9 @@
  *     on restore — that table is managed exclusively by runMigrations().
  *   - Restore is all-or-nothing via db.withTransactionAsync().
  *   - Before any restore, a safety snapshot of the current data is written
- *     to safety-snapshots/ in documentDirectory; the newest SAFETY_KEEP are
- *     kept, older ones are pruned, and the snapshot is lost on uninstall.
+ *     to safety-snapshots/ in documentDirectory. Once a restore has
+ *     succeeded, snapshots older than SAFETY_KEEP_DAYS are pruned, always
+ *     keeping the newest SAFETY_KEEP. Snapshots are lost on uninstall.
  *   - After a successful restore, scheduled OS notifications are resynced to
  *     the restored settings (#310): cancelAllScheduledNotificationsAsync()
  *     runs first, then reconcileScheduledNotifications(). cancelAll (rather
@@ -258,24 +259,36 @@ export async function exportBackup(): Promise<string> {
 
 // ─── Safety snapshot (pre-restore) ───────────────────────────────────────────
 
-const SAFETY_DIR_NAME = 'safety-snapshots/';
-const SAFETY_NAME_RE = /^healthtracker-pre-restore-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json$/;
-const SAFETY_TMP_RE = /^healthtracker-pre-restore-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json\.tmp$/;
+export const SAFETY_KEEP = 3;
+export const SAFETY_KEEP_DAYS = 7;
 
-/**
- * Produce a filename-safe ISO-ish timestamp for use in filenames.
- * Replaces ':' with '-' and strips milliseconds so the name is readable on
- * all platforms.
- *
- * Example: "2026-06-14T18-05-30"
- */
-function safeTimestamp(): string {
-  return new Date().toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, '');
+const SAFETY_DIR_NAME = 'safety-snapshots/';
+const SAFETY_NAME_RE =
+  /^healthtracker-pre-restore-(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})\.json$/;
+const SAFETY_TMP_RE = /^healthtracker-pre-restore-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json\.tmp$/;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Example: "healthtracker-pre-restore-2026-06-14T18-05-30.json", in UTC. */
+function safetySnapshotName(date: Date): string {
+  const stamp = date.toISOString().replace(/:/g, '-').replace(/\.\d{3}Z$/, '');
+  return `healthtracker-pre-restore-${stamp}.json`;
+}
+
+function parseSafetySnapshotName(name: string): Date | null {
+  const match = SAFETY_NAME_RE.exec(name);
+  if (!match) return null;
+  const [y, mo, d, h, mi, s] = match.slice(1).map(Number);
+  const date = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  return safetySnapshotName(date) === name ? date : null;
+}
+
+function readSafetyFolder(dir: string): Promise<BackupFolder> {
+  return readBackupFolder(dir, parseSafetySnapshotName, SAFETY_TMP_RE);
 }
 
 /**
  * Write a safety snapshot of the current DB state to safety-snapshots/ in
- * documentDirectory and return its URI, then prune to the newest SAFETY_KEEP.
+ * documentDirectory and return its URI.
  *
  * Called automatically before a restore wipes any data. The snapshot uses the
  * same payload format as a regular export, so it can be shared or imported as
@@ -284,38 +297,78 @@ function safeTimestamp(): string {
  *
  * The snapshot is written to a temporary name and moved into place, so a
  * failed write leaves no partial snapshot. A temporary file left behind by an
- * interrupted write is removed by the next call.
+ * interrupted write is removed by the next call. Nothing is pruned here: that
+ * happens once a restore has succeeded (pruneSafetySnapshots).
  *
  * @throws When the file write fails (caller decides whether to abort restore).
- *         A failed prune is logged and never thrown.
  */
 export async function writeSafetySnapshot(): Promise<string> {
   const payload = await buildBackupPayload();
   const json = JSON.stringify(payload, null, 2);
   const dir = `${documentDirectory ?? ''}${SAFETY_DIR_NAME}`;
-  const fileName = `healthtracker-pre-restore-${safeTimestamp()}.json`;
-  const fileUri = `${dir}${fileName}`;
+  const fileUri = `${dir}${safetySnapshotName(new Date())}`;
   await makeDirectoryAsync(dir, { intermediates: true });
   if (documentDirectory) await removeSafetyLeftovers(dir);
   await writeThenMove(fileUri, json);
-  if (documentDirectory) {
-    try {
-      await pruneSafetySnapshots(dir, fileName);
-    } catch (err) {
-      console.warn('[Backup] Failed to prune safety snapshots:', err);
-    }
-  }
   return fileUri;
 }
 
 async function removeSafetyLeftovers(dir: string): Promise<void> {
   try {
-    for (const name of await readDirectoryAsync(dir)) {
-      await deleteMatching(dir, name, SAFETY_TMP_RE);
-    }
+    const { leftovers } = await readSafetyFolder(dir);
+    for (const name of leftovers) await deleteMatching(dir, name, SAFETY_TMP_RE);
   } catch (err) {
     console.warn('[Backup] Failed to remove temporary safety snapshots:', err);
   }
+}
+
+/**
+ * Delete safety snapshots older than SAFETY_KEEP_DAYS, always keeping the
+ * newest SAFETY_KEEP. Age and "newest" are read from the file name. Snapshots
+ * dated more than an hour ahead of `now` are never deleted and do not count
+ * toward SAFETY_KEEP, so a clock that was once set ahead cannot push out real
+ * ones.
+ */
+async function pruneSafetySnapshots(now: Date): Promise<void> {
+  if (!documentDirectory) return;
+  const dir = `${documentDirectory}${SAFETY_DIR_NAME}`;
+  if (!(await getInfoAsync(dir)).exists) return;
+
+  const { valid } = await readSafetyFolder(dir);
+  const horizon = now.getTime() + CLOCK_SKEW_MS;
+  const cutoff = now.getTime() - SAFETY_KEEP_DAYS * DAY_MS;
+  const counted = valid.filter((entry) => entry.time.getTime() <= horizon);
+  for (const entry of counted.slice(SAFETY_KEEP)) {
+    if (entry.time.getTime() < cutoff) await deleteMatching(dir, entry.name, SAFETY_NAME_RE);
+  }
+}
+
+// ─── Backup folders ──────────────────────────────────────────────────────────
+
+const CLOCK_SKEW_MS = 60 * 60 * 1000;
+
+interface BackupFolder {
+  /** Files whose name parses to a real timestamp, newest first. */
+  valid: { name: string; time: Date }[];
+  /** Temporary files left behind by an interrupted write. */
+  leftovers: string[];
+}
+
+async function readBackupFolder(
+  dir: string,
+  parseName: (name: string) => Date | null,
+  tmpPattern: RegExp
+): Promise<BackupFolder> {
+  const names = await readDirectoryAsync(dir);
+  const valid: BackupFolder['valid'] = [];
+  const leftovers: string[] = [];
+  for (const name of names) {
+    const time = parseName(name);
+    if (time) valid.push({ name, time });
+    else if (tmpPattern.test(name)) leftovers.push(name);
+  }
+  valid.sort((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
+  return { valid, leftovers };
 }
 
 async function writeThenMove(finalUri: string, content: string): Promise<void> {
@@ -330,16 +383,6 @@ async function writeThenMove(finalUri: string, content: string): Promise<void> {
       console.warn('[Backup] Failed to remove temporary backup file:', cleanupErr);
     }
     throw err;
-  }
-}
-
-async function pruneSafetySnapshots(dir: string, justWritten: string): Promise<void> {
-  const others = (await readDirectoryAsync(dir))
-    .filter((name) => name !== justWritten && SAFETY_NAME_RE.test(name))
-    .sort()
-    .reverse();
-  for (const name of others.slice(SAFETY_KEEP - 1)) {
-    await deleteMatching(dir, name, SAFETY_NAME_RE);
   }
 }
 
@@ -395,9 +438,9 @@ export async function importBackup(
 
 /**
  * Restore from a backup file already on the device: parse and validate it,
- * write a safety snapshot, restore all tables transactionally, then resync
- * notifications. The source file is only read. Automatic backups do not run
- * while this is in progress.
+ * write a safety snapshot, restore all tables transactionally, then prune old
+ * safety snapshots and resync notifications. The source file is only read.
+ * Automatic backups do not run while this is in progress.
  *
  * @throws When the file is invalid, the schema is incompatible, the safety
  *         snapshot fails and the caller declines to continue, or the DB
@@ -463,8 +506,14 @@ async function performRestore(uri: string, options: RestoreOptions): Promise<Res
   }
   const { tablesRestored, rowsRestored, skipped, consumedMealsWithoutRefund } = restored;
 
-  // Best-effort: a failure here must not turn a successful restore into a
-  // reported failure.
+  // Best-effort from here on: a failure must not turn a successful restore
+  // into a reported failure.
+  try {
+    await pruneSafetySnapshots(new Date());
+  } catch (err) {
+    console.warn('[Backup] Failed to prune safety snapshots:', err);
+  }
+
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
     await reconcileScheduledNotifications();
@@ -507,7 +556,6 @@ export async function shareFile(
 // ─── Automatic backups ───────────────────────────────────────────────────────
 
 export const AUTO_BACKUP_KEEP = 7;
-export const SAFETY_KEEP = 3;
 
 export interface AutoBackupEntry {
   name: string;
@@ -520,7 +568,6 @@ const AUTO_DIR_NAME = 'auto-backups/';
 const AUTO_NAME_RE = /^healthtracker-auto-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z\.json$/;
 const AUTO_TMP_RE = /^healthtracker-auto-\d{8}T\d{6}Z\.json\.tmp$/;
 const AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const AUTO_CLOCK_SKEW_MS = 60 * 60 * 1000;
 
 let autoBackupInFlight: Promise<void> | null = null;
 let restoreInProgress = false;
@@ -542,19 +589,8 @@ function parseAutoBackupName(name: string): Date | null {
   return autoBackupName(date) === name ? date : null;
 }
 
-async function readAutoBackupFolder(
-  dir: string
-): Promise<{ valid: { name: string; time: Date }[]; leftovers: string[] }> {
-  const names = await readDirectoryAsync(dir);
-  const valid: { name: string; time: Date }[] = [];
-  const leftovers: string[] = [];
-  for (const name of names) {
-    const time = parseAutoBackupName(name);
-    if (time) valid.push({ name, time });
-    else if (AUTO_TMP_RE.test(name)) leftovers.push(name);
-  }
-  valid.sort((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
-  return { valid, leftovers };
+function readAutoBackupFolder(dir: string): Promise<BackupFolder> {
+  return readBackupFolder(dir, parseAutoBackupName, AUTO_TMP_RE);
 }
 
 /**
@@ -588,7 +624,7 @@ async function performAutoBackup(now: Date): Promise<void> {
   const { valid, leftovers } = await readAutoBackupFolder(dir);
   for (const name of leftovers) await deleteMatching(dir, name, AUTO_TMP_RE);
 
-  const horizon = now.getTime() + AUTO_CLOCK_SKEW_MS;
+  const horizon = now.getTime() + CLOCK_SKEW_MS;
   const newest = valid.find((entry) => entry.time.getTime() <= horizon);
   if (newest && now.getTime() - newest.time.getTime() < AUTO_INTERVAL_MS) return;
 
