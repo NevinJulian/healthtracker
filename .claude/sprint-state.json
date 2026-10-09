@@ -272,7 +272,7 @@
       "workOrder": "C:/git/ht-lanes/wo/443.md",
       "deviceCheck": "none (decision item 5)",
       "notes": "WO ready (ahead), no PARK. handleSave is RecipeEditorScreen.tsx:344-429; the count is knowable in the aborted case too (fallback.unmatchedIngredients minus the no-data set, the expression the deadline path already uses). Design: one finish() with a once-flag and a mounted ref; Alert.alert('Saved', msg, [OK -> finish], { cancelable: true, onDismiss: finish }); saving stays true while the Alert is up. Analyst picks to repeat in the report: title Saved, button OK, banner keeps the names in parentheses, the Alert also counts lookups refused by the budget or a 429 pause when the recompute finished (the decision's lead sentence covers any save with ingredients that were not looked up), the Alert still shows after an unmount but then navigates nowhere. Existing assertions that change: saveDeadline.test.tsx:167 and :184 (old banner text). | dev STOPPED before the fix commit (correctly): with saving kept true while the Alert is up, the existing assertion saveDeadline.test.tsx:95 (no Saving... label after a deadline save) fails. ORCHESTRATOR decision: the assertion stays; it pins that a save never stays stuck on Saving.... saving goes false when the write finishes, as today; a separate closing state disables Save and Cancel and makes handleSave inert while the Alert is up; the developer's own new test changes accordingly in its own commit. Not counted as a round trip (no tester verdict yet). So far: 9dd5480 (banner wording, two listed assertions changed), 1c6136e (failing tests). | dev done after the design change: 4 commits, tip 45be56c, 1402/108 per dev; saving resets in the existing finally; new closing state set after a successful write when the Alert shows and cleared in finish; Save and Cancel disabled={saving || closing}; handleSave returns at once while closing; finish has a once-flag and a mounted check, called from onPress and onDismiss; showUnmatched now runs on every path. Existing assertions changed: only saveDeadline.test.tsx:167 and :184 (old banner text); line 95 untouched. Dev's own caveat: the Save-disabled test cannot tell the disabled button from the handleSave guard. RecipeEditorScreen suites run three times, identical.",
-      "securityReview": "running in parallel with the tester on d0c057d..45be56c. Not skipped although the diff is one screen file: handleSave is a data-writing path and its logic around the saved macros was reordered"
+      "securityReview": "APPROVE (d0c057d..45be56c, handleSave read at the tip through git): the saved payload is unchanged on all three paths (normal = the settled macros, timeout and aborted = computed.macros with the same arguments as the old fallback); the new always-on computeRecipeMacros call is pure and its result is used only for the unmatched list; the Saved Alert and finish run only after the write resolved; a rejected write goes to the existing catch, closing is never set, so the user can retry; no path to a second write (saving while pending, closing while the Alert is up, a once-flag on finish); finish checks mounted and uses the recipe id captured for this save; the Alert text is a fixed string plus a count, the banner shows the user's own ingredient names, no API text. Notes: after an abort race the Alert count can come from a slightly newer lookup state than the settled macros (notice text only); navigation still runs inside the outer try on the no-notice path, so a throwing navigation after a successful create would show Failed to save (unchanged shape); if the Alert is never answered the buttons stay disabled (data is already saved)."
     },
     "444": {
       "lane": "B",
@@ -347,7 +347,8 @@
     "SMALL (#344 tester): the migration unit test 'leaves a row inserted before v39 as NULL' runs the v39 SQL directly, not through runMigrations (the tester covered the real path with a scratch test)",
     "SMALL (#344 tester): an unrecognised set_type from a hand-edited backup silently counts as working",
     "SMALL (#347 dev): bracketed qualifiers steer the aisle lookup: 'egg (for meatballs)' and 'oat flour (for meatballs)' land in Meat and fish; the normalised key cuts at the first comma only",
-    "SMALL (#347 dev): getShoppingListItems still orders by is_checked, id DESC; the screen re-sorts, so the SQL order is unused"
+    "SMALL (#347 dev): getShoppingListItems still orders by is_checked, id DESC; the screen re-sorts, so the SQL order is unused",
+    "SMALL (#443 security): navigation.replace / goBack runs inside the outer try of handleSave on the no-notice path; if it threw after a successful create the user would see Failed to save and could create a duplicate by retrying (same shape before the sprint)"
   ],
   "log": [
     {
@@ -401,6 +402,10 @@
     {
       "at": "2026-10-09T07:50:45Z",
       "event": "#347 dev done (6 commits, tip 87e59fd; 1449/111 per dev) -> in_test, security in parallel"
+    },
+    {
+      "at": "2026-10-09T07:50:57Z",
+      "event": "#443 security APPROVE on 45be56c (tester still running)"
     }
   ],
   "aheadAnalysis": {
