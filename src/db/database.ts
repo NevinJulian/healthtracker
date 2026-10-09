@@ -1800,11 +1800,55 @@ async function _assignMealToPlanImpl(date: string, meal_type: string, recipe_id:
   });
 }
 
-export async function copyMealToDates(
-  planId: number,
-  targetDates: string[]
-): Promise<{ copied: number; skipped: number }> {
-  return { copied: 0, skipped: 0 };
+export interface CopyMealsResult {
+  copied: number;
+  skipped: number;
+}
+
+/**
+ * Copies a planned meal into the same slot on each target date where that
+ * slot is empty. Copies start unticked with no inventory pointer and never
+ * touch meal_inventory. Occupied slots are counted as skipped and left as
+ * they are; the source date and malformed or duplicate dates are ignored.
+ */
+export function copyMealToDates(planId: number, targetDates: string[]): Promise<CopyMealsResult> {
+  return _enqueueWrite('copyMealToDates', () => _copyMealToDatesImpl(planId, targetDates));
+}
+
+async function _copyMealToDatesImpl(planId: number, targetDates: string[]): Promise<CopyMealsResult> {
+  const db = getDatabase();
+  const result: CopyMealsResult = { copied: 0, skipped: 0 };
+  await db.withTransactionAsync(async () => {
+    const source = await db.getFirstAsync<{ date: string; meal_type: string; recipe_id: string }>(
+      'SELECT date, meal_type, recipe_id FROM weekly_meal_plan WHERE id = ?',
+      [planId]
+    );
+    if (!source) return;
+    const targets = new Set(targetDates.filter((d) => isValidDateKey(d) && d !== source.date));
+    for (const date of targets) {
+      if (await _insertCopyIfEmpty(db, date, source.meal_type, source.recipe_id)) result.copied++;
+      else result.skipped++;
+    }
+  });
+  return result;
+}
+
+async function _insertCopyIfEmpty(
+  db: SQLite.SQLiteDatabase,
+  date: string,
+  meal_type: string,
+  recipe_id: string
+): Promise<boolean> {
+  const occupied = await db.getFirstAsync<{ id: number }>(
+    'SELECT id FROM weekly_meal_plan WHERE date = ? AND meal_type = ? LIMIT 1',
+    [date, meal_type]
+  );
+  if (occupied) return false;
+  await db.runAsync(
+    'INSERT INTO weekly_meal_plan (date, meal_type, recipe_id, is_consumed, consumed_from_inventory_id) VALUES (?, ?, ?, 0, NULL)',
+    [date, meal_type, recipe_id]
+  );
+  return true;
 }
 
 export function removeMealFromPlan(id: number): Promise<void> {
