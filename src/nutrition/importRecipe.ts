@@ -10,7 +10,7 @@
  *
  * The import is "best-effort": ingredients with no local or OFF match
  * contribute 0 macros and are flagged in `estimatedIngredients`, or in
- * `notLookedUpIngredients` when the lookup was refused before a request.
+ * `notLookedUpIngredients` when the lookup was refused or rate limited.
  *
  * This module is pure orchestration — no UI state, no navigation.
  */
