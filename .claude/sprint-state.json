@@ -74,8 +74,10 @@
         347,
         348
       ],
-      "current": 444,
-      "done": [],
+      "current": 347,
+      "done": [
+        444
+      ],
       "parked": []
     },
     "C": {
@@ -170,7 +172,7 @@
     "347": {
       "lane": "B",
       "kind": "feature",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "title": "shopping list: combine duplicate ingredients and group by aisle",
@@ -203,7 +205,8 @@
       "decisionSource": "owner comment 6070883467 on #352: 'Import from URL' action on the Recipes screen with a small dialog; http/https only, 15 s timeout, at most 3 MB, non-2xx or non-HTML = clear error, reuse fetchJson hardening, no new package; every ld+json block incl. arrays and @graph, first object whose @type is or contains Recipe; map name, recipeIngredient, recipeInstructions (string, HowToStep, HowToSection), recipeYield (first number), totalTime or prepTime; unparsed ingredient lines kept as names; opens the editor prefilled, nothing saved until Save, macros from the editor's recompute; no-recipe message; no images, no page nutrition; only plain strings reach the editor",
       "securityPlan": "required by the decision (untrusted web pages)",
       "workOrder": "C:/git/ht-lanes/wo/352.md",
-      "notes": "WO draft received (ahead), sent back to the analyst to finalise: it called itself a first-pass draft, ran 1481 words, hedged on how tests fail before the code and had a garbled finding. Findings so far: fetchJson is JSON-only, so a separate HTML fetch module copies its timeout/abort pattern; the global fetch in SDK 57 is expo/fetch with a streaming body, so a real 3 MB cap works without a package; parseMeasure takes (name, measure), so a new line splitter src/nutrition/parseIngredientLine.ts is needed; recipe_library has no source column, so the source URL is not stored (would need a migration); the editor takes only {recipeId?} today, new param draft; rowsToIngredients (RecipeEditorScreen.tsx:87) drops rows with quantity <= 0, which would drop unparsed lines at Save, so the work order keeps named rows at quantity 0 (changes every save: analyst asked to verify the downstream consumers)."
+      "notes": "WO draft received (ahead), sent back to the analyst to finalise: it called itself a first-pass draft, ran 1481 words, hedged on how tests fail before the code and had a garbled finding. Findings so far: fetchJson is JSON-only, so a separate HTML fetch module copies its timeout/abort pattern; the global fetch in SDK 57 is expo/fetch with a streaming body, so a real 3 MB cap works without a package; parseMeasure takes (name, measure), so a new line splitter src/nutrition/parseIngredientLine.ts is needed; recipe_library has no source column, so the source URL is not stored (would need a migration); the editor takes only {recipeId?} today, new param draft; rowsToIngredients (RecipeEditorScreen.tsx:87) drops rows with quantity <= 0, which would drop unparsed lines at Save, so the work order keeps named rows at quantity 0 (changes every save: analyst asked to verify the downstream consumers). | FINAL WO received. Stub pattern stated as a rule; German normalisation before parseMeasure written out (ca./circa, decimal comma, unit words such as EL/TL, vague words such as Prise/etwas give quantity 0 and keep the whole line as the name); parseMeasure.ts itself is not changed. EDITOR RULE (quantity 0): a row with a name is kept with its quantity or 0, Save still needs one row above 0, recompute and Open Food Facts lookups use only rows above 0. This also fixes a DATA-LOSS that exists today: opening and saving a Discover-imported recipe silently deletes its quantity-0 ingredients (rowsToIngredients, RecipeEditorScreen.tsx:89) - same root cause, lane D file, so it is fixed and tested inside #352 (sibling rule). Note the interaction: #442's new wording sends users to exactly that editor save.",
+      "deviceCheck": "Expo Go: import a recipe page from a big recipe site you use. The editor opens with title, ingredients, steps and servings, and saving computes macros. A news article URL shows the no-recipe message."
     },
     "442": {
       "lane": "D",
@@ -222,7 +225,7 @@
       "workOrder": "C:/git/ht-lanes/wo/442.md",
       "deviceCheck": "none (decision item 5: the limit cannot be reached on purpose in Expo Go, tests cover it)",
       "notes": "WO ready, no PARK, no file outside lane D. Claim verified: notLookedUpSentence (DiscoverDetailScreen.tsx:55-57) is the only source of the Try again in a minute text; a lookup that got the 429 itself returns null at openfoodfacts.ts:189 after setting pausedUntil; the sentinel is never cached. Fix: return 'not-looked-up' in the 429 branch; new singular/plural sentences; In your library subtitle. Existing assertions that change (they pin the replaced behaviour): retryAfter.test.ts:56,74,88 (toBeNull on the 429 receiver) and notLookedUp.test.tsx:47,77,81 (old sentence). Side effect to watch: in the editor, 429 receivers move from the no-data branch into the Not looked up banner (wording is #443's). ORCHESTRATOR AMENDMENT (appended to the work order file): the analyst picked In your library for every no-warning case, which would also change a fresh clean import; decision item 4 is only about a recipe already in the library, so the subtitle is shown only when the load effect found the recipe or dbImportRecipe returned false, and a fresh clean import keeps Macros computed from local data. | dev: 4 commits, 1393/108 per dev. fetchFromOFF returns the sentinel after the 429 branch sets the pause; one sentence function for Alert and card; new alreadyInLibrary state set in exactly two places. Existing assertions changed as listed in the work order (retryAfter.test.ts:56,74,88 toBeNull -> 'not-looked-up'; the NOT_LOOKED_UP constant at notLookedUp.test.tsx:47). BEYOND THE WORK ORDER: the already-in-library effect's dynamic import('../db/database') was replaced by a static import of getRecipeById, because under jest the dynamic import throws and the empty catch swallowed it, so the reopen path could not be tested; same module is already imported statically in that file. Tester asked to judge it.",
-      "securityReview": "running in parallel with the tester on c698da2..d0c057d"
+      "securityReview": "APPROVE (c698da2..d0c057d, read through git): the only new network-derived value is the constant sentinel returned after the pause is set; the sentinel is excluded before every sink (cache write only for real objects, importRecipe and the editor branch on the string first, batch keeps objects only), no NaN path; a 429 or any failure is never cached; budget, pause formula (longer wins, 1-300 s clamp, 60 s default), abort handling and the 5xx retry are untouched; the import is still INSERT OR IGNORE and never overwrites; a failed import is never shown as In your library. Note: a 5xx first attempt whose retry is refused locally still resolves null (unchanged)."
     },
     "443": {
       "lane": "D",
@@ -240,7 +243,7 @@
     "444": {
       "lane": "B",
       "kind": "bug",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "fee7eea",
@@ -253,7 +256,8 @@
       "workOrder": "C:/git/ht-lanes/wo/444.md",
       "deviceCheck": "Expo Go: cook one portion of a recipe, assign it to two slots and tick both. Removing the second one shows the text without the inventory sentence. (Also remove the first, which has a pointer, and see the old text.)",
       "notes": "WO ready, no PARK. Claim verified: confirmRemove (MealPrepScreen.tsx:510-521) shows the refund sentence for every eaten row; _creditPortion is a no-op on a NULL pointer. The plan item already carries consumed_from_inventory_id (type at database.ts:92-106, loader is SELECT *), so no database.ts source change is needed: one text branch in MealPrepScreen.tsx plus tests. The db-level test is a contract pin that passes today by design; the screen test is the fail-then-pass proof. Siblings: none.",
-      "securityReview": "skipped: the diff c698da2..14194af is MealPrepScreen.tsx (+14/-5, one text branch on a field the screen already holds) and two test files; no source change in src/db, no data flow, no external input"
+      "securityReview": "skipped: the diff c698da2..14194af is MealPrepScreen.tsx (+14/-5, one text branch on a field the screen already holds) and two test files; no source change in src/db, no data flow, no external input",
+      "regressionProof": "tester APPROVE r0: with MealPrepScreen.tsx from c698da2 the new screen test fails (old sentence received), 34/34 at 14194af; the db pin (passes before by design) goes red under a mutation of the no-stock branch in _toggleMealConsumedImpl; sql.js scratch run: removing the no-pointer meal leaves inventory at 0 (new text true), removing the pointer meal restores it to 1 (old text true); condition != null matches _creditPortion exactly; one call site; no existing assertion edited; 1390/107 (tester reproduced)"
     }
   },
   "foundDuringSprint": [],
@@ -285,7 +289,12 @@
     "NOT A BUG, for the report (#352 analyst): the issue body asks to store the source URL; recipe_library has no column for it and the decision does not ask for it, so it is not built (needs a migration)",
     "SMALL (orchestrator): .claude/agents/developer.md still says Expo SDK 54 / RN 0.81; CLAUDE.md says SDK 57 / RN 0.86 (developers were briefed with the right numbers)",
     "SMALL (#442 dev): the already-imported effect in DiscoverDetailScreen still swallows every error in an empty catch, which is how the failing dynamic import stayed hidden under jest",
-    "SMALL (#442 dev): the existing assertion '1 ingredient(s) had no nutritional data.' pins the (s) form of the no-data note"
+    "SMALL (#442 dev): the existing assertion '1 ingredient(s) had no nutritional data.' pins the (s) form of the no-data note",
+    "SMALL (#444 tester): a row ticked before migration v34 has a NULL pointer although stock may have been debited then; it now gets the no-inventory text, which is true because such rows get no credit",
+    "DATA-LOSS (#352 analyst): opening a Discover-imported recipe in the editor and saving it silently deletes every ingredient stored with quantity 0 (vague measures), because rowsToIngredients (RecipeEditorScreen.tsx:89) drops rows with quantity <= 0. Fixed inside #352 by its editor rule (same root cause, lane D file). MUST be filed as its own issue if #352 is parked, because #442's new wording tells users to open the recipe in the editor and save it",
+    "USER-HITTABLE (#352 analyst): an ingredient stored with quantity 0 (Discover imports already produce them) is shown as '0 g' in RecipeDetailScreen.tsx:224 and is put on the shopping list as a 0-quantity line such as 'Salt 0 g' (_addRecipeToShoppingListImpl, database.ts:1961-1963) - to be filed as its own issue",
+    "SMALL (#352 analyst): parseMeasure misreads: '1 pinch' -> 1 whole (pinch is not in detectUnit, parseMeasure.ts:275-319; expected a vague 0), '1,5 kg' -> 6000 g (splits on the comma at :275 and adds the parts at :121; expected 1500 g), '1 EL' -> 1 whole (:191; expected 15 g). No TheMealDB measure in the repo is confirmed to hit them; the new URL import normalises before calling parseMeasure",
+    "SMALL (#352 analyst): src/db/__tests__/recipeHelpers.test.ts:80-92 asserts the drop of quantity-0 rows against a local copy of the function, so it neither fails nor guards"
   ],
   "log": [
     {
@@ -311,6 +320,10 @@
     {
       "at": "2026-10-09T07:39:59Z",
       "event": "#444 dev done (fee7eea, eb6295b, 14194af; 1390/107 per dev) -> in_test, security skipped (pure UI text branch). #442 dev done (711b910, 31c2726, 5f0b565, d0c057d; 1393/108 per dev) -> in_test, security in parallel. #344 work order ready with an orchestrator amendment (prefill unchanged) -> in_dev on lane A. Ahead work orders ready: #347 #348 #443 #338 #342 (#342 amended: no raw-delta fallback); #352 sent back to its analyst to finalise"
+    },
+    {
+      "at": "2026-10-09T07:41:05Z",
+      "event": "#444 ready (tester APPROVE r0, security skipped, 1390/107) -> lane B moves to #347, developer dispatched. #442 security APPROVE on d0c057d (tester still running). #352 work order finalised by the analyst"
     }
   ],
   "aheadAnalysis": {
@@ -320,7 +333,7 @@
     "342": "ready (amended)",
     "347": "ready",
     "348": "ready",
-    "352": "draft, back with the analyst",
+    "352": "ready (finalised by the analyst; orchestrator reads it before dispatch)",
     "443": "ready"
   }
 }
