@@ -212,7 +212,7 @@ export function WeightTrendCard({
         <>
           {/* Flat chart: sage-tint area fill + sage bars + sageDeep dot on last point.
               Uses View-based rendering (no new chart dependency) per DESIGN.md §5. */}
-          <View style={styles.chartContainer}>
+          <View style={styles.chartContainer} testID="weight-chart">
             {/* sageTint area spans the full chart width at half-opacity */}
             <View style={styles.areaBackground} />
 
