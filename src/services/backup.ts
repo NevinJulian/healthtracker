@@ -359,8 +359,33 @@ export async function importBackup(
     return null;
   }
 
-  const asset = result.assets[0];
-  const rawJson = await readAsStringAsync(asset.uri);
+  return restoreBackupFromUri(result.assets[0].uri, options);
+}
+
+/**
+ * Restore from a backup file already on the device: parse and validate it,
+ * write a safety snapshot, restore all tables transactionally, then resync
+ * notifications. The source file is only read. Automatic backups do not run
+ * while this is in progress.
+ *
+ * @throws When the file is invalid, the schema is incompatible, the safety
+ *         snapshot fails and the caller declines to continue, or the DB
+ *         restore transaction fails.
+ */
+export async function restoreBackupFromUri(
+  uri: string,
+  options: RestoreOptions = {}
+): Promise<RestoreResult> {
+  restoreInProgress = true;
+  try {
+    return await performRestore(uri, options);
+  } finally {
+    restoreInProgress = false;
+  }
+}
+
+async function performRestore(uri: string, options: RestoreOptions): Promise<RestoreResult> {
+  const rawJson = await readAsStringAsync(uri);
 
   let parsed: unknown;
   try {
@@ -576,11 +601,4 @@ export async function listAutoBackups(): Promise<AutoBackupEntry[]> {
     entries.push({ name, uri, createdAt: time, sizeBytes: info.size });
   }
   return entries;
-}
-
-export async function restoreBackupFromUri(
-  _uri: string,
-  _options: RestoreOptions = {}
-): Promise<RestoreResult | null> {
-  return null;
 }
