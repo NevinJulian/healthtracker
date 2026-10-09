@@ -77,11 +77,14 @@ import SettingsScreen from '../SettingsScreen';
 import {
   exportBackup,
   listAutoBackups,
+  importBackup,
   shareFile,
+  restoreBackupFromUri,
   type AutoBackupEntry,
 } from '../../services/backup';
 
 const mockList = jest.mocked(listAutoBackups);
+const mockRestore = jest.mocked(restoreBackupFromUri);
 const mockShare = jest.mocked(shareFile);
 
 function entry(iso: string, sizeBytes: number): AutoBackupEntry {
@@ -268,6 +271,171 @@ describe('SettingsScreen automatic backup share', () => {
 
     await act(async () => {
       finish(true);
+    });
+    expect(screen.queryByRole('button', { name: 'Back up data', disabled: true })).toBeNull();
+  });
+});
+
+describe('SettingsScreen automatic backup restore', () => {
+  const RESTORE_NAME = 'Restore automatic backup 8 Oct 2026, 14:03';
+  const RESULT = { tablesRestored: 12, rowsRestored: 340, safetySnapshotUri: 'file:///document/safety-snapshots/s.json' };
+  let alertSpy: jest.SpyInstance;
+
+  type AlertButton = { text: string; onPress?: () => void | Promise<void> };
+  const buttonsOf = (call: number): AlertButton[] => alertSpy.mock.calls[call][2] as AlertButton[];
+
+  async function pressRestoreAndConfirm() {
+    fireEvent.press(screen.getByRole('button', { name: RESTORE_NAME }));
+    await act(async () => {
+      await buttonsOf(0).find((b) => b.text === 'Restore')?.onPress?.();
+    });
+  }
+
+  beforeEach(() => {
+    mockList.mockResolvedValue([NEWER, OLDER]);
+    mockRestore.mockReset().mockResolvedValue(RESULT);
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    alertSpy.mockRestore();
+  });
+
+  it('asks for confirmation naming the backup before restoring anything', async () => {
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: RESTORE_NAME }));
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][1]).toBe(
+      'Restore the automatic backup from 8 Oct 2026, 14:03? This will replace ALL current data with its contents. A safety copy of your current data will be saved first. Continue?'
+    );
+    expect(buttonsOf(0).map((b) => b.text)).toEqual(['Cancel', 'Restore']);
+    expect(mockRestore).not.toHaveBeenCalled();
+  });
+
+  it('restores nothing when the confirmation is cancelled', async () => {
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: RESTORE_NAME }));
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await buttonsOf(0).find((b) => b.text === 'Cancel')?.onPress?.();
+    });
+
+    expect(mockRestore).not.toHaveBeenCalled();
+    expect(mockList).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores from that backup file through the service, not the file picker', async () => {
+    await renderSettings();
+
+    await pressRestoreAndConfirm();
+
+    expect(mockRestore).toHaveBeenCalledTimes(1);
+    expect(mockRestore).toHaveBeenCalledWith(NEWER.uri, {
+      onSnapshotFailed: expect.any(Function),
+    });
+    expect(jest.mocked(importBackup)).not.toHaveBeenCalled();
+  });
+
+  it('restores the other backup when its own button is pressed', async () => {
+    await renderSettings();
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Restore automatic backup 7 Oct 2026, 09:05' })
+    );
+    await act(async () => {
+      await buttonsOf(0).find((b) => b.text === 'Restore')?.onPress?.();
+    });
+
+    expect(mockRestore).toHaveBeenCalledWith(OLDER.uri, expect.anything());
+  });
+
+  it('reports the result and offers the safety copy, as a restore from a picked file does', async () => {
+    await renderSettings();
+
+    await pressRestoreAndConfirm();
+
+    const [title, body] = alertSpy.mock.calls[1] as [string, string];
+    expect(title).toBe('Restore complete');
+    expect(body).toContain('Restored 12 tables and 340 rows.');
+    expect(body).toContain('A safety copy of your previous data was saved.');
+    await act(async () => {
+      await buttonsOf(1).find((b) => b.text === 'Share safety copy')?.onPress?.();
+    });
+    expect(mockShare).toHaveBeenCalledWith(RESULT.safetySnapshotUri);
+  });
+
+  it('warns about meals that cannot be traced back, as a restore from a picked file does', async () => {
+    mockRestore.mockResolvedValue({ ...RESULT, consumedMealsWithoutRefund: 2 });
+    await renderSettings();
+
+    await pressRestoreAndConfirm();
+
+    expect(alertSpy.mock.calls[1][1]).toContain('predates portion tracking');
+  });
+
+  it('reloads the list after a restore', async () => {
+    await renderSettings();
+    mockList.mockResolvedValue([entry('2026-10-09T08:00:00.000Z', 100)]);
+
+    await pressRestoreAndConfirm();
+
+    expect(mockList).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Restore automatic backup 9 Oct 2026, 08:00' })).toBeTruthy();
+  });
+
+  it('reports a failed restore, reloads the list and frees the buttons', async () => {
+    mockRestore.mockRejectedValue(new Error('Invalid backup file: could not parse JSON.'));
+    await renderSettings();
+
+    await pressRestoreAndConfirm();
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Restore failed',
+      'Invalid backup file: could not parse JSON.'
+    );
+    expect(alertSpy.mock.calls.some(([title]) => title === 'Restore complete')).toBe(false);
+    expect(mockList).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('button', { name: 'Back up data', disabled: true })).toBeNull();
+  });
+
+  it('asks whether to continue when the safety copy cannot be saved', async () => {
+    await renderSettings();
+    await pressRestoreAndConfirm();
+    const options = mockRestore.mock.calls[0][1];
+
+    let proceed: boolean | undefined;
+    const asked = options?.onSnapshotFailed?.('disk full').then((answer) => {
+      proceed = answer;
+    });
+    const prompt = alertSpy.mock.calls.find(([title]) => title === 'Safety copy failed');
+    expect(prompt?.[1]).toContain('disk full');
+    await act(async () => {
+      (prompt?.[2] as AlertButton[]).find((b) => b.text === 'Continue anyway')?.onPress?.();
+      await asked;
+    });
+
+    expect(proceed).toBe(true);
+  });
+
+  it('blocks the other backup actions while the restore is running', async () => {
+    let finish: () => void = () => undefined;
+    mockRestore.mockReturnValue(new Promise((resolve) => { finish = () => resolve(RESULT); }));
+    await renderSettings();
+
+    fireEvent.press(screen.getByRole('button', { name: RESTORE_NAME }));
+    await act(async () => {
+      buttonsOf(0).find((b) => b.text === 'Restore')?.onPress?.();
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Back up data', disabled: true })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Share automatic backup 8 Oct 2026, 14:03', disabled: true })
+    ).toBeTruthy();
+
+    await act(async () => {
+      finish();
     });
     expect(screen.queryByRole('button', { name: 'Back up data', disabled: true })).toBeNull();
   });
