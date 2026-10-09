@@ -1833,6 +1833,10 @@ async function _copyMealToDatesImpl(planId: number, targetDates: string[]): Prom
   return result;
 }
 
+export async function copyDayToDate(fromDate: string, toDate: string): Promise<CopyMealsResult> {
+  return { copied: 0, skipped: 0 };
+}
+
 async function _insertCopyIfEmpty(
   db: SQLite.SQLiteDatabase,
   date: string,

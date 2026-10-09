@@ -144,3 +144,92 @@ describe('copyMealToDates', () => {
     expect((await rowsAt(db, '2030-01-02', 'Lunch'))[0].recipe_id).toBe(R1);
   });
 });
+
+describe('copyDayToDate', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('copies Lunch into a free slot and skips an occupied Dinner, leaving it unchanged', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await db.assignMealToPlan('2030-01-01', 'Lunch', R1);
+    await db.assignMealToPlan('2030-01-01', 'Dinner', R1);
+    await db.assignMealToPlan('2030-01-02', 'Dinner', R2);
+    const occupiedBefore = (await rowsAt(db, '2030-01-02', 'Dinner'))[0];
+
+    const result = await db.copyDayToDate('2030-01-01', '2030-01-02');
+
+    expect(result).toEqual({ copied: 1, skipped: 1 });
+    const lunch = await rowsAt(db, '2030-01-02', 'Lunch');
+    expect(lunch).toHaveLength(1);
+    expect(lunch[0].recipe_id).toBe(R1);
+    expect(lunch[0].is_consumed).toBe(0);
+    expect(lunch[0].consumed_from_inventory_id).toBeNull();
+    expect(await rowsAt(db, '2030-01-02', 'Dinner')).toEqual([occupiedBefore]);
+  });
+
+  it('copies consumed meals unticked and leaves inventory unchanged', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    const raw = db.getDatabase();
+    await raw.runAsync(
+      'INSERT INTO meal_inventory (recipe_id, portions_available, date_cooked) VALUES (?, ?, ?)',
+      [R1, 2, '2029-12-01']
+    );
+    await db.assignMealToPlan('2030-01-01', 'Lunch', R1);
+    await db.assignMealToPlan('2030-01-01', 'Dinner', R1);
+    await db.toggleMealConsumed(await planId(db, '2030-01-01', 'Lunch'), true);
+    const inventoryBefore = await raw.getAllAsync('SELECT * FROM meal_inventory ORDER BY id');
+
+    const result = await db.copyDayToDate('2030-01-01', '2030-01-02');
+
+    expect(result).toEqual({ copied: 2, skipped: 0 });
+    for (const mealType of ['Lunch', 'Dinner']) {
+      const rows = await rowsAt(db, '2030-01-02', mealType);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].is_consumed).toBe(0);
+      expect(rows[0].consumed_from_inventory_id).toBeNull();
+    }
+    expect(await raw.getAllAsync('SELECT * FROM meal_inventory ORDER BY id')).toEqual(inventoryBefore);
+  });
+
+  it('copies only the slots the source day has', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await db.assignMealToPlan('2030-01-01', 'Dinner', R1);
+
+    const result = await db.copyDayToDate('2030-01-01', '2030-01-02');
+
+    expect(result).toEqual({ copied: 1, skipped: 0 });
+    expect(await rowsAt(db, '2030-01-02', 'Lunch')).toHaveLength(0);
+    expect(await rowsAt(db, '2030-01-02', 'Dinner')).toHaveLength(1);
+  });
+
+  it('copies nothing from an empty source day', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+
+    expect(await db.copyDayToDate('2030-01-01', '2030-01-02')).toEqual({ copied: 0, skipped: 0 });
+    expect(await planCount(db)).toBe(0);
+  });
+
+  it('copies nothing when the source and target are the same day', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await db.assignMealToPlan('2030-01-01', 'Lunch', R1);
+
+    expect(await db.copyDayToDate('2030-01-01', '2030-01-01')).toEqual({ copied: 0, skipped: 0 });
+    expect(await planCount(db)).toBe(1);
+  });
+
+  it('copies nothing for a malformed date', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await db.assignMealToPlan('2030-01-01', 'Lunch', R1);
+
+    expect(await db.copyDayToDate('2030-01-01', 'nonsense')).toEqual({ copied: 0, skipped: 0 });
+    expect(await db.copyDayToDate('2030-13-40', '2030-01-02')).toEqual({ copied: 0, skipped: 0 });
+    expect(await planCount(db)).toBe(1);
+  });
+});
