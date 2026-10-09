@@ -106,9 +106,10 @@
         443,
         352
       ],
-      "current": 443,
+      "current": 352,
       "done": [
-        442
+        442,
+        443
       ],
       "parked": []
     }
@@ -117,15 +118,25 @@
     "337": {
       "lane": "A",
       "kind": "feature",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "acf0a79",
+        "759d6d1",
+        "c6a6547",
+        "4bc6592",
+        "cf0ffce",
+        "e55c722",
+        "247f190",
+        "57d39b3"
+      ],
       "title": "last session's performance as a prefill on set inputs",
       "decisionSource": "owner comment 6070869800 on #337: last working set of the most recent session before today; line 'Last time: 80 kg x 8 · 3 days ago' above the inputs, tap fills both; placeholders while empty; 'yesterday' / 'N days ago'; no history = no line, empty inputs; today's prefill from today's last set stays; getLastSetForExercise(exercise, beforeDate) on the (exercise, date) index, LIMIT 1",
       "securityPlan": "required (new query in src/db)",
       "workOrder": "C:/git/ht-lanes/wo/337.md",
       "deviceCheck": "Expo Go: open the logger for an exercise you logged on an earlier day. The line shows that session's last working set (not a warm-up), and tapping it fills both fields. An exercise you never logged shows no line.",
-      "notes": "WO ready (analysed on the snapshot of #344 at 10a3f39), no PARK, no file outside lane A, no migration. New getLastSetForExercise + exported WORKOUT_LAST_SET_SQL directly after getWorkoutHistory in database.ts: exercise = ? AND date < ? AND (set_type IS NULL OR set_type <> 'warmup') ORDER BY date DESC, set_index DESC LIMIT 1; an EXPLAIN QUERY PLAN test pins the (exercise, date) index. The modal gets a today prop (the Dashboard's render-time value, the one handleLogSet writes with), fetches in an effect with a cancelled flag, shows no line while loading or after a failed read. Analyst picks to repeat in the report: when the most recent earlier day holds only warm-ups the line shows the last working set of the next older day that has one (reading of 'last working set of the most recent session', warm-ups never count); line text 'Last time: 80 kg x 8' (U+00D7) with a middle dot and yesterday / N days ago, no month or year forms; weight printed like the set list (80, 82.5); the line sits between the toggle and the inputs; tapping overwrites typed text and does not log; with a set already logged today only Reps shows a placeholder; exercise names match exactly as stored."
+      "notes": "WO ready (analysed on the snapshot of #344 at 10a3f39), no PARK, no file outside lane A, no migration. New getLastSetForExercise + exported WORKOUT_LAST_SET_SQL directly after getWorkoutHistory in database.ts: exercise = ? AND date < ? AND (set_type IS NULL OR set_type <> 'warmup') ORDER BY date DESC, set_index DESC LIMIT 1; an EXPLAIN QUERY PLAN test pins the (exercise, date) index. The modal gets a today prop (the Dashboard's render-time value, the one handleLogSet writes with), fetches in an effect with a cancelled flag, shows no line while loading or after a failed read. Analyst picks to repeat in the report: when the most recent earlier day holds only warm-ups the line shows the last working set of the next older day that has one (reading of 'last working set of the most recent session', warm-ups never count); line text 'Last time: 80 kg x 8' (U+00D7) with a middle dot and yesterday / N days ago, no month or year forms; weight printed like the set list (80, 82.5); the line sits between the toggle and the inputs; tapping overwrites typed text and does not log; with a set already logged today only Reps shows a placeholder; exercise names match exactly as stored. | dev: 8 commits in 4 test/code pairs, tip 57d39b3, 1426/109 per dev. Ten DashboardScreen.*.test.tsx mocks gained getLastSetForExercise; no existing assertion changed. The index test passed already at the stub commit (the SQL constant came with the stub); tester asked for a mutation proof. The SetLoggerModal doc comment was corrected.",
+      "securityReview": "running in parallel with the tester on 10a3f39..57d39b3"
     },
     "338": {
       "lane": "C",
@@ -225,7 +236,7 @@
     "352": {
       "lane": "D",
       "kind": "feature",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "title": "import a recipe from a URL via schema.org JSON-LD",
@@ -258,7 +269,7 @@
     "443": {
       "lane": "D",
       "kind": "bug",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "9dd5480",
@@ -272,7 +283,8 @@
       "workOrder": "C:/git/ht-lanes/wo/443.md",
       "deviceCheck": "none (decision item 5)",
       "notes": "WO ready (ahead), no PARK. handleSave is RecipeEditorScreen.tsx:344-429; the count is knowable in the aborted case too (fallback.unmatchedIngredients minus the no-data set, the expression the deadline path already uses). Design: one finish() with a once-flag and a mounted ref; Alert.alert('Saved', msg, [OK -> finish], { cancelable: true, onDismiss: finish }); saving stays true while the Alert is up. Analyst picks to repeat in the report: title Saved, button OK, banner keeps the names in parentheses, the Alert also counts lookups refused by the budget or a 429 pause when the recompute finished (the decision's lead sentence covers any save with ingredients that were not looked up), the Alert still shows after an unmount but then navigates nowhere. Existing assertions that change: saveDeadline.test.tsx:167 and :184 (old banner text). | dev STOPPED before the fix commit (correctly): with saving kept true while the Alert is up, the existing assertion saveDeadline.test.tsx:95 (no Saving... label after a deadline save) fails. ORCHESTRATOR decision: the assertion stays; it pins that a save never stays stuck on Saving.... saving goes false when the write finishes, as today; a separate closing state disables Save and Cancel and makes handleSave inert while the Alert is up; the developer's own new test changes accordingly in its own commit. Not counted as a round trip (no tester verdict yet). So far: 9dd5480 (banner wording, two listed assertions changed), 1c6136e (failing tests). | dev done after the design change: 4 commits, tip 45be56c, 1402/108 per dev; saving resets in the existing finally; new closing state set after a successful write when the Alert shows and cleared in finish; Save and Cancel disabled={saving || closing}; handleSave returns at once while closing; finish has a once-flag and a mounted check, called from onPress and onDismiss; showUnmatched now runs on every path. Existing assertions changed: only saveDeadline.test.tsx:167 and :184 (old banner text); line 95 untouched. Dev's own caveat: the Save-disabled test cannot tell the disabled button from the handleSave guard. RecipeEditorScreen suites run three times, identical.",
-      "securityReview": "APPROVE (d0c057d..45be56c, handleSave read at the tip through git): the saved payload is unchanged on all three paths (normal = the settled macros, timeout and aborted = computed.macros with the same arguments as the old fallback); the new always-on computeRecipeMacros call is pure and its result is used only for the unmatched list; the Saved Alert and finish run only after the write resolved; a rejected write goes to the existing catch, closing is never set, so the user can retry; no path to a second write (saving while pending, closing while the Alert is up, a once-flag on finish); finish checks mounted and uses the recipe id captured for this save; the Alert text is a fixed string plus a count, the banner shows the user's own ingredient names, no API text. Notes: after an abort race the Alert count can come from a slightly newer lookup state than the settled macros (notice text only); navigation still runs inside the outer try on the no-notice path, so a throwing navigation after a successful create would show Failed to save (unchanged shape); if the Alert is never answered the buttons stay disabled (data is already saved)."
+      "securityReview": "APPROVE (d0c057d..45be56c, handleSave read at the tip through git): the saved payload is unchanged on all three paths (normal = the settled macros, timeout and aborted = computed.macros with the same arguments as the old fallback); the new always-on computeRecipeMacros call is pure and its result is used only for the unmatched list; the Saved Alert and finish run only after the write resolved; a rejected write goes to the existing catch, closing is never set, so the user can retry; no path to a second write (saving while pending, closing while the Alert is up, a once-flag on finish); finish checks mounted and uses the recipe id captured for this save; the Alert text is a fixed string plus a count, the banner shows the user's own ingredient names, no API text. Notes: after an abort race the Alert count can come from a slightly newer lookup state than the settled macros (notice text only); navigation still runs inside the outer try on the no-notice path, so a throwing navigation after a successful create would show Failed to save (unchanged shape); if the Alert is never answered the buttons stay disabled (data is already saved).",
+      "regressionProof": "tester APPROVE r0: with RecipeEditorScreen.tsx from b37248a and the tests at the tip, 8 of 19 fail (Alert.alert called 0 times; the double-answer test on its navigation assertion), all pass at 45be56c; the no-Alert guard goes red when no-data ingredients are counted; disabled={saving} alone turns the Save-disabled test red. createRecipe payloads compared before and after the fix for three scratch cases (mixed fine / no-data / refused / hanging, a Recompute tap during the save, one hanging ingredient): identical macros and ingredients. Mixed save: Alert says 2, banner lists the same two names, the no-data one is kept apart. A rejected createRecipe shows only the Error Alert, no navigation, Save usable again. Only the two banner assertions changed among existing expects; the Saving... assertion is untouched. Suites run 3 times incl. --no-cache, 19/19 each. 1402/108 (tester reproduced). GAPS: removing if (closing) return leaves every test green (the guard is unreachable while the button is disabled; read, not tested); the updateRecipe rejection path was not run (same catch)."
     },
     "444": {
       "lane": "B",
@@ -296,7 +308,8 @@
   },
   "foundDuringSprint": [
     449,
-    450
+    450,
+    451
   ],
   "pendingFindings": [
     "SMALL (#444 analyst): WeeklyMealPlanItem.is_consumed is typed boolean but getWeeklyMealPlan returns raw 0/1 (database.ts:1719); truthy checks work, === true would not",
@@ -348,7 +361,11 @@
     "SMALL (#344 tester): an unrecognised set_type from a hand-edited backup silently counts as working",
     "SMALL (#347 dev): bracketed qualifiers steer the aisle lookup: 'egg (for meatballs)' and 'oat flour (for meatballs)' land in Meat and fish; the normalised key cuts at the first comma only",
     "SMALL (#347 dev): getShoppingListItems still orders by is_checked, id DESC; the screen re-sorts, so the SQL order is unused",
-    "SMALL (#443 security): navigation.replace / goBack runs inside the outer try of handleSave on the no-notice path; if it threw after a successful create the user would see Failed to save and could create a duplicate by retrying (same shape before the sprint)"
+    "SMALL (#443 security): navigation.replace / goBack runs inside the outer try of handleSave on the no-notice path; if it threw after a successful create the user would see Failed to save and could create a duplicate by retrying (same shape before the sprint)",
+    "SMALL (#443 tester): the mounted ref in RecipeEditorScreen is set false in cleanup and never set true again on setup; under React StrictMode the simulated unmount would stop the navigation after the Alert (the app does not use StrictMode)",
+    "SMALL (#443 tester): two rows with the same not-looked-up name count as 2 ingredients and the banner lists the name twice",
+    "SMALL (#443 tester): the handler guard if (closing) return has no test that can reach it (a mutation that removes it survives)",
+    "SMALL (#337 dev): the set logger's initial weight prefill is state captured once at mount"
   ],
   "log": [
     {
@@ -410,6 +427,10 @@
     {
       "at": "2026-10-09T07:51:51Z",
       "event": "#347 security BLOCK on 87e59fd (unit string used as a plain-object key: 'constructor' / '__proto__' give NaN in the merge UPDATE; overflow of the merged sum unchecked). Tester still running; developer goes back once both verdicts are in"
+    },
+    {
+      "at": "2026-10-09T07:53:57Z",
+      "event": "#443 ready (tester APPROVE r0, security APPROVE, 1402/108) -> lane D moves to #352, developer dispatched. Filed #451 (save with partial macros after Recompute or an edit during a pending save; reproduced by the #443 tester; not worked). #337 dev done (8 commits, tip 57d39b3; 1426/109 per dev) -> in_test, security in parallel"
     }
   ],
   "aheadAnalysis": {
@@ -424,6 +445,7 @@
   },
   "findingsFiled": {
     "449": "Backup export reads the tables one by one, not in one transaction (the #338 analyst's DATA-LOSS finding; claim checked by the orchestrator at backup.ts:190-197 and database.ts:2596)",
-    "450": "Ingredients stored with quantity 0 show as '0 g' in the recipe detail and go on the shopping list as a 0-quantity line (the #352 analyst's USER-HITTABLE finding)"
+    "450": "Ingredients stored with quantity 0 show as '0 g' in the recipe detail and go on the shopping list as a 0-quantity line (the #352 analyst's USER-HITTABLE finding)",
+    "451": "Recipe editor: tapping Recompute or editing a row while a save is pending saves the recipe with partial macros (the #443 analyst's finding, reproduced by the #443 tester: 0/0/0/0 saved instead of 10 kcal / 3 g protein; present before the sprint)"
   }
 }
