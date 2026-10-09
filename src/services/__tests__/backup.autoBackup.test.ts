@@ -58,7 +58,7 @@ jest.mock('../../db/database', () => ({
 
 import * as FileSystem from 'expo-file-system/legacy';
 import * as db from '../../db/database';
-import { writeSafetySnapshot } from '../backup';
+import { writeSafetySnapshot, runAutoBackupIfDue, listAutoBackups } from '../backup';
 
 const fsMock = FileSystem as unknown as typeof FileSystem & {
   __files: Map<string, { content: string; mtime: number }>;
@@ -153,5 +153,296 @@ describe('writeSafetySnapshot', () => {
 
     expect(uri).toBe(`${SAFETY_DIR}${snapshotName(new Date(base + 10 * 60_000))}`);
     expect(files.has(uri)).toBe(true);
+  });
+});
+
+const AUTO_DIR = 'file:///document/auto-backups/';
+const NOW = new Date(Date.UTC(2026, 9, 8, 14, 3, 0));
+const HOUR = 3_600_000;
+const AUTO_NAME = /^healthtracker-auto-\d{8}T\d{6}Z\.json$/;
+
+const writeAsyncMock = jest.mocked(FileSystem.writeAsStringAsync);
+const moveAsyncMock = jest.mocked(FileSystem.moveAsync);
+const readDirMock = jest.mocked(FileSystem.readDirectoryAsync);
+const defaultReadDir = readDirMock.getMockImplementation();
+
+function autoName(date: Date): string {
+  const stamp = date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  return `healthtracker-auto-${stamp}.json`;
+}
+
+function seedAuto(date: Date, content = '{}'): string {
+  const uri = `${AUTO_DIR}${autoName(date)}`;
+  files.set(uri, { content, mtime: 1 });
+  return uri;
+}
+
+function autoFiles(): string[] {
+  return [...files.keys()].filter((uri) => uri.startsWith(AUTO_DIR)).sort();
+}
+
+function deletedUris(): string[] {
+  return deleteAsync.mock.calls.map(([uri]) => uri);
+}
+
+describe('runAutoBackupIfDue', () => {
+  beforeEach(() => {
+    if (defaultReadDir) readDirMock.mockImplementation(defaultReadDir);
+  });
+
+  it('writes one backup with the UTC timestamp name when none exists', async () => {
+    await runAutoBackupIfDue(NOW);
+
+    expect(autoFiles()).toEqual([`${AUTO_DIR}${autoName(NOW)}`]);
+    const name = autoFiles()[0].slice(AUTO_DIR.length);
+    expect(name).toMatch(AUTO_NAME);
+    expect(name).toBe('healthtracker-auto-20261008T140300Z.json');
+    const saved = JSON.parse(files.get(autoFiles()[0])?.content ?? '{}');
+    expect(saved.format).toBe('healthtracker-backup');
+    expect(FileSystem.makeDirectoryAsync).toHaveBeenCalledWith(AUTO_DIR, { intermediates: true });
+  });
+
+  it('writes nothing when the newest backup is 23 hours old', async () => {
+    const existing = seedAuto(new Date(NOW.getTime() - 23 * HOUR));
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(autoFiles()).toEqual([existing]);
+  });
+
+  it('writes a backup when the newest is 25 hours old', async () => {
+    seedAuto(new Date(NOW.getTime() - 25 * HOUR));
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(autoFiles()).toHaveLength(2);
+    expect(files.has(`${AUTO_DIR}${autoName(NOW)}`)).toBe(true);
+  });
+
+  it('writes a backup when the newest is exactly 24 hours old', async () => {
+    seedAuto(new Date(NOW.getTime() - 24 * HOUR));
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(files.has(`${AUTO_DIR}${autoName(NOW)}`)).toBe(true);
+  });
+
+  it('treats a backup dated up to an hour ahead as the newest', async () => {
+    const ahead = seedAuto(new Date(NOW.getTime() + HOUR / 2));
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(autoFiles()).toEqual([ahead]);
+  });
+
+  it('writes a backup when the newest is dated more than an hour ahead, and keeps that file', async () => {
+    const ahead = seedAuto(new Date(NOW.getTime() + 2 * HOUR));
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(files.has(`${AUTO_DIR}${autoName(NOW)}`)).toBe(true);
+    expect(files.has(ahead)).toBe(true);
+  });
+
+  it('decides the newest by file name, not by file-system time', async () => {
+    const oldByName = seedAuto(new Date(NOW.getTime() - 30 * HOUR));
+    const touched = files.get(oldByName);
+    if (touched) touched.mtime = NOW.getTime();
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(files.has(`${AUTO_DIR}${autoName(NOW)}`)).toBe(true);
+  });
+
+  it('keeps the newest 7 valid backups and leaves foreign files alone', async () => {
+    const old = Array.from({ length: 7 }, (_, i) =>
+      seedAuto(new Date(NOW.getTime() - (25 + i * 24) * HOUR))
+    );
+    const foreign = `${AUTO_DIR}notes.txt`;
+    const lookalike = `${AUTO_DIR}healthtracker-auto-20260101T000000Z.json.bak`;
+    const otherPrefix = `${AUTO_DIR}healthtracker-backup-2026-01-01.json`;
+    for (const uri of [foreign, lookalike, otherPrefix]) {
+      files.set(uri, { content: 'keep', mtime: 1 });
+    }
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(files.has(old[6])).toBe(false);
+    for (const uri of old.slice(0, 6)) expect(files.has(uri)).toBe(true);
+    expect(files.has(`${AUTO_DIR}${autoName(NOW)}`)).toBe(true);
+    expect(autoFiles().filter((uri) => AUTO_NAME.test(uri.slice(AUTO_DIR.length)))).toHaveLength(7);
+    for (const uri of [foreign, lookalike, otherPrefix]) expect(files.has(uri)).toBe(true);
+  });
+
+  it('does not prune future-dated backups or count them toward the 7', async () => {
+    const ahead = seedAuto(new Date(NOW.getTime() + 5 * HOUR));
+    const old = Array.from({ length: 7 }, (_, i) =>
+      seedAuto(new Date(NOW.getTime() - (25 + i * 24) * HOUR))
+    );
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(files.has(ahead)).toBe(true);
+    expect(files.has(old[6])).toBe(false);
+    expect(files.has(old[5])).toBe(true);
+  });
+
+  it('prunes nothing when no new backup was due', async () => {
+    const recent = seedAuto(new Date(NOW.getTime() - HOUR));
+    const older = Array.from({ length: 8 }, (_, i) =>
+      seedAuto(new Date(NOW.getTime() - (30 + i * 24) * HOUR))
+    );
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(files.has(recent)).toBe(true);
+    for (const uri of older) expect(files.has(uri)).toBe(true);
+    expect(deleteAsync).not.toHaveBeenCalled();
+  });
+
+  it('removes leftover temporary files and never lists them', async () => {
+    const tmp = `${AUTO_DIR}${autoName(new Date(NOW.getTime() - HOUR))}.tmp`;
+    files.set(tmp, { content: 'half', mtime: 1 });
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(files.has(tmp)).toBe(false);
+    expect(autoFiles()).toEqual([`${AUTO_DIR}${autoName(NOW)}`]);
+  });
+
+  it('never deletes a name that is not a plain auto-backup name', async () => {
+    const valid = Array.from({ length: 9 }, (_, i) =>
+      autoName(new Date(NOW.getTime() - (25 + i * 24) * HOUR))
+    );
+    const hostile = [
+      '../healthtracker-auto-20200101T000000Z.json',
+      '..',
+      'sub/healthtracker-auto-20200101T000000Z.json',
+      'healthtracker-auto-20200101T000000Z.json/../../SQLite/healthtracker.db',
+      'healthtracker-auto-20201341T250000Z.json',
+    ];
+    readDirMock.mockResolvedValue([...hostile, ...valid]);
+
+    await runAutoBackupIfDue(NOW);
+
+    const deleted = deletedUris();
+    expect(deleted.length).toBeGreaterThan(0);
+    for (const uri of deleted) {
+      expect(uri.startsWith(AUTO_DIR)).toBe(true);
+      expect(valid).toContain(uri.slice(AUTO_DIR.length));
+    }
+  });
+
+  it('rejects, removes the temp file and deletes nothing else when the write fails', async () => {
+    const existing = seedAuto(new Date(NOW.getTime() - 25 * HOUR));
+    writeAsyncMock.mockRejectedValueOnce(new Error('disk full'));
+
+    await expect(runAutoBackupIfDue(NOW)).rejects.toThrow('disk full');
+
+    expect(autoFiles()).toEqual([existing]);
+    expect(deletedUris()).toEqual([`${AUTO_DIR}${autoName(NOW)}.tmp`]);
+  });
+
+  it('rejects and removes the temp file when moving it into place fails', async () => {
+    const existing = seedAuto(new Date(NOW.getTime() - 25 * HOUR));
+    moveAsyncMock.mockRejectedValueOnce(new Error('move failed'));
+
+    await expect(runAutoBackupIfDue(NOW)).rejects.toThrow('move failed');
+
+    expect(autoFiles()).toEqual([existing]);
+    expect(deletedUris()).toEqual([`${AUTO_DIR}${autoName(NOW)}.tmp`]);
+  });
+
+  it('writes under a temporary name first and only then moves it into place', async () => {
+    await runAutoBackupIfDue(NOW);
+
+    const finalUri = `${AUTO_DIR}${autoName(NOW)}`;
+    const written = writeAsyncMock.mock.calls.map(([uri]) => uri);
+    expect(written).toContain(`${finalUri}.tmp`);
+    expect(written).not.toContain(finalUri);
+    expect(moveAsyncMock).toHaveBeenCalledWith({ from: `${finalUri}.tmp`, to: finalUri });
+  });
+
+  it('still succeeds and deletes the others when one prune delete fails', async () => {
+    const old = Array.from({ length: 9 }, (_, i) =>
+      seedAuto(new Date(NOW.getTime() - (25 + i * 24) * HOUR))
+    );
+    deleteAsync.mockRejectedValueOnce(new Error('locked'));
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(runAutoBackupIfDue(NOW)).resolves.toBeUndefined();
+
+    expect(files.has(`${AUTO_DIR}${autoName(NOW)}`)).toBe(true);
+    // 10 valid files after the write, so 3 are over the limit. One delete fails,
+    // the other two still go.
+    expect(old.slice(0, 6).every((uri) => files.has(uri))).toBe(true);
+    expect(old.slice(6).filter((uri) => files.has(uri))).toHaveLength(1);
+    expect(deleteAsync).toHaveBeenCalledTimes(3);
+  });
+
+  it('runs once for two concurrent calls', async () => {
+    const first = runAutoBackupIfDue(NOW);
+    const second = runAutoBackupIfDue(NOW);
+
+    await Promise.all([first, second]);
+
+    expect(second).toBe(first);
+    const writes = writeAsyncMock.mock.calls.filter(([uri]) => uri.startsWith(AUTO_DIR));
+    expect(writes).toHaveLength(1);
+  });
+
+  it('can run again after a run has finished', async () => {
+    await runAutoBackupIfDue(NOW);
+    await runAutoBackupIfDue(new Date(NOW.getTime() + 25 * HOUR));
+
+    expect(autoFiles()).toHaveLength(2);
+  });
+});
+
+describe('listAutoBackups', () => {
+  beforeEach(() => {
+    if (defaultReadDir) readDirMock.mockImplementation(defaultReadDir);
+  });
+
+  it('is empty when the folder does not exist yet', async () => {
+    await expect(listAutoBackups()).resolves.toEqual([]);
+  });
+
+  it('lists valid backups newest first with date and size, ignoring other files', async () => {
+    const older = seedAuto(new Date(NOW.getTime() - 48 * HOUR), 'a'.repeat(10));
+    const newer = seedAuto(new Date(NOW.getTime() - 2 * HOUR), 'b'.repeat(2048));
+    files.set(`${AUTO_DIR}notes.txt`, { content: 'x', mtime: 9_999_999 });
+    files.set(`${AUTO_DIR}${autoName(NOW)}.tmp`, { content: 'x', mtime: 9_999_999 });
+    const newerFile = files.get(newer);
+    if (newerFile) newerFile.mtime = 1;
+
+    const list = await listAutoBackups();
+
+    expect(list.map((entry) => entry.uri)).toEqual([newer, older]);
+    expect(list[0]).toEqual({
+      name: autoName(new Date(NOW.getTime() - 2 * HOUR)),
+      uri: newer,
+      createdAt: new Date(NOW.getTime() - 2 * HOUR),
+      sizeBytes: 2048,
+    });
+    expect(list[1].sizeBytes).toBe(10);
+  });
+
+  it('lists a future-dated backup as it is', async () => {
+    const ahead = seedAuto(new Date(NOW.getTime() + 10 * 24 * HOUR));
+
+    const list = await listAutoBackups();
+
+    expect(list.map((entry) => entry.uri)).toEqual([ahead]);
+  });
+
+  it('drops an entry whose file has gone missing', async () => {
+    const kept = seedAuto(new Date(NOW.getTime() - 2 * HOUR));
+    const missing = autoName(new Date(NOW.getTime() - 50 * HOUR));
+    readDirMock.mockResolvedValue([autoName(new Date(NOW.getTime() - 2 * HOUR)), missing]);
+
+    const list = await listAutoBackups();
+
+    expect(list.map((entry) => entry.uri)).toEqual([kept]);
   });
 });
