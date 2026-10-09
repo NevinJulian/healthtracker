@@ -24,6 +24,8 @@ jest.mock('../services/rescueExport', () => ({
 }));
 jest.mock('../services/backup', () => ({
   runAutoBackupIfDue: jest.fn(() => Promise.resolve()),
+  listAutoBackups: jest.fn(() => Promise.resolve([])),
+  shareFile: jest.fn(() => Promise.resolve(true)),
 }));
 jest.mock('../db/devStress369', () => ({ installStress369: jest.fn() }));
 jest.mock('../services/notifications', () => ({
@@ -55,11 +57,27 @@ jest.mock('../screens/OnboardingScreen', () => {
 import { useFonts } from 'expo-font';
 import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from '../db/database';
 import { exportRawDatabase, hasRescueWal } from '../services/rescueExport';
+import { listAutoBackups, shareFile } from '../services/backup';
 import App from '../../App';
 import { COLD_RENDER_WAIT } from '../testUtils/coldRenderWait';
 
 const rescue = exportRawDatabase as jest.Mock;
 const walPresent = hasRescueWal as jest.Mock;
+const listBackups = listAutoBackups as jest.Mock;
+const share = shareFile as jest.Mock;
+
+const NEWEST_BACKUP = {
+  name: 'healthtracker-auto-20261008T140300Z.json',
+  uri: 'file:///document/auto-backups/healthtracker-auto-20261008T140300Z.json',
+  createdAt: new Date('2026-10-08T14:03:00.000Z'),
+  sizeBytes: 2048,
+};
+const OLDER_BACKUP = {
+  name: 'healthtracker-auto-20261007T090500Z.json',
+  uri: 'file:///document/auto-backups/healthtracker-auto-20261007T090500Z.json',
+  createdAt: new Date('2026-10-07T09:05:00.000Z'),
+  sizeBytes: 500,
+};
 
 let consoleError: jest.SpyInstance;
 
@@ -71,6 +89,8 @@ beforeEach(() => {
   (useFonts as jest.Mock).mockReturnValue([true, null]);
   (initDatabase as jest.Mock).mockReset().mockResolvedValue(undefined);
   walPresent.mockResolvedValue(false);
+  listBackups.mockReset().mockResolvedValue([]);
+  share.mockReset().mockResolvedValue(true);
   (getOnboardingComplete as jest.Mock).mockResolvedValue(true);
   (getLatestBodyWeight as jest.Mock).mockResolvedValue(null);
 });
@@ -138,5 +158,39 @@ describe('App render crash screen', () => {
     expect(
       await screen.findByText('Saving shares two files. Keep both.', undefined, COLD_RENDER_WAIT),
     ).toBeTruthy();
+  });
+
+  it('offers Share latest backup when an automatic backup exists, and shares the newest one', async () => {
+    listBackups.mockResolvedValue([NEWEST_BACKUP, OLDER_BACKUP]);
+    render(<App />);
+
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Share latest backup' }, COLD_RENDER_WAIT),
+    );
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(share).toHaveBeenCalledWith(NEWEST_BACKUP.uri, 'Save your HealthTracker backup');
+    expect(screen.getAllByRole('button')).toHaveLength(3);
+    expect(rescue).not.toHaveBeenCalled();
+  });
+
+  it('offers no Share latest backup when there is no automatic backup', async () => {
+    render(<App />);
+    await screen.findByText(/screen exploded/, undefined, COLD_RENDER_WAIT);
+    await waitFor(() => expect(listBackups).toHaveBeenCalled());
+
+    expect(screen.queryByRole('button', { name: 'Share latest backup' })).toBeNull();
+  });
+
+  it('shows the message when sharing the latest backup fails', async () => {
+    listBackups.mockResolvedValue([NEWEST_BACKUP]);
+    share.mockRejectedValue(new Error('file vanished'));
+    render(<App />);
+
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Share latest backup' }, COLD_RENDER_WAIT),
+    );
+
+    expect(await screen.findByText('file vanished')).toBeTruthy();
   });
 });
