@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView } from 'react-native';
+import { AppState, ScrollView } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 jest.mock('react-native-gesture-handler', () => ({}));
@@ -239,5 +239,90 @@ describe('App automatic backup', () => {
     fireEvent.press(await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT));
     await screen.findByText('NAVIGATOR');
     await waitFor(() => expect(autoBackup).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('App automatic backup when the app returns to the foreground', () => {
+  const addListener = jest.mocked(AppState.addEventListener);
+
+  // Calls every 'change' listener whose subscription has not been removed.
+  async function emitAppState(state: string) {
+    await act(async () => {
+      addListener.mock.calls.forEach(([type, handler], index) => {
+        const subscription = addListener.mock.results[index]?.value as { remove: jest.Mock };
+        if (type !== 'change' || subscription.remove.mock.calls.length > 0) return;
+        (handler as (next: string) => void)(state);
+      });
+    });
+  }
+
+  async function renderStarted() {
+    init.mockResolvedValue(undefined);
+    const view = render(<App />);
+    await screen.findByText('NAVIGATOR', undefined, COLD_RENDER_WAIT);
+    await waitFor(() => expect(autoBackup).toHaveBeenCalledTimes(1));
+    return view;
+  }
+
+  it('checks again every time the app becomes active', async () => {
+    await renderStarted();
+
+    await emitAppState('active');
+    expect(autoBackup).toHaveBeenCalledTimes(2);
+
+    await emitAppState('background');
+    await emitAppState('active');
+    expect(autoBackup).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not check when the app goes to the background or becomes inactive', async () => {
+    await renderStarted();
+
+    await emitAppState('inactive');
+    await emitAppState('background');
+
+    expect(autoBackup).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no recovery screen and logs when a foreground check rejects', async () => {
+    await renderStarted();
+    autoBackup.mockRejectedValue(new Error('disk full'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await emitAppState('active');
+
+    await waitFor(() => expect(warn).toHaveBeenCalledWith('[App] Auto-backup failed:', expect.any(Error)));
+    expect(screen.getByText('NAVIGATOR')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save data' })).toBeNull();
+  });
+
+  it('does not check when the database failed to initialise', async () => {
+    init.mockRejectedValue(new Error('disk exploded'));
+    render(<App />);
+    await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT);
+
+    await emitAppState('active');
+
+    expect(autoBackup).not.toHaveBeenCalled();
+  });
+
+  it('does not check on a font load error', async () => {
+    (useFonts as jest.Mock).mockReturnValue([false, new Error('font failed')]);
+    init.mockResolvedValue(undefined);
+    render(<App />);
+    await screen.findByText(/font failed/, undefined, COLD_RENDER_WAIT);
+
+    await emitAppState('active');
+
+    expect(autoBackup).not.toHaveBeenCalled();
+  });
+
+  it('stops checking once the app is unmounted', async () => {
+    const { unmount } = await renderStarted();
+
+    unmount();
+    await emitAppState('active');
+
+    expect(autoBackup).toHaveBeenCalledTimes(1);
   });
 });

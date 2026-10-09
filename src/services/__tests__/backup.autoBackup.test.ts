@@ -69,9 +69,15 @@ jest.mock('../notifications', () => ({
   reconcileScheduledNotifications: jest.fn(async () => undefined),
 }));
 
+jest.mock('../../utils/dates', () => {
+  const actual = jest.requireActual('../../utils/dates');
+  return { ...actual, localDateKey: jest.fn(actual.localDateKey) };
+});
+
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as db from '../../db/database';
+import { localDateKey } from '../../utils/dates';
 import {
   shareFile,
   writeSafetySnapshot,
@@ -90,6 +96,8 @@ const dirs = fsMock.__dirs;
 const deleteAsync = jest.mocked(FileSystem.deleteAsync);
 const writeAsyncMock = jest.mocked(FileSystem.writeAsStringAsync);
 const moveAsyncMock = jest.mocked(FileSystem.moveAsync);
+const localDateKeyMock = jest.mocked(localDateKey);
+const actualDates = jest.requireActual<typeof import('../../utils/dates')>('../../utils/dates');
 
 const SAFETY_DIR = 'file:///document/safety-snapshots/';
 const NOW = new Date(Date.UTC(2026, 9, 8, 14, 3, 0));
@@ -262,16 +270,26 @@ describe('runAutoBackupIfDue', () => {
     error.mockRestore();
   });
 
-  it('writes nothing when the newest backup is 23 hours old', async () => {
-    const existing = seedAuto(new Date(NOW.getTime() - 23 * HOUR));
+  it('writes nothing when a backup from earlier today exists', async () => {
+    const existing = seedAuto(new Date(Date.UTC(2026, 9, 8, 0, 0, 0)));
 
-    await runAutoBackupIfDue(NOW);
+    await runAutoBackupIfDue(new Date(Date.UTC(2026, 9, 8, 23, 59, 59)));
 
     expect(autoFiles()).toEqual([existing]);
   });
 
-  it('writes a backup when the newest is 25 hours old', async () => {
-    seedAuto(new Date(NOW.getTime() - 25 * HOUR));
+  it('writes a backup on a new day, even when the newest is a second old', async () => {
+    seedAuto(new Date(Date.UTC(2026, 9, 8, 23, 59, 59)));
+    const midnight = new Date(Date.UTC(2026, 9, 9, 0, 0, 0));
+
+    await runAutoBackupIfDue(midnight);
+
+    expect(autoFiles()).toHaveLength(2);
+    expect(files.has(`${AUTO_DIR}${autoName(midnight)}`)).toBe(true);
+  });
+
+  it('writes a backup when the newest is from yesterday evening', async () => {
+    seedAuto(new Date(NOW.getTime() - 15 * HOUR));
 
     await runAutoBackupIfDue(NOW);
 
@@ -279,15 +297,16 @@ describe('runAutoBackupIfDue', () => {
     expect(files.has(`${AUTO_DIR}${autoName(NOW)}`)).toBe(true);
   });
 
-  it('writes a backup when the newest is exactly 24 hours old', async () => {
-    seedAuto(new Date(NOW.getTime() - 24 * HOUR));
+  it('writes nothing when today has a backup that is not the newest by name', async () => {
+    const today = seedAuto(new Date(NOW.getTime() - HOUR));
+    const ahead = seedAuto(new Date(NOW.getTime() + 3 * DAY));
 
     await runAutoBackupIfDue(NOW);
 
-    expect(files.has(`${AUTO_DIR}${autoName(NOW)}`)).toBe(true);
+    expect(autoFiles()).toEqual([today, ahead].sort());
   });
 
-  it('treats a backup dated up to an hour ahead as the newest', async () => {
+  it('writes nothing when a backup is dated later today', async () => {
     const ahead = seedAuto(new Date(NOW.getTime() + HOUR / 2));
 
     await runAutoBackupIfDue(NOW);
@@ -295,8 +314,8 @@ describe('runAutoBackupIfDue', () => {
     expect(autoFiles()).toEqual([ahead]);
   });
 
-  it('writes a backup when the newest is dated more than an hour ahead, and keeps that file', async () => {
-    const ahead = seedAuto(new Date(NOW.getTime() + 2 * HOUR));
+  it('writes a backup when the only one is dated on a later day, and keeps that file', async () => {
+    const ahead = seedAuto(new Date(NOW.getTime() + 2 * DAY));
 
     await runAutoBackupIfDue(NOW);
 
@@ -304,7 +323,36 @@ describe('runAutoBackupIfDue', () => {
     expect(files.has(ahead)).toBe(true);
   });
 
-  it('decides the newest by file name, not by file-system time', async () => {
+  describe('in a time zone two hours ahead of UTC', () => {
+    beforeEach(() => {
+      localDateKeyMock.mockImplementation((date: Date = new Date()) =>
+        new Date(date.getTime() + 2 * HOUR).toISOString().slice(0, 10)
+      );
+    });
+
+    afterEach(() => {
+      localDateKeyMock.mockImplementation(actualDates.localDateKey);
+    });
+
+    it('writes a backup after local midnight, although the UTC date has not changed', async () => {
+      seedAuto(new Date(Date.UTC(2026, 9, 8, 21, 0, 0)));
+      const afterLocalMidnight = new Date(Date.UTC(2026, 9, 8, 22, 30, 0));
+
+      await runAutoBackupIfDue(afterLocalMidnight);
+
+      expect(files.has(`${AUTO_DIR}${autoName(afterLocalMidnight)}`)).toBe(true);
+    });
+
+    it('writes nothing later the same local day, although the UTC date has changed', async () => {
+      const existing = seedAuto(new Date(Date.UTC(2026, 9, 8, 23, 0, 0)));
+
+      await runAutoBackupIfDue(new Date(Date.UTC(2026, 9, 9, 0, 30, 0)));
+
+      expect(autoFiles()).toEqual([existing]);
+    });
+  });
+
+  it('decides the date by file name, not by file-system time', async () => {
     const oldByName = seedAuto(new Date(NOW.getTime() - 30 * HOUR));
     const touched = files.get(oldByName);
     if (touched) touched.mtime = NOW.getTime();
@@ -335,7 +383,7 @@ describe('runAutoBackupIfDue', () => {
   });
 
   it('does not prune future-dated backups or count them toward the 7', async () => {
-    const ahead = seedAuto(new Date(NOW.getTime() + 5 * HOUR));
+    const ahead = seedAuto(new Date(NOW.getTime() + 2 * DAY));
     const old = Array.from({ length: 7 }, (_, i) =>
       seedAuto(new Date(NOW.getTime() - (25 + i * 24) * HOUR))
     );
