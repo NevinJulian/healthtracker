@@ -136,7 +136,7 @@
       "workOrder": "C:/git/ht-lanes/wo/337.md",
       "deviceCheck": "Expo Go: open the logger for an exercise you logged on an earlier day. The line shows that session's last working set (not a warm-up), and tapping it fills both fields. An exercise you never logged shows no line.",
       "notes": "WO ready (analysed on the snapshot of #344 at 10a3f39), no PARK, no file outside lane A, no migration. New getLastSetForExercise + exported WORKOUT_LAST_SET_SQL directly after getWorkoutHistory in database.ts: exercise = ? AND date < ? AND (set_type IS NULL OR set_type <> 'warmup') ORDER BY date DESC, set_index DESC LIMIT 1; an EXPLAIN QUERY PLAN test pins the (exercise, date) index. The modal gets a today prop (the Dashboard's render-time value, the one handleLogSet writes with), fetches in an effect with a cancelled flag, shows no line while loading or after a failed read. Analyst picks to repeat in the report: when the most recent earlier day holds only warm-ups the line shows the last working set of the next older day that has one (reading of 'last working set of the most recent session', warm-ups never count); line text 'Last time: 80 kg x 8' (U+00D7) with a middle dot and yesterday / N days ago, no month or year forms; weight printed like the set list (80, 82.5); the line sits between the toggle and the inputs; tapping overwrites typed text and does not log; with a set already logged today only Reps shows a placeholder; exercise names match exactly as stored. | dev: 8 commits in 4 test/code pairs, tip 57d39b3, 1426/109 per dev. Ten DashboardScreen.*.test.tsx mocks gained getLastSetForExercise; no existing assertion changed. The index test passed already at the stub commit (the SQL constant came with the stub); tester asked for a mutation proof. The SetLoggerModal doc comment was corrected.",
-      "securityReview": "running in parallel with the tester on 10a3f39..57d39b3"
+      "securityReview": "APPROVE (10a3f39..57d39b3, read through git): WORKOUT_LAST_SET_SQL is a constant, exercise and beforeDate are bound, read-only, LIMIT 1; stored reps and weight_kg only reach template strings, String() and placeholder props; tapping the line only sets the two inputs, the user still presses Add and handleAdd's validation (integer reps 1-100, finite weight 0.5-500) is unchanged; logWorkoutSet, handleLogSet and the delete path are not in the diff; the read's failure is caught and logged and cannot block or fake a write; a malformed stored date gives no 'when' text and no crash. Note: the reviewer did not re-check that set_type exists before the query runs (v39 from #344 on this branch; the tester's real-engine suite covers it)."
     },
     "338": {
       "lane": "C",
@@ -431,6 +431,10 @@
     {
       "at": "2026-10-09T07:53:57Z",
       "event": "#443 ready (tester APPROVE r0, security APPROVE, 1402/108) -> lane D moves to #352, developer dispatched. Filed #451 (save with partial macros after Recompute or an edit during a pending save; reproduced by the #443 tester; not worked). #337 dev done (8 commits, tip 57d39b3; 1426/109 per dev) -> in_test, security in parallel"
+    },
+    {
+      "at": "2026-10-09T07:54:20Z",
+      "event": "#337 security APPROVE on 57d39b3 (tester still running)"
     }
   ],
   "aheadAnalysis": {
