@@ -3273,10 +3273,19 @@ async function _logWorkoutSetImpl(
   const db = getDatabase();
   const createdAt = new Date().toISOString();
   await db.runAsync(
-    `INSERT INTO workout_set_log (date, exercise, set_index, reps, weight_kg, created_at)
-     SELECT ?, ?, COALESCE(MAX(set_index), -1) + 1, ?, ?, ?
+    `INSERT INTO workout_set_log (date, exercise, set_index, reps, weight_kg, created_at, set_type)
+     SELECT ?, ?, COALESCE(MAX(set_index), -1) + 1, ?, ?, ?, ?
      FROM workout_set_log WHERE date = ? AND exercise = ?`,
-    [date, exercise, set.reps, set.weightKg, createdAt, date, exercise]
+    [
+      date,
+      exercise,
+      set.reps,
+      set.weightKg,
+      createdAt,
+      set.setType === 'warmup' ? 'warmup' : null,
+      date,
+      exercise,
+    ]
   );
 }
 
