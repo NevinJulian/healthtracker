@@ -194,15 +194,27 @@
     "339": {
       "lane": "C",
       "kind": "feature",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "commits": [],
+      "commits": [
+        "edc742c",
+        "8ec9bba",
+        "83cb3f2",
+        "1b4eb66",
+        "5aafc11",
+        "82a70de",
+        "e57f83c",
+        "308cc0f",
+        "b8f9757",
+        "c8bd38a"
+      ],
       "title": "CSV export alongside the JSON backup",
       "decisionSource": "owner comment 6070878592 on #339: three files shared one after the other (workout_sets.csv, daily_log.csv, meals.csv), no zip, a dismissed sheet does not stop the next; 'Export as CSV' button below the JSON export; RFC 4180 quoting, UTF-8 with BOM, ISO dates, one header row, empty db = headers only; columns as listed in the comment (set_type working|warmup from #344); built in memory; unit tests for the escaping helper",
       "securityPlan": "required (filesystem, db reads, user text into files)",
       "workOrder": "C:/git/ht-lanes/wo/339.md",
       "deviceCheck": "Expo Go: export, save the three files and open meals.csv in Google Sheets. Umlauts and recipe names with commas are intact. On Android also check that the three share sheets appear one after the other.",
-      "notes": "WO ready (ahead), no PARK, no file outside lane C, no migration. New src/services/csvExport.ts (pure escapeCsvField, buildCsv and three serialisers, separate from exportCsv which reads, writes and shares), three new unbounded ordered readers in database.ts next to their related readers, one button in SettingsScreen.tsx; backup.ts and App.tsx untouched (shareFile is not reused, it hardcodes the JSON mime type). Verified: created_at is stored as toISOString(); recipe macros are INTEGER and already per serving; recipes are only archived, never hard-deleted, so a missing recipe can only come from a restored backup (title and macros then written empty). daily_log exports date, body_weight, water_ml, walk_completed, hammer_completed, fasting_completed; left out: the two task labels, is_rest_day, is_meal_prep_day and both JSON columns. Analyst picks to repeat in the report: CRLF line ends with a final CRLF; NULL and non-finite numbers written empty, flags as 0/1; set_type written as working for anything that is not warmup; row order (sets by date, exercise, set_index; daily log by date, including the planned future rows; meals by date, meal type, id); files in cacheDirectory, overwritten each run; dialog title Save <filename>; partial failure shows CSV export incomplete naming the files, total failure CSV export failed, full success no message; the button shares backupBusy. FOR THE HUMAN, NOT IN THE DECISION: a FORMULA GUARD - a text field starting with = + - @ TAB or CR gets a leading apostrophe before quoting (numbers are never touched), so a recipe titled -5 min bowl is exported with an apostrophe in front. The decision says RFC 4180 quoting and that names stay intact; the guard is there because recipe titles can come from the web (TheMealDB, URL import) and a spreadsheet would run such a field as a formula. Easy to remove if a byte-faithful export is wanted. UNVERIFIED by the analyst: whether Sharing.shareAsync resolves only when the sheet is dismissed on Android (rescueExport already shares two files in sequence the same way)."
+      "notes": "WO ready (ahead), no PARK, no file outside lane C, no migration. New src/services/csvExport.ts (pure escapeCsvField, buildCsv and three serialisers, separate from exportCsv which reads, writes and shares), three new unbounded ordered readers in database.ts next to their related readers, one button in SettingsScreen.tsx; backup.ts and App.tsx untouched (shareFile is not reused, it hardcodes the JSON mime type). Verified: created_at is stored as toISOString(); recipe macros are INTEGER and already per serving; recipes are only archived, never hard-deleted, so a missing recipe can only come from a restored backup (title and macros then written empty). daily_log exports date, body_weight, water_ml, walk_completed, hammer_completed, fasting_completed; left out: the two task labels, is_rest_day, is_meal_prep_day and both JSON columns. Analyst picks to repeat in the report: CRLF line ends with a final CRLF; NULL and non-finite numbers written empty, flags as 0/1; set_type written as working for anything that is not warmup; row order (sets by date, exercise, set_index; daily log by date, including the planned future rows; meals by date, meal type, id); files in cacheDirectory, overwritten each run; dialog title Save <filename>; partial failure shows CSV export incomplete naming the files, total failure CSV export failed, full success no message; the button shares backupBusy. FOR THE HUMAN, NOT IN THE DECISION: a FORMULA GUARD - a text field starting with = + - @ TAB or CR gets a leading apostrophe before quoting (numbers are never touched), so a recipe titled -5 min bowl is exported with an apostrophe in front. The decision says RFC 4180 quoting and that names stay intact; the guard is there because recipe titles can come from the web (TheMealDB, URL import) and a spreadsheet would run such a field as a formula. Easy to remove if a byte-faithful export is wanted. UNVERIFIED by the analyst: whether Sharing.shareAsync resolves only when the sheet is dismissed on Android (rescueExport already shares two files in sequence the same way). | dev: all five steps done, 10 commits, tip c8bd38a, 1600/118 per dev, both exit codes 0. New src/services/csvExport.ts (escapeCsvField, guardFormula as ONE function with its own tests, three serialisers, exportCsv); database.ts +62 and 0 deletions: getAllDailyLogForExport at line 1216 (after getWeightHistory), getAllMealsForExport at 1751 (after getWeeklyMealPlan), getAllWorkoutSetsForExport at 3382 (after getWorkoutHistory), import block untouched; SettingsScreen +43. Headers exactly as the decision lists them. No existing test edited; the existing Settings suites needed no new mock entries. exportCsv checks isAvailableAsync first, reads all three tables (a reader error throws and nothing is written), then per file writes to cacheDirectory and awaits the share; a failure is recorded and the next file still goes out; all three failing throws. A dismissed share sheet cannot be detected and is not reported as failed.",
+      "securityReview": "running in parallel with the tester on e6fb6e6..c8bd38a"
     },
     "342": {
       "lane": "A",
@@ -532,7 +544,9 @@
     "SMALL (lane D cleanup): the field doc on notLookedUpIngredients in src/nutrition/importRecipe.ts:32 still says refused before a request was sent; after #442 a lookup that got a 429 answer lands there too (outside the lane's hunks, so left)",
     "SMALL (#338 dev r2): the docblock above safeTimestamp in backup.ts is detached from its function (it now sits above the snapshot folder and pattern constants) - for lane C cleanup",
     "SMALL (#338 dev r2): many older comments in backup.ts carry issue numbers (#310, #315, #302, #293, #279), outside the lines the lane touched",
-    "SMALL (#338 tester r2): while the safety-snapshot folder holds snapshots dated in the future (a wrong clock, later corrected), each new pre-restore snapshot survives only until the next restore, because the two latest-dated old ones are kept ahead of it; the copy for the restore in progress is never lost"
+    "SMALL (#338 tester r2): while the safety-snapshot folder holds snapshots dated in the future (a wrong clock, later corrected), each new pre-restore snapshot survives only until the next restore, because the two latest-dated old ones are kept ahead of it; the copy for the restore in progress is never lost",
+    "SMALL (#339 dev): csvExport.ts imports the readers from database.ts at module level, so the pure serialiser tests also load database.ts (works with the repo's expo-sqlite mock)",
+    "SMALL (#339 dev): exportCsv logs a failed file with console.warn, so the failing-share tests print warnings in jest output"
   ],
   "log": [
     {
@@ -720,6 +734,10 @@
       "at": "2026-10-09T08:45:53Z",
       "event": "#338 ready after 1 round trip (tester APPROVE r2, security APPROVE r2, 1530/113) -> lane C moves to #339, developer dispatched. The developer was told where the three new readers go in database.ts (after getWorkoutHistory, getWeightHistory, getWeeklyMealPlan) so the lane merges without a conflict: integration already has lane B's hunks near lines 20, 1622, 1785 and 2299 of that file. GitHub CI test check on integration bfc0492 (lanes A, B, D merged): completed success",
       "sha": "bfc0492"
+    },
+    {
+      "at": "2026-10-09T08:54:15Z",
+      "event": "#339 dev done (10 commits in five steps, tip c8bd38a; 1600/118 per dev, exit codes 0) -> in_test, security in parallel"
     }
   ],
   "aheadAnalysis": {
