@@ -63,7 +63,7 @@ import {
   type BodyMeasurement,
   type WorkoutSet,
 } from '../db/database';
-import { addDays as addDaysKey } from '../utils/dates';
+import { addDays as addDaysKey, daysBetween } from '../utils/dates';
 import { Card, ProgressBar, ScreenHeader, Pill } from '../components';
 import LoadErrorView from '../components/LoadErrorView';
 import {
@@ -82,6 +82,8 @@ import {
   bestSetPerDay,
   resolveSelectedExercise,
   plausibleWeights,
+  ewmaTrend,
+  visibleTrend,
   type HydrationDay,
   type WorkoutSetSlice,
 } from './analyticsHelpers';
@@ -122,6 +124,11 @@ function MetricCard({
 
 // ─── Weight trend (flat View-based chart with 30/90-day toggle) ───────────────
 
+const WEIGHT_CHART_HEIGHT = 80;
+const WEIGHT_DOT_SIZE = 6;
+const WEIGHT_DOT_OPACITY = 0.35;
+const TREND_LINE_THICKNESS = 2;
+
 export function WeightTrendCard({
   history30,
   history90,
@@ -130,6 +137,7 @@ export function WeightTrendCard({
   history90: { date: string; weight: number }[];
 }) {
   const [window, setWindow] = useState<WeightWindow>(30);
+  const [chartWidth, setChartWidth] = useState(0);
   const history = window === 30 ? history30 : history90;
 
   if (history30.length === 0 && history90.length === 0) {
@@ -153,7 +161,40 @@ export function WeightTrendCard({
   const minW = Math.min(...weights) - 2;
   const maxW = Math.max(...weights) + 2;
   const current = plausible.length > 0 ? weights[weights.length - 1] : null;
-  const range = maxW - minW || 1;
+
+  const longest = history90.length >= history30.length ? history90 : history30;
+  const trend = ewmaTrend(plausibleWeights(longest).valid);
+  const firstDate = plausible.length > 0 ? plausible[0].date : '';
+  const lastDate = plausible.length > 0 ? plausible[plausible.length - 1].date : '';
+  const trendShown = visibleTrend(trend).filter((p) => p.date >= firstDate);
+
+  const yValues = [...weights, ...trendShown.map((p) => p.trend)];
+  const yMin = Math.min(...yValues) - 2;
+  const yRange = Math.max(...yValues) + 2 - yMin || 1;
+  const spanDays = plausible.length > 0 ? daysBetween(firstDate, lastDate) : 0;
+  const xPct = (date: string) =>
+    spanDays > 0
+      ? Math.min(100, Math.max(0, (daysBetween(firstDate, date) / spanDays) * 100))
+      : 50;
+  const yPct = (kg: number) => ((kg - yMin) / yRange) * 100;
+
+  const segments =
+    chartWidth > 0
+      ? trendShown.slice(1).map((pt, i) => {
+          const a = trendShown[i];
+          const ax = (xPct(a.date) / 100) * chartWidth;
+          const ay = (1 - yPct(a.trend) / 100) * WEIGHT_CHART_HEIGHT;
+          const bx = (xPct(pt.date) / 100) * chartWidth;
+          const by = (1 - yPct(pt.trend) / 100) * WEIGHT_CHART_HEIGHT;
+          const length = Math.hypot(bx - ax, by - ay);
+          return {
+            left: (ax + bx) / 2 - length / 2,
+            top: (ay + by) / 2 - TREND_LINE_THICKNESS / 2,
+            width: length,
+            angle: Math.atan2(by - ay, bx - ax),
+          };
+        })
+      : [];
 
   return (
     <Card style={styles.sectionCard}>
@@ -210,42 +251,48 @@ export function WeightTrendCard({
         <Text style={styles.emptyText}>No data for this period.</Text>
       ) : (
         <>
-          {/* Flat chart: sage-tint area fill + sage bars + sageDeep dot on last point.
-              Uses View-based rendering (no new chart dependency) per DESIGN.md §5. */}
-          <View style={styles.chartContainer} testID="weight-chart">
-            {/* sageTint area spans the full chart width at half-opacity */}
+          {/* Raw weigh-ins as faint dots, trend as a solid line of rotated Views
+              (no chart dependency). Dots are placed by calendar day. */}
+          <View
+            style={styles.chartContainer}
+            testID="weight-chart"
+            onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}
+          >
             <View style={styles.areaBackground} />
 
-            {/* Bars + last-point dot */}
-            <View style={styles.lineLayer}>
-              {plausible.map((pt, i) => {
-                const heightPct = Math.max(4, ((pt.weight - minW) / range) * 100);
-                const isLast = i === plausible.length - 1;
-                return (
-                  <View key={`bar-${i}`} style={styles.barColumn}>
-                    {isLast ? (
-                      /* sageDeep dot for the most-recent data point */
-                      <View style={styles.lastDot} />
-                    ) : (
-                      <View
-                        style={[
-                          styles.bar,
-                          {
-                            height: `${heightPct}%`,
-                            backgroundColor: Colors.sage,
-                          },
-                        ]}
-                      />
-                    )}
-                    {(i === 0 || isLast) && (
-                      <Text style={styles.barDateLabel}>
-                        {pt.date.substring(8, 10)}/{pt.date.substring(5, 7)}
-                      </Text>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
+            {plausible.map((pt, i) => (
+              <View
+                key={`dot-${i}`}
+                testID={`weight-dot-${i}`}
+                style={[
+                  styles.weightDot,
+                  { left: `${xPct(pt.date)}%`, bottom: `${yPct(pt.weight)}%` },
+                ]}
+              />
+            ))}
+
+            {segments.map((s, i) => (
+              <View
+                key={`seg-${i}`}
+                testID={`trend-seg-${i}`}
+                style={[
+                  styles.trendSegment,
+                  {
+                    left: s.left,
+                    top: s.top,
+                    width: s.width,
+                    transform: [{ rotate: `${s.angle}rad` }],
+                  },
+                ]}
+              />
+            ))}
+
+            <Text style={[styles.barDateLabel, { left: 0 }]}>
+              {firstDate.substring(8, 10)}/{firstDate.substring(5, 7)}
+            </Text>
+            <Text style={[styles.barDateLabel, { right: 0 }]}>
+              {lastDate.substring(8, 10)}/{lastDate.substring(5, 7)}
+            </Text>
           </View>
 
           <View style={styles.chartMeta}>
@@ -1773,8 +1820,24 @@ const styles = StyleSheet.create({
     color: Colors.sageDeep,
   },
   chartContainer: {
-    height: 80,
+    height: WEIGHT_CHART_HEIGHT,
     marginBottom: Spacing.lg,
+  },
+  weightDot: {
+    position: 'absolute',
+    width: WEIGHT_DOT_SIZE,
+    height: WEIGHT_DOT_SIZE,
+    marginLeft: -WEIGHT_DOT_SIZE / 2,
+    marginBottom: -WEIGHT_DOT_SIZE / 2,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.sage,
+    opacity: WEIGHT_DOT_OPACITY,
+  },
+  trendSegment: {
+    position: 'absolute',
+    height: TREND_LINE_THICKNESS,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.sageDeep,
   },
   strengthChartContainer: {
     height: 80,
