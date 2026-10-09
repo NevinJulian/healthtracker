@@ -26,6 +26,8 @@ import {
   TREND_MIN_POINTS,
   ewmaTrend,
   visibleTrend,
+  weightRatePerWeek,
+  formatWeightRate,
 } from '../analyticsHelpers';
 
 // ─── computeStreaks ───────────────────────────────────────────────────────────
@@ -881,5 +883,70 @@ describe('visibleTrend', () => {
 
   it('shows one entry for exactly 5 points: the fifth', () => {
     expect(visibleTrend(make(5))).toEqual([{ i: 4 }]);
+  });
+});
+
+// ─── weightRatePerWeek / formatWeightRate ─────────────────────────────────────
+
+describe('weightRatePerWeek', () => {
+  const TODAY = '2024-01-14';
+  const at = (day: number, trend: number) => ({
+    date: `2024-01-${String(day + 1).padStart(2, '0')}`,
+    trend,
+  });
+  const line = (days: number[]) => days.map((d) => at(d, 80 - 0.1 * d));
+
+  it('uses calendar days, not point index, for the slope', () => {
+    const rate = weightRatePerWeek(line([0, 1, 3, 7, 13]), TODAY);
+    expect(rate).not.toBeNull();
+    expect(rate as number).toBeCloseTo(-0.7, 6);
+  });
+
+  it('excludes a point 14 days back', () => {
+    const points = [{ date: '2023-12-31', trend: 95 }, ...line([0, 1, 3, 7, 13])];
+    expect(weightRatePerWeek(points, TODAY) as number).toBeCloseTo(-0.7, 6);
+  });
+
+  it('excludes points after today', () => {
+    const points = [...line([0, 1, 3, 7, 13]), { date: '2024-01-20', trend: 95 }];
+    expect(weightRatePerWeek(points, TODAY) as number).toBeCloseTo(-0.7, 6);
+  });
+
+  it('is null when fewer than 5 points are in the window', () => {
+    const points = [{ date: '2023-12-31', trend: 95 }, ...line([1, 3, 7, 13])];
+    expect(weightRatePerWeek(points, TODAY)).toBeNull();
+    expect(weightRatePerWeek([], TODAY)).toBeNull();
+  });
+
+  it('is 0 when the trend is flat', () => {
+    const flat = [0, 1, 3, 7, 13].map((d) => at(d, 80));
+    const rate = weightRatePerWeek(flat, TODAY);
+    expect(rate).toBe(0);
+    expect(formatWeightRate(rate)).toBe('0.0 kg/week');
+  });
+
+  it('is null, not NaN, when every point is on the same day', () => {
+    const same = [80, 81, 82, 83, 84].map((t) => at(13, t));
+    expect(weightRatePerWeek(same, TODAY)).toBeNull();
+  });
+});
+
+describe('formatWeightRate', () => {
+  it('formats a loss with U+2212', () => {
+    expect(formatWeightRate(-0.7)).toBe('−0.7 kg/week');
+  });
+
+  it('formats a gain with a plus sign', () => {
+    expect(formatWeightRate(0.44)).toBe('+0.4 kg/week');
+  });
+
+  it('never shows a signed zero', () => {
+    expect(formatWeightRate(-0.04)).toBe('0.0 kg/week');
+    expect(formatWeightRate(0.04)).toBe('0.0 kg/week');
+    expect(formatWeightRate(-0)).toBe('0.0 kg/week');
+  });
+
+  it('shows a dash when there is no rate', () => {
+    expect(formatWeightRate(null)).toBe('—');
   });
 });

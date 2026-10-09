@@ -376,6 +376,26 @@ export function visibleTrend<T>(points: T[]): T[] {
   return points.slice(TREND_MIN_POINTS - 1);
 }
 
+export const RATE_WINDOW_DAYS = 14;
+export const RATE_MIN_POINTS = 5;
+
+/**
+ * Least-squares slope of the trend over the last RATE_WINDOW_DAYS calendar
+ * days up to `todayISO`, in kg per week. Null when the window holds fewer than
+ * RATE_MIN_POINTS points or they all fall on one day.
+ */
+export function weightRatePerWeek(
+  points: { date: string; trend: number }[],
+  todayISO: string
+): number | null {
+  return null;
+}
+
+/** "+0.4 kg/week", "−0.4 kg/week" (U+2212), "0.0 kg/week", or "—" when null. */
+export function formatWeightRate(kgPerWeek: number | null): string {
+  return '';
+}
+
 // ─────────────────────────────────────────────
 // Hydration helpers (#283)
 // ─────────────────────────────────────────────
