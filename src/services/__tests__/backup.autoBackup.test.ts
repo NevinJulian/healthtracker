@@ -56,9 +56,18 @@ jest.mock('../../db/database', () => ({
   restoreFromPayload: jest.fn(),
 }));
 
+jest.mock('../notifications', () => ({
+  reconcileScheduledNotifications: jest.fn(async () => undefined),
+}));
+
 import * as FileSystem from 'expo-file-system/legacy';
 import * as db from '../../db/database';
-import { writeSafetySnapshot, runAutoBackupIfDue, listAutoBackups } from '../backup';
+import {
+  writeSafetySnapshot,
+  runAutoBackupIfDue,
+  listAutoBackups,
+  restoreBackupFromUri,
+} from '../backup';
 
 const fsMock = FileSystem as unknown as typeof FileSystem & {
   __files: Map<string, { content: string; mtime: number }>;
@@ -444,5 +453,134 @@ describe('listAutoBackups', () => {
     const list = await listAutoBackups();
 
     expect(list.map((entry) => entry.uri)).toEqual([kept]);
+  });
+});
+
+describe('restoreBackupFromUri', () => {
+  const SOURCE = 'file:///cache/picked.json';
+  const tables = { daily_log: [{ date: '2026-10-01' }], settings: [{ key: 'a', value: '1' }] };
+  const restoreFromPayload = jest.mocked(db.restoreFromPayload);
+
+  function payloadJson(overrides: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      format: 'healthtracker-backup',
+      version: 1,
+      appVersion: '1.0.0',
+      schemaVersion: 5,
+      createdAt: '2026-10-01T00:00:00.000Z',
+      tables,
+      ...overrides,
+    });
+  }
+
+  beforeEach(() => {
+    if (defaultReadDir) readDirMock.mockImplementation(defaultReadDir);
+    restoreFromPayload.mockReset();
+    restoreFromPayload.mockResolvedValue({ tablesRestored: 2, rowsRestored: 2 });
+    files.set(SOURCE, { content: payloadJson(), mtime: 1 });
+  });
+
+  it('validates, writes a safety snapshot, then restores the file tables', async () => {
+    let snapshotExistedAtRestore = false;
+    restoreFromPayload.mockImplementation(async () => {
+      snapshotExistedAtRestore = [...files.keys()].some((uri) => uri.startsWith(SAFETY_DIR));
+      return { tablesRestored: 2, rowsRestored: 2 };
+    });
+
+    const result = await restoreBackupFromUri(SOURCE);
+
+    expect(restoreFromPayload).toHaveBeenCalledWith(tables, 5);
+    expect(snapshotExistedAtRestore).toBe(true);
+    expect(result).toEqual({
+      tablesRestored: 2,
+      rowsRestored: 2,
+      safetySnapshotUri: expect.stringMatching(/^file:\/\/\/document\/safety-snapshots\//),
+    });
+  });
+
+  it('rejects an invalid file before writing a snapshot or touching data', async () => {
+    files.set(SOURCE, { content: payloadJson({ format: 'other' }), mtime: 1 });
+
+    await expect(restoreBackupFromUri(SOURCE)).rejects.toThrow('not created by HealthTracker');
+
+    expect(restoreFromPayload).not.toHaveBeenCalled();
+    expect([...files.keys()].some((uri) => uri.startsWith(SAFETY_DIR))).toBe(false);
+  });
+
+  it('rejects a file that is not JSON', async () => {
+    files.set(SOURCE, { content: 'not json', mtime: 1 });
+
+    await expect(restoreBackupFromUri(SOURCE)).rejects.toThrow('could not parse JSON');
+
+    expect(restoreFromPayload).not.toHaveBeenCalled();
+  });
+
+  it('aborts when the safety snapshot fails and the caller declines to continue', async () => {
+    writeAsyncMock.mockRejectedValueOnce(new Error('disk full'));
+    const onSnapshotFailed = jest.fn(async () => false);
+
+    await expect(restoreBackupFromUri(SOURCE, { onSnapshotFailed })).rejects.toThrow(
+      'Restore aborted'
+    );
+
+    expect(onSnapshotFailed).toHaveBeenCalledWith('disk full');
+    expect(restoreFromPayload).not.toHaveBeenCalled();
+  });
+
+  it('restores without a snapshot uri when the caller chooses to continue', async () => {
+    writeAsyncMock.mockRejectedValueOnce(new Error('disk full'));
+
+    const result = await restoreBackupFromUri(SOURCE, { onSnapshotFailed: async () => true });
+
+    expect(result?.safetySnapshotUri).toBe('');
+    expect(restoreFromPayload).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a failed restore as leaving the data unchanged', async () => {
+    restoreFromPayload.mockRejectedValue(new Error('constraint'));
+
+    await expect(restoreBackupFromUri(SOURCE)).rejects.toThrow(
+      'Restore failed — your existing data was not changed'
+    );
+  });
+
+  it('never modifies or deletes the file it restores from', async () => {
+    const autoUri = seedAuto(new Date(NOW.getTime() - 5 * HOUR), payloadJson());
+
+    await restoreBackupFromUri(autoUri);
+
+    expect(files.get(autoUri)?.content).toBe(payloadJson());
+    expect(deletedUris()).not.toContain(autoUri);
+    expect(writeAsyncMock.mock.calls.map(([uri]) => uri)).not.toContain(autoUri);
+    expect(moveAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps automatic backups from running while a restore is in progress', async () => {
+    let release: () => void = () => undefined;
+    restoreFromPayload.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ tablesRestored: 2, rowsRestored: 2 });
+        })
+    );
+
+    const restoring = restoreBackupFromUri(SOURCE);
+    await new Promise((resolve) => setImmediate(resolve));
+    await runAutoBackupIfDue(NOW);
+    expect(autoFiles()).toEqual([]);
+
+    release();
+    await restoring;
+    await runAutoBackupIfDue(NOW);
+    expect(autoFiles()).toEqual([`${AUTO_DIR}${autoName(NOW)}`]);
+  });
+
+  it('allows automatic backups again after a restore fails', async () => {
+    restoreFromPayload.mockRejectedValue(new Error('constraint'));
+    await expect(restoreBackupFromUri(SOURCE)).rejects.toThrow();
+
+    await runAutoBackupIfDue(NOW);
+
+    expect(autoFiles()).toEqual([`${AUTO_DIR}${autoName(NOW)}`]);
   });
 });
