@@ -90,7 +90,7 @@
     "C": {
       "name": "data",
       "branch": "sprint/lane-c-data",
-      "worktree": "C:/git/ht-lanes/lane-c (created at caea6aa, npm ci running)",
+      "worktree": "C:/git/ht-lanes/lane-c",
       "status": "in_progress",
       "waitsFor": "lane A merged into sprint/auto-fixes (#339 exports #344's set type)",
       "order": [
@@ -149,7 +149,7 @@
     "338": {
       "lane": "C",
       "kind": "feature",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "title": "automatic rotating local backups",
@@ -273,7 +273,7 @@
       "workOrder": "C:/git/ht-lanes/wo/348.md",
       "deviceCheck": "Expo Go: plan Lunch on day 1 and on day 2 (a different recipe), copy day 1's lunch to days 2, 3 and 4. Expect 'Copied 2 meals. Skipped 1 already planned.', days 3 and 4 filled and unticked, day 2 unchanged. Then open Log Cooked Meal: your usual recipes sit under Often cooked at the top, each once.",
       "notes": "WO ready (ahead), no PARK, no migration. Verified: a slot is (date, meal_type) with a unique index (schema.ts:729) that restore drops briefly, so the copy SELECTs for emptiness inside its transaction; assignMealToPlan (database.ts:1760) checks no stock and moves no inventory (stock is a UI-only rule in AssignMealModal, MealPrepScreen.tsx:710); cook_log is one row per cook event. New: copyMealToDates(planId, dates), copyDayToDate(from, to) next to assignMealToPlan; rankOftenCooked + getOftenCookedRecipes next to getMostCookedRecipes. Analyst picks to repeat in the report: 'the next 7 days' = the 7 days the screen shows (today..today+6) minus the source day, so at most 6 targets; a copy does no stock check (the manual assign UI requires stock); result wording via Alert; section recipes are removed from the full list, which gets an All recipes header only when the section shows; archived recipes excluded; ties by later last date, then title, then id. | dev: all six steps done, 12 commits, tip 3358f01, 1550/117 per dev (jest exit code NOT captured; the tester captures it). copyMealToDates and copyDayToDate next to assignMealToPlan, each one queue unit with one transaction, emptiness checked by a SELECT inside it, shared private _insertCopyIfEmpty; rankOftenCooked pure with today as an argument, getOftenCookedRecipes next to getMostCookedRecipes. BEYOND THE WORK ORDER: copyResultMessage lives in a new src/data/copyResult.ts (the MealPrep suites mock the database module, so a helper there would be undefined in screen tests); a malformed last-cooked date scores 0 and ranks last. Two existing MealPrep suites gained one mock line each; no existing expect changed. The dev edited some files with sed and node scripts against the brief; the tester checks the diff for CR and mojibake. The new Copy day pill reuses assignBtnWrap (flex: 1); layout not checked on a device.",
-      "securityReview": "running in parallel with the tester on 3871273..3358f01"
+      "securityReview": "APPROVE (3871273..3358f01, read through git; tests not run by the reviewer): every value bound; dates validated with isValidDateKey like the neighbours; no UPDATE, DELETE or INSERT OR REPLACE in the new code, each insert guarded by a SELECT in the same transaction; the diff removes 0 lines from database.ts; each exported function is one queue unit with one transaction, the Impl functions call only a helper that opens no transaction; a failure part-way rolls back the whole call; two copies racing for one slot are serialised by the write queue, and a restore (which drops and recreates the unique index) is itself a queue unit, so a copy cannot run in that gap; copies never read or write meal_inventory and never copy the tick or the pointer, so a copied row cannot be credited for a portion that was never debited; a failed copy shows the Error alert and keeps the chooser open, the Copied alert comes only after the write resolved; the quiet catch wraps only the often-cooked read; the ranking cannot produce NaN (malformed date scores 0, future date clamped). Notes: the db functions accept past dates (only the screen limits targets to today..today+6); a copy still inserts when the source recipe is no longer in the library (assignMealToPlan behaves the same); loadData after a copy is not awaited."
     },
     "352": {
       "lane": "D",
@@ -556,6 +556,10 @@
     {
       "at": "2026-10-09T08:15:46Z",
       "event": "#348 dev done (12 commits in six steps, tip 3358f01; 1550/117 per dev, exit code not captured) -> in_test, security in parallel. Integration pushed at caea6aa; worktree lane-c created at caea6aa, npm ci running; snapshot worktree read-a removed"
+    },
+    {
+      "at": "2026-10-09T08:16:36Z",
+      "event": "#348 security APPROVE on 3358f01 (tester still running). npm ci ok in worktree lane-c -> #338 in_dev, developer dispatched on lane C. CI test check on the pushed integration tip caea6aa (lane A merged) is in progress"
     }
   ],
   "aheadAnalysis": {
