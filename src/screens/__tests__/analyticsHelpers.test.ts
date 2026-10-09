@@ -23,6 +23,9 @@ import {
   plausibleWeights,
   WEIGHT_MIN_KG,
   WEIGHT_MAX_KG,
+  TREND_MIN_POINTS,
+  ewmaTrend,
+  visibleTrend,
 } from '../analyticsHelpers';
 
 // ─── computeStreaks ───────────────────────────────────────────────────────────
@@ -816,3 +819,67 @@ function formatDate(d: Date): string {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dd}`;
 }
+
+// ─── ewmaTrend / visibleTrend ─────────────────────────────────────────────────
+
+describe('ewmaTrend', () => {
+  it('returns [] for no points', () => {
+    expect(ewmaTrend([])).toEqual([]);
+  });
+
+  it('starts at the first weight for a single point', () => {
+    const out = ewmaTrend([{ date: '2024-01-01', weight: 80 }]);
+    expect(out).toHaveLength(1);
+    expect(out[0].trend).toBe(80);
+    expect(out[0].date).toBe('2024-01-01');
+    expect(out[0].weight).toBe(80);
+  });
+
+  it('smooths a step with alpha 2/11', () => {
+    const weights = [80, 80, 80, 80, 90];
+    const out = ewmaTrend(
+      weights.map((weight, i) => ({ date: `2024-01-0${i + 1}`, weight }))
+    );
+    expect(out.map((p) => p.trend.toFixed(4))).toEqual([
+      '80.0000',
+      '80.0000',
+      '80.0000',
+      '80.0000',
+      '81.8182',
+    ]);
+  });
+
+  it('does not interpolate gaps: a missing stretch changes nothing', () => {
+    const gapped = ewmaTrend([
+      { date: '2024-01-01', weight: 80 },
+      { date: '2024-01-02', weight: 82 },
+      { date: '2024-01-10', weight: 80 },
+    ]);
+    const consecutive = ewmaTrend([
+      { date: '2024-01-01', weight: 80 },
+      { date: '2024-01-02', weight: 82 },
+      { date: '2024-01-03', weight: 80 },
+    ]);
+    expect(gapped[1].trend).toBeCloseTo(80.3636, 4);
+    expect(gapped[2].trend).toBeCloseTo(80.2975, 4);
+    expect(gapped.map((p) => p.trend)).toEqual(consecutive.map((p) => p.trend));
+  });
+});
+
+describe('visibleTrend', () => {
+  const make = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ i }));
+
+  it('shows the minimum point count constant as 5', () => {
+    expect(TREND_MIN_POINTS).toBe(5);
+  });
+
+  it('is empty for fewer than 5 points', () => {
+    expect(visibleTrend(make(4))).toEqual([]);
+    expect(visibleTrend([])).toEqual([]);
+  });
+
+  it('shows one entry for exactly 5 points: the fifth', () => {
+    expect(visibleTrend(make(5))).toEqual([{ i: 4 }]);
+  });
+});

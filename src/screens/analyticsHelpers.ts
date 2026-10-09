@@ -342,6 +342,32 @@ export function plausibleWeights<T extends { weight: number }>(
 }
 
 // ─────────────────────────────────────────────
+// Weight trend (exponentially weighted)
+// ─────────────────────────────────────────────
+
+export const TREND_ALPHA = 2 / (10 + 1);
+export const TREND_MIN_POINTS = 5;
+
+export interface TrendPoint {
+  date: string;
+  weight: number;
+  trend: number;
+}
+
+/**
+ * Exponentially weighted trend over plausible, ascending weigh-ins. One entry
+ * per weigh-in; days without one are not represented and do not change alpha.
+ */
+export function ewmaTrend(points: { date: string; weight: number }[]): TrendPoint[] {
+  return [];
+}
+
+/** Trend entries that are shown: those from the TREND_MIN_POINTS-th weigh-in on. */
+export function visibleTrend<T>(points: T[]): T[] {
+  return [];
+}
+
+// ─────────────────────────────────────────────
 // Hydration helpers (#283)
 // ─────────────────────────────────────────────
 
