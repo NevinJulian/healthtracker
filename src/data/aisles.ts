@@ -37,14 +37,14 @@ export const AISLE_KEYWORDS: Record<Exclude<Aisle, 'Other'>, string[]> = {
     'brombeer', 'grape', 'traube', 'mango', 'pineapple', 'ananas', 'melon', 'kiwi', 'peach', 'pfirsich',
     'plum', 'pflaume', 'cherries', 'kirsche', 'fig', 'figs', 'basil', 'basilikum', 'thai basil',
     'parsley', 'petersilie', 'coriander', 'koriander', 'cilantro', 'chives', 'schnittlauch', 'dill', 'mint',
-    'minze', 'fresh basil', 'fresh parsley', 'fresh coriander', 'fresh dill', 'fresh chives', 'fresh mint',
+    'gemüse', 'obst', 'fruit', 'vegetables', 'veggies', 'minze', 'fresh basil', 'fresh parsley', 'fresh coriander', 'fresh dill', 'fresh chives', 'fresh mint',
     'fresh thyme', 'fresh rosemary', 'fresh herbs', 'frische kräuter', 'sprouts', 'edamame pods',
   ],
   'Meat and fish': [
     'chicken', 'huhn', 'hähnchen', 'hühner', 'poulet', 'turkey', 'pute', 'truthahn', 'duck', 'ente',
     'beef', 'rind', 'veal', 'kalb', 'pork', 'schwein', 'lamb', 'lamm', 'venison', 'mince',
     'hackfleisch', 'gehacktes', 'steak', 'fillet', 'filet', 'ribs', 'rippchen', 'bacon', 'speck',
-    'ham', 'schinken', 'sausage', 'wurst', 'würstchen', 'salami', 'chorizo', 'fleisch',
+    'ham', 'schinken', 'pepperoni', 'sausage', 'wurst', 'würstchen', 'salami', 'chorizo', 'fleisch',
     'meat', 'liver', 'leber', 'salmon', 'lachs', 'tuna', 'thunfisch', 'cod', 'kabeljau', 'haddock',
     'mackerel', 'makrele', 'trout', 'forelle', 'sardine', 'anchov', 'herring', 'hering', 'sea bass',
     'seebarsch', 'tilapia', 'prawn', 'shrimp', 'garnele', 'crab', 'krabbe', 'lobster', 'mussel',
@@ -72,7 +72,7 @@ export const AISLE_KEYWORDS: Record<Exclude<Aisle, 'Other'>, string[]> = {
     'hirse', 'semolina', 'grieß', 'flour', 'mehl', 'cornstarch', 'stärke', 'baking powder', 'backpulver',
     'baking soda', 'natron', 'yeast', 'hefe', 'breadcrumb', 'paniermehl', 'semmelbrösel', 'sugar',
     'zucker', 'vanilla sugar', 'vanillezucker', 'honey', 'honig', 'syrup', 'agave', 'chocolate',
-    'schokolade', 'cocoa', 'kakao', 'lentil', 'linse', 'beans', 'nut', 'nuts', 'nüsse', 'almond',
+    'schokolade', 'cocoa', 'kakao', 'lentil', 'linse', 'cornmeal', 'popcorn', 'maismehl', 'nut', 'nuts', 'nüsse', 'almond',
     'mandel', 'walnut', 'walnuss', 'cashew', 'hazelnut', 'haselnuss', 'pistachio', 'pistazie', 'peanut',
     'erdnuss', 'pine nut', 'pinienkern', 'coconut', 'seeds', 'chia', 'flax', 'leinsamen', 'sesame',
     'sesam', 'sunflower seed', 'sonnenblumenkern', 'kürbiskern', 'raisin', 'rosine', 'dates', 'dattel',
@@ -80,7 +80,7 @@ export const AISLE_KEYWORDS: Record<Exclude<Aisle, 'Other'>, string[]> = {
     'protein powder', 'whey', 'dried porcini', 'eiweißpulver', 'pea protein', 'cracker',
   ],
   'Tins and jars': [
-    'canned', 'tinned', 'konserve', 'jar', 'tin', 'can', 'tomato paste', 'tomatenmark', 'passata',
+    'canned', 'tinned', 'konserve', 'bean', 'butter beans', 'olive', 'jar', 'tin', 'can', 'tomato paste', 'tomatenmark', 'passata',
     'crushed tomato', 'diced tomato', 'chopped tomato', 'gehackte tomaten', 'passierte tomaten',
     'tomato puree', 'tuna in', 'tomato salsa', 'tomato sauce', 'salsa', 'sauce', 'soße', 'sosse', 'ketchup',
     'mayonnaise', 'mayo', 'mustard', 'senf', 'dressing', 'vinaigrette', 'pesto', 'hummus', 'tahini',
@@ -90,19 +90,19 @@ export const AISLE_KEYWORDS: Record<Exclude<Aisle, 'Other'>, string[]> = {
     'pinto', 'baked beans', 'sun-dried', 'sundried', 'roasted red pepper', 'artichoke heart',
     'artischocken', 'water chestnut', 'wasserkastanie', 'bamboo shoot', 'chipotle', 'adobo', 'enchilada',
     'curry paste', 'currypaste', 'miso', 'sambal', 'harissa', 'chutney', 'broth', 'brühe', 'bouillon',
-    'stock', 'fond', 'vegetable broth', 'chicken broth', 'beef broth', 'chicken stock', 'beef stock', 'vegetable stock', 'lemon juice', 'lime juice', 'zitronensaft', 'limettensaft',
+    'stock', 'fond', 'vegetable broth', 'vegetable bouillon', 'gemüsebrühe', 'gemüsebouillon', 'chicken broth', 'beef broth', 'chicken stock', 'beef stock', 'vegetable stock', 'lemon juice', 'lime juice', 'zitronensaft', 'limettensaft',
   ],
   Frozen: [
     'frozen', 'tiefkühl', 'gefroren', 'ice cream', 'eiscreme', 'eis', 'sorbet', 'ice cubes', 'eiswürfel',
     'fish fingers', 'fischstäbchen', 'nuggets', 'fries', 'pommes', 'pizza', 'blätterteig', 'puff pastry',
     'filo', 'phyllo', 'waffles', 'dumplings', 'gyoza', 'spring roll', 'frühlingsrolle', 'edamame',
     'frozen broccoli', 'frozen spinach', 'frozen green bean', 'frozen sweetcorn', 'frozen pepper',
-    'frozen berries', 'frozen pea', 'frozen carrot', 'frozen onion', 'frozen potato', 'frozen corn', 'frozen mixed', 'frozen stir', 'frozen vegetable', 'frozen raspberr',
+    'frozen berries', 'frozen fruit', 'frozen veg', 'frozen pea', 'frozen carrot', 'frozen onion', 'frozen potato', 'frozen corn', 'frozen mixed', 'frozen stir', 'frozen vegetable', 'frozen raspberr',
     'frozen strawberr', 'frozen blueberr', 'frozen mango', 'frozen cauliflower', 'frozen chicken',
     'frozen salmon', 'frozen shrimp', 'frozen prawn', 'frozen fish',
   ],
   'Spices and oils': [
-    'salt', 'salz', 'sea salt', 'meersalz', 'pepper', 'pfeffer', 'black pepper', 'schwarzer pfeffer',
+    'salt', 'salz', 'sea salt', 'meersalz', 'garlic salt', 'celery salt', 'onion salt', 'peanut oil', 'corn oil', 'groundnut oil', 'sunflower oil', 'canola oil', 'rapeseed oil', 'pepper', 'pfeffer', 'black pepper', 'schwarzer pfeffer',
     'paprika', 'smoked paprika', 'cumin', 'kreuzkümmel', 'kümmel', 'caraway', 'turmeric', 'kurkuma',
     'cinnamon', 'zimt', 'nutmeg', 'muskat', 'oregano', 'thyme', 'thymian', 'rosemary', 'rosmarin',
     'bay leaf', 'bay leaves', 'lorbeer', 'cardamom', 'kardamom', 'cayenne', 'chilli powder',
@@ -120,7 +120,7 @@ export const AISLE_KEYWORDS: Record<Exclude<Aisle, 'Other'>, string[]> = {
     'orange juice', 'apple juice', 'orangensaft', 'apfelsaft', 'schorle', 'oat milk', 'almond milk',
     'soy milk', 'plant milk', 'hafermilch', 'mandelmilch', 'sojamilch', 'coconut water', 'tea', 'tee',
     'iced tea', 'eistee', 'peppermint', 'pfefferminz', 'matcha', 'coffee', 'kaffee', 'espresso', 'cola',
-    'lemonade', 'limonade', 'kombucha', 'smoothie', 'ginger beer', 'beer', 'bier', 'wine', 'wein',
+    'lemonade', 'limonade', 'kombucha', 'smoothie', 'ginger beer', 'ginger ale', 'fruit juice', 'beer', 'bier', 'wine', 'wein',
     'prosecco', 'champagne', 'vodka', 'whisky', 'whiskey', 'gin', 'rum', 'energy drink', 'getränk',
     'protein shake',
   ],
@@ -139,13 +139,17 @@ const KEYWORD_ENTRIES: KeywordEntry[] = AISLES.filter(
 );
 
 export function aisleFor(name: string): Aisle {
-  const key = shoppingKey(name);
+  const fullKey = shoppingKey(name);
+  // Bracketed qualifiers ("(for meatballs)") don't steer the section; keywords that
+  // themselves contain a bracket are matched against the full name.
+  const key = fullKey.replace(/\([^)]*(\)|$)/g, ' ').replace(/\s+/g, ' ').trim();
   const words = new Set(key.split(/[^\p{L}\p{N}]+/u).filter(Boolean));
   let best: Aisle = 'Other';
   let bestLength = 0;
   for (const entry of KEYWORD_ENTRIES) {
     if (entry.keyword.length <= bestLength) continue;
-    const hit = entry.wholeWord ? words.has(entry.keyword) : key.includes(entry.keyword);
+    const haystack = entry.keyword.includes('(') ? fullKey : key;
+    const hit = entry.wholeWord ? words.has(entry.keyword) : haystack.includes(entry.keyword);
     if (hit) {
       best = entry.aisle;
       bestLength = entry.keyword.length;
