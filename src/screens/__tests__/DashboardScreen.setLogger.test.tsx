@@ -49,7 +49,7 @@ jest.mock('../../db/database', () => ({
 }));
 
 import DashboardScreen from '../DashboardScreen';
-import { getLogByDate, logWorkoutSet } from '../../db/database';
+import { getLogByDate, logWorkoutSet, getWorkoutSetsForDay } from '../../db/database';
 
 const mockGetLogByDate = jest.mocked(getLogByDate);
 const mockLogWorkoutSet = jest.mocked(logWorkoutSet);
@@ -137,6 +137,100 @@ describe('DashboardScreen set logger validation (#364)', () => {
       reps: 100,
       weightKg: 500,
     });
+  });
+});
+
+describe('DashboardScreen set logger set types', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetLogByDate.mockResolvedValue({ ...mockEntry });
+    mockLogWorkoutSet.mockResolvedValue(undefined);
+    jest.mocked(getWorkoutSetsForDay).mockResolvedValue([]);
+  });
+
+  async function openLogger() {
+    const utils = render(<DashboardScreen />);
+    await flushMicrotasks();
+    fireEvent.press(utils.getByLabelText('Log sets for Squat'));
+    return utils;
+  }
+
+  async function add(utils: ReturnType<typeof render>, reps: string, weight: string) {
+    const [repsInput, weightInput] = loggerInputs(utils);
+    fireEvent.changeText(repsInput, reps);
+    fireEvent.changeText(weightInput, weight);
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Add set'));
+    });
+  }
+
+  it('logs a warm-up and keeps the toggle on Warm-up until the logger is reopened', async () => {
+    const utils = await openLogger();
+    expect(utils.getByLabelText('Working').props.accessibilityState.selected).toBe(true);
+
+    fireEvent.press(utils.getByLabelText('Warm-up'));
+    await add(utils, '10', '40');
+    expect(mockLogWorkoutSet).toHaveBeenLastCalledWith(mockToday, 'Squat', {
+      reps: 10,
+      weightKg: 40,
+      setType: 'warmup',
+    });
+    expect(utils.getByLabelText('Warm-up').props.accessibilityState.selected).toBe(true);
+
+    await add(utils, '8', '40');
+    expect(mockLogWorkoutSet).toHaveBeenLastCalledWith(mockToday, 'Squat', {
+      reps: 8,
+      weightKg: 40,
+      setType: 'warmup',
+    });
+
+    fireEvent.press(utils.getByText('Done'));
+    fireEvent.press(utils.getByLabelText('Log sets for Squat'));
+    expect(utils.getByLabelText('Working').props.accessibilityState.selected).toBe(true);
+    expect(utils.getByLabelText('Warm-up').props.accessibilityState.selected).toBe(false);
+  });
+
+  it('logs a working set without a setType key', async () => {
+    const utils = await openLogger();
+    await add(utils, '5', '80');
+    expect(mockLogWorkoutSet).toHaveBeenCalledWith(mockToday, 'Squat', {
+      reps: 5,
+      weightKg: 80,
+    });
+  });
+
+  it('labels warm-up sets in today list and leaves working sets unlabelled', async () => {
+    const base = {
+      date: mockToday,
+      exercise: 'Squat',
+      reps: 5,
+      weight_kg: 60,
+      created_at: '2026-09-19T10:00:00.000Z',
+    };
+    jest.mocked(getWorkoutSetsForDay).mockResolvedValue([
+      { ...base, id: 1, set_index: 0, set_type: 'warmup' },
+      { ...base, id: 2, set_index: 1, set_type: null },
+    ]);
+    const utils = await openLogger();
+    expect(utils.getAllByLabelText('Warm-up set')).toHaveLength(1);
+  });
+
+  it('shows no warm-up label when every set is a working set', async () => {
+    jest.mocked(getWorkoutSetsForDay).mockResolvedValue([
+      {
+        id: 1,
+        date: mockToday,
+        exercise: 'Squat',
+        set_index: 0,
+        reps: 5,
+        weight_kg: 60,
+        set_type: null,
+        created_at: '2026-09-19T10:00:00.000Z',
+      },
+    ]);
+    const utils = await openLogger();
+    expect(utils.getByText('5 reps @ 60 kg')).toBeTruthy();
+    expect(utils.queryAllByLabelText('Warm-up set')).toHaveLength(0);
   });
 });
 

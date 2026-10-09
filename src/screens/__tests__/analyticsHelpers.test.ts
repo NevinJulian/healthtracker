@@ -703,6 +703,46 @@ describe('bestSetPerDay', () => {
   });
 });
 
+describe('warm-up sets are excluded from PRs and the per-day best', () => {
+  const working = [
+    { id: 1, date: '2024-02-01', exercise: 'Squat', reps: 5, weight_kg: 80, set_type: null },
+    { id: 2, date: '2024-02-01', exercise: 'Squat', reps: 5, weight_kg: 85 },
+    { id: 3, date: '2024-02-02', exercise: 'Squat', reps: 3, weight_kg: 90, set_type: null },
+  ];
+  const warmups = [
+    { id: 4, date: '2024-02-01', exercise: 'Squat', reps: 10, weight_kg: 120, set_type: 'warmup' },
+    { id: 5, date: '2024-02-03', exercise: 'Squat', reps: 12, weight_kg: 100, set_type: 'warmup' },
+  ];
+  const mixed = [warmups[0], ...working, warmups[1]];
+
+  it('computePRs of a mixed history equals computePRs of its working sets', () => {
+    expect(computePRs(mixed)).toEqual(computePRs(working));
+    expect(computePRs(mixed).bestWeight).toEqual({ value: 90, date: '2024-02-02' });
+  });
+
+  it('computePRs of an all-warm-up history is all null', () => {
+    expect(computePRs(warmups)).toEqual({ bestWeight: null, best1RM: null, bestVolume: null });
+  });
+
+  it('bestSetPerDay of a mixed history equals bestSetPerDay of its working sets', () => {
+    expect(bestSetPerDay(mixed)).toEqual(bestSetPerDay(working));
+    expect(bestSetPerDay(mixed).map((d) => d.date)).toEqual(['2024-02-01', '2024-02-02']);
+  });
+
+  it('bestSetPerDay of an all-warm-up history is empty', () => {
+    expect(bestSetPerDay(warmups)).toEqual([]);
+  });
+
+  it('counts NULL and undefined set_type as working', () => {
+    const history = [
+      { id: 1, date: '2024-02-01', exercise: 'Squat', reps: 5, weight_kg: 70, set_type: null },
+      { id: 2, date: '2024-02-02', exercise: 'Squat', reps: 5, weight_kg: 75 },
+    ];
+    expect(computePRs(history).bestWeight).toEqual({ value: 75, date: '2024-02-02' });
+    expect(bestSetPerDay(history)).toHaveLength(2);
+  });
+});
+
 // ─── resolveSelectedExercise ──────────────────────────────────────────────────
 
 describe('resolveSelectedExercise', () => {
