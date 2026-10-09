@@ -74,3 +74,7 @@ export function mealsToCsv(rows: readonly MealExportRow[]): string {
     ])
   );
 }
+
+export async function exportCsv(): Promise<{ failed: string[] }> {
+  return { failed: [] };
+}
