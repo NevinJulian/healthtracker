@@ -3244,18 +3244,15 @@ export interface WorkoutSetInput {
 /**
  * Insert one logged set for an exercise on `date`.
  *
- * `set_index` is NOT caller-supplied (#317): it's assigned atomically as one
- * past the current max set_index for this (date, exercise) pair, via a
- * single INSERT…SELECT rather than a separate read-then-write. The previous
- * design took a caller-computed index (DashboardScreen used
- * `existingSets.length`), which collided with a surviving row's set_index
- * whenever a set was deleted before the next one was logged. v37 (schema.ts)
- * enforces UNIQUE(date, exercise, set_index) at the schema level, so any
- * remaining race would throw here rather than silently duplicate.
+ * `set_index` is NOT caller-supplied: it's assigned atomically as one past the
+ * current max set_index for this (date, exercise) pair, via a single
+ * INSERT…SELECT rather than a separate read-then-write. The schema enforces
+ * UNIQUE(date, exercise, set_index), so any remaining race would throw here
+ * rather than silently duplicate.
  *
  * @param date      - YYYY-MM-DD date key (use toISODate() / localDateKey()).
  * @param exercise  - Exercise name (matches Exercise.name from daily_log.exercises).
- * @param set       - Set details: reps performed, weight in kg.
+ * @param set       - Set details: reps performed, weight in kg, and `setType: 'warmup'` for a warm-up.
  */
 export function logWorkoutSet(
   date: string,

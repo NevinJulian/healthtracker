@@ -12,8 +12,8 @@
  * Layout:
  *   - ScreenHeader (Fraunces title, "Last 30 days" subtitle)
  *   - Metric cards row: Weight delta | Workout count | Fasting streak
- *   - Weight trend card: flat View-based chart (sage line, sageTint area, sageDeep dot)
- *                        with 30/90-day Pill toggle
+ *   - Weight trend card: flat View-based chart (faint weigh-in dots, sageDeep trend
+ *                        line, sageTint area) with 30/90-day Pill toggle
  *   - Strength progression chart: step-line of gym weight over 90 days
  *   - Streaks card: current + longest for gym, walk, fasting
  *   - Consistency grid: 7-col rounded dot grid (sage/gold/canvasSunken) 30-day + legend
@@ -158,8 +158,8 @@ export function WeightTrendCard({
 
   // getWeightHistory() only filters IS NOT NULL, so a mis-typed entry (e.g.
   // 9999 instead of 99.9) can still reach here. Keep the chart, the
-  // current-weight label, and the Min/Max text limited to plausible points
-  // (#322); excluded points are surfaced as a small muted note below.
+  // current-weight label, and the Min/Max text limited to plausible points;
+  // excluded points are surfaced as a small muted note below.
   const { valid: plausible, excludedCount } = plausibleWeights(history);
 
   const weights = plausible.length > 0 ? plausible.map((w) => w.weight) : [0];
