@@ -60,9 +60,10 @@
         337,
         342
       ],
-      "current": 337,
+      "current": 342,
       "done": [
-        344
+        344,
+        337
       ],
       "parked": []
     },
@@ -118,7 +119,7 @@
     "337": {
       "lane": "A",
       "kind": "feature",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "commits": [
         "acf0a79",
@@ -136,7 +137,8 @@
       "workOrder": "C:/git/ht-lanes/wo/337.md",
       "deviceCheck": "Expo Go: open the logger for an exercise you logged on an earlier day. The line shows that session's last working set (not a warm-up), and tapping it fills both fields. An exercise you never logged shows no line.",
       "notes": "WO ready (analysed on the snapshot of #344 at 10a3f39), no PARK, no file outside lane A, no migration. New getLastSetForExercise + exported WORKOUT_LAST_SET_SQL directly after getWorkoutHistory in database.ts: exercise = ? AND date < ? AND (set_type IS NULL OR set_type <> 'warmup') ORDER BY date DESC, set_index DESC LIMIT 1; an EXPLAIN QUERY PLAN test pins the (exercise, date) index. The modal gets a today prop (the Dashboard's render-time value, the one handleLogSet writes with), fetches in an effect with a cancelled flag, shows no line while loading or after a failed read. Analyst picks to repeat in the report: when the most recent earlier day holds only warm-ups the line shows the last working set of the next older day that has one (reading of 'last working set of the most recent session', warm-ups never count); line text 'Last time: 80 kg x 8' (U+00D7) with a middle dot and yesterday / N days ago, no month or year forms; weight printed like the set list (80, 82.5); the line sits between the toggle and the inputs; tapping overwrites typed text and does not log; with a set already logged today only Reps shows a placeholder; exercise names match exactly as stored. | dev: 8 commits in 4 test/code pairs, tip 57d39b3, 1426/109 per dev. Ten DashboardScreen.*.test.tsx mocks gained getLastSetForExercise; no existing assertion changed. The index test passed already at the stub commit (the SQL constant came with the stub); tester asked for a mutation proof. The SetLoggerModal doc comment was corrected.",
-      "securityReview": "APPROVE (10a3f39..57d39b3, read through git): WORKOUT_LAST_SET_SQL is a constant, exercise and beforeDate are bound, read-only, LIMIT 1; stored reps and weight_kg only reach template strings, String() and placeholder props; tapping the line only sets the two inputs, the user still presses Add and handleAdd's validation (integer reps 1-100, finite weight 0.5-500) is unchanged; logWorkoutSet, handleLogSet and the delete path are not in the diff; the read's failure is caught and logged and cannot block or fake a write; a malformed stored date gives no 'when' text and no crash. Note: the reviewer did not re-check that set_type exists before the query runs (v39 from #344 on this branch; the tester's real-engine suite covers it)."
+      "securityReview": "APPROVE (10a3f39..57d39b3, read through git): WORKOUT_LAST_SET_SQL is a constant, exercise and beforeDate are bound, read-only, LIMIT 1; stored reps and weight_kg only reach template strings, String() and placeholder props; tapping the line only sets the two inputs, the user still presses Add and handleAdd's validation (integer reps 1-100, finite weight 0.5-500) is unchanged; logWorkoutSet, handleLogSet and the delete path are not in the diff; the read's failure is caught and logged and cannot block or fake a write; a malformed stored date gives no 'when' text and no crash. Note: the reviewer did not re-check that set_type exists before the query runs (v39 from #344 on this branch; the tester's real-engine suite covers it).",
+      "regressionProof": "tester APPROVE r0: with database.ts from acf0a79 (stub), 6 workoutLastSet tests fail on assertions; with DashboardScreen.tsx from c6a6547, 9 setLogger tests fail (line text, tap, button role, placeholders, rejected read); all pass at 57d39b3. By-design tests proven by mutation: lower(exercise) turns 'exact name only' and the index test red, date <= ? turns 'ignores today' red, a '' prefill turns the today-prefill test red, a '0' fallback turns the no-history test red. Real engine: a warm-up as the last set of the day returns the working set before it; a warm-up-only day with nothing older returns null; unknown set_type values count as working; a trailing space or a quote in the name returns null (bound values). EXPLAIN QUERY PLAN: SEARCH ... USING INDEX idx_workout_set_log_exercise_date (exercise=? AND date<?). One read per open, none per add. Only an import line changed in existing tests; the midnight suite is untouched and green. typecheck passes at the stub commit. 1426/109, exit 0 (tester reproduced). GAP: the two late-result screen tests guard nothing - with the cancelled check or the reset removed all 31 setLogger tests stay green, because close unmounts the modal and nothing can switch exercise behind the overlay; the behaviour is correct, the guard is unreachable through the UI."
     },
     "338": {
       "lane": "C",
@@ -167,7 +169,7 @@
     "342": {
       "lane": "A",
       "kind": "feature",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "commits": [],
       "title": "EWMA-smoothed weight trend line",
@@ -370,7 +372,9 @@
     "SMALL (#347 tester): negative quantities now merge (adding -2 g to a 5 g line gives 3 g; before, a separate row was inserted) and a quantity of 0 merges without a new row; nothing in the app passes a negative",
     "SMALL (#347 tester): a null name now throws a TypeError from shoppingKey instead of the NOT NULL error (still throws, still rolls back)",
     "SMALL (#347 tester + orchestrator): section headers render in capitals (MEAT AND FISH) through the existing categoryLabel textTransform; the decision writes them in sentence case; the new screen test checks the string, which jest does not uppercase",
-    "SMALL (#347 tester): the tester counted 695 keyword entries including repeats inside a section; the developer reported 686 distinct"
+    "SMALL (#347 tester): the tester counted 695 keyword entries including repeats inside a section; the developer reported 686 distinct",
+    "SMALL (#337 tester): the two late-result tests in DashboardScreen.setLogger (result after close, result for another exercise) pass without the cancelled guard; they would need a direct switch from one exercise to another on a mounted modal to mean anything, and the UI cannot do that today",
+    "SMALL (#337 tester): with a wrong device clock (a stored date equal to or after today) the last-time line shows without the date part"
   ],
   "log": [
     {
@@ -444,6 +448,10 @@
     {
       "at": "2026-10-09T07:56:02Z",
       "event": "#347 tester APPROVE r0 on 87e59fd, security BLOCK r0 -> ROUND TRIP 1: developer resumed with the block (prototype-key unit lookup, non-finite merged sum), the quantity display (1.25 stored, 1.3 shown) and the tester's aisle misfiles"
+    },
+    {
+      "at": "2026-10-09T07:57:31Z",
+      "event": "#337 ready (tester APPROVE r0, security APPROVE, 1426/109) -> lane A moves to #342, developer dispatched"
     }
   ],
   "aheadAnalysis": {
