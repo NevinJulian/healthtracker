@@ -92,3 +92,16 @@ describe('ShoppingListScreen', () => {
     ).toEqual(['Carrot, grated', 'Onion', 'Spinach', 'Avocado', 'Banana']);
   });
 });
+
+describe('ShoppingListScreen quantities', () => {
+  it('shows a merged amount with its stored decimals', async () => {
+    mockGetItems.mockReset();
+    mockGetItems.mockResolvedValue([
+      { id: 1, ingredient_name: 'Milk', total_quantity: 1.25, unit: 'l', is_checked: false },
+    ]);
+    const view = render(<ShoppingListScreen />);
+    await waitFor(() => expect(view.getByText('Milk')).toBeTruthy());
+
+    expect(view.getByText('1.25 l')).toBeTruthy();
+  });
+});
