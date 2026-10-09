@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  AppState,
   StatusBar,
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -88,7 +89,16 @@ export default function App() {
 
   useEffect(() => {
     if (!started) return;
-    runAutoBackupIfDue().catch((err) => console.warn('[App] Auto-backup failed:', err));
+    const backUpIfDue = () => {
+      runAutoBackupIfDue().catch((err) => console.warn('[App] Auto-backup failed:', err));
+    };
+    backUpIfDue();
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') backUpIfDue();
+    });
+    return () => {
+      subscription.remove();
+    };
   }, [started]);
 
   const retry = () => {

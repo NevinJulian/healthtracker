@@ -597,7 +597,6 @@ export type SafetySnapshotEntry = AutoBackupEntry;
 const AUTO_DIR_NAME = 'auto-backups/';
 const AUTO_NAME_RE = /^healthtracker-auto-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z\.json$/;
 const AUTO_TMP_RE = /^healthtracker-auto-\d{8}T\d{6}Z\.json\.tmp$/;
-const AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 let autoBackupInFlight: Promise<void> | null = null;
 let restoreInProgress = false;
@@ -625,14 +624,14 @@ function readAutoBackupFolder(dir: string): Promise<BackupFolder> {
 
 /**
  * Write an automatic backup into auto-backups/ in documentDirectory when none
- * exists or the newest is at least 24 hours old, then keep the newest
+ * exists from the local calendar date of `now`, then keep the newest
  * AUTO_BACKUP_KEEP. Concurrent calls share one run; nothing runs during a
  * restore.
  *
  * A backup is written to a temporary name and moved into place, so a partial
- * file is never listed or restored. "Newest" is read from the file name.
- * Files dated more than an hour ahead of `now` are ignored for the due check
- * and never pruned, so a clock set back cannot block backups.
+ * file is never listed or restored. A backup's date and "newest" are read
+ * from the file name. Files dated more than an hour ahead of `now` are never
+ * pruned and do not count toward AUTO_BACKUP_KEEP.
  *
  * @throws When the write fails; the caller logs it.
  */
@@ -654,9 +653,8 @@ async function performAutoBackup(now: Date): Promise<void> {
   const { valid, leftovers } = await readAutoBackupFolder(dir);
   for (const name of leftovers) await deleteMatching(dir, name, AUTO_TMP_RE);
 
-  const horizon = now.getTime() + CLOCK_SKEW_MS;
-  const newest = valid.find((entry) => entry.time.getTime() <= horizon);
-  if (newest && now.getTime() - newest.time.getTime() < AUTO_INTERVAL_MS) return;
+  const today = localDateKey(now);
+  if (valid.some((entry) => localDateKey(entry.time) === today)) return;
 
   const payload = await buildBackupPayload();
   if (restoreInProgress) return;
@@ -664,6 +662,7 @@ async function performAutoBackup(now: Date): Promise<void> {
   await writeThenMove(`${dir}${autoBackupName(now)}`, JSON.stringify(payload, null, 2));
 
   try {
+    const horizon = now.getTime() + CLOCK_SKEW_MS;
     const after = await readAutoBackupFolder(dir);
     const counted = after.valid.filter((entry) => entry.time.getTime() <= horizon);
     for (const entry of counted.slice(AUTO_BACKUP_KEEP)) {
