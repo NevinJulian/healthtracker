@@ -1213,6 +1213,10 @@ export interface DailyLogExportRow {
   fasting_completed: number | null;
 }
 
+export async function getAllDailyLogForExport(): Promise<DailyLogExportRow[]> {
+  return [];
+}
+
 // ─────────────────────────────────────────────
 // Weekly Template CRUD
 // ─────────────────────────────────────────────
@@ -1737,6 +1741,10 @@ export interface MealExportRow {
   carbs: number | null;
   fat: number | null;
   is_consumed: number | null;
+}
+
+export async function getAllMealsForExport(): Promise<MealExportRow[]> {
+  return [];
 }
 
 export interface MealPlanWithRecipe extends WeeklyMealPlanItem {
@@ -3354,6 +3362,10 @@ export interface WorkoutSetExportRow {
   reps: number | null;
   weight_kg: number | null;
   created_at: string | null;
+}
+
+export async function getAllWorkoutSetsForExport(): Promise<WorkoutSetExportRow[]> {
+  return [];
 }
 
 export const WORKOUT_LAST_SET_SQL = `SELECT * FROM workout_set_log
