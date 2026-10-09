@@ -9,19 +9,31 @@
     "testSuites": 107,
     "tests": 1387
   },
-  "frozenScope": [344, 337, 342, 444, 347, 348, 338, 339, 442, 443, 352],
+  "frozenScope": [
+    344,
+    337,
+    342,
+    444,
+    347,
+    348,
+    338,
+    339,
+    442,
+    443,
+    352
+  ],
   "excluded": {
-    "349": "sprint 6 (native package)",
-    "392": "sprint 6 (native package)",
     "346": "sprint 6 (builds on #342)",
-    "351": "sprint 6 (builds on #342)",
-    "447": "sprint 6 (quick add, changes the daily totals)",
+    "349": "sprint 6 (native package)",
     "350": "sprint 7 (dark mode)",
+    "351": "sprint 6 (builds on #342)",
     "353": "needs a development build",
     "355": "needs a development build",
+    "392": "sprint 6 (native package)",
     "396": "not part of the feature sprints",
     "441": "not part of the feature sprints",
-    "445": "not part of the feature sprints"
+    "445": "not part of the feature sprints",
+    "447": "sprint 6 (quick add, changes the daily totals)"
   },
   "budget": {
     "maxRoundTripsPerIssue": 3,
@@ -42,9 +54,13 @@
       "name": "training",
       "branch": "sprint/lane-a-training",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "pending",
-      "order": [344, 337, 342],
-      "current": null,
+      "status": "in_progress",
+      "order": [
+        344,
+        337,
+        342
+      ],
+      "current": 344,
       "done": [],
       "parked": []
     },
@@ -52,9 +68,13 @@
       "name": "meals",
       "branch": "sprint/lane-b-meals",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "pending",
-      "order": [444, 347, 348],
-      "current": null,
+      "status": "in_progress",
+      "order": [
+        444,
+        347,
+        348
+      ],
+      "current": 444,
       "done": [],
       "parked": []
     },
@@ -64,7 +84,10 @@
       "worktree": "C:/git/ht-lanes/lane-c",
       "status": "pending",
       "waitsFor": "lane A merged into sprint/auto-fixes (#339 exports #344's set type)",
-      "order": [338, 339],
+      "order": [
+        338,
+        339
+      ],
       "current": null,
       "done": [],
       "parked": []
@@ -73,79 +96,130 @@
       "name": "recipes",
       "branch": "sprint/lane-d-recipes",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "pending",
-      "order": [442, 443, 352],
-      "current": null,
+      "status": "in_progress",
+      "order": [
+        442,
+        443,
+        352
+      ],
+      "current": 442,
       "done": [],
       "parked": []
     }
   },
   "issues": {
-    "344": {
-      "lane": "A", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
-      "title": "set types (warm-up / working) per set",
-      "decisionSource": "owner comment 6070858497 on #344: working + warm-up only, no RPE; migration v39 ADD COLUMN set_type TEXT (NULL = working, 'warmup'); two-option toggle above Add set, resets to Working on open; Warm-up label in today's list; warm-ups left out of computePRs, bestSetPerDay, progression chart, volume; backups carry the column",
-      "securityPlan": "required (src/db, migration, restore)"
-    },
     "337": {
-      "lane": "A", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "lane": "A",
+      "kind": "feature",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
       "title": "last session's performance as a prefill on set inputs",
       "decisionSource": "owner comment 6070869800 on #337: last working set of the most recent session before today; line 'Last time: 80 kg x 8 · 3 days ago' above the inputs, tap fills both; placeholders while empty; 'yesterday' / 'N days ago'; no history = no line, empty inputs; today's prefill from today's last set stays; getLastSetForExercise(exercise, beforeDate) on the (exercise, date) index, LIMIT 1",
       "securityPlan": "required (new query in src/db)"
     },
-    "342": {
-      "lane": "A", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
-      "title": "EWMA-smoothed weight trend line",
-      "decisionSource": "owner comment 6070877036 on #342: alpha = 2/(10+1); trend moves only on weigh-in days, nothing interpolated; raw as faint dots, trend solid from the 5th weigh-in, computed over the longest loaded history; card shows kg/week = least-squares slope of the trend over the last 14 days when they hold >= 5 weigh-ins, else a dash; change figure uses trend values; helpers in analyticsHelpers.ts next to rollingAverage; plausibleWeights filters first",
-      "securityPlan": "skip if the diff stays in analyticsHelpers.ts and the Analytics screen; decide on the diff"
-    },
-    "444": {
-      "lane": "B", "kind": "bug", "status": "pending", "roundTrips": 0, "commits": [],
-      "title": "MealPrep Remove confirm promises a refund that is not given",
-      "decisionSource": "owner comment 6070879398 on #444: confirm text depends on the inventory pointer; with a pointer unchanged, without one 'This meal will be removed from your nutrition history.'; the plan item on the screen gets consumed_from_inventory_id",
-      "securityPlan": "required (plan-item read in src/db changes shape)"
-    },
-    "347": {
-      "lane": "B", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
-      "title": "shopping list: combine duplicate ingredients and group by aisle",
-      "decisionSource": "owner comment 6070880122 on #347: merge at write time, no migration; into an existing unchecked line with the same normalised name and a compatible unit; checked lines never merged into; normalised = lowercase, trimmed, text before the first comma, spaces collapsed; g/kg and ml/l merge converted to the line's unit, other units only with themselves; existing lines not merged after the fact; aisles by keyword lookup in code (German + English), fixed section order, unmatched = Other; items alphabetical inside a section; units.ts may be used but not changed",
-      "securityPlan": "required (shopping-list writes in src/db)"
-    },
-    "348": {
-      "lane": "B", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
-      "title": "copy meal, copy day, often cooked",
-      "decisionSource": "owner comment 6070880760 on #348: 'Copy to...' on a planned slot offers the next 7 days, same recipe into the same slot where empty, occupied skipped and counted, copies unticked; 'Copy day to...' copies Lunch and Dinner into the empty slots of one chosen day; Log Cooked Meal picker shows the 5 recipes with the highest cook events x 0.95^(days since last cooked) from cook_log in an 'Often cooked' section; quick add is #447, saved meals and time-of-day ranking not planned",
-      "securityPlan": "required (meal-plan writes in src/db)"
-    },
     "338": {
-      "lane": "C", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "lane": "C",
+      "kind": "feature",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
       "title": "automatic rotating local backups",
       "decisionSource": "owner comment 6070877910 on #338: auto-backups folder in documentDirectory; written after a successful start when the newest is older than 24 h or none exists, in the background, failure only logged; newest 7 kept; Settings 'Automatic backups' list newest first with date, time, size, Share and Restore through the existing restore path; pre-restore safety snapshot moves to documentDirectory, newest 3 kept, header comment corrected; manual export unchanged",
       "securityPlan": "required (backup.ts, filesystem)"
     },
     "339": {
-      "lane": "C", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
+      "lane": "C",
+      "kind": "feature",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
       "title": "CSV export alongside the JSON backup",
       "decisionSource": "owner comment 6070878592 on #339: three files shared one after the other (workout_sets.csv, daily_log.csv, meals.csv), no zip, a dismissed sheet does not stop the next; 'Export as CSV' button below the JSON export; RFC 4180 quoting, UTF-8 with BOM, ISO dates, one header row, empty db = headers only; columns as listed in the comment (set_type working|warmup from #344); built in memory; unit tests for the escaping helper",
       "securityPlan": "required (filesystem, db reads, user text into files)"
     },
+    "342": {
+      "lane": "A",
+      "kind": "feature",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "title": "EWMA-smoothed weight trend line",
+      "decisionSource": "owner comment 6070877036 on #342: alpha = 2/(10+1); trend moves only on weigh-in days, nothing interpolated; raw as faint dots, trend solid from the 5th weigh-in, computed over the longest loaded history; card shows kg/week = least-squares slope of the trend over the last 14 days when they hold >= 5 weigh-ins, else a dash; change figure uses trend values; helpers in analyticsHelpers.ts next to rollingAverage; plausibleWeights filters first",
+      "securityPlan": "skip if the diff stays in analyticsHelpers.ts and the Analytics screen; decide on the diff"
+    },
+    "344": {
+      "lane": "A",
+      "kind": "feature",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": [],
+      "title": "set types (warm-up / working) per set",
+      "decisionSource": "owner comment 6070858497 on #344: working + warm-up only, no RPE; migration v39 ADD COLUMN set_type TEXT (NULL = working, 'warmup'); two-option toggle above Add set, resets to Working on open; Warm-up label in today's list; warm-ups left out of computePRs, bestSetPerDay, progression chart, volume; backups carry the column",
+      "securityPlan": "required (src/db, migration, restore)",
+      "workOrder": "C:/git/ht-lanes/wo/344.md"
+    },
+    "347": {
+      "lane": "B",
+      "kind": "feature",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "title": "shopping list: combine duplicate ingredients and group by aisle",
+      "decisionSource": "owner comment 6070880122 on #347: merge at write time, no migration; into an existing unchecked line with the same normalised name and a compatible unit; checked lines never merged into; normalised = lowercase, trimmed, text before the first comma, spaces collapsed; g/kg and ml/l merge converted to the line's unit, other units only with themselves; existing lines not merged after the fact; aisles by keyword lookup in code (German + English), fixed section order, unmatched = Other; items alphabetical inside a section; units.ts may be used but not changed",
+      "securityPlan": "required (shopping-list writes in src/db)"
+    },
+    "348": {
+      "lane": "B",
+      "kind": "feature",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "title": "copy meal, copy day, often cooked",
+      "decisionSource": "owner comment 6070880760 on #348: 'Copy to...' on a planned slot offers the next 7 days, same recipe into the same slot where empty, occupied skipped and counted, copies unticked; 'Copy day to...' copies Lunch and Dinner into the empty slots of one chosen day; Log Cooked Meal picker shows the 5 recipes with the highest cook events x 0.95^(days since last cooked) from cook_log in an 'Often cooked' section; quick add is #447, saved meals and time-of-day ranking not planned",
+      "securityPlan": "required (meal-plan writes in src/db)"
+    },
+    "352": {
+      "lane": "D",
+      "kind": "feature",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
+      "title": "import a recipe from a URL via schema.org JSON-LD",
+      "decisionSource": "owner comment 6070883467 on #352: 'Import from URL' action on the Recipes screen with a small dialog; http/https only, 15 s timeout, at most 3 MB, non-2xx or non-HTML = clear error, reuse fetchJson hardening, no new package; every ld+json block incl. arrays and @graph, first object whose @type is or contains Recipe; map name, recipeIngredient, recipeInstructions (string, HowToStep, HowToSection), recipeYield (first number), totalTime or prepTime; unparsed ingredient lines kept as names; opens the editor prefilled, nothing saved until Save, macros from the editor's recompute; no-recipe message; no images, no page nutrition; only plain strings reach the editor",
+      "securityPlan": "required by the decision (untrusted web pages)"
+    },
     "442": {
-      "lane": "D", "kind": "bug", "status": "pending", "roundTrips": 0, "commits": [],
+      "lane": "D",
+      "kind": "bug",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": [],
       "title": "Discover import: not-looked-up recipe cannot be refreshed, alert says Try again in a minute",
       "decisionSource": "owner comment 6070881544 on #442 (latest of 2): no re-import refresh; new alert and card text with a singular form, pointing at the editor; lookups that receive the 429 itself count as not looked up; reopening an imported recipe in Discover says 'In your library'; device check none",
-      "securityPlan": "required (src/api)"
+      "securityPlan": "required (src/api)",
+      "workOrder": "C:/git/ht-lanes/wo/442.md"
     },
     "443": {
-      "lane": "D", "kind": "bug", "status": "pending", "roundTrips": 0, "commits": [],
+      "lane": "D",
+      "kind": "bug",
+      "status": "pending",
+      "roundTrips": 0,
+      "commits": [],
       "title": "Recipe editor: save-deadline notice is set on a screen that closes at once",
       "decisionSource": "owner comment 6070882693 on #443: Alert after the save and before the editor closes when ingredients were not looked up (deadline or aborted recompute), singular form, editor closes on dismiss; no Alert when every lookup finished; banner text 'Not looked up yet. Tap Recompute later.'; lookups stay sequential; device check none",
       "securityPlan": "skip if the diff stays in RecipeEditorScreen.tsx and its tests; decide on the diff"
     },
-    "352": {
-      "lane": "D", "kind": "feature", "status": "pending", "roundTrips": 0, "commits": [],
-      "title": "import a recipe from a URL via schema.org JSON-LD",
-      "decisionSource": "owner comment 6070883467 on #352: 'Import from URL' action on the Recipes screen with a small dialog; http/https only, 15 s timeout, at most 3 MB, non-2xx or non-HTML = clear error, reuse fetchJson hardening, no new package; every ld+json block incl. arrays and @graph, first object whose @type is or contains Recipe; map name, recipeIngredient, recipeInstructions (string, HowToStep, HowToSection), recipeYield (first number), totalTime or prepTime; unparsed ingredient lines kept as names; opens the editor prefilled, nothing saved until Save, macros from the editor's recompute; no-recipe message; no images, no page nutrition; only plain strings reach the editor",
-      "securityPlan": "required by the decision (untrusted web pages)"
+    "444": {
+      "lane": "B",
+      "kind": "bug",
+      "status": "analysing",
+      "roundTrips": 0,
+      "commits": [],
+      "title": "MealPrep Remove confirm promises a refund that is not given",
+      "decisionSource": "owner comment 6070879398 on #444: confirm text depends on the inventory pointer; with a pointer unchanged, without one 'This meal will be removed from your nutrition history.'; the plan item on the screen gets consumed_from_inventory_id",
+      "securityPlan": "required (plan-item read in src/db changes shape)",
+      "workOrder": "C:/git/ht-lanes/wo/444.md"
     }
   },
   "foundDuringSprint": [],
@@ -154,6 +228,20 @@
     {
       "at": "2026-10-09T07:27:09Z",
       "event": "preflight ok: tree clean, user.email is the verified noreply address, main e4e6e3b typecheck pass and 1387 tests / 107 suites pass with --maxWorkers=2; sprint/auto-fixes created from e4e6e3b and pushed. Scope frozen: all 11 issues of SPRINT.md section 3 are open, each with an owner decision comment dated 2026-10-08"
+    },
+    {
+      "at": "2026-10-09T07:31:42Z",
+      "event": "worktrees a/b/d created at c698da2 (npm ci running); analysts dispatched for #344 #444 #442 (current) and #347 #348 #443 #352 #342 #338 (ahead, read-only on the main checkout)"
     }
-  ]
+  ],
+  "aheadAnalysis": {
+    "337": "waits for #344 ready",
+    "338": "running",
+    "339": "waits for #344 ready",
+    "342": "running",
+    "347": "running",
+    "348": "running",
+    "352": "running",
+    "443": "running"
+  }
 }
