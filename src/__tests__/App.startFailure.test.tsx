@@ -23,6 +23,9 @@ jest.mock('../services/rescueExport', () => ({
   hasRescueWal: jest.fn(() => Promise.resolve(false)),
   clearRescueCopies: jest.fn(() => Promise.resolve()),
 }));
+jest.mock('../services/backup', () => ({
+  runAutoBackupIfDue: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('../db/devStress369', () => ({ installStress369: jest.fn() }));
 jest.mock('../services/notifications', () => ({
   configureNotificationHandler: jest.fn(),
@@ -41,9 +44,11 @@ jest.mock('../screens/OnboardingScreen', () => {
 import { useFonts } from 'expo-font';
 import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from '../db/database';
 import { clearRescueCopies, exportRawDatabase, hasRescueWal } from '../services/rescueExport';
+import { runAutoBackupIfDue } from '../services/backup';
 import App from '../../App';
 import { COLD_RENDER_WAIT } from '../testUtils/coldRenderWait';
 
+const autoBackup = runAutoBackupIfDue as jest.Mock;
 const rescue = exportRawDatabase as jest.Mock;
 const walPresent = hasRescueWal as jest.Mock;
 const clearCopies = clearRescueCopies as jest.Mock;
@@ -53,6 +58,7 @@ const init = initDatabase as jest.Mock;
 beforeEach(() => {
   jest.clearAllMocks();
   init.mockReset();
+  autoBackup.mockReset().mockResolvedValue(undefined);
   jest.spyOn(console, 'error').mockImplementation(() => {});
   (useFonts as jest.Mock).mockReturnValue([true, null]);
   walPresent.mockResolvedValue(false);
@@ -180,5 +186,58 @@ describe('App start failure screen', () => {
     expect(await screen.findByText(/font failed/, undefined, COLD_RENDER_WAIT)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Save data' })).toBeTruthy();
+  });
+});
+
+describe('App automatic backup', () => {
+  it('starts one automatic backup once the app has started', async () => {
+    init.mockResolvedValue(undefined);
+    render(<App />);
+    expect(await screen.findByText('NAVIGATOR', undefined, COLD_RENDER_WAIT)).toBeTruthy();
+    await waitFor(() => expect(autoBackup).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows the navigator while the automatic backup never finishes', async () => {
+    init.mockResolvedValue(undefined);
+    autoBackup.mockReturnValue(new Promise<void>(() => {}));
+    render(<App />);
+    expect(await screen.findByText('NAVIGATOR', undefined, COLD_RENDER_WAIT)).toBeTruthy();
+    await waitFor(() => expect(autoBackup).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows no recovery screen and logs when the automatic backup rejects', async () => {
+    init.mockResolvedValue(undefined);
+    autoBackup.mockRejectedValue(new Error('disk full'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    render(<App />);
+    expect(await screen.findByText('NAVIGATOR', undefined, COLD_RENDER_WAIT)).toBeTruthy();
+    await waitFor(() => expect(warn).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save data' })).toBeNull();
+  });
+
+  it('does not start one when the database fails to initialise', async () => {
+    init.mockRejectedValue(new Error('disk exploded'));
+    render(<App />);
+    await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT);
+    await act(async () => {});
+    expect(autoBackup).not.toHaveBeenCalled();
+  });
+
+  it('does not start one on a font load error', async () => {
+    (useFonts as jest.Mock).mockReturnValue([false, new Error('font failed')]);
+    init.mockResolvedValue(undefined);
+    render(<App />);
+    await screen.findByText(/font failed/, undefined, COLD_RENDER_WAIT);
+    await act(async () => {});
+    expect(autoBackup).not.toHaveBeenCalled();
+  });
+
+  it('starts one only after a failed start is retried successfully', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded')).mockResolvedValue(undefined);
+    render(<App />);
+    fireEvent.press(await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT));
+    await screen.findByText('NAVIGATOR');
+    await waitFor(() => expect(autoBackup).toHaveBeenCalledTimes(1));
   });
 });
