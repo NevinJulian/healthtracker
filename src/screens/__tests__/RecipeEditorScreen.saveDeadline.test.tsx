@@ -1,9 +1,11 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, act, fireEvent } from '@testing-library/react-native';
 
 const mockReplace = jest.fn();
+const mockGoBack = jest.fn();
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ goBack: jest.fn(), replace: mockReplace, navigate: jest.fn() }),
+  useNavigation: () => ({ goBack: mockGoBack, replace: mockReplace, navigate: jest.fn() }),
   useRoute: () => ({ params: {} }),
 }));
 
@@ -30,14 +32,19 @@ const mockCreateRecipe = createRecipe as jest.Mock;
 const SAVE_DEADLINE_MS = 10_000;
 
 describe('RecipeEditorScreen save deadline', () => {
+  let alertSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.useFakeTimers();
     mockLookup.mockReset();
     mockCreateRecipe.mockClear();
     mockReplace.mockClear();
+    mockGoBack.mockClear();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
+    alertSpy.mockRestore();
     jest.useRealTimers();
   });
 
@@ -164,7 +171,7 @@ describe('RecipeEditorScreen save deadline', () => {
     await fillIngredients(utils, ['zzz empty', 'zzz refused']);
 
     expect(utils.getByText('Estimated (no data): zzz empty')).toBeTruthy();
-    expect(utils.getByText('Not looked up (try Recompute in a minute): zzz refused')).toBeTruthy();
+    expect(utils.getByText('Not looked up yet. Tap Recompute later. (zzz refused)')).toBeTruthy();
   });
 
   it('shows the ingredient cut off by the save deadline as not looked up', async () => {
@@ -181,7 +188,175 @@ describe('RecipeEditorScreen save deadline', () => {
       await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
     });
 
-    expect(utils.getByText('Not looked up (try Recompute in a minute): zzz hanging')).toBeTruthy();
+    expect(utils.getByText('Not looked up yet. Tap Recompute later. (zzz hanging)')).toBeTruthy();
     expect(utils.getByText('Estimated (no data): zzz empty')).toBeTruthy();
+  });
+
+  describe('notice for lookups that were not finished', () => {
+    const PLURAL =
+      "2 ingredients couldn't be looked up and count as 0. Open and save the recipe again later to look them up.";
+    const SINGULAR =
+      "1 ingredient couldn't be looked up and counts as 0. Open and save the recipe again later to look it up.";
+
+    const hangOn = (hanging: string[]) => {
+      mockLookup.mockImplementation((name: string) =>
+        hanging.includes(name)
+          ? new Promise(() => {})
+          : Promise.resolve(name === 'zzz empty' ? null : { kcal: 40, protein: 10, carbs: 0, fat: 0 }),
+      );
+    };
+
+    const saveAndWaitForDeadline = async (utils: ReturnType<typeof render>) => {
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Create Recipe'));
+        await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
+      });
+    };
+
+    const buttons = () => alertSpy.mock.calls[0][2]!;
+    const options = () => alertSpy.mock.calls[0][3]!;
+
+    it('shows one Alert with the plural sentence and does not leave until it is answered', async () => {
+      hangOn(['zzz hang one', 'zzz hang two']);
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz hang one', 'zzz hang two']);
+
+      await saveAndWaitForDeadline(utils);
+
+      expect(mockCreateRecipe).toHaveBeenCalledTimes(1);
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy.mock.calls[0][0]).toBe('Saved');
+      expect(alertSpy.mock.calls[0][1]).toBe(PLURAL);
+      expect(mockReplace).not.toHaveBeenCalled();
+
+      await act(async () => {
+        buttons()[0].onPress!();
+      });
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+      expect(mockReplace).toHaveBeenCalledWith('RecipeDetail', {
+        recipeId: mockCreateRecipe.mock.calls[0][0].id,
+      });
+    });
+
+    it('uses the singular sentence for one ingredient', async () => {
+      hangOn(['zzz hanging']);
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
+
+      await saveAndWaitForDeadline(utils);
+
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy.mock.calls[0][1]).toBe(SINGULAR);
+    });
+
+    it('counts a refused lookup together with one cut off by the deadline', async () => {
+      mockLookup.mockImplementation((name: string) =>
+        name === 'zzz refused' ? Promise.resolve('not-looked-up') : new Promise(() => {}),
+      );
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz refused', 'zzz hanging']);
+
+      await saveAndWaitForDeadline(utils);
+
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy.mock.calls[0][1]).toBe(PLURAL);
+    });
+
+    it('counts a refused lookup when every lookup finished', async () => {
+      mockLookup.mockImplementation(async (name: string) =>
+        name === 'zzz refused' ? 'not-looked-up' : { kcal: 40, protein: 10, carbs: 0, fat: 0 },
+      );
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz refused']);
+
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Create Recipe'));
+        await jest.advanceTimersByTimeAsync(0);
+      });
+
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy.mock.calls[0][1]).toBe(SINGULAR);
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+
+    it('navigates once when the Alert is dismissed after a button press and the reverse', async () => {
+      hangOn(['zzz hanging']);
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
+      await saveAndWaitForDeadline(utils);
+
+      await act(async () => {
+        buttons()[0].onPress!();
+        options().onDismiss!();
+      });
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+
+      alertSpy.mockClear();
+      mockReplace.mockClear();
+      const second = render(<RecipeEditorScreen />);
+      await fillIngredients(second, ['zzz fine', 'zzz hanging']);
+      await saveAndWaitForDeadline(second);
+
+      await act(async () => {
+        options().onDismiss!();
+        buttons()[0].onPress!();
+      });
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows no Alert and navigates at once when every lookup finished', async () => {
+      hangOn([]);
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz empty']);
+
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Create Recipe'));
+        await jest.advanceTimersByTimeAsync(0);
+      });
+
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps Save disabled but not labelled Saving while the Alert is up', async () => {
+      hangOn(['zzz hanging']);
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
+      await saveAndWaitForDeadline(utils);
+
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(utils.queryByLabelText('Saving…')).toBeNull();
+      const save = utils.getByLabelText('Create Recipe');
+      expect(save.props.accessibilityState.disabled).toBe(true);
+      expect(utils.getByLabelText('Cancel').props.accessibilityState.disabled).toBe(true);
+
+      await act(async () => {
+        fireEvent.press(save);
+        await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
+      });
+      expect(mockCreateRecipe).toHaveBeenCalledTimes(1);
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        buttons()[0].onPress!();
+      });
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not navigate when the screen was closed before the Alert was answered', async () => {
+      hangOn(['zzz hanging']);
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
+      await saveAndWaitForDeadline(utils);
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+
+      utils.unmount();
+      await act(async () => {
+        buttons()[0].onPress!();
+      });
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockGoBack).not.toHaveBeenCalled();
+    });
   });
 });

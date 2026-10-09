@@ -14,7 +14,7 @@ import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
 import { fetchMealById, MealDetail } from '../api/mealdb';
 import { useRoute } from '@react-navigation/native';
 import { Card, Row, Pill } from '../components';
-import { importRecipe as dbImportRecipe } from '../db/database';
+import { importRecipe as dbImportRecipe, getRecipeById } from '../db/database';
 import { buildImportResult, mealDbRecipeId } from '../nutrition/importRecipe';
 
 // ─── Section label ────────────────────────────────────────────────────────────
@@ -53,7 +53,10 @@ function ErrorView({ onRetry }: { onRetry: () => void }) {
 }
 
 function notLookedUpSentence(count: number): string {
-  return `${count} ingredient(s) were not looked up (too many requests); their macros count as 0. Try again in a minute.`;
+  if (count === 1) {
+    return "1 ingredient couldn't be looked up right now and counts as 0. Open the recipe in the editor later and save it to look it up.";
+  }
+  return `${count} ingredients couldn't be looked up right now and count as 0. Open the recipe in the editor later and save it to look them up.`;
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -69,6 +72,7 @@ export default function DiscoverDetailScreen() {
   // Import state
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
+  const [alreadyInLibrary, setAlreadyInLibrary] = useState(false);
   const [importEstimated, setImportEstimated] = useState<string[]>([]);
   const [importNotLookedUp, setImportNotLookedUp] = useState<string[]>([]);
 
@@ -119,6 +123,7 @@ export default function DiscoverDetailScreen() {
           'Already in your library',
           `"${meal.name}" is already in your recipe library.`,
         );
+        setAlreadyInLibrary(true);
         setImportDone(true);
         return;
       }
@@ -157,9 +162,11 @@ export default function DiscoverDetailScreen() {
     if (!meal) return;
     const checkAlreadyImported = async () => {
       try {
-        const { getRecipeById } = await import('../db/database');
         const existing = await getRecipeById(mealDbRecipeId(meal.id));
-        if (existing) setImportDone(true);
+        if (existing) {
+          setAlreadyInLibrary(true);
+          setImportDone(true);
+        }
       } catch {
         // Non-fatal — worst case the button shows and the user gets the "already imported" alert
       }
@@ -278,7 +285,9 @@ export default function DiscoverDetailScreen() {
                       {importEstimated.length === 1 ? '' : 's'} had no nutritional data
                     </Text>
                   ) : importNotLookedUp.length === 0 ? (
-                    <Text style={styles.importSubtitle}>Macros computed from local data</Text>
+                    <Text style={styles.importSubtitle}>
+                      {alreadyInLibrary ? 'In your library' : 'Macros computed from local data'}
+                    </Text>
                   ) : null}
                   {importNotLookedUp.length > 0 ? (
                     <Text style={styles.importSubtitle}>

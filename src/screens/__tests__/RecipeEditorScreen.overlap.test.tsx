@@ -1,8 +1,10 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, act, fireEvent } from '@testing-library/react-native';
 
+const mockGoBack = jest.fn();
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ goBack: jest.fn(), replace: jest.fn(), navigate: jest.fn() }),
+  useNavigation: () => ({ goBack: mockGoBack, replace: jest.fn(), navigate: jest.fn() }),
   useRoute: () => ({ params: { recipeId: 'r1' } }),
 }));
 
@@ -37,14 +39,63 @@ const mockUpdateRecipe = updateRecipe as jest.Mock;
 const NUTRITION = { kcal: 40, protein: 10, carbs: 0, fat: 0 };
 
 describe('RecipeEditorScreen overlapping macro recomputes', () => {
+  let alertSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.useFakeTimers();
     mockLookup.mockReset();
     mockUpdateRecipe.mockClear();
+    mockGoBack.mockClear();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
+    alertSpy.mockRestore();
     jest.useRealTimers();
+  });
+
+  it('tells the user about an ingredient whose run was superseded during the save, and goes back after OK', async () => {
+    const resolvers: Array<(v: typeof NUTRITION) => void> = [];
+    mockLookup.mockImplementation(
+      () => new Promise((resolve) => resolvers.push(resolve)),
+    );
+
+    const utils = render(<RecipeEditorScreen />);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(700);
+    });
+    expect(mockLookup).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText('Save Changes'));
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.changeText(utils.getByDisplayValue('100'), '300');
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(700);
+    });
+    expect(mockLookup).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolvers[0](NUTRITION);
+      await jest.advanceTimersByTimeAsync(0);
+    });
+
+    expect(mockUpdateRecipe).toHaveBeenCalledTimes(1);
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][0]).toBe('Saved');
+    expect(alertSpy.mock.calls[0][1]).toBe(
+      "1 ingredient couldn't be looked up and counts as 0. Open and save the recipe again later to look it up.",
+    );
+    expect(mockGoBack).not.toHaveBeenCalled();
+
+    await act(async () => {
+      alertSpy.mock.calls[0][2]![0].onPress!();
+    });
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
 
   it('saves the macros of the edited ingredients when an older recompute finishes last', async () => {
