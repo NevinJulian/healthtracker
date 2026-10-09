@@ -385,7 +385,17 @@ export function weightChange(
   history90: { date: string; weight: number }[],
   history30: { date: string; weight: number }[]
 ): number | null {
-  return null;
+  const trendByDate = new Map<string, { trend: number; shown: boolean }>();
+  ewmaTrend(plausibleWeights(history90).valid).forEach((p, i) => {
+    trendByDate.set(p.date, { trend: p.trend, shown: i >= TREND_MIN_POINTS - 1 });
+  });
+  const shown: number[] = [];
+  for (const p of plausibleWeights(history30).valid) {
+    const entry = trendByDate.get(p.date);
+    if (entry && entry.shown) shown.push(entry.trend);
+  }
+  if (shown.length < 2) return null;
+  return shown[shown.length - 1] - shown[0];
 }
 
 export const RATE_WINDOW_DAYS = 14;

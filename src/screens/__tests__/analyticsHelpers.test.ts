@@ -982,7 +982,7 @@ describe('weightChange', () => {
     const history90 = series([...Array(30).fill(80), ...Array(10).fill(90)]);
     const history30 = history90.slice(10);
     expect(weightChange(history90, history30) as number).toBeCloseTo(
-      90 - 10 * Math.pow(9 / 11, 10),
+      10 - 10 * Math.pow(9 / 11, 10),
       6
     );
   });

@@ -63,7 +63,7 @@ import {
   type BodyMeasurement,
   type WorkoutSet,
 } from '../db/database';
-import { addDays as addDaysKey, daysBetween } from '../utils/dates';
+import { addDays as addDaysKey, daysBetween, todayKey } from '../utils/dates';
 import { Card, ProgressBar, ScreenHeader, Pill } from '../components';
 import LoadErrorView from '../components/LoadErrorView';
 import {
@@ -84,6 +84,9 @@ import {
   plausibleWeights,
   ewmaTrend,
   visibleTrend,
+  weightRatePerWeek,
+  formatWeightRate,
+  weightChange,
   type HydrationDay,
   type WorkoutSetSlice,
 } from './analyticsHelpers';
@@ -132,6 +135,7 @@ const TREND_LINE_THICKNESS = 2;
 export function WeightTrendCard({
   history30,
   history90,
+  todayISO,
 }: {
   history30: { date: string; weight: number }[];
   history90: { date: string; weight: number }[];
@@ -168,6 +172,8 @@ export function WeightTrendCard({
   const firstDate = plausible.length > 0 ? plausible[0].date : '';
   const lastDate = plausible.length > 0 ? plausible[plausible.length - 1].date : '';
   const trendShown = visibleTrend(trend).filter((p) => p.date >= firstDate);
+
+  const rateText = formatWeightRate(weightRatePerWeek(trend, todayISO ?? todayKey()));
 
   const yValues = [...weights, ...trendShown.map((p) => p.trend)];
   const yMin = Math.min(...yValues) - 2;
@@ -247,6 +253,10 @@ export function WeightTrendCard({
           </Text>
         </TouchableOpacity>
       </View>
+
+      <Text style={styles.rateText} accessibilityLabel="Weight trend rate">
+        {rateText}
+      </Text>
 
       {plausible.length === 0 ? (
         <Text style={styles.emptyText}>No data for this period.</Text>
@@ -1466,14 +1476,7 @@ export default function AnalyticsDashboardScreen() {
       const s7 = computeStats(7);
       const s30 = computeStats(30);
 
-      // Weight delta (first vs last plausible point in the 30-day window —
-      // an implausible outlier must not dominate the metric tile, #322)
-      const { valid: plausibleWeightData30 } = plausibleWeights(weightData30);
-      const weightDelta =
-        plausibleWeightData30.length >= 2
-          ? plausibleWeightData30[plausibleWeightData30.length - 1].weight -
-            plausibleWeightData30[0].weight
-          : null;
+      const weightDelta = weightChange(weightData90, weightData30);
 
       // Total workouts (gym sessions + extra) in 30 days
       const gymDays30 = s30.total > 0 ? Math.round((s30.gym / 100) * s30.total) : 0;
@@ -1659,6 +1662,7 @@ export default function AnalyticsDashboardScreen() {
         <WeightTrendCard
           history30={weightHistory30}
           history90={weightHistory90}
+          todayISO={todayISO || undefined}
         />
 
         {/* Strength progression */}
@@ -1792,6 +1796,12 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginBottom: Spacing.md,
     alignSelf: 'flex-start',
+  },
+  rateText: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    color: Colors.sageDeep,
+    marginBottom: Spacing.md,
   },
   togglePill: {
     borderRadius: Radius.full,
