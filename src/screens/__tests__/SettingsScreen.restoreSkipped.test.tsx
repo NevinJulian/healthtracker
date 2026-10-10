@@ -69,6 +69,9 @@ jest.mock('../../services/backup', () => ({
   exportBackup: jest.fn(),
   importBackup: jest.fn(),
   shareFile: jest.fn(),
+  listAutoBackups: jest.fn().mockResolvedValue([]),
+  listSafetySnapshots: jest.fn().mockResolvedValue([]),
+  restoreBackupFromUri: jest.fn(),
 }));
 
 import SettingsScreen from '../SettingsScreen';

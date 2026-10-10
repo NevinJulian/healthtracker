@@ -20,6 +20,7 @@ import * as SQLite from 'expo-sqlite';
 import { CREATE_SCHEMA_VERSION_TABLE, MIGRATIONS, RESTORE_SLOT_DEDUPE_SQL, RESTORE_SET_INDEX_SQL, Exercise } from './schema';
 import { bioForceExercises } from '../../bioForceExercises';
 import { recipes } from '../data/recipes';
+import { shoppingKey, mergedQuantity } from '../data/shoppingMerge';
 import { NUTRITION_GOALS, NutritionGoals } from '../nutrition/goals';
 import type { Sex, ActivityLevel, GoalType } from '../nutrition/tdee';
 import {
@@ -1204,6 +1205,24 @@ export async function getWeightHistory(days: number): Promise<{ date: string; we
   return rows.map((r) => ({ date: r.date, weight: r.body_weight }));
 }
 
+export interface DailyLogExportRow {
+  date: string;
+  body_weight: number | null;
+  water_ml: number | null;
+  walk_completed: number | null;
+  hammer_completed: number | null;
+  fasting_completed: number | null;
+}
+
+export async function getAllDailyLogForExport(): Promise<DailyLogExportRow[]> {
+  const db = getDatabase();
+  return db.getAllAsync<DailyLogExportRow>(
+    `SELECT date, body_weight, water_ml, walk_completed, hammer_completed, fasting_completed
+     FROM daily_log
+     ORDER BY date`
+  );
+}
+
 // ─────────────────────────────────────────────
 // Weekly Template CRUD
 // ─────────────────────────────────────────────
@@ -1622,6 +1641,20 @@ export function addShoppingListItem(name: string, total_quantity: number, unit: 
 
 async function _addShoppingListItemImpl(name: string, total_quantity: number, unit: string): Promise<void> {
   const db = getDatabase();
+  const key = shoppingKey(name);
+  if (key !== '' && Number.isFinite(total_quantity)) {
+    const open = await db.getAllAsync<{ id: number; ingredient_name: string; total_quantity: number; unit: string }>(
+      'SELECT id, ingredient_name, total_quantity, unit FROM shopping_list WHERE is_checked = 0 ORDER BY id ASC'
+    );
+    for (const line of open) {
+      if (shoppingKey(line.ingredient_name) !== key) continue;
+      const merged = mergedQuantity(line.total_quantity, line.unit, total_quantity, unit);
+      if (merged === null) continue;
+      if (!Number.isFinite(merged)) break;
+      await db.runAsync('UPDATE shopping_list SET total_quantity = ? WHERE id = ?', [merged, line.id]);
+      return;
+    }
+  }
   await db.runAsync(
     'INSERT INTO shopping_list (ingredient_name, total_quantity, unit, is_checked) VALUES (?, ?, ?, 0)',
     [name, total_quantity, unit]
@@ -1719,6 +1752,31 @@ export async function getWeeklyMealPlan(): Promise<WeeklyMealPlanItem[]> {
   return await db.getAllAsync<WeeklyMealPlanItem>('SELECT * FROM weekly_meal_plan');
 }
 
+export interface MealExportRow {
+  date: string;
+  meal_type: string;
+  recipe_title: string | null;
+  calories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+  is_consumed: number | null;
+}
+
+export async function getAllMealsForExport(): Promise<MealExportRow[]> {
+  const db = getDatabase();
+  return db.getAllAsync<MealExportRow>(
+    `SELECT p.date AS date, p.meal_type AS meal_type, r.title AS recipe_title,
+            r.calories AS calories, r.protein AS protein, r.carbs AS carbs, r.fat AS fat,
+            p.is_consumed AS is_consumed
+     FROM weekly_meal_plan p
+     LEFT JOIN recipe_library r ON r.id = p.recipe_id
+     ORDER BY p.date,
+              CASE p.meal_type WHEN 'breakfast' THEN 0 WHEN 'lunch' THEN 1 WHEN 'dinner' THEN 2 ELSE 3 END,
+              p.id`
+  );
+}
+
 export interface MealPlanWithRecipe extends WeeklyMealPlanItem {
   recipe?: Recipe;
 }
@@ -1783,6 +1841,82 @@ async function _assignMealToPlanImpl(date: string, meal_type: string, recipe_id:
       );
     }
   });
+}
+
+export interface CopyMealsResult {
+  copied: number;
+  skipped: number;
+}
+
+/**
+ * Copies a planned meal into the same slot on each target date where that
+ * slot is empty. Copies start unticked with no inventory pointer and never
+ * touch meal_inventory. Occupied slots are counted as skipped and left as
+ * they are; the source date and malformed or duplicate dates are ignored.
+ */
+export function copyMealToDates(planId: number, targetDates: string[]): Promise<CopyMealsResult> {
+  return _enqueueWrite('copyMealToDates', () => _copyMealToDatesImpl(planId, targetDates));
+}
+
+async function _copyMealToDatesImpl(planId: number, targetDates: string[]): Promise<CopyMealsResult> {
+  const db = getDatabase();
+  const result: CopyMealsResult = { copied: 0, skipped: 0 };
+  await db.withTransactionAsync(async () => {
+    const source = await db.getFirstAsync<{ date: string; meal_type: string; recipe_id: string }>(
+      'SELECT date, meal_type, recipe_id FROM weekly_meal_plan WHERE id = ?',
+      [planId]
+    );
+    if (!source) return;
+    const targets = new Set(targetDates.filter((d) => isValidDateKey(d) && d !== source.date));
+    for (const date of targets) {
+      if (await _insertCopyIfEmpty(db, date, source.meal_type, source.recipe_id)) result.copied++;
+      else result.skipped++;
+    }
+  });
+  return result;
+}
+
+/**
+ * Copies the Lunch and Dinner rows of one day into the empty slots of another
+ * day, under the same rules as copyMealToDates.
+ */
+export function copyDayToDate(fromDate: string, toDate: string): Promise<CopyMealsResult> {
+  return _enqueueWrite('copyDayToDate', () => _copyDayToDateImpl(fromDate, toDate));
+}
+
+async function _copyDayToDateImpl(fromDate: string, toDate: string): Promise<CopyMealsResult> {
+  const result: CopyMealsResult = { copied: 0, skipped: 0 };
+  if (fromDate === toDate || !isValidDateKey(fromDate) || !isValidDateKey(toDate)) return result;
+  const db = getDatabase();
+  await db.withTransactionAsync(async () => {
+    const sources = await db.getAllAsync<{ meal_type: string; recipe_id: string }>(
+      "SELECT meal_type, recipe_id FROM weekly_meal_plan WHERE date = ? AND meal_type IN ('Lunch', 'Dinner') ORDER BY id",
+      [fromDate]
+    );
+    for (const source of sources) {
+      if (await _insertCopyIfEmpty(db, toDate, source.meal_type, source.recipe_id)) result.copied++;
+      else result.skipped++;
+    }
+  });
+  return result;
+}
+
+async function _insertCopyIfEmpty(
+  db: SQLite.SQLiteDatabase,
+  date: string,
+  meal_type: string,
+  recipe_id: string
+): Promise<boolean> {
+  const occupied = await db.getFirstAsync<{ id: number }>(
+    'SELECT id FROM weekly_meal_plan WHERE date = ? AND meal_type = ? LIMIT 1',
+    [date, meal_type]
+  );
+  if (occupied) return false;
+  await db.runAsync(
+    'INSERT INTO weekly_meal_plan (date, meal_type, recipe_id, is_consumed, consumed_from_inventory_id) VALUES (?, ?, ?, 0, NULL)',
+    [date, meal_type, recipe_id]
+  );
+  return true;
 }
 
 export function removeMealFromPlan(id: number): Promise<void> {
@@ -2299,6 +2433,71 @@ export async function getMostCookedRecipes(limit: number = 5): Promise<CookedRec
   }));
 }
 
+export interface OftenCookedInput {
+  recipe_id: string;
+  title: string;
+  cook_events: number;
+  last_date: string;
+}
+
+export interface OftenCookedRecipe {
+  recipe_id: string;
+  title: string;
+  cookEvents: number;
+  score: number;
+}
+
+const OFTEN_COOKED_DECAY = 0.95;
+
+/**
+ * Orders recipes by cook events weighted by recency: events times 0.95 per
+ * day since the last cook. A future last date counts as today; a malformed
+ * one scores 0. Ties go to the later last date, then title, then id.
+ */
+export function rankOftenCooked(
+  rows: OftenCookedInput[],
+  today: string,
+  limit: number = 5
+): OftenCookedRecipe[] {
+  if (!(limit > 0)) return [];
+  return rows
+    .map((r) => {
+      const days = isValidDateKey(r.last_date) ? Math.max(0, _daysBetweenKey(r.last_date, today)) : null;
+      const score = days === null ? 0 : r.cook_events * Math.pow(OFTEN_COOKED_DECAY, days);
+      return { r, score };
+    })
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (a.r.last_date < b.r.last_date ? 1 : a.r.last_date > b.r.last_date ? -1 : 0) ||
+        a.r.title.localeCompare(b.r.title) ||
+        (a.r.recipe_id < b.r.recipe_id ? -1 : a.r.recipe_id > b.r.recipe_id ? 1 : 0)
+    )
+    .slice(0, limit)
+    .map(({ r, score }) => ({
+      recipe_id: r.recipe_id,
+      title: r.title,
+      cookEvents: r.cook_events,
+      score,
+    }));
+}
+
+export async function getOftenCookedRecipes(
+  limit: number = 5,
+  today: string = toISODate()
+): Promise<OftenCookedRecipe[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<OftenCookedInput>(
+    `SELECT cl.recipe_id AS recipe_id, r.title AS title,
+            COUNT(*) AS cook_events, MAX(cl.date) AS last_date
+     FROM cook_log cl
+     JOIN recipe_library r ON cl.recipe_id = r.id
+     WHERE r.archived_at IS NULL
+     GROUP BY cl.recipe_id, r.title`
+  );
+  return rankOftenCooked(rows, today, limit);
+}
+
 export interface InventorySnapshot {
   /** Total number of distinct recipes currently in stock. */
   recipesInStock: number;
@@ -2602,6 +2801,25 @@ export async function dumpTable(
     `SELECT * FROM ${tableName}`
   );
   return rows;
+}
+
+/**
+ * Read the schema version and every user table as one unit on the write
+ * queue, so the result is one point in time: no write or restore can land
+ * between two tables. Call this from outside the queue only.
+ */
+export function dumpAllTables(): Promise<{
+  schemaVersion: number;
+  tables: Record<string, Record<string, unknown>[]>;
+}> {
+  return _enqueueWrite('dumpAllTables', async () => {
+    const schemaVersion = await getCurrentSchemaVersion();
+    const tables: Record<string, Record<string, unknown>[]> = {};
+    for (const name of await listUserTables()) {
+      tables[name] = await dumpTable(name);
+    }
+    return { schemaVersion, tables };
+  });
 }
 
 const RENUMBER_MIGRATION_VERSION = 37;
@@ -3229,29 +3447,35 @@ export interface WorkoutSet {
   set_index: number;
   reps: number;
   weight_kg: number;
+  /** `'warmup'` for a warm-up set; null (or absent) for a working set. */
+  set_type?: string | null;
   created_at: string;
+}
+
+/** Details of one set to log. Omit `setType` for a working set. */
+export interface WorkoutSetInput {
+  reps: number;
+  weightKg: number;
+  setType?: 'warmup';
 }
 
 /**
  * Insert one logged set for an exercise on `date`.
  *
- * `set_index` is NOT caller-supplied (#317): it's assigned atomically as one
- * past the current max set_index for this (date, exercise) pair, via a
- * single INSERT…SELECT rather than a separate read-then-write. The previous
- * design took a caller-computed index (DashboardScreen used
- * `existingSets.length`), which collided with a surviving row's set_index
- * whenever a set was deleted before the next one was logged. v37 (schema.ts)
- * enforces UNIQUE(date, exercise, set_index) at the schema level, so any
- * remaining race would throw here rather than silently duplicate.
+ * `set_index` is NOT caller-supplied: it's assigned atomically as one past the
+ * current max set_index for this (date, exercise) pair, via a single
+ * INSERT…SELECT rather than a separate read-then-write. The schema enforces
+ * UNIQUE(date, exercise, set_index), so any remaining race would throw here
+ * rather than silently duplicate.
  *
  * @param date      - YYYY-MM-DD date key (use toISODate() / localDateKey()).
  * @param exercise  - Exercise name (matches Exercise.name from daily_log.exercises).
- * @param set       - Set details: reps performed, weight in kg.
+ * @param set       - Set details: reps performed, weight in kg, and `setType: 'warmup'` for a warm-up.
  */
 export function logWorkoutSet(
   date: string,
   exercise: string,
-  set: { reps: number; weightKg: number }
+  set: WorkoutSetInput
 ): Promise<void> {
   return _enqueueWrite('logWorkoutSet', () => _logWorkoutSetImpl(date, exercise, set));
 }
@@ -3259,15 +3483,24 @@ export function logWorkoutSet(
 async function _logWorkoutSetImpl(
   date: string,
   exercise: string,
-  set: { reps: number; weightKg: number }
+  set: WorkoutSetInput
 ): Promise<void> {
   const db = getDatabase();
   const createdAt = new Date().toISOString();
   await db.runAsync(
-    `INSERT INTO workout_set_log (date, exercise, set_index, reps, weight_kg, created_at)
-     SELECT ?, ?, COALESCE(MAX(set_index), -1) + 1, ?, ?, ?
+    `INSERT INTO workout_set_log (date, exercise, set_index, reps, weight_kg, created_at, set_type)
+     SELECT ?, ?, COALESCE(MAX(set_index), -1) + 1, ?, ?, ?, ?
      FROM workout_set_log WHERE date = ? AND exercise = ?`,
-    [date, exercise, set.reps, set.weightKg, createdAt, date, exercise]
+    [
+      date,
+      exercise,
+      set.reps,
+      set.weightKg,
+      createdAt,
+      set.setType === 'warmup' ? 'warmup' : null,
+      date,
+      exercise,
+    ]
   );
 }
 
@@ -3309,6 +3542,44 @@ export async function getWorkoutHistory(
     return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SINCE_SQL, [exercise, sinceDateKey]);
   }
   return db.getAllAsync<WorkoutSet>(WORKOUT_HISTORY_SQL, [exercise]);
+}
+
+export interface WorkoutSetExportRow {
+  date: string;
+  exercise: string;
+  set_index: number;
+  set_type: string | null;
+  reps: number | null;
+  weight_kg: number | null;
+  created_at: string | null;
+}
+
+export async function getAllWorkoutSetsForExport(): Promise<WorkoutSetExportRow[]> {
+  const db = getDatabase();
+  return db.getAllAsync<WorkoutSetExportRow>(
+    `SELECT date, exercise, set_index, set_type, reps, weight_kg, created_at
+     FROM workout_set_log
+     ORDER BY date, exercise, set_index`
+  );
+}
+
+export const WORKOUT_LAST_SET_SQL = `SELECT * FROM workout_set_log
+     WHERE exercise = ? AND date < ? AND (set_type IS NULL OR set_type <> 'warmup')
+     ORDER BY date DESC, set_index DESC LIMIT 1`;
+
+/**
+ * Return the last working set of the most recent session of `exercise`
+ * before `beforeDate`, or null if there is none. Warm-ups never count.
+ *
+ * @param exercise   - Exact exercise name as logged.
+ * @param beforeDate - YYYY-MM-DD; only earlier dates are considered.
+ */
+export async function getLastSetForExercise(
+  exercise: string,
+  beforeDate: string
+): Promise<WorkoutSet | null> {
+  const db = getDatabase();
+  return db.getFirstAsync<WorkoutSet>(WORKOUT_LAST_SET_SQL, [exercise, beforeDate]);
 }
 
 /**

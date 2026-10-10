@@ -138,6 +138,7 @@ describe('database.ts write-queue rules (#369)', () => {
         'syncRollingSchedule',
         'toggleMealConsumed',
         'restoreFromPayload',
+        'dumpAllTables',
         'setSetting',
         'upsertLogField',
       ])

@@ -79,7 +79,18 @@ import {
   formatTimeString,
   parseTimeString,
 } from '../services/notifications';
-import { exportBackup, importBackup, shareFile } from '../services/backup';
+import {
+  exportBackup,
+  importBackup,
+  shareFile,
+  listAutoBackups,
+  listSafetySnapshots,
+  restoreBackupFromUri,
+  type AutoBackupEntry,
+  type RestoreOptions,
+  type RestoreResult,
+} from '../services/backup';
+import { exportCsv } from '../services/csvExport';
 import Card from '../components/Card';
 import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
@@ -426,6 +437,44 @@ const MAX_SKIPPED_TABLES_SHOWN = 5;
 const MAX_SKIPPED_COLUMNS_SHOWN = 5;
 const MAX_SKIPPED_NAME_LENGTH = 40;
 
+const BYTES_PER_KB = 1024;
+const BYTES_PER_MB = BYTES_PER_KB * 1024;
+
+function formatBackupTitle(date: Date): string {
+  const day = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `${day}, ${time}`;
+}
+
+function formatBackupSize(bytes: number): string {
+  if (bytes < BYTES_PER_KB) return `${bytes} B`;
+  if (bytes < BYTES_PER_MB) return `${(bytes / BYTES_PER_KB).toFixed(1)} KB`;
+  return `${(bytes / BYTES_PER_MB).toFixed(1)} MB`;
+}
+
+/** A list of backup files on this device; `entries` is null until the first load settles. */
+function useBackupList(list: () => Promise<AutoBackupEntry[]>, label: string) {
+  const [entries, setEntries] = useState<AutoBackupEntry[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const loadSeq = useRef(0);
+
+  const reload = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    try {
+      const next = await list();
+      if (seq !== loadSeq.current) return;
+      setEntries(next);
+      setFailed(false);
+    } catch (err) {
+      console.warn(`[Settings] Could not list ${label}:`, err);
+      if (seq !== loadSeq.current) return;
+      setFailed(true);
+    }
+  }, [list, label]);
+
+  return { entries, failed, reload };
+}
+
 function truncateName(name: string): string {
   const points = Array.from(name);
   return points.length > MAX_SKIPPED_NAME_LENGTH
@@ -480,6 +529,23 @@ export default function SettingsScreen() {
 
   // Backup state
   const [backupBusy, setBackupBusy] = useState(false);
+  const {
+    entries: autoBackups,
+    failed: autoBackupsFailed,
+    reload: loadAutoBackups,
+  } = useBackupList(listAutoBackups, 'automatic backups');
+  const {
+    entries: safetySnapshots,
+    failed: safetySnapshotsFailed,
+    reload: loadSafetySnapshots,
+  } = useBackupList(listSafetySnapshots, 'safety snapshots');
+
+  const loadBackupLists = useCallback(() => {
+    loadAutoBackups();
+    loadSafetySnapshots();
+  }, [loadAutoBackups, loadSafetySnapshots]);
+
+  useFocusEffect(loadBackupLists);
 
   // Nutrition goals — seeded from NUTRITION_GOALS defaults until DB is loaded
   const [goalCalories, setGoalCalories] = useState(1800);
@@ -1171,13 +1237,54 @@ export default function SettingsScreen() {
     }
   }
 
+  // ── Backup: CSV export ──────────────────────────────────────────────────
+
+  async function handleCsvExport() {
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      const { failed } = await exportCsv();
+      if (failed.length > 0) {
+        Alert.alert('CSV export incomplete', `Could not share: ${failed.join(', ')}.`);
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Something went wrong.';
+      Alert.alert('CSV export failed', message);
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  // ── Backup: share an automatic backup or a safety snapshot ──────────────
+
+  async function handleBackupFileShare(backup: AutoBackupEntry, dialogTitle: string) {
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      const shared = await shareFile(backup.uri, dialogTitle);
+      if (!shared) {
+        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong.';
+      Alert.alert('Share failed', message);
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
   // ── Backup: restore ─────────────────────────────────────────────────────
 
-  function handleBackupRestore() {
+  function confirmRestore(
+    title: string,
+    message: string,
+    restore: (options: RestoreOptions) => Promise<RestoreResult | null>
+  ) {
     if (backupBusy) return;
     Alert.alert(
-      'Restore from backup',
-      'This will replace ALL current data with the contents of the backup file. A safety copy of your current data will be saved first. Continue?',
+      title,
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -1186,7 +1293,7 @@ export default function SettingsScreen() {
           onPress: async () => {
             setBackupBusy(true);
             try {
-              const result = await importBackup({
+              const result = await restore({
                 onSnapshotFailed: async (errorMessage) => {
                   return new Promise<boolean>((resolve) => {
                     Alert.alert(
@@ -1242,10 +1349,79 @@ export default function SettingsScreen() {
               Alert.alert('Restore failed', message);
             } finally {
               setBackupBusy(false);
+              loadBackupLists();
             }
           },
         },
       ]
+    );
+  }
+
+  function handleBackupRestore() {
+    confirmRestore(
+      'Restore from backup',
+      'This will replace ALL current data with the contents of the backup file. A safety copy of your current data will be saved first. Continue?',
+      importBackup
+    );
+  }
+
+  function handleAutoBackupRestore(backup: AutoBackupEntry) {
+    confirmRestore(
+      'Restore automatic backup',
+      `Restore the automatic backup from ${formatBackupTitle(backup.createdAt)}? This will replace ALL current data with its contents. A safety copy of your current data will be saved first. Continue?`,
+      (options) => restoreBackupFromUri(backup.uri, options)
+    );
+  }
+
+  function handleSafetySnapshotRestore(snapshot: AutoBackupEntry) {
+    confirmRestore(
+      'Restore safety copy',
+      `Restore the safety copy saved before the restore on ${formatBackupTitle(snapshot.createdAt)}? This will replace ALL current data with its contents. A safety copy of your current data will be saved first. Continue?`,
+      (options) => restoreBackupFromUri(snapshot.uri, options)
+    );
+  }
+
+  function renderBackupFileRow(
+    backup: AutoBackupEntry,
+    kind: string,
+    subtitle: string,
+    onShare: () => void,
+    onRestore: () => void
+  ) {
+    const title = formatBackupTitle(backup.createdAt);
+    return (
+      <View key={backup.name} style={styles.autoBackupRow}>
+        <View style={styles.backupTextBlock}>
+          <Text style={styles.backupRowTitle}>{title}</Text>
+          <Text style={styles.backupRowSubtitle}>{subtitle}</Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.autoBackupAction, backupBusy && styles.backupRowDisabled]}
+          onPress={onShare}
+          disabled={backupBusy}
+          accessibilityLabel={`Share ${kind} ${title}`}
+          accessibilityRole="button"
+          activeOpacity={0.7}
+        >
+          <Text style={styles.autoBackupActionLabel}>Share</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.autoBackupAction,
+            styles.autoBackupActionRestore,
+            backupBusy && styles.backupRowDisabled,
+          ]}
+          onPress={onRestore}
+          disabled={backupBusy}
+          accessibilityLabel={`Restore ${kind} ${title}`}
+          accessibilityRole="button"
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.autoBackupActionLabel, styles.autoBackupActionLabelRestore]}>
+            Restore
+          </Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
@@ -1836,6 +2012,29 @@ export default function SettingsScreen() {
 
         <View style={styles.sectionDivider} />
 
+        {/* Export as CSV */}
+        <TouchableOpacity
+          style={[styles.backupRow, backupBusy && styles.backupRowDisabled]}
+          onPress={handleCsvExport}
+          disabled={backupBusy}
+          accessibilityLabel="Export as CSV"
+          accessibilityRole="button"
+          activeOpacity={0.7}
+        >
+          <View style={styles.backupIconChip}>
+            <Ionicons name="document-text-outline" size={18} color={Colors.skyDeep} />
+          </View>
+          <View style={styles.backupTextBlock}>
+            <Text style={styles.backupRowTitle}>Export as CSV</Text>
+            <Text style={styles.backupRowSubtitle}>
+              Workout sets, daily log and meals as three spreadsheet files
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward-outline" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        <View style={styles.sectionDivider} />
+
         {/* Restore from backup */}
         <TouchableOpacity
           style={[styles.backupRow, backupBusy && styles.backupRowDisabled]}
@@ -1856,6 +2055,46 @@ export default function SettingsScreen() {
           </View>
           <Ionicons name="chevron-forward-outline" size={16} color={Colors.textMuted} />
         </TouchableOpacity>
+
+        <View style={styles.sectionDivider} />
+
+        {/* Automatic backups */}
+        <Text style={styles.backupRowTitle}>Automatic backups</Text>
+        <Text style={styles.backupRowSubtitle}>
+          Saved on this device once a day when you open the app. The newest 7 are kept.
+        </Text>
+        {autoBackupsFailed ? (
+          <Text style={styles.autoBackupMessage}>Could not read the automatic backups.</Text>
+        ) : autoBackups !== null && autoBackups.length === 0 ? (
+          <Text style={styles.autoBackupMessage}>
+            No automatic backups yet. The first one is saved the next time you open the app.
+          </Text>
+        ) : (
+          (autoBackups ?? []).map((backup) =>
+            renderBackupFileRow(
+              backup,
+              'automatic backup',
+              formatBackupSize(backup.sizeBytes),
+              () => handleBackupFileShare(backup, 'Save your HealthTracker backup'),
+              () => handleAutoBackupRestore(backup)
+            )
+          )
+        )}
+        {safetySnapshotsFailed ? (
+          <Text style={styles.autoBackupMessage}>
+            Could not read the safety copies saved before a restore.
+          </Text>
+        ) : (
+          (safetySnapshots ?? []).map((snapshot) =>
+            renderBackupFileRow(
+              snapshot,
+              'safety copy',
+              `Before restore · ${formatBackupSize(snapshot.sizeBytes)}`,
+              () => handleBackupFileShare(snapshot, 'Save your safety backup'),
+              () => handleSafetySnapshotRestore(snapshot)
+            )
+          )
+        )}
 
         <View style={styles.sectionDivider} />
 
@@ -2213,6 +2452,35 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
+  },
+  autoBackupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  autoBackupMessage: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.xs,
+    color: Colors.textMuted,
+    marginTop: Spacing.md,
+  },
+  autoBackupAction: {
+    backgroundColor: Colors.skyTint,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  autoBackupActionRestore: {
+    backgroundColor: Colors.clayTint,
+  },
+  autoBackupActionLabel: {
+    fontFamily: Typography.title,
+    fontSize: Typography.sizes.sm,
+    color: Colors.skyDeep,
+  },
+  autoBackupActionLabelRestore: {
+    color: Colors.clayDeep,
   },
 
   // ── Profile section (#281) ──────────────────────────────────────────────

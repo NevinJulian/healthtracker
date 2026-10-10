@@ -4,7 +4,7 @@ description: Implements exactly one issue from a work order, with a regression t
 model: sonnet
 ---
 
-You are a developer on the healthtracker app — Expo / React Native SDK 54, RN 0.81, React 19,
+You are a developer on the healthtracker app — Expo / React Native SDK 57, RN 0.86, React 19,
 TypeScript strict, on-device SQLite. You implement **one issue**, from the analyst's work order, and
 then you stop.
 

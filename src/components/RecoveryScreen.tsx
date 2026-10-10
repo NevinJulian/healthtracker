@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import Button from './Button';
+import { listAutoBackups, shareFile } from '../services/backup';
 import { exportRawDatabase, hasRescueWal } from '../services/rescueExport';
 import { Colors, Spacing, Typography } from '../theme/tokens';
 
 const TWO_FILES_NOTICE = 'Saving shares two files. Keep both.';
+const LATEST_BACKUP_NOTICE =
+  'Share latest backup shares your newest automatic backup. It is the file that Restore from backup in Settings reads after a reinstall.';
 const NO_RESET_NOTICE =
   "Clearing the app's storage in Android settings deletes all your data, so there is no reset button here.";
 
@@ -31,12 +34,17 @@ export default function RecoveryScreen({ title, detail, onRetry, beforeSave }: R
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [hasWal, setHasWal] = useState(false);
+  const [hasBackup, setHasBackup] = useState(false);
 
   useEffect(() => {
     let active = true;
     hasRescueWal().then(
       (found) => active && setHasWal(found),
       () => active && setHasWal(false),
+    );
+    listAutoBackups().then(
+      (backups) => active && setHasBackup(backups.length > 0),
+      () => active && setHasBackup(false),
     );
     return () => {
       active = false;
@@ -51,6 +59,21 @@ export default function RecoveryScreen({ title, detail, onRetry, beforeSave }: R
       await exportRawDatabase();
     } catch (err: any) {
       setSaveError(err?.message || 'Could not save your data.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const shareLatestBackup = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const [latest] = await listAutoBackups();
+      if (!latest) throw new Error('No automatic backup was found on this device.');
+      const shared = await shareFile(latest.uri, 'Save your HealthTracker backup');
+      if (!shared) throw new Error('Sharing is not available on this device.');
+    } catch (err) {
+      setSaveError((err instanceof Error && err.message) || 'Could not share the backup.');
     } finally {
       setSaving(false);
     }
@@ -75,8 +98,18 @@ export default function RecoveryScreen({ title, detail, onRetry, beforeSave }: R
         disabled={saving}
         style={styles.button}
       />
+      {hasBackup && (
+        <Button
+          title="Share latest backup"
+          variant="ghost"
+          onPress={shareLatestBackup}
+          disabled={saving}
+          style={styles.button}
+        />
+      )}
       {saveError && <Text style={styles.errorText}>{saveError}</Text>}
       {hasWal && <Text style={styles.errorDetail}>{TWO_FILES_NOTICE}</Text>}
+      {hasBackup && <Text style={styles.errorDetail}>{LATEST_BACKUP_NOTICE}</Text>}
       <Text style={styles.errorDetail}>{NO_RESET_NOTICE}</Text>
     </ScrollView>
   );

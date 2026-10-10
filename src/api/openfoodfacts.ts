@@ -25,7 +25,7 @@ export interface OFFNutrition {
   fat: number;
 }
 
-/** `'not-looked-up'`: refused before any request was sent. `null`: no data, failure or abort. */
+/** `'not-looked-up'`: refused locally or answered 429. `null`: no data, failure or abort. */
 export type OFFLookup = OFFNutrition | null | 'not-looked-up';
 
 // ─── OFF search response shape (we only need nutriments) ─────────────────────
@@ -136,8 +136,8 @@ function takeSearchSlot(): void {
 /**
  * Fetch per-100g nutrition data from Open Food Facts for the given search term.
  * Returns `'not-looked-up'` when the local budget or a 429 pause refused every
- * attempt before a request was sent, and null for no products, missing fields,
- * network failure or abort. Never throws.
+ * attempt, or when the server answered 429, and null for no products, missing
+ * fields, other failures or abort. Never throws.
  */
 async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFLookup> {
   let refused = false;
@@ -185,6 +185,7 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFLook
         Math.min(pausedUntil, now + RETRY_AFTER_MAX_MS),
         now + parseRetryAfterMs(err.retryAfter),
       );
+      return 'not-looked-up';
     }
     return null;
   }
@@ -196,9 +197,9 @@ async function fetchFromOFF(term: string, signal?: AbortSignal): Promise<OFFLook
  * Look up per-100g nutrition for the given ingredient name.
  *
  * Checks the SQLite cache first; falls back to an OFF network call when the
- * cache misses. Returns null when a request was sent but found nothing, failed
- * or was aborted, and `'not-looked-up'` when the budget or a 429 pause refused
- * it before any request. Only real nutrition is cached.
+ * cache misses. Returns null when a request found nothing, failed or was
+ * aborted, and `'not-looked-up'` when the budget or a 429 pause refused it or
+ * the server answered 429. Only real nutrition is cached.
  *
  * @param ingredientName - Ingredient name (will be normalised to lowercase for cache key)
  * @param signal - Optional abort signal

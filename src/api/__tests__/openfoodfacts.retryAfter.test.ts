@@ -53,7 +53,7 @@ describe('openfoodfacts — 429 pause', () => {
 
   async function pauseLengthMs(retryAfter: string | null | undefined): Promise<number> {
     const { lookupNutrition } = load(retryAfter);
-    expect(await lookupNutrition('a')).toBeNull();
+    expect(await lookupNutrition('a')).toBe('not-looked-up');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     let low = 0;
     let high = 400_000;
@@ -71,7 +71,7 @@ describe('openfoodfacts — 429 pause', () => {
 
   it('sends nothing for Retry-After seconds, then resumes', async () => {
     const { lookupNutrition } = load('30');
-    expect(await lookupNutrition('a')).toBeNull();
+    expect(await lookupNutrition('a')).toBe('not-looked-up');
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     now += 29_000;
@@ -85,9 +85,33 @@ describe('openfoodfacts — 429 pause', () => {
 
   it("resolves 'not-looked-up' for a lookup refused by the pause", async () => {
     const { lookupNutrition } = load('30');
-    expect(await lookupNutrition('a')).toBeNull();
+    expect(await lookupNutrition('a')).toBe('not-looked-up');
     expect(await lookupNutrition('b')).toBe('not-looked-up');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves 'not-looked-up' for the lookup that received the 429 and caches nothing", async () => {
+    const { lookupNutrition } = load('30');
+    expect(await lookupNutrition('a')).toBe('not-looked-up');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(putOFFCache).not.toHaveBeenCalled();
+  });
+
+  it('still resolves null for a 5xx that is not a 429', async () => {
+    fetchMock = jest.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    jest.doMock('../../db/database', () => ({
+      getDatabase: () => {
+        throw new Error('not initialised');
+      },
+      putOFFCache: jest.fn().mockResolvedValue(undefined),
+    }));
+    const { lookupNutrition } = require('../openfoodfacts') as typeof import('../openfoodfacts');
+    jest.useFakeTimers({ doNotFake: ['Date'] });
+    const result = lookupNutrition('a');
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(await result).toBeNull();
+    jest.useRealTimers();
   });
 
   it('spends no budget slot and writes no cache entry while paused', async () => {
@@ -182,7 +206,11 @@ describe('openfoodfacts — 429 pause', () => {
       resolvers[0](tooMany(first));
       resolvers[1](tooMany(second));
       resolvers[2]({ ok: true, status: 200, json: async () => body });
-      await Promise.all(inFlight);
+      expect(await Promise.all(inFlight)).toEqual([
+        'not-looked-up',
+        'not-looked-up',
+        { kcal: 52, protein: 0.3, carbs: 14, fat: 0.2 },
+      ]);
       return lookupNutrition;
     }
 

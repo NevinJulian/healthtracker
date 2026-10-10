@@ -342,6 +342,104 @@ export function plausibleWeights<T extends { weight: number }>(
 }
 
 // ─────────────────────────────────────────────
+// Weight trend (exponentially weighted)
+// ─────────────────────────────────────────────
+
+export const TREND_ALPHA = 2 / (10 + 1);
+export const TREND_MIN_POINTS = 5;
+
+export interface TrendPoint {
+  date: string;
+  weight: number;
+  trend: number;
+}
+
+/**
+ * Exponentially weighted trend over plausible, ascending weigh-ins. One entry
+ * per weigh-in; days without one are not represented and do not change alpha.
+ */
+export function ewmaTrend(points: { date: string; weight: number }[]): TrendPoint[] {
+  const out: TrendPoint[] = [];
+  for (const p of points) {
+    const prev = out.length > 0 ? out[out.length - 1].trend : p.weight;
+    out.push({
+      date: p.date,
+      weight: p.weight,
+      trend: prev + TREND_ALPHA * (p.weight - prev),
+    });
+  }
+  return out;
+}
+
+/** Trend entries that are shown: those from the TREND_MIN_POINTS-th weigh-in on. */
+export function visibleTrend<T>(points: T[]): T[] {
+  return points.slice(TREND_MIN_POINTS - 1);
+}
+
+/**
+ * Change in trend over the 30-day set: trend at its last weigh-in minus trend
+ * at its earliest weigh-in that has a shown trend value, both taken from the
+ * trend over the 90-day history. Null when fewer than two have one.
+ */
+export function weightChange(
+  history90: { date: string; weight: number }[],
+  history30: { date: string; weight: number }[]
+): number | null {
+  const trendByDate = new Map<string, { trend: number; shown: boolean }>();
+  ewmaTrend(plausibleWeights(history90).valid).forEach((p, i) => {
+    trendByDate.set(p.date, { trend: p.trend, shown: i >= TREND_MIN_POINTS - 1 });
+  });
+  const shown: number[] = [];
+  for (const p of plausibleWeights(history30).valid) {
+    const entry = trendByDate.get(p.date);
+    if (entry && entry.shown) shown.push(entry.trend);
+  }
+  if (shown.length < 2) return null;
+  return shown[shown.length - 1] - shown[0];
+}
+
+export const RATE_WINDOW_DAYS = 14;
+export const RATE_MIN_POINTS = 5;
+
+/**
+ * Least-squares slope of the trend over the last RATE_WINDOW_DAYS calendar
+ * days up to `todayISO`, in kg per week. Null when the window holds fewer than
+ * RATE_MIN_POINTS points or they all fall on one day.
+ */
+export function weightRatePerWeek(
+  points: { date: string; trend: number }[],
+  todayISO: string
+): number | null {
+  const inWindow = points.filter((p) => {
+    const age = dateDiffDays(p.date, todayISO);
+    return age >= 0 && age < RATE_WINDOW_DAYS;
+  });
+  if (inWindow.length < RATE_MIN_POINTS) return null;
+
+  const origin = inWindow[0].date;
+  const xs = inWindow.map((p) => dateDiffDays(origin, p.date));
+  const n = xs.length;
+  const meanX = xs.reduce((s, x) => s + x, 0) / n;
+  const meanY = inWindow.reduce((s, p) => s + p.trend, 0) / n;
+  let sxx = 0;
+  let sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sxx += (xs[i] - meanX) ** 2;
+    sxy += (xs[i] - meanX) * (inWindow[i].trend - meanY);
+  }
+  if (sxx === 0) return null;
+  return (sxy / sxx) * 7;
+}
+
+/** "+0.4 kg/week", "−0.4 kg/week" (U+2212), "0.0 kg/week", or "—" when null. */
+export function formatWeightRate(kgPerWeek: number | null): string {
+  if (kgPerWeek === null || !Number.isFinite(kgPerWeek)) return '—';
+  const r = Math.round(kgPerWeek * 10) / 10;
+  if (r === 0) return '0.0 kg/week';
+  return r > 0 ? `+${r.toFixed(1)} kg/week` : `−${Math.abs(r).toFixed(1)} kg/week`;
+}
+
+// ─────────────────────────────────────────────
 // Hydration helpers (#283)
 // ─────────────────────────────────────────────
 
@@ -436,6 +534,7 @@ export interface WorkoutSetSlice {
   exercise: string;
   reps: number;
   weight_kg: number;
+  set_type?: string | null;
 }
 
 export interface PRRecord {
@@ -484,6 +583,7 @@ export function computePRs(history: WorkoutSetSlice[]): PRRecord {
   let bestVolume: { value: number; date: string } | null = null;
 
   for (const set of history) {
+    if (set.set_type === 'warmup') continue;
     const orm = estimated1RM(set.weight_kg, set.reps);
     const volume = set.weight_kg * set.reps;
 
@@ -550,6 +650,7 @@ export function bestSetPerDay(
   >();
 
   for (const set of history) {
+    if (set.set_type === 'warmup') continue;
     const existing = byDate.get(set.date);
     const orm = estimated1RM(set.weight_kg, set.reps);
 

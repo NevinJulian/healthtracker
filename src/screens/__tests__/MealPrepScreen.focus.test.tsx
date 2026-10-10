@@ -36,6 +36,7 @@ jest.mock('../../db/database', () => ({
   toggleMealConsumed: jest.fn(() => Promise.resolve(undefined)),
   getRecipes: jest.fn(() => Promise.resolve([])),
   getRecipesIncludingArchived: jest.fn(() => Promise.resolve([])),
+  getOftenCookedRecipes: jest.fn(() => Promise.resolve([])),
   toISODate: jest.fn(() => '2026-09-19'),
   resetCookEmptyNotified: jest.fn(() => Promise.resolve(undefined)),
 }));

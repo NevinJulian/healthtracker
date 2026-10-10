@@ -76,6 +76,7 @@ jest.mock('../../db/database', () => ({
   getLatestMeasurements: jest.fn(() => Promise.resolve(null)),
   logWorkoutSet: jest.fn(() => Promise.resolve(undefined)),
   getWorkoutSetsForDay: jest.fn(() => Promise.resolve([])),
+  getLastSetForExercise: jest.fn(() => Promise.resolve(null)),
   deleteWorkoutSet: jest.fn(() => Promise.resolve(undefined)),
 }));
 

@@ -23,6 +23,12 @@ import {
   plausibleWeights,
   WEIGHT_MIN_KG,
   WEIGHT_MAX_KG,
+  TREND_MIN_POINTS,
+  ewmaTrend,
+  visibleTrend,
+  weightRatePerWeek,
+  formatWeightRate,
+  weightChange,
 } from '../analyticsHelpers';
 
 // ─── computeStreaks ───────────────────────────────────────────────────────────
@@ -703,6 +709,46 @@ describe('bestSetPerDay', () => {
   });
 });
 
+describe('warm-up sets are excluded from PRs and the per-day best', () => {
+  const working = [
+    { id: 1, date: '2024-02-01', exercise: 'Squat', reps: 5, weight_kg: 80, set_type: null },
+    { id: 2, date: '2024-02-01', exercise: 'Squat', reps: 5, weight_kg: 85 },
+    { id: 3, date: '2024-02-02', exercise: 'Squat', reps: 3, weight_kg: 90, set_type: null },
+  ];
+  const warmups = [
+    { id: 4, date: '2024-02-01', exercise: 'Squat', reps: 10, weight_kg: 120, set_type: 'warmup' },
+    { id: 5, date: '2024-02-03', exercise: 'Squat', reps: 12, weight_kg: 100, set_type: 'warmup' },
+  ];
+  const mixed = [warmups[0], ...working, warmups[1]];
+
+  it('computePRs of a mixed history equals computePRs of its working sets', () => {
+    expect(computePRs(mixed)).toEqual(computePRs(working));
+    expect(computePRs(mixed).bestWeight).toEqual({ value: 90, date: '2024-02-02' });
+  });
+
+  it('computePRs of an all-warm-up history is all null', () => {
+    expect(computePRs(warmups)).toEqual({ bestWeight: null, best1RM: null, bestVolume: null });
+  });
+
+  it('bestSetPerDay of a mixed history equals bestSetPerDay of its working sets', () => {
+    expect(bestSetPerDay(mixed)).toEqual(bestSetPerDay(working));
+    expect(bestSetPerDay(mixed).map((d) => d.date)).toEqual(['2024-02-01', '2024-02-02']);
+  });
+
+  it('bestSetPerDay of an all-warm-up history is empty', () => {
+    expect(bestSetPerDay(warmups)).toEqual([]);
+  });
+
+  it('counts NULL and undefined set_type as working', () => {
+    const history = [
+      { id: 1, date: '2024-02-01', exercise: 'Squat', reps: 5, weight_kg: 70, set_type: null },
+      { id: 2, date: '2024-02-02', exercise: 'Squat', reps: 5, weight_kg: 75 },
+    ];
+    expect(computePRs(history).bestWeight).toEqual({ value: 75, date: '2024-02-02' });
+    expect(bestSetPerDay(history)).toHaveLength(2);
+  });
+});
+
 // ─── resolveSelectedExercise ──────────────────────────────────────────────────
 
 describe('resolveSelectedExercise', () => {
@@ -776,3 +822,174 @@ function formatDate(d: Date): string {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dd}`;
 }
+
+// ─── ewmaTrend / visibleTrend ─────────────────────────────────────────────────
+
+describe('ewmaTrend', () => {
+  it('returns [] for no points', () => {
+    expect(ewmaTrend([])).toEqual([]);
+  });
+
+  it('starts at the first weight for a single point', () => {
+    const out = ewmaTrend([{ date: '2024-01-01', weight: 80 }]);
+    expect(out).toHaveLength(1);
+    expect(out[0].trend).toBe(80);
+    expect(out[0].date).toBe('2024-01-01');
+    expect(out[0].weight).toBe(80);
+  });
+
+  it('smooths a step with alpha 2/11', () => {
+    const weights = [80, 80, 80, 80, 90];
+    const out = ewmaTrend(
+      weights.map((weight, i) => ({ date: `2024-01-0${i + 1}`, weight }))
+    );
+    expect(out.map((p) => p.trend.toFixed(4))).toEqual([
+      '80.0000',
+      '80.0000',
+      '80.0000',
+      '80.0000',
+      '81.8182',
+    ]);
+  });
+
+  it('does not interpolate gaps: a missing stretch changes nothing', () => {
+    const gapped = ewmaTrend([
+      { date: '2024-01-01', weight: 80 },
+      { date: '2024-01-02', weight: 82 },
+      { date: '2024-01-10', weight: 80 },
+    ]);
+    const consecutive = ewmaTrend([
+      { date: '2024-01-01', weight: 80 },
+      { date: '2024-01-02', weight: 82 },
+      { date: '2024-01-03', weight: 80 },
+    ]);
+    expect(gapped[1].trend).toBeCloseTo(80.3636, 4);
+    expect(gapped[2].trend).toBeCloseTo(80.2975, 4);
+    expect(gapped.map((p) => p.trend)).toEqual(consecutive.map((p) => p.trend));
+  });
+});
+
+describe('visibleTrend', () => {
+  const make = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ i }));
+
+  it('shows the minimum point count constant as 5', () => {
+    expect(TREND_MIN_POINTS).toBe(5);
+  });
+
+  it('is empty for fewer than 5 points', () => {
+    expect(visibleTrend(make(4))).toEqual([]);
+    expect(visibleTrend([])).toEqual([]);
+  });
+
+  it('shows one entry for exactly 5 points: the fifth', () => {
+    expect(visibleTrend(make(5))).toEqual([{ i: 4 }]);
+  });
+});
+
+// ─── weightRatePerWeek / formatWeightRate ─────────────────────────────────────
+
+describe('weightRatePerWeek', () => {
+  const TODAY = '2024-01-14';
+  const at = (day: number, trend: number) => ({
+    date: `2024-01-${String(day + 1).padStart(2, '0')}`,
+    trend,
+  });
+  const line = (days: number[]) => days.map((d) => at(d, 80 - 0.1 * d));
+
+  it('uses calendar days, not point index, for the slope', () => {
+    const rate = weightRatePerWeek(line([0, 1, 3, 7, 13]), TODAY);
+    expect(rate).not.toBeNull();
+    expect(rate as number).toBeCloseTo(-0.7, 6);
+  });
+
+  it('excludes a point 14 days back', () => {
+    const points = [{ date: '2023-12-31', trend: 95 }, ...line([0, 1, 3, 7, 13])];
+    expect(weightRatePerWeek(points, TODAY) as number).toBeCloseTo(-0.7, 6);
+  });
+
+  it('excludes points after today', () => {
+    const points = [...line([0, 1, 3, 7, 13]), { date: '2024-01-20', trend: 95 }];
+    expect(weightRatePerWeek(points, TODAY) as number).toBeCloseTo(-0.7, 6);
+  });
+
+  it('is null when fewer than 5 points are in the window', () => {
+    const points = [{ date: '2023-12-31', trend: 95 }, ...line([1, 3, 7, 13])];
+    expect(weightRatePerWeek(points, TODAY)).toBeNull();
+    expect(weightRatePerWeek([], TODAY)).toBeNull();
+  });
+
+  it('is 0 when the trend is flat', () => {
+    const flat = [0, 1, 3, 7, 13].map((d) => at(d, 80));
+    const rate = weightRatePerWeek(flat, TODAY);
+    expect(rate).toBe(0);
+    expect(formatWeightRate(rate)).toBe('0.0 kg/week');
+  });
+
+  it('is null, not NaN, when every point is on the same day', () => {
+    const same = [80, 81, 82, 83, 84].map((t) => at(13, t));
+    expect(weightRatePerWeek(same, TODAY)).toBeNull();
+  });
+});
+
+describe('formatWeightRate', () => {
+  it('formats a loss with U+2212', () => {
+    expect(formatWeightRate(-0.7)).toBe('−0.7 kg/week');
+  });
+
+  it('formats a gain with a plus sign', () => {
+    expect(formatWeightRate(0.44)).toBe('+0.4 kg/week');
+  });
+
+  it('never shows a signed zero', () => {
+    expect(formatWeightRate(-0.04)).toBe('0.0 kg/week');
+    expect(formatWeightRate(0.04)).toBe('0.0 kg/week');
+    expect(formatWeightRate(-0)).toBe('0.0 kg/week');
+  });
+
+  it('shows a dash when there is no rate', () => {
+    expect(formatWeightRate(null)).toBe('—');
+  });
+});
+
+// ─── weightChange ─────────────────────────────────────────────────────────────
+
+describe('weightChange', () => {
+  const utcDay = (n: number) =>
+    new Date(Date.UTC(2024, 0, 1 + n)).toISOString().slice(0, 10);
+  const series = (weights: number[]) =>
+    weights.map((weight, i) => ({ date: utcDay(i), weight }));
+
+  it('is the trend change between the 5th and the last weigh-in', () => {
+    const history = series([80, 80, 80, 80, 90, 90, 90]);
+    expect(weightChange(history, history) as number).toBeCloseTo(2.7047, 4);
+  });
+
+  it('is null with one shown trend value, and with fewer than five weigh-ins', () => {
+    const five = series([80, 80, 80, 80, 90]);
+    expect(weightChange(five, five)).toBeNull();
+    const four = series([80, 80, 80, 90]);
+    expect(weightChange(four, four)).toBeNull();
+    expect(weightChange([], [])).toBeNull();
+  });
+
+  it('never falls back to a raw difference', () => {
+    const history = series([70, 75]);
+    expect(weightChange(history, history)).toBeNull();
+  });
+
+  it('takes the trend values from the 90-day series, not a restart at the 30-day edge', () => {
+    const history90 = series([...Array(30).fill(80), ...Array(10).fill(90)]);
+    const history30 = history90.slice(10);
+    expect(weightChange(history90, history30) as number).toBeCloseTo(
+      10 - 10 * Math.pow(9 / 11, 10),
+      6
+    );
+  });
+
+  it('ignores implausible weights', () => {
+    const clean = series([80, 80, 80, 80, 90, 90, 90]);
+    const withOutlier = [{ date: '2023-12-31', weight: 9999 }, ...clean];
+    expect(weightChange(withOutlier, withOutlier) as number).toBeCloseTo(2.7047, 4);
+  });
+});

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView } from 'react-native';
+import { AppState, ScrollView } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 jest.mock('react-native-gesture-handler', () => ({}));
@@ -23,6 +23,11 @@ jest.mock('../services/rescueExport', () => ({
   hasRescueWal: jest.fn(() => Promise.resolve(false)),
   clearRescueCopies: jest.fn(() => Promise.resolve()),
 }));
+jest.mock('../services/backup', () => ({
+  runAutoBackupIfDue: jest.fn(() => Promise.resolve()),
+  listAutoBackups: jest.fn(() => Promise.resolve([])),
+  shareFile: jest.fn(() => Promise.resolve(true)),
+}));
 jest.mock('../db/devStress369', () => ({ installStress369: jest.fn() }));
 jest.mock('../services/notifications', () => ({
   configureNotificationHandler: jest.fn(),
@@ -41,9 +46,28 @@ jest.mock('../screens/OnboardingScreen', () => {
 import { useFonts } from 'expo-font';
 import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from '../db/database';
 import { clearRescueCopies, exportRawDatabase, hasRescueWal } from '../services/rescueExport';
+import { listAutoBackups, runAutoBackupIfDue, shareFile } from '../services/backup';
 import App from '../../App';
 import { COLD_RENDER_WAIT } from '../testUtils/coldRenderWait';
 
+const autoBackup = runAutoBackupIfDue as jest.Mock;
+const listBackups = listAutoBackups as jest.Mock;
+const share = shareFile as jest.Mock;
+
+const NEWEST_BACKUP = {
+  name: 'healthtracker-auto-20261008T140300Z.json',
+  uri: 'file:///document/auto-backups/healthtracker-auto-20261008T140300Z.json',
+  createdAt: new Date('2026-10-08T14:03:00.000Z'),
+  sizeBytes: 2048,
+};
+const OLDER_BACKUP = {
+  name: 'healthtracker-auto-20261007T090500Z.json',
+  uri: 'file:///document/auto-backups/healthtracker-auto-20261007T090500Z.json',
+  createdAt: new Date('2026-10-07T09:05:00.000Z'),
+  sizeBytes: 500,
+};
+const LATEST_BACKUP_NOTICE =
+  'Share latest backup shares your newest automatic backup. It is the file that Restore from backup in Settings reads after a reinstall.';
 const rescue = exportRawDatabase as jest.Mock;
 const walPresent = hasRescueWal as jest.Mock;
 const clearCopies = clearRescueCopies as jest.Mock;
@@ -53,6 +77,9 @@ const init = initDatabase as jest.Mock;
 beforeEach(() => {
   jest.clearAllMocks();
   init.mockReset();
+  autoBackup.mockReset().mockResolvedValue(undefined);
+  listBackups.mockReset().mockResolvedValue([]);
+  share.mockReset().mockResolvedValue(true);
   jest.spyOn(console, 'error').mockImplementation(() => {});
   (useFonts as jest.Mock).mockReturnValue([true, null]);
   walPresent.mockResolvedValue(false);
@@ -180,5 +207,243 @@ describe('App start failure screen', () => {
     expect(await screen.findByText(/font failed/, undefined, COLD_RENDER_WAIT)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Save data' })).toBeTruthy();
+  });
+});
+
+describe('App start failure screen latest backup', () => {
+  const SHARE_LATEST = { name: 'Share latest backup' };
+
+  async function renderFailed() {
+    init.mockRejectedValueOnce(new Error('disk exploded'));
+    render(<App />);
+    await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT);
+    await waitFor(() => expect(listBackups).toHaveBeenCalled());
+    await act(async () => {});
+  }
+
+  it('offers Share latest backup next to Retry and Save data when an automatic backup exists', async () => {
+    listBackups.mockResolvedValue([NEWEST_BACKUP, OLDER_BACKUP]);
+    await renderFailed();
+
+    expect(screen.getByRole('button', SHARE_LATEST)).toBeTruthy();
+    expect(screen.getAllByRole('button')).toHaveLength(3);
+    expect(screen.getByText(LATEST_BACKUP_NOTICE)).toBeTruthy();
+  });
+
+  it('shares the newest automatic backup as a backup file', async () => {
+    listBackups.mockResolvedValue([NEWEST_BACKUP, OLDER_BACKUP]);
+    await renderFailed();
+
+    fireEvent.press(screen.getByRole('button', SHARE_LATEST));
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(share).toHaveBeenCalledWith(NEWEST_BACKUP.uri, 'Save your HealthTracker backup');
+    expect(rescue).not.toHaveBeenCalled();
+  });
+
+  it('shares a backup that was written after the screen appeared', async () => {
+    listBackups.mockResolvedValue([OLDER_BACKUP]);
+    await renderFailed();
+    listBackups.mockResolvedValue([NEWEST_BACKUP, OLDER_BACKUP]);
+
+    fireEvent.press(screen.getByRole('button', SHARE_LATEST));
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(share).toHaveBeenCalledWith(NEWEST_BACKUP.uri, 'Save your HealthTracker backup');
+  });
+
+  it('offers no Share latest backup and no sentence about it when there is no automatic backup', async () => {
+    await renderFailed();
+
+    expect(screen.queryByRole('button', SHARE_LATEST)).toBeNull();
+    expect(screen.queryByText(LATEST_BACKUP_NOTICE)).toBeNull();
+  });
+
+  it('offers no Share latest backup when the backups cannot be listed', async () => {
+    listBackups.mockRejectedValue(new Error('unreadable'));
+    await renderFailed();
+
+    expect(screen.queryByRole('button', SHARE_LATEST)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save data' })).toBeTruthy();
+  });
+
+  it('shows a message when sharing is unavailable', async () => {
+    listBackups.mockResolvedValue([NEWEST_BACKUP]);
+    share.mockResolvedValue(false);
+    await renderFailed();
+
+    fireEvent.press(screen.getByRole('button', SHARE_LATEST));
+
+    expect(await screen.findByText('Sharing is not available on this device.')).toBeTruthy();
+  });
+
+  it('shows a message when sharing the backup fails', async () => {
+    listBackups.mockResolvedValue([NEWEST_BACKUP]);
+    share.mockRejectedValue(new Error('file vanished'));
+    await renderFailed();
+
+    fireEvent.press(screen.getByRole('button', SHARE_LATEST));
+
+    expect(await screen.findByText('file vanished')).toBeTruthy();
+  });
+
+  it('shows a message when the backup has gone by the time the button is pressed', async () => {
+    listBackups.mockResolvedValue([NEWEST_BACKUP]);
+    await renderFailed();
+    listBackups.mockResolvedValue([]);
+
+    fireEvent.press(screen.getByRole('button', SHARE_LATEST));
+
+    expect(await screen.findByText('No automatic backup was found on this device.')).toBeTruthy();
+    expect(share).not.toHaveBeenCalled();
+  });
+
+  it('shares the backup on a font load error without waiting for a pending init', async () => {
+    (useFonts as jest.Mock).mockReturnValue([false, new Error('font failed')]);
+    init.mockReturnValue(new Promise<void>(() => {}));
+    listBackups.mockResolvedValue([NEWEST_BACKUP]);
+    render(<App />);
+
+    fireEvent.press(await screen.findByRole('button', SHARE_LATEST, COLD_RENDER_WAIT));
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('App automatic backup', () => {
+  it('starts one automatic backup once the app has started', async () => {
+    init.mockResolvedValue(undefined);
+    render(<App />);
+    expect(await screen.findByText('NAVIGATOR', undefined, COLD_RENDER_WAIT)).toBeTruthy();
+    await waitFor(() => expect(autoBackup).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows the navigator while the automatic backup never finishes', async () => {
+    init.mockResolvedValue(undefined);
+    autoBackup.mockReturnValue(new Promise<void>(() => {}));
+    render(<App />);
+    expect(await screen.findByText('NAVIGATOR', undefined, COLD_RENDER_WAIT)).toBeTruthy();
+    await waitFor(() => expect(autoBackup).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows no recovery screen and logs when the automatic backup rejects', async () => {
+    init.mockResolvedValue(undefined);
+    autoBackup.mockRejectedValue(new Error('disk full'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    render(<App />);
+    expect(await screen.findByText('NAVIGATOR', undefined, COLD_RENDER_WAIT)).toBeTruthy();
+    await waitFor(() => expect(warn).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save data' })).toBeNull();
+  });
+
+  it('does not start one when the database fails to initialise', async () => {
+    init.mockRejectedValue(new Error('disk exploded'));
+    render(<App />);
+    await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT);
+    await act(async () => {});
+    expect(autoBackup).not.toHaveBeenCalled();
+  });
+
+  it('does not start one on a font load error', async () => {
+    (useFonts as jest.Mock).mockReturnValue([false, new Error('font failed')]);
+    init.mockResolvedValue(undefined);
+    render(<App />);
+    await screen.findByText(/font failed/, undefined, COLD_RENDER_WAIT);
+    await act(async () => {});
+    expect(autoBackup).not.toHaveBeenCalled();
+  });
+
+  it('starts one only after a failed start is retried successfully', async () => {
+    init.mockRejectedValueOnce(new Error('disk exploded')).mockResolvedValue(undefined);
+    render(<App />);
+    fireEvent.press(await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT));
+    await screen.findByText('NAVIGATOR');
+    await waitFor(() => expect(autoBackup).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('App automatic backup when the app returns to the foreground', () => {
+  const addListener = jest.mocked(AppState.addEventListener);
+
+  // Calls every 'change' listener whose subscription has not been removed.
+  async function emitAppState(state: string) {
+    await act(async () => {
+      addListener.mock.calls.forEach(([type, handler], index) => {
+        const subscription = addListener.mock.results[index]?.value as { remove: jest.Mock };
+        if (type !== 'change' || subscription.remove.mock.calls.length > 0) return;
+        (handler as (next: string) => void)(state);
+      });
+    });
+  }
+
+  async function renderStarted() {
+    init.mockResolvedValue(undefined);
+    const view = render(<App />);
+    await screen.findByText('NAVIGATOR', undefined, COLD_RENDER_WAIT);
+    await waitFor(() => expect(autoBackup).toHaveBeenCalledTimes(1));
+    return view;
+  }
+
+  it('checks again every time the app becomes active', async () => {
+    await renderStarted();
+
+    await emitAppState('active');
+    expect(autoBackup).toHaveBeenCalledTimes(2);
+
+    await emitAppState('background');
+    await emitAppState('active');
+    expect(autoBackup).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not check when the app goes to the background or becomes inactive', async () => {
+    await renderStarted();
+
+    await emitAppState('inactive');
+    await emitAppState('background');
+
+    expect(autoBackup).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no recovery screen and logs when a foreground check rejects', async () => {
+    await renderStarted();
+    autoBackup.mockRejectedValue(new Error('disk full'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await emitAppState('active');
+
+    await waitFor(() => expect(warn).toHaveBeenCalledWith('[App] Auto-backup failed:', expect.any(Error)));
+    expect(screen.getByText('NAVIGATOR')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save data' })).toBeNull();
+  });
+
+  it('does not check when the database failed to initialise', async () => {
+    init.mockRejectedValue(new Error('disk exploded'));
+    render(<App />);
+    await screen.findByRole('button', { name: 'Retry' }, COLD_RENDER_WAIT);
+
+    await emitAppState('active');
+
+    expect(autoBackup).not.toHaveBeenCalled();
+  });
+
+  it('does not check on a font load error', async () => {
+    (useFonts as jest.Mock).mockReturnValue([false, new Error('font failed')]);
+    init.mockResolvedValue(undefined);
+    render(<App />);
+    await screen.findByText(/font failed/, undefined, COLD_RENDER_WAIT);
+
+    await emitAppState('active');
+
+    expect(autoBackup).not.toHaveBeenCalled();
+  });
+
+  it('stops checking once the app is unmounted', async () => {
+    const { unmount } = await renderStarted();
+
+    unmount();
+    await emitAppState('active');
+
+    expect(autoBackup).toHaveBeenCalledTimes(1);
   });
 });

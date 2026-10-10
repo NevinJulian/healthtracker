@@ -44,4 +44,16 @@ describe('LiftingSectionCard — selection tracks loggedExercises as it loads (#
     // The chart for squat should be populated — the empty state must be gone.
     expect(queryByText('No data for this exercise yet.')).toBeNull();
   });
+
+  it('shows the empty states for an exercise with only warm-up sets', () => {
+    const warmupOnly: WorkoutSetSlice[] = [
+      { id: 1, date: '2024-01-01', exercise: 'squat', reps: 10, weight_kg: 40, set_type: 'warmup' },
+    ];
+    const { getByText, queryByText } = render(
+      <LiftingSectionCard loggedExercises={['squat']} historyByExercise={{ squat: warmupOnly }} />
+    );
+    expect(getByText('No sets logged yet.')).toBeTruthy();
+    expect(queryByText('Best weight')).toBeNull();
+    expect(getByText('No data for this exercise yet.')).toBeTruthy();
+  });
 });
