@@ -88,20 +88,21 @@ Most of the scope touches `src/db/database.ts` or one of the big screens. Runnin
 parallel worktrees guarantees conflicts on every merge. So issues are grouped into lanes by file
 ownership, lanes run in parallel, and **issues within a lane run serially on one branch**.
 
-This table is sprint 5's scope. `/sprint` freezes exactly the issues in the Issues column that are
-still open. Sprints 1 to 4 were bug sprints and are done. Their lanes are in git history.
+This table is sprint 6's scope. `/sprint` freezes exactly the issues in the Issues column that are
+still open. Sprints 1 to 4 were bug sprints and sprint 5 was the first feature sprint. Their lanes are
+in git history.
 
 | Lane | Branch | Owns | Issues, in order |
 |---|---|---|---|
-| A — training | `sprint/lane-a-training` | `src/db/schema.ts`, `src/screens/DashboardScreen.tsx`, `src/screens/AnalyticsDashboardScreen.tsx`, `src/screens/analyticsHelpers.ts`, and in `database.ts` the `workout_set_log` functions | #344, #337, #342 |
-| B — meals | `sprint/lane-b-meals` | `src/screens/{MealPrep,ShoppingList}Screen.tsx`, a new aisle lookup under `src/data/`, and in `database.ts` the shopping-list, meal-plan, inventory and `cook_log` functions | #444, #347, #348 |
-| C — data | `sprint/lane-c-data` | `src/services/backup.ts`, a new `src/services/csvExport.ts`, `src/screens/SettingsScreen.tsx`, `App.tsx`, and new read functions in `database.ts` for the CSV export | #338, #339 |
-| D — recipes | `sprint/lane-d-recipes` | `src/api/**`, `src/nutrition/**`, `src/screens/{Recipes,RecipeEditor,RecipeDetail,Discover,DiscoverDetail}Screen.tsx`, the route params in `src/navigation/AppNavigator.tsx`, and in `database.ts` the recipe and `off_cache` functions | #442, #443, #352 |
+| A — food log | `sprint/lane-a-foodlog` | `src/db/schema.ts`, `src/screens/DashboardScreen.tsx`, `src/screens/MealPrepScreen.tsx`, `src/services/csvExport.ts`, and in `database.ts` the new `food_log` functions, `getConsumedMacrosByDay` and `_restoreFromPayload` | #447 |
+| B — weekly review | `sprint/lane-b-review` | a new `src/screens/WeeklyReviewScreen.tsx` and its helper module, `src/navigation/AppNavigator.tsx`, `App.tsx`, `src/services/notifications.ts`, `src/screens/SettingsScreen.tsx`, and in `database.ts` the weekly review settings and new read functions for the review | #346 |
+| C — expenditure | `sprint/lane-c-expenditure` | a new `src/nutrition/adaptiveTdee.ts`, `src/nutrition/tdee.ts`, `src/screens/AnalyticsDashboardScreen.tsx`, `src/screens/analyticsHelpers.ts`, and in `database.ts` the nutrition goal functions | #351 |
+| D — recipes | `sprint/lane-d-import` | `src/api/**`, `src/nutrition/**` except `tdee.ts` and `adaptiveTdee.ts`, `src/screens/{Recipes,RecipeEditor,RecipeDetail,Discover,DiscoverDetail,ShoppingList}Screen.tsx`, `src/data/shoppingMerge.ts`, and in `database.ts` the recipe, `off_cache` and shopping-list functions | #352, #451, #454, #450 |
 
 Each lane also owns the tests for what it changes and any new file it creates.
 
-**Features.** Sprint 5 is the first feature sprint. #444, #442 and #443 are bugs in files these lanes
-own anyway.
+**Features.** Sprint 6 is a feature sprint. #451, #454 and #450 are bugs in lane D's files. #450 is in
+scope because #352 creates many more ingredients without a quantity.
 
 - For a feature, the pipeline's regression test means the feature's tests. They must fail on the lane
   commit before the feature code, because the behaviour is missing and not just an import, and pass
@@ -115,32 +116,33 @@ own anyway.
 
 **Ordering constraints** — these are real dependencies, not preferences:
 
-- Lanes A, B and D start right away. Lane C starts after lane A has merged into the integration
-  branch, because #339 exports #344's set type.
-- Lane A: #344 first, because #337's "last time" line leaves warm-ups out. #342 last.
-- Lane B: #444 first.
-- Lane D: #442 and #443 before #352.
-- Only lane A adds a migration: v39 for #344. No other lane touches `schema.ts`.
+- The sprint starts from a `main` that has the Expo SDK 58 upgrade. If `package.json` on `main` still
+  has `expo` on `~57`, stop before step 0 and report.
+- Lanes A and D start right away. Lanes B and C start after lane A has merged into the integration
+  branch, because #346 and #351 read the daily totals that #447 changes.
+- Lane D: #352 first. Its lane branch starts from the integration branch with `sprint/lane-d-recipes`
+  (tip `a355753`, the parked sprint 5 work) merged into it, as #352's sprint 6 decision describes.
+  Then #451, #454 and #450.
+- Only lane A adds a migration: v40 for #447. No other lane touches `schema.ts`.
+- Lanes B and C may import from `analyticsHelpers.ts`. Only lane C changes it.
 - In `database.ts`, a lane puts new functions next to the functions it owns, never at the end of the
   file.
-- Lane B may use `src/nutrition/units.ts` but not change it.
 - No lane changes `package.json`, `package-lock.json` or `app.json`. A developer who thinks it needs
   a new package stops and reports.
 
 **Cross-lane dependencies** are the orchestrator's problem. A developer who finds that its issue needs
 a file another lane owns stops and reports, as rule 7 says.
 
-**Decisions.** Every issue in the table has a decision comment, and the latest one is binding. #348 is
-adapted to this app's Lunch and Dinner slots, and its quick add moved to #447.
+**Decisions.** Every issue in the table has a decision comment for sprint 6, and the latest one is
+binding. #352's sprint 5 decision stays binding where the sprint 6 one doesn't change it.
 
 ### Excluded from this sprint
 
-- **Sprint 6:** #349 (barcode scanning) and #392 (muscle map) add native packages. #346 (weekly
-  review) and #351 (adaptive TDEE) build on #342, and #447 (quick add) changes the daily totals they
-  read.
-- **Sprint 7:** #350 (dark mode), on its own, because it touches every screen.
+- **Sprint 7:** #349 (barcode scanning) and #392 (muscle map). Both add native packages, so that
+  sprint needs an exception to the `package.json` rule above.
+- **Sprint 8:** #350 (dark mode), on its own, because it touches every screen.
 - **#353 and #355** need a development build, and the phone checks run in Expo Go.
-- **#396, #441 and #445** are not part of the feature sprints.
+- **#396, #441, #445, #449, #453 and #455 to #460** are not part of the feature sprints.
 
 ---
 
