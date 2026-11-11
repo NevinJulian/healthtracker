@@ -201,7 +201,11 @@ export async function createSqljsDb(): Promise<SqljsExpoDb> {
         await fn();
         db.run('COMMIT');
       } catch (err) {
-        db.run('ROLLBACK');
+        try {
+          db.run('ROLLBACK');
+        } catch {
+          // SQLite may already have rolled back. Keep the original error.
+        }
         throw err;
       }
     },
