@@ -133,7 +133,7 @@ export default function App() {
   if (onboardingDone === false) {
     return (
       <SafeAreaProvider>
-        <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+        <StatusBar barStyle="dark-content" />
         <OnboardingScreen
           onComplete={() => setOnboardingDone(true)}
           latestWeight={latestWeight}
@@ -144,7 +144,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.surface} />
+      <StatusBar barStyle="light-content" />
       <AppErrorBoundary>
         <NavigationContainer
           theme={{
