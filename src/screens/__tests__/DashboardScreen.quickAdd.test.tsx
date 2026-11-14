@@ -126,7 +126,7 @@ async function renderDashboard() {
 
 async function openSheet(utils: ReturnType<typeof render>) {
   await act(async () => {
-    fireEvent.press(utils.getByText('+ Quick add'));
+    fireEvent.press(utils.getByLabelText('+ Quick add'));
   });
   await flush();
   return within(utils.getByTestId('quick-add-sheet'));
@@ -155,20 +155,20 @@ describe('DashboardScreen quick add', () => {
 
   describe('today list', () => {
     it('shows the quick add button and the empty hint when nothing is planned', async () => {
-      const { getByText } = await renderDashboard();
+      const { getByText, getByLabelText } = await renderDashboard();
 
       expect(getByText('No meals planned for today.')).toBeTruthy();
-      expect(getByText('+ Quick add')).toBeTruthy();
+      expect(getByLabelText('+ Quick add')).toBeTruthy();
     });
 
     it('shows the quick add button when meals are planned too', async () => {
       mockGetMeals.mockResolvedValue([makeMeal()]);
 
-      const { getByText, queryByText } = await renderDashboard();
+      const { getByText, getByLabelText, queryByText } = await renderDashboard();
 
       expect(getByText('lunch: Chicken Bowl')).toBeTruthy();
       expect(queryByText('No meals planned for today.')).toBeNull();
-      expect(getByText('+ Quick add')).toBeTruthy();
+      expect(getByLabelText('+ Quick add')).toBeTruthy();
     });
 
     it('lists today\'s entries with label and rounded kcal and protein', async () => {
@@ -479,9 +479,9 @@ describe('DashboardScreen quick add', () => {
       mockGetFoodLog.mockRejectedValue(new Error('db down'));
       const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      const { getByText } = await renderDashboard();
+      const { getByLabelText } = await renderDashboard();
 
-      expect(getByText('Retry')).toBeTruthy();
+      expect(getByLabelText('Retry')).toBeTruthy();
       errorSpy.mockRestore();
     });
   });

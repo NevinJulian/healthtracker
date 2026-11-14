@@ -143,9 +143,9 @@ describe('MealPrepScreen quick add totals', () => {
     mockTotals.mockRejectedValue(new Error('db down'));
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    const { getAllByText } = await renderScreen();
+    const { getAllByLabelText } = await renderScreen();
 
-    expect(getAllByText('Retry').length).toBeGreaterThan(0);
+    expect(getAllByLabelText('Retry').length).toBeGreaterThan(0);
     errorSpy.mockRestore();
   });
 });
