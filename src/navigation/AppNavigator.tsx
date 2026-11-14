@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DashboardScreen from '../screens/DashboardScreen';
 import OverviewScreen from '../screens/OverviewScreen';
 import AnalyticsDashboardScreen from '../screens/AnalyticsDashboardScreen';
+import WeeklyReviewScreen from '../screens/WeeklyReviewScreen';
 import MealPrepScreen from '../screens/MealPrepScreen';
 import TemplateEditorScreen from '../screens/TemplateEditorScreen';
 import RecipesScreen from '../screens/RecipesScreen';
@@ -49,6 +50,7 @@ const DRAWER_ICONS: Record<string, IoniconsName> = {
   Today: 'barbell-outline',
   Schedule: 'calendar-outline',
   Analytics: 'stats-chart-outline',
+  'Weekly review': 'calendar-number-outline',
   'Meal Prep': 'nutrition-outline',
   Template: 'create-outline',
   Recipes: 'restaurant-outline',
@@ -129,6 +131,7 @@ export default function AppNavigator() {
       <Drawer.Screen name="Today" component={DashboardScreen} />
       <Drawer.Screen name="Schedule" component={OverviewScreen} />
       <Drawer.Screen name="Analytics" component={AnalyticsDashboardScreen} />
+      <Drawer.Screen name="Weekly review" component={WeeklyReviewScreen} />
       <Drawer.Screen name="Meal Prep" component={MealPrepScreen} />
       <Drawer.Screen name="Recipes" component={RecipesStackScreen} />
       <Drawer.Screen name="Discover" component={DiscoverStackScreen} />

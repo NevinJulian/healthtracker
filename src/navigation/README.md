@@ -19,6 +19,7 @@ AppNavigator (Drawer.Navigator)
 ├── Today          → DashboardScreen
 ├── Schedule       → OverviewScreen
 ├── Analytics      → AnalyticsDashboardScreen
+├── Weekly review  → WeeklyReviewScreen
 ├── Meal Prep      → MealPrepScreen
 ├── Recipes        → RecipesStackScreen
 │     ├── RecipesMain   → RecipesScreen
