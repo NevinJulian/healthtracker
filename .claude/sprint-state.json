@@ -70,27 +70,29 @@
       "name": "weekly review",
       "branch": "sprint/lane-b-review",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "pending",
+      "status": "analysing",
       "waitsFor": "lane A merged into sprint/auto-fixes",
       "order": [
         346
       ],
       "current": null,
       "done": [],
-      "parked": []
+      "parked": [],
+      "note": "worktree detached at 6bcdf82 (lane A tip) for read-ahead analysis; lane branch is cut from sprint/auto-fixes after lane A merges"
     },
     "C": {
       "name": "expenditure",
       "branch": "sprint/lane-c-expenditure",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "pending",
+      "status": "analysing",
       "waitsFor": "lane A merged into sprint/auto-fixes",
       "order": [
         351
       ],
       "current": null,
       "done": [],
-      "parked": []
+      "parked": [],
+      "note": "same as B"
     },
     "D": {
       "name": "recipes",
@@ -113,13 +115,13 @@
   "issues": {
     "346": {
       "lane": "B",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "security": "required (database.ts reads, notifications deep link)"
     },
     "351": {
       "lane": "C",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "security": "required (database.ts goal write)"
     },
@@ -140,7 +142,7 @@
         "b8d3a3d test r2 ruling 11",
         "43abd32 fix r2 ruling 11"
       ],
-      "securityVerdict": "APPROVE round 1 (ea8e626): sprint 5 fetch/JSON-LD guards hold on SDK 58 base; new regexes bounded, LAST_WORD is O(n^2) unanchored but 1.1 ms at the 500-char cap (note, not a block); 30k hostile fuzz lines, 0 throws, max 0.14 ms; readDraft lets only typed strings/numbers through.",
+      "securityVerdict": "APPROVE round 1 (ea8e626): sprint 5 fetch/JSON-LD guards hold on SDK 58 base; new regexes bounded, LAST_WORD is O(n^2) unanchored but 1.1 ms at the 500-char cap (note, not a block); 30k hostile fuzz lines, 0 throws, max 0.14 ms; readDraft lets only typed strings/numbers through. | APPROVE round 2 (43abd32): MAX_LINE_LENGTH still first; EDGE_PUNCTUATION O(n^2) within one token, worst 1.1 ms at 500 chars; prototype-key words safe; 40k fuzz lines 0 throws.",
       "testerVerdicts": [
         "round 1 REJECT: first-two-words rule too narrow; ~30 realistic lines still get a wrong quantity (multi-word modifiers, bracketed modifiers, hyphenated, each/jeweils/jede without a unit, unlisted abbreviations Teel./Pak./P.)"
       ]
@@ -275,6 +277,14 @@
     {
       "at": "2026-11-14T14:25:37.538Z",
       "event": "#352 round 2 (tip 43abd32, 2362 tests) to tester (resumed, has probe corpus) and security re-check"
+    },
+    {
+      "at": "2026-11-14T14:26:25.459Z",
+      "event": "#352 security APPROVE round 2"
+    },
+    {
+      "at": "2026-11-14T14:26:25.460Z",
+      "event": "lane B and C worktrees created detached at 6bcdf82; #346 and #351 analysts dispatched ahead (read-only)"
     }
   ]
 }
