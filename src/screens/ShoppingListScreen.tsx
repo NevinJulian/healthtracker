@@ -94,7 +94,7 @@ function ShoppingItemRow({
       >
         {item.ingredient_name}
       </Text>
-      <Text style={styles.itemQty}>{qtyStr}</Text>
+      {item.total_quantity !== 0 && <Text style={styles.itemQty}>{qtyStr}</Text>}
     </TouchableOpacity>
   );
 }
