@@ -32,6 +32,11 @@ module.exports = {
   // Foreground handler
   setNotificationHandler: jest.fn(),
 
+  // Notification taps
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  getLastNotificationResponse: jest.fn(() => null),
+  clearLastNotificationResponse: jest.fn(),
+
   // Trigger type enum (used in scheduleWorkoutReminder)
   SchedulableTriggerInputTypes,
 };
