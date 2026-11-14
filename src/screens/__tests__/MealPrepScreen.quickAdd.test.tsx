@@ -42,6 +42,9 @@ const mockGetRecipes = jest.mocked(getRecipes);
 const mockGetAllRecipes = jest.mocked(getRecipesIncludingArchived);
 const mockGetPlan = jest.mocked(getWeeklyMealPlan);
 
+// Pill hides its text from the accessibility tree.
+const PILL = { includeHiddenElements: true };
+
 const TODAY = '2026-09-19';
 const TOMORROW = '2026-09-20';
 
@@ -97,7 +100,7 @@ describe('MealPrepScreen quick add totals', () => {
 
     const { getByText } = await renderScreen();
 
-    expect(getByText('250 kcal')).toBeTruthy();
+    expect(getByText('250 kcal', PILL)).toBeTruthy();
     expect(getByText('CONSUMED TODAY')).toBeTruthy();
     expect(getByText('250 kcal · 10g protein')).toBeTruthy();
   });
@@ -108,7 +111,7 @@ describe('MealPrepScreen quick add totals', () => {
 
     const { getByText } = await renderScreen();
 
-    expect(getByText('700 kcal')).toBeTruthy();
+    expect(getByText('700 kcal', PILL)).toBeTruthy();
     expect(getByText('700 kcal · 45g protein')).toBeTruthy();
   });
 
@@ -117,7 +120,7 @@ describe('MealPrepScreen quick add totals', () => {
 
     const { getAllByText, getByText } = await renderScreen();
 
-    expect(getAllByText('120 kcal')).toHaveLength(1);
+    expect(getAllByText('120 kcal', PILL)).toHaveLength(1);
     expect(getByText('120 kcal · 3g protein')).toBeTruthy();
   });
 
@@ -126,7 +129,7 @@ describe('MealPrepScreen quick add totals', () => {
 
     const { getByText } = await renderScreen();
 
-    expect(getByText('250 kcal')).toBeTruthy();
+    expect(getByText('250 kcal', PILL)).toBeTruthy();
     expect(getByText('250 kcal · 10g protein')).toBeTruthy();
   });
 
@@ -136,7 +139,7 @@ describe('MealPrepScreen quick add totals', () => {
     const { queryByText } = await renderScreen();
 
     expect(queryByText('CONSUMED TODAY')).toBeNull();
-    expect(queryByText(/kcal$/)).toBeNull();
+    expect(queryByText(/kcal$/, PILL)).toBeNull();
   });
 
   it('shows the load error view when reading the totals fails', async () => {
