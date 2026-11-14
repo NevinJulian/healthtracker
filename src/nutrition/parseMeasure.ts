@@ -174,6 +174,9 @@ function detectUnit(token: string): { unit: string; isLiquid: boolean } | null {
     case 'fl':
     case 'floz':
       return { unit: 'floz', isLiquid: true };
+    case 'pinch':
+    case 'pinche':
+      return { unit: 'pinch', isLiquid: false };
     case 'clove':
     case 'cloves':
     case 'head':
