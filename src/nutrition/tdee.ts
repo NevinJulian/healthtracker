@@ -164,3 +164,11 @@ export function suggestGoals(profile: UserProfile, weightKg: number): SuggestedG
 
   return { calories, protein };
 }
+
+export function formulaTdee(profile: UserProfile, weightKg: number): number {
+  return 0;
+}
+
+export function goalDelta(goalType: GoalType): number {
+  return 0;
+}
