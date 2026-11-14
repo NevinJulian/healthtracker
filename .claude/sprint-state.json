@@ -90,13 +90,15 @@
       "name": "expenditure",
       "branch": "sprint/lane-c-expenditure",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "in_progress",
+      "status": "cleanup",
       "waitsFor": "lane A merged into sprint/auto-fixes",
       "order": [
         351
       ],
-      "current": 351,
-      "done": [],
+      "current": null,
+      "done": [
+        351
+      ],
       "parked": [],
       "base": "56ecae3"
     },
@@ -133,7 +135,7 @@
     },
     "351": {
       "lane": "C",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 1,
       "security": "required (database.ts goal write)",
       "workOrder": "C:/git/ht-lanes/wo/351.md",
@@ -154,7 +156,8 @@
       ],
       "securityVerdict": "APPROVE round 1 (77d9275): bound params, one txn, malformed appliedOn -> null, NaN paths end in insufficient, only Apply writes the goal. Notes: (1) applyAdaptiveCalorieGoal has no own validation (caller-safe today); (2) restored huge nutritionGoalCalories accepted (hand-edited backup, pre-existing); (3) Apply uses toISODate() vs todayKey elsewhere (midnight edge); (4) failed refresh after a successful write shows goal was not changed. | APPROVE round 2 (2b543b6): validation first in the queued unit, before any transaction; throw reaches the card Alert; loadData never rethrows (note 4 confirmed as non-issue).",
       "testerVerdicts": [
-        "round 1 REJECT: suggestion line hidden within 10 kcal (decision 8-9 hide only the button). Everything else verified; input rows hidden in insufficient cases judged NOT a contradiction (progress text covers item 6)."
+        "round 1 REJECT: suggestion line hidden within 10 kcal (decision 8-9 hide only the button). Everything else verified; input rows hidden in insufficient cases judged NOT a contradiction (progress text covers item 6).",
+        "round 2 APPROVE: 9 tests fail at 77d9275, pass at 2b543b6; 139/2016; items 7-9 met as worded; suggestions always within the writer range for UI-reachable goals (Settings caps at 5000)"
       ]
     },
     "352": {
@@ -425,6 +428,10 @@
     {
       "at": "2026-11-14T14:47:02.715Z",
       "event": "#351 security APPROVE round 2"
+    },
+    {
+      "at": "2026-11-14T14:47:53.322Z",
+      "event": "#351 tester APPROVE round 2 -> ready (roundTrips 1); lane C to cleanup"
     }
   ],
   "pendingFinish": [
@@ -434,6 +441,7 @@
     "#451 tester: handleSave guards only closing, not saving; a double tap on Save within one frame could start two saves (pre-existing, timing)",
     "#351 security: restored nutritionGoalCalories of 1e300 accepted (max Infinity) - hand-edited backup, pre-existing",
     "#351: Apply stamps the date with toISODate() at press time while the card uses todayISO set at load; across midnight the 7-day wait shifts by a day",
-    "#351: getAdaptiveTdeeAppliedOn only pattern-checks YYYY-MM-DD, so 2025-13-45 from a hand-edited backup passes into canApply"
+    "#351: getAdaptiveTdeeAppliedOn only pattern-checks YYYY-MM-DD, so 2025-13-45 from a hand-edited backup passes into canApply",
+    "#351 tester: a goal restored from a hand-edited backup above ~9090 makes the suggestion exceed 10000; the writer throws and the card shows Couldn't change goal (fails safe)"
   ]
 }
