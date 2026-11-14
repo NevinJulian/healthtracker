@@ -78,13 +78,15 @@
       "name": "weekly review",
       "branch": "sprint/lane-b-review",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "in_progress",
+      "status": "cleanup",
       "waitsFor": "lane A merged into sprint/auto-fixes",
       "order": [
         346
       ],
-      "current": 346,
-      "done": [],
+      "current": null,
+      "done": [
+        346
+      ],
       "parked": [],
       "base": "56ecae3"
     },
@@ -133,7 +135,7 @@
   "issues": {
     "346": {
       "lane": "B",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "security": "required (database.ts reads, notifications deep link)",
       "workOrder": "C:/git/ht-lanes/wo/346.md",
@@ -145,7 +147,10 @@
         "51e8bdf..ae5ab11 feature (10, incl. 2 test commits 4ae2649, 5f1764b)",
         "4bf8c88 round-trip fixture (ruling)"
       ],
-      "securityVerdict": "APPROVE round 1 (4bf8c88): bound params; only the notification identifier is read, fixed route name; setters assert day/time, getters fall back on malformed values; tap functions wrapped, startup failure still reaches RecoveryScreen; reconcile block isolated; Settings writes report failures."
+      "securityVerdict": "APPROVE round 1 (4bf8c88): bound params; only the notification identifier is read, fixed route name; setters assert day/time, getters fall back on malformed values; tap functions wrapped, startup failure still reaches RecoveryScreen; reconcile block isolated; Settings writes report failures.",
+      "testerVerdicts": [
+        "round 1 APPROVE: 84/109 fail at eda4feb on neutral skeletons; 143/2051; helpers pass in 4 other TZs; App.tsx startup path read line by line (tap once after onReady, never replayed, dropped on failure/onboarding/crash); existing-test edits exactly as ruled. Notes: intermediate commits 5d1859f..ae5ab11 likely red on autoBackupRoundTrip (fixture fix is the last commit); review screen loads all set history per focus; Settings toggle flickers false->true on hydration."
+      ]
     },
     "351": {
       "lane": "C",
@@ -505,6 +510,10 @@
     {
       "at": "2026-11-14T14:56:39.006Z",
       "event": "#450 tester APPROVE round 1 -> ready; lane D to cleanup"
+    },
+    {
+      "at": "2026-11-14T14:57:16.912Z",
+      "event": "#346 tester APPROVE round 1 -> ready; lane B to cleanup"
     }
   ],
   "pendingFinish": [
@@ -520,6 +529,8 @@
     "#454 security: normaliseIngredientName indexes ALIAS_MAP (plain object) without an own-key check, so an ingredient named __proto__ or constructor returns a non-string; parseMeasure catches it and returns quantity 0; pre-existing",
     "#454 security: the existing rangeLeadMatch regex in parseMeasure is mildly super-linear on hostile 1-1-1-... input (100k chars ~0.5 s); Discover measures have no length cap; pre-existing",
     "#454 tester: parseMeasure ignores a stated gram weight in brackets (\"1 cup (125g) flour\" uses the cup conversion); pre-existing",
-    "#454 tester: parseMeasure does not know dl or cl (\"2 dl\" gives 2 whole) on the Discover path; the URL line parser handles them; pre-existing"
+    "#454 tester: parseMeasure does not know dl or cl (\"2 dl\" gives 2 whole) on the Discover path; the URL line parser handles them; pre-existing",
+    "#346 tester: the Settings weekly review toggle renders off and flips on after hydration (visible flicker, no data impact)",
+    "#346 tester: WeeklyReviewScreen loads the whole workout set history (getWorkoutSetsBetween from 0000-01-01) on every focus to find prior bests; fine at current sizes, unbounded"
   ]
 }
