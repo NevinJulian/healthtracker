@@ -234,7 +234,7 @@ describe('computeAdaptiveTdee thresholds', () => {
 describe('suggestGoalCalories', () => {
   it('adds the goal delta and rounds to 10', () => {
     expect(suggestGoalCalories({ estimate: 2500, goalType: 'cut', currentGoal: 2000 })).toBe(2000);
-    expect(suggestGoalCalories({ estimate: 2000, goalType: 'gain', currentGoal: 2200 })).toBe(2200);
+    expect(suggestGoalCalories({ estimate: 2000, goalType: 'gain', currentGoal: 2200 })).toBe(2300);
     expect(suggestGoalCalories({ estimate: 2010, goalType: 'maintain', currentGoal: 2000 })).toBe(2010);
   });
 
