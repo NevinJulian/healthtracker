@@ -72,7 +72,7 @@ Filed, labelled `found-during-sprint`. **None was worked.**
 - **typecheck:** pass at `e70dac5` (exit 0).
 - **tests:** 2746 passed / 2746, 153 suites at `e70dac5`, with `--maxWorkers=2`, exit 0. The baseline on `main` `4dd49ae` was 1843 / 131. After each merge: A 1944 / 136, C 2016 / 139, D 2639 / 146, B 2746 / 153. Each step is exactly the previous total plus the lane's own suites and tests.
 - **`src/db/schema.ts`:** 13 lines added against `main`, none removed: the v40 entry (`CREATE TABLE IF NOT EXISTS food_log …` and `CREATE INDEX IF NOT EXISTS idx_food_log_date ON food_log(date)`).
-- **GitHub CI `test` check:** success on `56ecae3` (lane A), `7af8dd0` (+C) and `e21796f` (all four lanes). Lane D's merge was pushed together with lane B's. The docs merge `e70dac5` was still running when this report was written; it changes only `CLAUDE.md`.
+- **GitHub CI `test` check:** success on `56ecae3` (lane A), `7af8dd0` (+C), `e21796f` (all four lanes) and `e70dac5` (+docs). Lane D's merge was pushed together with lane B's.
 - **Size:** 97 files changed, +9252 / −102 against `main` (state file and report excluded). 100 commits besides merges and state commits, 21 of them the sprint 5 #352 work.
 - **Changed outside `src/`:** `App.tsx` (#346 tap routing), `__mocks__/expo-notifications.js` (+5 lines, three jest.fns for the tap API, additive), `CLAUDE.md`.
 - **Not changed:** `package.json`, `package-lock.json`, `app.json`, `eas.json`, `babel.config.js`, `jest.config.js`, the workflows. So `build-check.yml` will not run on the PR, and no native dependency moved.
