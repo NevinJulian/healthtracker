@@ -239,6 +239,19 @@ function namesEachWord(name: string): boolean {
     .some((token) => EACH_WORDS.has(token.replace(EDGE_PUNCTUATION, '').toLowerCase()));
 }
 
+function isUnitWord(word: string): boolean {
+  const parts = word.includes('-') ? [word, ...word.split('-')] : [word];
+  return parts.some(
+    (part) =>
+      part.length > 1 &&
+      (Object.prototype.hasOwnProperty.call(UNIT_WORDS, part.toLowerCase()) || englishUnit(part) !== undefined),
+  );
+}
+
+function namesAUnit(name: string): boolean {
+  return name.split(WHITESPACE).some((token) => isUnitWord(token.replace(EDGE_PUNCTUATION, '')));
+}
+
 function namesAMeasure(name: string): boolean {
   if (name.startsWith('(')) return true;
   const tokens = name.split(',', 1)[0].split(WHITESPACE).filter((token) => token !== '');
@@ -294,7 +307,7 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
     const name = tidyName(afterQuantity);
     if (!isAcceptableName(name)) return nameOnly(whole);
 
-    if (!hasUnit && namesAMeasure(name)) return nameOnly(whole);
+    if (!hasUnit && (namesAMeasure(name) || namesAUnit(name))) return nameOnly(whole);
     if (namesEachWord(name)) return nameOnly(whole);
 
     const quantityText = String(Number(qty.value.toFixed(6)));
