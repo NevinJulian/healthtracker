@@ -52,7 +52,9 @@
     "Agents must not create extra worktrees or directory junctions (the #447 developer deleted lane-a/node_modules by removing a temp worktree that linked it). Pre-fix proofs check out pre-fix source files in place and restore them.",
     "#346: src/services/expoNotifications.ts (Expo Go stub) and __mocks__/expo-notifications.js belong to no lane; assigned to lane B, additive only. The default-on weekly review without any permission request is a product gap, not built around: filed as #465.",
     "#451: RecipeEditorScreen.overlap.test first case encoded the scenario the decision removes; rewritten in place for the same sequence (approved edit to an existing test, own commit).",
-    "#454: keyword matching per decision item 2 literally for all keywords; analyst-proposed English whole-word restriction rejected. First-comma cut and leading-1-9 thousands rule accepted."
+    "#454: keyword matching per decision item 2 literally for all keywords; analyst-proposed English whole-word restriction rejected. First-comma cut and leading-1-9 thousands rule accepted.",
+    "#346: autoBackupRoundTrip broke because the default-on weekly review makes the post-restore reconcile write its OS-id key. Fixed by a fixture setup change (weekly review off before the backup), assertion untouched, plus a new test for the default-on behaviour. Dropping the OS-id key was rejected: it would break the reminder pattern to fit a test.",
+    "#346: the new weekly review DB functions sit right after the backup reminder settings, which is the end of database.ts. Accepted (work order placement); no other lane appends there, so no conflict risk."
   ],
   "lanes": {
     "A": {
@@ -134,7 +136,8 @@
       "security": "required (database.ts reads, notifications deep link)",
       "workOrder": "C:/git/ht-lanes/wo/346.md",
       "deviceCheck": "decision 9",
-      "notes": "rulings: expoNotifications.ts stub + __mocks__/expo-notifications.js assigned to lane B (additive); listed mock/count test edits pre-authorised; no new permission prompt (gap filed as #465)."
+      "notes": "rulings: expoNotifications.ts stub + __mocks__/expo-notifications.js assigned to lane B (additive); listed mock/count test edits pre-authorised; no new permission prompt (gap filed as #465). Round 1 dev: 19 commits, NOT pushed; 83/107 feature tests fail at eda4feb; 142/143 suites green, the one failure is autoBackupRoundTrip (reconcile after restore now writes weeklyReviewNotificationId because the reminder is on by default). Orchestrator ruling: option (b) setup-only (fixture disables the weekly review before the backup; assertion untouched) + a new test documenting the extra key; option (a) (drop the OS-id key) rejected. Not a round trip (no tester verdict). Developer stash count of 3 was a miscount: still the 2 pre-sprint stashes.",
+      "preFeatureSha": "eda4feb"
     },
     "351": {
       "lane": "C",
@@ -456,6 +459,10 @@
     {
       "at": "2026-11-14T14:49:21.865Z",
       "event": "#454 tester APPROVE round 1 -> ready; #450 developer dispatched"
+    },
+    {
+      "at": "2026-11-14T14:51:52.184Z",
+      "event": "#346 developer stopped on autoBackupRoundTrip; ruling sent (fixture setup change + new test)"
     }
   ],
   "pendingFinish": [
