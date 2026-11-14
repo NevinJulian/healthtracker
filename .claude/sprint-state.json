@@ -228,12 +228,21 @@
     },
     "454": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "security": "skip (pure parser, no I/O)",
+      "security": "light check: new comma regexes read imported measure text (TheMealDB, URL import), so run despite the frozen-scope skip note",
       "workOrder": "C:/git/ht-lanes/wo/454.md",
       "deviceCheck": "decision 7",
-      "notes": "work order ready at 593d786; waits for #451. Rulings: decision matching rule literally for all keywords (analyst English whole-word restriction rejected), comma cut accepted, thousands comma needs leading 1-9 (0,125 l). Gap filed as #466."
+      "notes": "work order ready at 593d786; waits for #451. Rulings: decision matching rule literally for all keywords (analyst English whole-word restriction rejected), comma cut accepted, thousands comma needs leading 1-9 (0,125 l). Gap filed as #466.",
+      "commits": [
+        "1655dc1 test",
+        "e09af67 table",
+        "6d104a4 density conversion (+15 planned assertion updates)",
+        "2533e03 floz",
+        "4ccdefc comma",
+        "5146104 pinch",
+        "4d67b1a EL/TL"
+      ]
     }
   },
   "foundDuringSprint": [
@@ -408,6 +417,10 @@
     {
       "at": "2026-11-14T14:46:24.793Z",
       "event": "#351 round 2 developer done (tip 2b543b6); tester + security re-check dispatched"
+    },
+    {
+      "at": "2026-11-14T14:46:58.568Z",
+      "event": "#454 round 1 developer done (tip 4d67b1a, 137/2456); tester + light security dispatched"
     }
   ],
   "pendingFinish": [
