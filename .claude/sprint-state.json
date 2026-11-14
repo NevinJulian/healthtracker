@@ -90,7 +90,7 @@
       "name": "expenditure",
       "branch": "sprint/lane-c-expenditure",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "cleanup",
+      "status": "merged",
       "waitsFor": "lane A merged into sprint/auto-fixes",
       "order": [
         351
@@ -100,7 +100,9 @@
         351
       ],
       "parked": [],
-      "base": "56ecae3"
+      "base": "56ecae3",
+      "mergeSha": "eec95fb",
+      "cleanup": "no changes needed, no commit (all exported constants used in-file, new imports used, docblocks accurate, no debug/issue numbers). Left: ~10 constants and 2 types exported from adaptiveTdee.ts with no outside importer (API surface, not cleanup)."
     },
     "D": {
       "name": "recipes",
@@ -135,7 +137,7 @@
     },
     "351": {
       "lane": "C",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 1,
       "security": "required (database.ts goal write)",
       "workOrder": "C:/git/ht-lanes/wo/351.md",
@@ -437,6 +439,15 @@
     {
       "at": "2026-11-14T14:48:02.867Z",
       "event": "#454 security APPROVE round 1"
+    },
+    {
+      "at": "2026-11-14T14:49:02.020Z",
+      "event": "merged lane C into sprint/auto-fixes",
+      "sha": "eec95fb"
+    },
+    {
+      "at": "2026-11-14T14:49:02.022Z",
+      "event": "integration gates after lane C: typecheck pass, 139 suites / 2016 tests"
     }
   ],
   "pendingFinish": [
