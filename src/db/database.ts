@@ -1777,6 +1777,21 @@ export async function getAllMealsForExport(): Promise<MealExportRow[]> {
   );
 }
 
+export interface FoodLogExportRow {
+  date: string;
+  label: string | null;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export async function getAllFoodLogForExport(): Promise<FoodLogExportRow[]> {
+  return getDatabase().getAllAsync<FoodLogExportRow>(
+    'SELECT date, label, calories, protein, carbs, fat FROM food_log ORDER BY date, id'
+  );
+}
+
 export interface MealPlanWithRecipe extends WeeklyMealPlanItem {
   recipe?: Recipe;
 }
@@ -1803,6 +1818,106 @@ export async function getTodaysMealsWithRecipe(date: string): Promise<MealPlanWi
       fat: r.fat,
     } : undefined
   }));
+}
+
+export interface FoodLogEntry {
+  id: number;
+  date: string;
+  label: string | null;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  created_at: string;
+}
+
+export interface FoodLogInput {
+  label: string | null;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+const FOOD_LOG_LABEL_MAX = 60;
+const FOOD_LOG_CALORIES_MAX = 5000;
+const FOOD_LOG_MACRO_MAX = 500;
+
+function assertFoodLogInput(input: FoodLogInput): string | null {
+  const label = input.label === null ? null : input.label.trim();
+  if (label !== null && label.length > FOOD_LOG_LABEL_MAX) {
+    throw new Error(`Food log label is longer than ${FOOD_LOG_LABEL_MAX} characters`);
+  }
+  const { calories } = input;
+  if (!Number.isFinite(calories) || calories <= 0 || calories > FOOD_LOG_CALORIES_MAX) {
+    throw new Error(`Food log calories must be above 0 and at most ${FOOD_LOG_CALORIES_MAX}`);
+  }
+  for (const [name, value] of [
+    ['protein', input.protein],
+    ['carbs', input.carbs],
+    ['fat', input.fat],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0 || value > FOOD_LOG_MACRO_MAX) {
+      throw new Error(`Food log ${name} must be between 0 and ${FOOD_LOG_MACRO_MAX}`);
+    }
+  }
+  return label === '' ? null : label;
+}
+
+export function addFoodLogEntry(input: FoodLogInput & { date: string }): Promise<number> {
+  return _enqueueWrite('addFoodLogEntry', async () => {
+    if (!isValidDateKey(input.date)) {
+      throw new Error(`Food log date is not a valid YYYY-MM-DD key: ${input.date}`);
+    }
+    const label = assertFoodLogInput(input);
+    const result = await getDatabase().runAsync(
+      `INSERT INTO food_log (date, label, calories, protein, carbs, fat, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [input.date, label, input.calories, input.protein, input.carbs, input.fat, new Date().toISOString()]
+    );
+    return result.lastInsertRowId;
+  });
+}
+
+export function updateFoodLogEntry(id: number, input: FoodLogInput): Promise<void> {
+  return _enqueueWrite('updateFoodLogEntry', async () => {
+    const label = assertFoodLogInput(input);
+    const result = await getDatabase().runAsync(
+      'UPDATE food_log SET label = ?, calories = ?, protein = ?, carbs = ?, fat = ? WHERE id = ?',
+      [label, input.calories, input.protein, input.carbs, input.fat, id]
+    );
+    if (result.changes !== 1) throw new Error('Food log entry not found');
+  });
+}
+
+export function deleteFoodLogEntry(id: number): Promise<void> {
+  return _enqueueWrite('deleteFoodLogEntry', async () => {
+    await getDatabase().runAsync('DELETE FROM food_log WHERE id = ?', [id]);
+  });
+}
+
+export async function getFoodLogForDate(date: string): Promise<FoodLogEntry[]> {
+  return getDatabase().getAllAsync<FoodLogEntry>(
+    'SELECT id, date, label, calories, protein, carbs, fat, created_at FROM food_log WHERE date = ? ORDER BY id',
+    [date]
+  );
+}
+
+/** Per-date calorie and protein sums of the entries from `from` to `to`, both inclusive. */
+export async function getFoodLogTotalsByDate(
+  from: string,
+  to: string
+): Promise<Record<string, { calories: number; protein: number }>> {
+  const rows = await getDatabase().getAllAsync<{ date: string; calories: number; protein: number }>(
+    `SELECT date, SUM(calories) AS calories, SUM(protein) AS protein
+     FROM food_log
+     WHERE date >= ? AND date <= ?
+     GROUP BY date`,
+    [from, to]
+  );
+  const totals: Record<string, { calories: number; protein: number }> = {};
+  for (const r of rows) totals[r.date] = { calories: r.calories ?? 0, protein: r.protein ?? 0 };
+  return totals;
 }
 
 /**
