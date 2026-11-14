@@ -33,6 +33,7 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Typography, Radius } from '../theme/tokens';
@@ -53,6 +54,10 @@ import {
   getHydrationGoal,
   getLoggedExercises,
   getWorkoutHistory,
+  getUserProfile,
+  getAdaptiveTdeeAppliedOn,
+  applyAdaptiveCalorieGoal,
+  type UserProfileData,
   type NutritionGoals,
   type DailyMacroTotals,
   type MealAdherenceSummary,
@@ -63,8 +68,8 @@ import {
   type BodyMeasurement,
   type WorkoutSet,
 } from '../db/database';
-import { addDays as addDaysKey, daysBetween, todayKey } from '../utils/dates';
-import { Card, ProgressBar, ScreenHeader, Pill } from '../components';
+import { addDays as addDaysKey, daysBetween, todayKey, dateKeyToLocalDate } from '../utils/dates';
+import { Card, ProgressBar, ScreenHeader, Pill, Row, Button } from '../components';
 import LoadErrorView from '../components/LoadErrorView';
 import {
   computeStreaks,
@@ -91,7 +96,13 @@ import {
   type WorkoutSetSlice,
 } from './analyticsHelpers';
 import { NUTRITION_GOALS } from '../nutrition/goals';
-import type { AdaptiveTdeeResult } from '../nutrition/adaptiveTdee';
+import {
+  computeAdaptiveTdee,
+  suggestGoalCalories,
+  canApply,
+  APPLY_DEADBAND_KCAL,
+  type AdaptiveTdeeResult,
+} from '../nutrition/adaptiveTdee';
 import type { GoalType } from '../nutrition/tdee';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1120,7 +1131,14 @@ export function LiftingSectionCard({
 
 // ─── Nutrition: Energy expenditure card ───────────────────────────────────────
 
-export function EnergyExpenditureCard(props: {
+export function EnergyExpenditureCard({
+  result,
+  currentGoal,
+  goalType,
+  appliedOn,
+  todayISO,
+  onApply,
+}: {
   result: AdaptiveTdeeResult;
   currentGoal: number;
   goalType: GoalType | null;
@@ -1128,7 +1146,104 @@ export function EnergyExpenditureCard(props: {
   todayISO: string;
   onApply: (kcal: number) => Promise<void>;
 }) {
-  return null;
+  const formula =
+    result.formulaTdee !== null ? `Formula estimate: ${Math.round(result.formulaTdee)} kcal/day` : null;
+
+  let reasonText: string | null = null;
+  if (result.status === 'insufficient') {
+    if (result.reason === 'logged_days' && result.progress) {
+      reasonText = `Need ${result.progress.need} logged days. You have ${result.progress.have}.`;
+    } else if (result.reason === 'weigh_ins' && result.progress) {
+      reasonText = `Need ${result.progress.need} weigh-ins in the last 28 days. You have ${result.progress.have}.`;
+    } else if (result.reason === 'profile') {
+      reasonText = 'Fill in your profile in Settings to compare with the formula.';
+    } else if (result.reason === 'out_of_range') {
+      reasonText = 'Far from the formula estimate. Usually meals are missing from the log.';
+    }
+  }
+
+  const showInputs =
+    result.status === 'estimate' ||
+    (result.status === 'insufficient' && result.reason === 'out_of_range');
+
+  const suggestion =
+    result.status === 'estimate' && goalType !== null
+      ? suggestGoalCalories({ estimate: result.estimate, goalType, currentGoal })
+      : null;
+  const availability =
+    suggestion !== null
+      ? canApply({ suggestion, currentGoal, todayISO, appliedOn })
+      : { show: false, returnsOn: null };
+  const suggestionDiffers =
+    suggestion !== null && Math.abs(suggestion - currentGoal) > APPLY_DEADBAND_KCAL;
+
+  const confirmApply = () => {
+    if (suggestion === null) return;
+    Alert.alert(
+      'Change calorie goal?',
+      `Set your daily goal to ${suggestion} kcal. Protein stays the same.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Apply',
+          onPress: async () => {
+            try {
+              await onApply(suggestion);
+            } catch (err) {
+              console.error('Failed to apply calorie goal', err);
+              Alert.alert("Couldn't change goal", 'Your goal was not changed. Try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const change = result.weightChangeKg;
+
+  return (
+    <Card style={styles.sectionCard}>
+      <View style={styles.cardTitleRow}>
+        <Text style={styles.cardSectionTitle}>Energy expenditure</Text>
+        <Text style={styles.cardSectionTrailing}>Last 28 days</Text>
+      </View>
+
+      {result.status === 'estimate' && (
+        <Text style={styles.energyHeadline}>{`${result.estimate} kcal/day`}</Text>
+      )}
+      {formula !== null && <Text style={styles.rateText}>{formula}</Text>}
+      {reasonText !== null && <Text style={styles.emptyText}>{reasonText}</Text>}
+
+      {showInputs && (
+        <View style={styles.energyRows}>
+          {result.meanIntake !== null && (
+            <Row title={`Mean intake: ${Math.round(result.meanIntake)} kcal/day`} />
+          )}
+          <Row
+            title={`Logged days: ${result.loggedDays} of 28 (${result.leftOutDays} left out, under 1000 kcal)`}
+          />
+          {change !== null && (
+            <Row
+              title={`Trend weight change (28 days): ${change >= 0 ? '+' : ''}${change.toFixed(1)} kg`}
+            />
+          )}
+          <Row title={`Weigh-ins: ${result.weighIns}`} />
+        </View>
+      )}
+
+      {suggestionDiffers && (
+        <Text style={styles.energySuggestion}>
+          {`Suggested goal ${suggestion} kcal (now ${currentGoal})`}
+        </Text>
+      )}
+      {availability.show && <Button title="Apply" onPress={confirmApply} />}
+      {availability.returnsOn !== null && (
+        <Text style={styles.emptyText}>
+          {`Apply is available again on ${dateKeyToLocalDate(availability.returnsOn).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+        </Text>
+      )}
+    </Card>
+  );
 }
 
 // ─── Nutrition: Section card ──────────────────────────────────────────────────
@@ -1141,6 +1256,7 @@ function NutritionSectionCard({
   mostCooked,
   inventory,
   nutritionGoals,
+  energy,
 }: {
   macros: DailyMacroTotals[];
   adherence: MealAdherenceSummary;
@@ -1149,6 +1265,7 @@ function NutritionSectionCard({
   mostCooked: CookedRecipeRow[];
   inventory: InventorySnapshot;
   nutritionGoals: NutritionGoals;
+  energy: React.ReactNode;
 }) {
   const hasConsumedHistory = macros.length > 0;
   const hasMostEaten = mostEaten.length > 0;
@@ -1160,6 +1277,8 @@ function NutritionSectionCard({
       <View style={styles.sectionDivider}>
         <Text style={styles.sectionDividerText}>Nutrition</Text>
       </View>
+
+      {energy}
 
       {/* 1. Nutrition adherence card */}
       <Card style={styles.sectionCard}>
@@ -1392,6 +1511,8 @@ export default function AnalyticsDashboardScreen() {
   // ── Nutrition analytics state ────────────────────────────────────────────────
   const [nutritionGoals, setNutritionGoals] = useState<NutritionGoals>(NUTRITION_GOALS);
   const [consumedMacros, setConsumedMacros] = useState<DailyMacroTotals[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
+  const [adaptiveAppliedOn, setAdaptiveAppliedOn] = useState<string | null>(null);
   const [mealAdherence, setMealAdherence] = useState<MealAdherenceSummary>({
     planned: 0,
     consumed: 0,
@@ -1430,6 +1551,23 @@ export default function AnalyticsDashboardScreen() {
       mountedRef.current = false;
     };
   }, []);
+
+  const energyResult = useMemo(() => {
+    if (todayISO === '') return null;
+    const trend = ewmaTrend(plausibleWeights(weightHistory90).valid);
+    return computeAdaptiveTdee({
+      todayISO,
+      intake: consumedMacros.map((d) => ({ date: d.date, calories: d.calories })),
+      trend: trend.map((t) => ({ date: t.date, trend: t.trend })),
+      profile: userProfile ?? {
+        sex: null,
+        age: null,
+        heightCm: null,
+        activityLevel: null,
+        goalType: null,
+      },
+    });
+  }, [todayISO, weightHistory90, consumedMacros, userProfile]);
 
   const loadData = useCallback(async () => {
     runIdRef.current += 1;
@@ -1551,6 +1689,8 @@ export default function AnalyticsDashboardScreen() {
         measurementRows,
         hydGoal,
         liftExercises,
+        profile,
+        appliedOn,
       ] = await Promise.all([
         getConsumedMacrosByDay(30),
         getMealAdherence(30),
@@ -1563,6 +1703,8 @@ export default function AnalyticsDashboardScreen() {
         getBodyMeasurements(),
         getHydrationGoal(),
         getLoggedExercises(),
+        getUserProfile(),
+        getAdaptiveTdeeAppliedOn(),
       ]);
 
       if (isCurrent()) {
@@ -1577,6 +1719,8 @@ export default function AnalyticsDashboardScreen() {
         setBodyMeasurements(measurementRows);
         setHydrationGoalMl(hydGoal);
         setLoggedExercises(liftExercises);
+        setUserProfile(profile);
+        setAdaptiveAppliedOn(appliedOn);
       }
 
       // ── Lifting history (#285) ──────────────────────────────────────────────
@@ -1607,6 +1751,14 @@ export default function AnalyticsDashboardScreen() {
       if (isCurrent()) setLoading(false);
     }
   }, []);
+
+  const applyEnergyGoal = useCallback(
+    async (kcal: number) => {
+      await applyAdaptiveCalorieGoal(kcal, toISODate());
+      await loadData();
+    },
+    [loadData]
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -1713,6 +1865,18 @@ export default function AnalyticsDashboardScreen() {
           mostCooked={mostCookedRecipes}
           inventory={inventorySnapshot}
           nutritionGoals={nutritionGoals}
+          energy={
+            energyResult !== null ? (
+              <EnergyExpenditureCard
+                result={energyResult}
+                currentGoal={nutritionGoals.calories}
+                goalType={userProfile?.goalType ?? null}
+                appliedOn={adaptiveAppliedOn}
+                todayISO={todayISO}
+                onApply={applyEnergyGoal}
+              />
+            ) : null
+          }
         />
 
         {/* Hydration summary (#283) */}
@@ -1811,6 +1975,23 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginBottom: Spacing.md,
     alignSelf: 'flex-start',
+  },
+  energyHeadline: {
+    fontFamily: Typography.display,
+    fontSize: Typography.sizes.xxl,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+  },
+  energyRows: {
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  energySuggestion: {
+    fontFamily: Typography.body,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.md,
   },
   rateText: {
     fontFamily: Typography.body,
