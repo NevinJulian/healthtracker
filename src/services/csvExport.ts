@@ -2,9 +2,11 @@ import * as Sharing from 'expo-sharing';
 import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
 import {
   getAllDailyLogForExport,
+  getAllFoodLogForExport,
   getAllMealsForExport,
   getAllWorkoutSetsForExport,
   type DailyLogExportRow,
+  type FoodLogExportRow,
   type MealExportRow,
   type WorkoutSetExportRow,
 } from '../db/database';
@@ -80,8 +82,15 @@ export function mealsToCsv(rows: readonly MealExportRow[]): string {
   );
 }
 
+export function foodLogToCsv(rows: readonly FoodLogExportRow[]): string {
+  return buildCsv(
+    ['date', 'label', 'calories', 'protein', 'carbs', 'fat'],
+    rows.map((r) => [r.date, r.label, r.calories, r.protein, r.carbs, r.fat])
+  );
+}
+
 /**
- * Write workout_sets.csv, daily_log.csv and meals.csv to the cache directory and
+ * Write workout_sets.csv, daily_log.csv, meals.csv and food_log.csv to the cache directory and
  * share them one after the other. A file that cannot be written or shared is
  * reported and does not stop the next one.
  *
@@ -93,15 +102,17 @@ export async function exportCsv(): Promise<{ failed: string[] }> {
     throw new Error('Sharing is not available on this device. Cannot export CSV.');
   }
 
-  const [sets, log, meals] = await Promise.all([
+  const [sets, log, meals, foodLog] = await Promise.all([
     getAllWorkoutSetsForExport(),
     getAllDailyLogForExport(),
     getAllMealsForExport(),
+    getAllFoodLogForExport(),
   ]);
   const files = [
     { name: 'workout_sets.csv', content: workoutSetsToCsv(sets) },
     { name: 'daily_log.csv', content: dailyLogToCsv(log) },
     { name: 'meals.csv', content: mealsToCsv(meals) },
+    { name: 'food_log.csv', content: foodLogToCsv(foodLog) },
   ];
 
   const failed: string[] = [];
