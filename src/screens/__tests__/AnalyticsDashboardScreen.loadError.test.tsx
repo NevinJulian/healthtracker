@@ -35,6 +35,14 @@ jest.mock('../../db/database', () => ({
     .fn()
     .mockResolvedValue({ recipesInStock: 0, totalPortions: 0, items: [] }),
   getLoggedExercises: jest.fn().mockResolvedValue(['bench']),
+  getUserProfile: jest.fn().mockResolvedValue({
+    heightCm: null,
+    age: null,
+    sex: null,
+    activityLevel: null,
+    goalType: null,
+  }),
+  getAdaptiveTdeeAppliedOn: jest.fn().mockResolvedValue(null),
 }));
 
 import AnalyticsDashboardScreen from '../AnalyticsDashboardScreen';

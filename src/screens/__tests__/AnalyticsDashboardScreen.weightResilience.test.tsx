@@ -75,6 +75,14 @@ jest.mock('../../db/database', () => ({
   getBodyMeasurements: jest.fn().mockResolvedValue([]),
   getHydrationGoal: jest.fn().mockResolvedValue(2000),
   getLoggedExercises: jest.fn().mockResolvedValue([]),
+  getUserProfile: jest.fn().mockResolvedValue({
+    heightCm: null,
+    age: null,
+    sex: null,
+    activityLevel: null,
+    goalType: null,
+  }),
+  getAdaptiveTdeeAppliedOn: jest.fn().mockResolvedValue(null),
   getWorkoutHistory: jest.fn().mockResolvedValue([]),
 }));
 

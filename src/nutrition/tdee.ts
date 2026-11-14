@@ -128,6 +128,22 @@ export function computeTDEE(bmr: number, activityLevel: ActivityLevel): number {
   return Math.max(1, bmr * multiplier);
 }
 
+/** Calorie delta for a goal type, in kcal/day. */
+export function goalDelta(goalType: GoalType): number {
+  return GOAL_DELTAS[goalType] ?? 0;
+}
+
+/** Unrounded TDEE for the profile at the given body weight. */
+export function formulaTdee(profile: UserProfile, weightKg: number): number {
+  const bmr = computeBMR({
+    sex:      profile.sex,
+    weightKg: clamp(weightKg, 30, 300),
+    heightCm: profile.heightCm,
+    age:      profile.age,
+  });
+  return computeTDEE(bmr, profile.activityLevel);
+}
+
 /**
  * Suggest daily calorie and protein goals from the user's profile and
  * current body weight.
@@ -146,17 +162,7 @@ export function computeTDEE(bmr: number, activityLevel: ActivityLevel): number {
 export function suggestGoals(profile: UserProfile, weightKg: number): SuggestedGoals {
   const safeWeight = clamp(weightKg, 30, 300);
 
-  const bmr  = computeBMR({
-    sex:      profile.sex,
-    weightKg: safeWeight,
-    heightCm: profile.heightCm,
-    age:      profile.age,
-  });
-
-  const tdee  = computeTDEE(bmr, profile.activityLevel);
-  const delta = GOAL_DELTAS[profile.goalType] ?? 0;
-
-  const rawCalories = tdee + delta;
+  const rawCalories = formulaTdee(profile, safeWeight) + goalDelta(profile.goalType);
   const calories    = Math.max(1000, roundTo(rawCalories, 10));
 
   const rawProtein = PROTEIN_G_PER_KG * safeWeight;

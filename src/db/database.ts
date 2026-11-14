@@ -3197,6 +3197,33 @@ export function setNutritionGoals(kcal: number, g: number): Promise<void> {
   });
 }
 
+const SETTING_ADAPTIVE_TDEE_APPLIED_ON = 'adaptiveTdeeAppliedOn';
+
+/** Date the adaptive calorie goal was last applied, or null when never or unreadable. */
+export async function getAdaptiveTdeeAppliedOn(): Promise<string | null> {
+  const raw = await getSetting(SETTING_ADAPTIVE_TDEE_APPLIED_ON);
+  return raw !== null && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+}
+
+/** Set the calorie goal and record the apply date in one transaction. Protein is untouched. */
+export function applyAdaptiveCalorieGoal(kcal: number, todayISO: string): Promise<void> {
+  return _enqueueWrite('applyAdaptiveCalorieGoal', async () => {
+    if (!Number.isInteger(kcal) || kcal < 1000 || kcal > 10000) {
+      throw new Error(`applyAdaptiveCalorieGoal: kcal must be an integer from 1000 to 10000, got ${kcal}`);
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(todayISO)) {
+      throw new Error(`applyAdaptiveCalorieGoal: date must be YYYY-MM-DD, got ${todayISO}`);
+    }
+    const db = getDatabase();
+    const upsert =
+      'INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value';
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(upsert, [SETTING_NUTRITION_GOAL_CALORIES, String(kcal)]);
+      await db.runAsync(upsert, [SETTING_ADAPTIVE_TDEE_APPLIED_ON, todayISO]);
+    });
+  });
+}
+
 // ── User profile settings (#281) ─────────────────────────────────────────────
 //
 // Profile fields are stored as simple string KV pairs in app_state.

@@ -12,6 +12,8 @@ import {
   computeBMR,
   computeTDEE,
   suggestGoals,
+  formulaTdee,
+  goalDelta,
   ACTIVITY_MULTIPLIERS,
   type Sex,
   type ActivityLevel,
@@ -316,4 +318,42 @@ describe('suggestGoals', () => {
     expect(protein).toBeGreaterThanOrEqual(105);
     expect(protein).toBeLessThanOrEqual(115);
   });
+});
+
+// ─── formulaTdee / goalDelta ─────────────────────────────────────────────────
+
+describe('formulaTdee and goalDelta', () => {
+  const profile: UserProfile = {
+    sex: 'male',
+    age: 30,
+    heightCm: 180,
+    activityLevel: 'moderate',
+    goalType: 'maintain',
+  };
+
+  it('formulaTdee is the multiplied BMR at the given weight', () => {
+    expect(formulaTdee(profile, 85)).toBe(1830 * 1.55);
+  });
+
+  it('formulaTdee clamps the weight like suggestGoals', () => {
+    const at = (weightKg: number) =>
+      computeTDEE(computeBMR({ sex: 'male', weightKg, heightCm: 180, age: 30 }), 'moderate');
+    expect(formulaTdee(profile, 5)).toBe(at(30));
+    expect(formulaTdee(profile, 900)).toBe(at(300));
+  });
+
+  it('goalDelta is cut -500, maintain 0, gain +300', () => {
+    expect(goalDelta('cut')).toBe(-500);
+    expect(goalDelta('maintain')).toBe(0);
+    expect(goalDelta('gain')).toBe(300);
+  });
+
+  it.each(['cut', 'maintain', 'gain'] as GoalType[])(
+    'suggestGoals equals formulaTdee plus goalDelta for %s',
+    (goalType) => {
+      const p = { ...profile, goalType };
+      const expected = Math.max(1000, Math.round((formulaTdee(p, 85) + goalDelta(goalType)) / 10) * 10);
+      expect(suggestGoals(p, 85).calories).toBe(expected);
+    }
+  );
 });
