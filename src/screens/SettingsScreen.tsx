@@ -47,6 +47,12 @@ import {
   setBackupReminderDay,
   getBackupReminderTime,
   setBackupReminderTime,
+  getWeeklyReviewEnabled,
+  setWeeklyReviewEnabled,
+  getWeeklyReviewDay,
+  setWeeklyReviewDay,
+  getWeeklyReviewTime,
+  setWeeklyReviewTime,
   getNutritionGoals,
   setNutritionGoalCalories,
   setNutritionGoalProtein,
@@ -143,6 +149,15 @@ const DEFAULT_BACKUP_REMINDER_STATE: BackupReminderState = {
   enabled: false,
   day: 0,
   time: '18:00',
+  permissionDenied: false,
+};
+
+// ─── Weekly review state ──────────────────────────────────────────────────────
+
+const DEFAULT_WEEKLY_REVIEW_STATE: BackupReminderState = {
+  enabled: false,
+  day: 0,
+  time: '19:00',
   permissionDenied: false,
 };
 
@@ -281,6 +296,7 @@ interface LatestSettings {
   cooking: CookingReminderState;
   mealReminders: MealReminderState;
   backupReminder: BackupReminderState;
+  weeklyReview: BackupReminderState;
   profile: UserProfileData;
   latestWeight: number | null;
 }
@@ -513,6 +529,7 @@ export default function SettingsScreen() {
     cooking: INITIAL_COOKING,
     mealReminders: DEFAULT_MEAL_REMINDER_STATE,
     backupReminder: DEFAULT_BACKUP_REMINDER_STATE,
+    weeklyReview: DEFAULT_WEEKLY_REVIEW_STATE,
     profile: INITIAL_PROFILE,
     latestWeight: null,
   });
@@ -526,6 +543,8 @@ export default function SettingsScreen() {
 
   // Backup reminder (#293)
   const [backupReminder, setBackupReminder] = useLatestState(latestRef, 'backupReminder');
+
+  const [weeklyReview, setWeeklyReview] = useLatestState(latestRef, 'weeklyReview');
 
   // Backup state
   const [backupBusy, setBackupBusy] = useState(false);
@@ -588,12 +607,15 @@ export default function SettingsScreen() {
   };
   const backupEnabledGuard = useWriteGuard();
   const backupDayGuard = useWriteGuard();
+  const reviewEnabledGuard = useWriteGuard();
+  const reviewDayGuard = useWriteGuard();
   const workoutEditGuard = useWriteGuard();
   const cookDayEditGuard = useWriteGuard();
   const breakfastEditGuard = useWriteGuard();
   const lunchEditGuard = useWriteGuard();
   const dinnerEditGuard = useWriteGuard();
   const backupEditGuard = useWriteGuard();
+  const reviewEditGuard = useWriteGuard();
   const caloriesEditGuard = useWriteGuard();
   const proteinEditGuard = useWriteGuard();
   const hydrationEditGuard = useWriteGuard();
@@ -612,6 +634,7 @@ export default function SettingsScreen() {
   const proteinDirtyRef = useRef(false);
   const hydrationDirtyRef = useRef(false);
   const backupTimeDirtyRef = useRef(false);
+  const reviewTimeDirtyRef = useRef(false);
 
   const mealEditGuards: Record<MealType, WriteGuard> = {
     breakfast: breakfastEditGuard,
@@ -684,6 +707,13 @@ export default function SettingsScreen() {
     }
   });
 
+  const flushReviewTime = useDebouncedCommit(weeklyReview.time, reviewTimeDirtyRef, async (time) => {
+    await setWeeklyReviewTime(time);
+    if (latestRef.current.weeklyReview.enabled) {
+      await scheduleAfterSave(reconcileScheduledNotifications);
+    }
+  });
+
   // ── Stepper debounce: flush on backgrounding (#313) ────────────────────
   // Android can tear down the RN instance as soon as the app is backgrounded
   // — a pending setTimeout never gets to fire. Flush every debounced write
@@ -702,6 +732,7 @@ export default function SettingsScreen() {
         flushProtein();
         flushHydration();
         flushBackupTime();
+        flushReviewTime();
       }
     });
     return () => {
@@ -717,6 +748,7 @@ export default function SettingsScreen() {
     flushProtein,
     flushHydration,
     flushBackupTime,
+    flushReviewTime,
   ]);
 
   // Load persisted settings on focus (same pattern as other screens using useFocusEffect)
@@ -739,12 +771,15 @@ export default function SettingsScreen() {
       };
       const backupEnabledSeqAtStart = backupEnabledGuard.seqRef.current;
       const backupDaySeqAtStart = backupDayGuard.seqRef.current;
+      const reviewEnabledSeqAtStart = reviewEnabledGuard.seqRef.current;
+      const reviewDaySeqAtStart = reviewDayGuard.seqRef.current;
       const workoutEditSeqAtStart = workoutEditGuard.seqRef.current;
       const cookDayEditSeqAtStart = cookDayEditGuard.seqRef.current;
       const breakfastEditSeqAtStart = breakfastEditGuard.seqRef.current;
       const lunchEditSeqAtStart = lunchEditGuard.seqRef.current;
       const dinnerEditSeqAtStart = dinnerEditGuard.seqRef.current;
       const backupEditSeqAtStart = backupEditGuard.seqRef.current;
+      const reviewEditSeqAtStart = reviewEditGuard.seqRef.current;
       const caloriesEditSeqAtStart = caloriesEditGuard.seqRef.current;
       const proteinEditSeqAtStart = proteinEditGuard.seqRef.current;
       const hydrationEditSeqAtStart = hydrationEditGuard.seqRef.current;
@@ -769,6 +804,9 @@ export default function SettingsScreen() {
           backupEnabled,
           backupDay,
           backupTime,
+          reviewEnabled,
+          reviewDay,
+          reviewTime,
         ] = await Promise.all([
           getWorkoutReminderEnabled(),
           getWorkoutReminderTime(),
@@ -789,6 +827,9 @@ export default function SettingsScreen() {
           getBackupReminderEnabled(),
           getBackupReminderDay(),
           getBackupReminderTime(),
+          getWeeklyReviewEnabled(),
+          getWeeklyReviewDay(),
+          getWeeklyReviewTime(),
         ]);
         if (active) {
           const workoutTimeKept =
@@ -809,6 +850,9 @@ export default function SettingsScreen() {
           const backupTimeKept =
             backupTimeDirtyRef.current ||
             editedSince(backupEditGuard, backupEditSeqAtStart);
+          const reviewTimeKept =
+            reviewTimeDirtyRef.current ||
+            editedSince(reviewEditGuard, reviewEditSeqAtStart);
           setReminder((prev) => ({
             ...prev,
             enabled: editedSince(workoutEnabledGuard, workoutEnabledSeqAtStart) ? prev.enabled : workoutEnabled,
@@ -856,6 +900,13 @@ export default function SettingsScreen() {
             enabled: editedSince(backupEnabledGuard, backupEnabledSeqAtStart) ? prev.enabled : backupEnabled,
             day: editedSince(backupDayGuard, backupDaySeqAtStart) ? prev.day : backupDay,
             time: backupTimeKept ? prev.time : backupTime,
+            permissionDenied: false,
+          }));
+          setWeeklyReview((prev) => ({
+            ...prev,
+            enabled: editedSince(reviewEnabledGuard, reviewEnabledSeqAtStart) ? prev.enabled : reviewEnabled,
+            day: editedSince(reviewDayGuard, reviewDaySeqAtStart) ? prev.day : reviewDay,
+            time: reviewTimeKept ? prev.time : reviewTime,
             permissionDenied: false,
           }));
           if (!caloriesDirtyRef.current && !editedSince(caloriesEditGuard, caloriesEditSeqAtStart)) {
@@ -911,6 +962,7 @@ export default function SettingsScreen() {
         flushProtein();
         flushHydration();
         flushBackupTime();
+        flushReviewTime();
       };
     }, [])
   );
@@ -1473,9 +1525,58 @@ export default function SettingsScreen() {
     });
   }
 
+  // ── Weekly review: toggle ────────────────────────────────────────────────
+
+  async function handleWeeklyReviewToggle(value: boolean) {
+    if (value) {
+      const granted = await ensurePermissions();
+      if (!granted) {
+        setWeeklyReview((prev) => ({ ...prev, permissionDenied: true }));
+        return;
+      }
+    }
+    try {
+      await trackSettingWrite(reviewEnabledGuard.seqRef, reviewEnabledGuard.pendingRef, () =>
+        setWeeklyReviewEnabled(value)
+      );
+      setWeeklyReview((prev) => ({ ...prev, enabled: value, permissionDenied: false }));
+      await scheduleAfterSave(reconcileScheduledNotifications);
+    } catch (error) {
+      reportWriteFailure(error);
+    }
+  }
+
+  // ── Weekly review: weekday chip ───────────────────────────────────────────
+
+  async function handleWeeklyReviewDaySelect(day: number) {
+    try {
+      await trackSettingWrite(reviewDayGuard.seqRef, reviewDayGuard.pendingRef, () => setWeeklyReviewDay(day));
+      setWeeklyReview((prev) => ({ ...prev, day }));
+      if (latestRef.current.weeklyReview.enabled) {
+        await scheduleAfterSave(reconcileScheduledNotifications);
+      }
+    } catch (error) {
+      reportWriteFailure(error);
+    }
+  }
+
+  // ── Weekly review: time adjustments ───────────────────────────────────────
+
+  function adjustWeeklyReviewTime(hourDelta: number, minuteDelta: number) {
+    reviewTimeDirtyRef.current = true;
+    reviewEditGuard.seqRef.current += 1;
+    setWeeklyReview((prev) => {
+      const { hour, minute } = parseTimeString(prev.time);
+      const newHour = stepHour(hour, hourDelta);
+      const newMinute = stepMinute(minute, minuteDelta);
+      return { ...prev, time: formatTimeString(newHour, newMinute) };
+    });
+  }
+
   const { hour: workoutHour, minute: workoutMinute } = parseTimeString(reminder.time);
   const { hour: cookHour, minute: cookMinute } = parseTimeString(cooking.weeklyCookDayTime);
   const { hour: backupHour, minute: backupMinute } = parseTimeString(backupReminder.time);
+  const { hour: reviewHour, minute: reviewMinute } = parseTimeString(weeklyReview.time);
 
   return (
     <ScrollView
@@ -2182,6 +2283,86 @@ export default function SettingsScreen() {
           </View>
         )}
       </Card>
+      {/* ── Weekly review ──────────────────────────────────────────── */}
+      <Card style={styles.card}>
+        <View style={styles.sectionLabelRow}>
+          <Ionicons name="calendar-number-outline" size={16} color={Colors.sageDeep} />
+          <Text style={styles.sectionLabel}>Weekly review</Text>
+        </View>
+
+        {weeklyReview.permissionDenied && (
+          <View style={styles.noticeRow}>
+            <Ionicons name="information-circle-outline" size={16} color={Colors.clayDeep} />
+            <Text style={styles.noticeText}>
+              Enable notifications in your device settings to receive reminders.
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleTextBlock}>
+            <Text style={styles.toggleTitle}>Weekly review</Text>
+            <Text style={styles.toggleSubtitle}>
+              A summary of the last 7 days on your chosen day
+            </Text>
+          </View>
+          <Switch
+            value={weeklyReview.enabled}
+            onValueChange={handleWeeklyReviewToggle}
+            trackColor={{ false: Colors.canvasSunken, true: Colors.sage }}
+            thumbColor={weeklyReview.enabled ? Colors.surface : Colors.textMuted}
+            ios_backgroundColor={Colors.canvasSunken}
+            accessibilityLabel="Enable weekly review"
+          />
+        </View>
+
+        {weeklyReview.enabled && (
+          <View style={styles.timePicker}>
+            <View style={styles.timePickerDivider} />
+
+            <Text style={styles.timePickerHeading}>Review day</Text>
+            <View style={styles.weekdayRow}>
+              {DAY_LABELS.map((label, idx) => {
+                const selected = weeklyReview.day === idx;
+                return (
+                  <TouchableOpacity
+                    key={label}
+                    style={[styles.weekdayChip, selected && styles.weekdayChipReviewSelected]}
+                    onPress={() => handleWeeklyReviewDaySelect(idx)}
+                    accessibilityLabel={`Select ${label}`}
+                    accessibilityRole="button"
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.weekdayChipLabel, selected && styles.weekdayChipLabelReviewSelected]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[styles.timePickerHeading, styles.timePickerHeadingSpaced]}>Review time</Text>
+            <View style={styles.timeStepperRow}>
+              <TimeStepper
+                label="Hour"
+                value={String(reviewHour).padStart(2, '0')}
+                onDecrement={() => adjustWeeklyReviewTime(-1, 0)}
+                onIncrement={() => adjustWeeklyReviewTime(1, 0)}
+              />
+              <Text style={styles.timeSeparator}>:</Text>
+              <TimeStepper
+                label="Minute"
+                value={String(reviewMinute).padStart(2, '0')}
+                onDecrement={() => adjustWeeklyReviewTime(0, -1)}
+                onIncrement={() => adjustWeeklyReviewTime(0, 1)}
+              />
+            </View>
+            <Text style={styles.timePreview}>
+              Review every {DAY_LABELS[weeklyReview.day]} at {formatTimeString(reviewHour, reviewMinute)}
+            </Text>
+          </View>
+        )}
+      </Card>
     </ScrollView>
   );
 }
@@ -2352,6 +2533,12 @@ const styles = StyleSheet.create({
   },
   weekdayChipLabelBackupSelected: {
     color: Colors.skyDeep,
+  },
+  weekdayChipReviewSelected: {
+    backgroundColor: Colors.sageTint,
+  },
+  weekdayChipLabelReviewSelected: {
+    color: Colors.sageDeep,
   },
   timePickerHeadingSpaced: {
     marginTop: Spacing.md,
