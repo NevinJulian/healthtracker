@@ -56,12 +56,14 @@
       "name": "food log",
       "branch": "sprint/lane-a-foodlog",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "in_progress",
+      "status": "cleanup",
       "order": [
         447
       ],
-      "current": 447,
-      "done": [],
+      "current": null,
+      "done": [
+        447
+      ],
       "parked": []
     },
     "B": {
@@ -123,7 +125,7 @@
     },
     "352": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "security": "required (fetches arbitrary web pages)",
       "workOrder": "C:/git/ht-lanes/wo/352.md",
@@ -134,7 +136,9 @@
         "ea8e626 fix",
         "1e462ae test r2",
         "070235e fix r2 rule 5",
-        "92fabc7 fix r2 rule 6"
+        "92fabc7 fix r2 rule 6",
+        "b8d3a3d test r2 ruling 11",
+        "43abd32 fix r2 ruling 11"
       ],
       "securityVerdict": "APPROVE round 1 (ea8e626): sprint 5 fetch/JSON-LD guards hold on SDK 58 base; new regexes bounded, LAST_WORD is O(n^2) unanchored but 1.1 ms at the 500-char cap (note, not a block); 30k hostile fuzz lines, 0 throws, max 0.14 ms; readDraft lets only typed strings/numbers through.",
       "testerVerdicts": [
@@ -143,18 +147,21 @@
     },
     "447": {
       "lane": "A",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "security": "required (schema, database.ts, backup restore, csvExport)",
       "workOrder": "C:/git/ht-lanes/wo/447.md",
       "deviceCheck": "decision 9",
-      "notes": "work order ready; rulings: no barrel edit (import by path), Settings wording to #464, en-GB chip labels, listed test edits pre-authorised Round 1 dev: 136 suites / 1944 tests green; 63 feature tests fail at 33ee1b1. Incident: the developer removed a temporary red-phase worktree that held a junction to lane-a/node_modules and it deleted that node_modules; restored with npm ci; orchestrator verified no stray worktrees and identical node_modules (475) in all three checkouts. MealPrep totals now Math.round recipe macros too (tester to judge).",
+      "notes": "work order ready; rulings: no barrel edit (import by path), Settings wording to #464, en-GB chip labels, listed test edits pre-authorised Round 1 dev: 136 suites / 1944 tests green; 63 feature tests fail at 33ee1b1. Incident: the developer removed a temporary red-phase worktree that held a junction to lane-a/node_modules and it deleted that node_modules; restored with npm ci; orchestrator verified no stray worktrees and identical node_modules (475) in all three checkouts. MealPrep totals now Math.round recipe macros too (tester to judge). Orchestrator accepted MealPrep rounding the whole day total (recipe part was unrounded): needed once entries with decimals join the pill sum; named in report section 6.",
       "commits": [
         "339a12d..33ee1b1 tests (9 commits, red phase)",
         "0ccf030..6bcdf82 feature (11 commits, incl. 2 test-query fixes ad5c134, ef94a1a)"
       ],
       "preFeatureSha": "33ee1b1",
-      "securityVerdict": "APPROVE round 1 (6bcdf82): all SQL bound; v40 append-only and idempotent; restore DELETE inside the txn, only when table live and key absent; writers re-validate and throw; sheet shows Alerts on failure; CSV label goes through guardFormula. Note: restore does not range-check food_log values (hand-edited backup) -> #464."
+      "securityVerdict": "APPROVE round 1 (6bcdf82): all SQL bound; v40 append-only and idempotent; restore DELETE inside the txn, only when table live and key absent; writers re-validate and throw; sheet shows Alerts on failure; CSV label goes through guardFormula. Note: restore does not range-check food_log values (hand-edited backup) -> #464.",
+      "testerVerdicts": [
+        "round 1 APPROVE: 63 decisive feature tests fail at 33ee1b1 on missing behaviour; 136/1944 green; ad5c134/ef94a1a only change element queries; local-day chips verified by reading; ruling 3 test edits exact"
+      ]
     },
     "450": {
       "lane": "D",
@@ -260,6 +267,14 @@
     {
       "at": "2026-11-14T14:23:52.829Z",
       "event": "#352 round 2 developer done; ruling 11 sent back before testing (same round)"
+    },
+    {
+      "at": "2026-11-14T14:25:37.538Z",
+      "event": "#447 tester APPROVE round 1 -> ready; lane A to cleanup"
+    },
+    {
+      "at": "2026-11-14T14:25:37.538Z",
+      "event": "#352 round 2 (tip 43abd32, 2362 tests) to tester (resumed, has probe corpus) and security re-check"
     }
   ]
 }
