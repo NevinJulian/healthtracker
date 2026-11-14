@@ -314,3 +314,137 @@ describe('parseMealIngredients', () => {
     expect(result[2].unit).toBe('g');
   });
 });
+
+// ─── Density, units and decimal commas ────────────────────────────────────────
+
+describe('parseMeasure — density', () => {
+  const TABLE: [string, number][] = [
+    ['flour', 125],
+    ['sugar', 200],
+    ['brown sugar', 210],
+    ['powdered sugar', 120],
+    ['icing sugar', 120],
+    ['rice', 185],
+    ['oats', 90],
+    ['cocoa powder', 85],
+    ['breadcrumbs', 110],
+  ];
+
+  it.each(TABLE)('%s: cup, tbsp and tsp use %d g per cup', (name, perCup) => {
+    const cup = parseMeasure(name, '1 cup');
+    expect(cup.baseQuantity).toBeCloseTo(perCup, 6);
+    expect(cup.unit).toBe('g');
+    expect(parseMeasure(name, '1 tbsp').baseQuantity).toBeCloseTo(perCup / 16, 6);
+    expect(parseMeasure(name, '1 tsp').baseQuantity).toBeCloseTo(perCup / 48, 6);
+  });
+
+  it.each([
+    ['Mehl', 125],
+    ['Zucker', 200],
+    ['brauner Zucker', 210],
+    ['Puderzucker', 120],
+    ['Reis', 185],
+    ['Haferflocken', 90],
+    ['Kakao', 85],
+    ['Paniermehl', 110],
+    ['Semmelbrösel', 110],
+  ])('German name %s uses %d g per cup', (name, perCup) => {
+    expect(parseMeasure(name, '1 cup').baseQuantity).toBeCloseTo(perCup, 6);
+  });
+
+  it.each([
+    ['plain flour', 125],
+    ['Weizenmehl', 125],
+    ['caster sugar', 200],
+    ['cornflour', 125],
+  ])('compound %s uses %d g per cup', (name, perCup) => {
+    expect(parseMeasure(name, '1 cup').baseQuantity).toBeCloseTo(perCup, 6);
+  });
+
+  it('lets the longest keyword win', () => {
+    expect(parseMeasure('brown sugar', '1 cup').baseQuantity).toBe(210);
+    expect(parseMeasure('Paniermehl', '1 cup').baseQuantity).toBe(110);
+    expect(parseMeasure('Puderzucker', '1 cup').baseQuantity).toBe(120);
+  });
+
+  it('keeps water density for non-matches', () => {
+    expect(parseMeasure('rice vinegar', '1 cup').baseQuantity).toBe(240);
+    expect(parseMeasure('butter lettuce', '1 cup').baseQuantity).toBe(240);
+  });
+
+  it('keeps water density for liquids and other ingredients', () => {
+    expect(parseMeasure('Milk', '1 cup').baseQuantity).toBe(240);
+    expect(parseMeasure('Honey', '1 tbsp').baseQuantity).toBe(15);
+    expect(parseMeasure('Olive Oil', '1 tsp').baseQuantity).toBe(5);
+  });
+
+  it('converts millilitres of a matched ingredient to grams', () => {
+    const r = parseMeasure('Flour', '100 ml');
+    expect(r.baseQuantity).toBeCloseTo(52.083, 3);
+    expect(r.unit).toBe('g');
+  });
+
+  it('leaves litres and kilograms alone', () => {
+    expect(parseMeasure('Flour', '1 l')).toMatchObject({ baseQuantity: 1000, unit: 'ml' });
+    expect(parseMeasure('Flour', '1 kg')).toMatchObject({ baseQuantity: 1000, unit: 'g' });
+  });
+
+  it('keeps the name as given', () => {
+    expect(parseMeasure('Flour, sifted', '1 cup').name).toBe('Flour, sifted');
+    expect(parseMeasure('Flour, sifted', '1 cup').baseQuantity).toBe(125);
+  });
+});
+
+describe('parseMeasure — fluid ounces', () => {
+  it('reads 2 floz as 59.14 ml', () => {
+    const r = parseMeasure('Milk', '2 floz');
+    expect(r.baseQuantity).toBeCloseTo(59.14, 2);
+    expect(r.unit).toBe('ml');
+  });
+
+  it('reads 2 fl oz of flour as grams', () => {
+    const r = parseMeasure('Flour', '2 fl oz');
+    expect(r.baseQuantity).toBeCloseTo(30.8, 2);
+    expect(r.unit).toBe('g');
+  });
+});
+
+describe('parseMeasure — decimal commas', () => {
+  it.each([
+    ['1,5 kg', 1500, 'g'],
+    ['1,000 g', 1000, 'g'],
+    ['1,5 EL', 22.5, 'g'],
+    ['0,25 l', 250, 'ml'],
+    ['0,125 l', 125, 'ml'],
+    ['12,500 g', 12500, 'g'],
+  ])('reads %s as %d %s', (measure, quantity, unit) => {
+    const r = parseMeasure('Beef', measure);
+    expect(r.baseQuantity).toBeCloseTo(quantity, 6);
+    expect(r.unit).toBe(unit);
+  });
+});
+
+describe('parseMeasure — pinch', () => {
+  it('reads a counted pinch as 0.5 g', () => {
+    expect(parseMeasure('Salt', '1 pinch')).toMatchObject({ baseQuantity: 0.5, unit: 'g', isVague: false });
+  });
+
+  it('reads pinches in the plural', () => {
+    expect(parseMeasure('Salt', '2 pinches')).toMatchObject({ baseQuantity: 1, unit: 'g', isVague: false });
+  });
+
+  it('keeps a pinch without a count vague', () => {
+    expect(parseMeasure('Salt', 'a pinch')).toMatchObject({ baseQuantity: 0, isVague: true });
+  });
+});
+
+describe('parseMeasure — EL and TL', () => {
+  it.each([
+    ['1 EL', 15],
+    ['1 el.', 15],
+    ['2 TL', 10],
+    ['1 tl', 5],
+  ])('reads %s as %d g', (measure, grams) => {
+    expect(parseMeasure('Butter', measure)).toMatchObject({ baseQuantity: grams, unit: 'g' });
+  });
+});

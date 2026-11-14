@@ -42,6 +42,13 @@ describe('parseRecipeHtml', () => {
       });
     });
 
+    it('weighs flour measured in cups at its own density', () => {
+      const recipe = { ...RECIPE, recipeIngredient: ['1 1/2 cups flour'] };
+      expect(draftOf(page(block(recipe))).ingredients).toEqual([
+        { name: 'flour', quantity: 187.5, unit: 'g' },
+      ]);
+    });
+
     it.each([
       ['uppercase tag and attribute', `<SCRIPT TYPE="APPLICATION/LD+JSON">`],
       ['single quotes', `<script type='application/ld+json'>`],
