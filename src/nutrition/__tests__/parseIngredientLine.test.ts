@@ -463,3 +463,12 @@ describe('sprint 6 round 1 probe lines', () => {
     expect(parseIngredientLine('2 t-bone steaks')).toEqual({ name: 't-bone steaks', quantity: 2, unit: 'whole' });
   });
 });
+
+describe('sprint 6 round 2 probe lines', () => {
+  it.each(['1 level, tsp salt', '1 heaped, tsp salt', '1 good heaped, level tbsp sugar'])(
+    'keeps %s as a name without a quantity (unit word after a comma)',
+    (line) => {
+      expectNameOnly(line);
+    },
+  );
+});
