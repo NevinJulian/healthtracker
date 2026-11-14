@@ -27,6 +27,7 @@
  */
 
 import { convertToGrams } from './units';
+import { gramsPerCup } from './ingredientDensity';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -154,10 +155,12 @@ function detectUnit(token: string): { unit: string; isLiquid: boolean } | null {
     case 'litre':
       return { unit: 'l', isLiquid: true };
     case 'tsp':
+    case 'tl':
     case 'teaspoon':
     case 't':
       return { unit: 'tsp', isLiquid: false };
     case 'tbsp':
+    case 'el':
     case 'tablespoon':
     case 'tb':
     case 'tbl':
@@ -172,7 +175,10 @@ function detectUnit(token: string): { unit: string; isLiquid: boolean } | null {
       return { unit: 'lb', isLiquid: false };
     case 'fl':
     case 'floz':
-      return { unit: 'ml', isLiquid: true }; // approx 30 ml per fl oz
+      return { unit: 'floz', isLiquid: true };
+    case 'pinch':
+    case 'pinche':
+      return { unit: 'pinch', isLiquid: false };
     case 'clove':
     case 'cloves':
     case 'head':
@@ -195,12 +201,15 @@ function detectUnit(token: string): { unit: string; isLiquid: boolean } | null {
 
 // ─── Unit conversion to grams / ml ───────────────────────────────────────────
 
+const ML_PER_FLUID_OUNCE = 29.57;
+
 /**
  * Extended unit-to-gram map covering units not in units.ts (kg, l, lb).
  */
 const EXTENDED_UNIT_TO_GRAMS: Record<string, number> = {
   g:    1,
   ml:   1,
+  floz: ML_PER_FLUID_OUNCE,
   kg:   1000,
   l:    1000,
   tsp:  5,
@@ -209,6 +218,14 @@ const EXTENDED_UNIT_TO_GRAMS: Record<string, number> = {
   oz:   28.35,
   lb:   453.592,
   pinch: 0.5,
+};
+
+const CUP_FRACTION: Record<string, number> = {
+  cup:  1,
+  tbsp: 1 / 16,
+  tsp:  1 / 48,
+  ml:   1 / 240,
+  floz: ML_PER_FLUID_OUNCE / 240,
 };
 
 function convertQuantity(
@@ -244,7 +261,10 @@ export function parseMeasure(ingredient: string, measure: string): ParsedIngredi
       return { name: cleanName, baseQuantity: 0, unit: 'g', isVague: true };
     }
 
-    const m = measure.trim();
+    const m = measure
+      .trim()
+      .replace(/\b[1-9]\d{0,2}(?:,\d{3})+(?!\d)/g, (thousands) => thousands.replace(/,/g, ''))
+      .replace(/(\d),(\d)/g, '$1.$2');
 
     // ── Attempt to split the measure into (quantity) + (unit) ──────────────
 
@@ -321,6 +341,12 @@ export function parseMeasure(ingredient: string, measure: string): ParsedIngredi
 
     if (detectedUnit.unit === 'whole') {
       return { name: cleanName, baseQuantity: quantity, unit: 'whole', isVague: false };
+    }
+
+    const cupFraction = CUP_FRACTION[detectedUnit.unit];
+    const perCup = cupFraction === undefined ? undefined : gramsPerCup(cleanName);
+    if (cupFraction !== undefined && perCup !== undefined) {
+      return { name: cleanName, baseQuantity: quantity * cupFraction * perCup, unit: 'g', isVague: false };
     }
 
     // Weight / volume unit detected — convert to grams or ml

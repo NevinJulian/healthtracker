@@ -54,7 +54,7 @@ describe('RecipeEditorScreen overlapping macro recomputes', () => {
     jest.useRealTimers();
   });
 
-  it('tells the user about an ingredient whose run was superseded during the save, and goes back after OK', async () => {
+  it('ignores an edit made during the save, saves the run it started with, and goes back when it finishes', async () => {
     const resolvers: Array<(v: typeof NUTRITION) => void> = [];
     mockLookup.mockImplementation(
       () => new Promise((resolve) => resolvers.push(resolve)),
@@ -77,7 +77,9 @@ describe('RecipeEditorScreen overlapping macro recomputes', () => {
     await act(async () => {
       await jest.advanceTimersByTimeAsync(700);
     });
-    expect(mockLookup).toHaveBeenCalledTimes(2);
+    expect(utils.getByDisplayValue('100')).toBeTruthy();
+    expect(utils.queryByDisplayValue('300')).toBeNull();
+    expect(mockLookup).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       resolvers[0](NUTRITION);
@@ -85,16 +87,11 @@ describe('RecipeEditorScreen overlapping macro recomputes', () => {
     });
 
     expect(mockUpdateRecipe).toHaveBeenCalledTimes(1);
-    expect(alertSpy).toHaveBeenCalledTimes(1);
-    expect(alertSpy.mock.calls[0][0]).toBe('Saved');
-    expect(alertSpy.mock.calls[0][1]).toBe(
-      "1 ingredient couldn't be looked up and counts as 0. Open and save the recipe again later to look it up.",
-    );
-    expect(mockGoBack).not.toHaveBeenCalled();
-
-    await act(async () => {
-      alertSpy.mock.calls[0][2]![0].onPress!();
-    });
+    const saved = mockUpdateRecipe.mock.calls[0][0];
+    expect(saved.ingredients).toEqual([{ name: 'zzz unknown one', baseQuantity: 100, unit: 'g' }]);
+    expect(saved.protein).toBe(5);
+    expect(saved.calories).toBe(20);
+    expect(alertSpy).not.toHaveBeenCalled();
     expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
 

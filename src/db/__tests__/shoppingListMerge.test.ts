@@ -204,3 +204,81 @@ describe('shopping list merge edge cases', () => {
     expect(first?.total_quantity).toBe(100);
   });
 });
+
+describe('shopping list name-only lines', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('adds one name-only line and ignores further name-only adds, whatever the unit', async () => {
+    const db = await freshDb();
+    await db.addShoppingListItem('Salt', 0, 'g');
+    await db.addShoppingListItem('Salt', 0, 'g');
+    await db.addShoppingListItem('Salt', 0, 'pinch');
+
+    const rows = await db.getShoppingListItems();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].total_quantity).toBe(0);
+  });
+
+  it('adds nothing when a name-only item meets an open line with an amount in another unit', async () => {
+    const db = await freshDb();
+    await db.addShoppingListItem('Salt', 5, 'g');
+    await db.addShoppingListItem('Salt', 0, 'pinch');
+
+    const rows = await db.getShoppingListItems();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].total_quantity).toBe(5);
+    expect(rows[0].unit).toBe('g');
+  });
+
+  it('gives an open name-only line the amount and unit of an item that has an amount', async () => {
+    const db = await freshDb();
+    await db.addShoppingListItem('Salt', 0, 'pinch');
+    await db.addShoppingListItem('Salt', 200, 'g');
+
+    const rows = await db.getShoppingListItems();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].total_quantity).toBe(200);
+    expect(rows[0].unit).toBe('g');
+  });
+
+  it('takes an amount in any unit onto an open name-only line', async () => {
+    const db = await freshDb();
+    await db.addShoppingListItem('Salt', 0, 'g');
+    await db.addShoppingListItem('Salt', 3, 'pinch');
+
+    const rows = await db.getShoppingListItems();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].total_quantity).toBe(3);
+    expect(rows[0].unit).toBe('pinch');
+  });
+
+  it('adds a new name-only line beside a checked line and leaves the checked line alone', async () => {
+    const db = await freshDb();
+    await db.addShoppingListItem('Salt', 0, 'g');
+    const [first] = await db.getShoppingListItems();
+    await db.toggleShoppingListItem(first.id, true);
+    await db.addShoppingListItem('Salt', 0, 'g');
+
+    const rows = await db.getShoppingListItems();
+    expect(rows).toHaveLength(2);
+    expect(rows.filter((r) => r.is_checked)).toHaveLength(1);
+    expect(rows.find((r) => r.id === first.id)?.total_quantity).toBe(0);
+  });
+
+  it('adds a new line for an amount beside a checked name-only line', async () => {
+    const db = await freshDb();
+    await db.addShoppingListItem('Salt', 0, 'g');
+    const [first] = await db.getShoppingListItems();
+    await db.toggleShoppingListItem(first.id, true);
+    await db.addShoppingListItem('Salt', 100, 'g');
+
+    const rows = await db.getShoppingListItems();
+    expect(rows).toHaveLength(2);
+    const checked = rows.find((r) => r.id === first.id);
+    expect(checked?.is_checked).toBe(true);
+    expect(checked?.total_quantity).toBe(0);
+    expect(rows.find((r) => !r.is_checked)?.total_quantity).toBe(100);
+  });
+});

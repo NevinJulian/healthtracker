@@ -39,6 +39,7 @@ import {
 } from '../db/database';
 import { computeRecipeMacros, ComputeIngredient } from '../nutrition/computeMacros';
 import { lookupNutrition, OFFNutrition } from '../api/openfoodfacts';
+import type { RecipeDraft } from '../api/recipeHtml';
 import { normaliseIngredientName } from '../nutrition/units';
 import { NUTRITION_TABLE } from '../nutrition/nutritionTable';
 import { Card, Button, ScreenHeader } from '../components';
@@ -101,6 +102,39 @@ function withQuantity(ingredients: RecipeIngredient[]): RecipeIngredient[] {
   return ingredients.filter((i) => i.baseQuantity > 0);
 }
 
+function draftRows(draft: RecipeDraft): IngredientRow[] {
+  const rows = draft.ingredients.map((ing) => ({
+    key: newKey(),
+    name: ing.name,
+    quantity: ing.quantity > 0 ? String(ing.quantity) : '',
+    unit: ing.unit,
+  }));
+  return rows.length > 0 ? rows : [{ key: newKey(), name: '', quantity: '', unit: 'g' }];
+}
+
+function readDraft(params: unknown): RecipeDraft | null {
+  if (typeof params !== 'object' || params === null) return null;
+  const { recipeId, draft } = params as { recipeId?: unknown; draft?: unknown };
+  if (recipeId || typeof draft !== 'object' || draft === null) return null;
+  const d = draft as Partial<RecipeDraft>;
+  if (typeof d.title !== 'string' || typeof d.instructions !== 'string') return null;
+  if (!Array.isArray(d.ingredients)) return null;
+  return {
+    title: d.title,
+    servings: typeof d.servings === 'number' ? d.servings : null,
+    prepMinutes: typeof d.prepMinutes === 'number' ? d.prepMinutes : null,
+    instructions: d.instructions,
+    ingredients: d.ingredients.filter(
+      (i): i is RecipeDraft['ingredients'][number] =>
+        typeof i === 'object' &&
+        i !== null &&
+        typeof i.name === 'string' &&
+        typeof i.quantity === 'number' &&
+        typeof i.unit === 'string',
+    ),
+  };
+}
+
 function ingredientsToRows(ingredients: RecipeIngredient[]): IngredientRow[] {
   return ingredients.map((ing) => ({
     key: newKey(),
@@ -121,18 +155,23 @@ export default function RecipeEditorScreen() {
   const navigation = useNavigation<any>();
   const { recipeId } = route.params ?? {};
   const isEdit = Boolean(recipeId);
+  const [draft] = useState(() => readDraft(route.params));
 
   // ── Form state ────────────────────────────────────────────────────────────
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(draft?.title ?? '');
   const [category, setCategory] = useState('Fresh & Fridge');
   const [customCategory, setCustomCategory] = useState('');
   const [showCustomCategory, setShowCustomCategory] = useState(false);
-  const [servings, setServings] = useState(DEFAULT_SERVINGS);
-  const [prepTime, setPrepTime] = useState(DEFAULT_PREP);
-  const [ingredients, setIngredients] = useState<IngredientRow[]>([
-    { key: newKey(), name: '', quantity: '', unit: 'g' },
-  ]);
-  const [instructions, setInstructions] = useState('');
+  const [servings, setServings] = useState(
+    draft?.servings != null ? String(draft.servings) : DEFAULT_SERVINGS,
+  );
+  const [prepTime, setPrepTime] = useState(
+    draft?.prepMinutes != null ? String(draft.prepMinutes) : DEFAULT_PREP,
+  );
+  const [ingredients, setIngredients] = useState<IngredientRow[]>(() =>
+    draft ? draftRows(draft) : [{ key: newKey(), name: '', quantity: '', unit: 'g' }],
+  );
+  const [instructions, setInstructions] = useState(draft?.instructions ?? '');
   const [freezerTips, setFreezerTips] = useState('');
 
   // ── Category picker state ─────────────────────────────────────────────────
@@ -149,6 +188,7 @@ export default function RecipeEditorScreen() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
+  const locked = saving || closing;
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const recomputeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -331,16 +371,19 @@ export default function RecipeEditorScreen() {
   // ── Ingredient list mutations ─────────────────────────────────────────────
 
   const updateIngredient = (key: string, field: keyof IngredientRow, value: string) => {
+    if (locked) return;
     setIngredients((prev) =>
       prev.map((row) => (row.key === key ? { ...row, [field]: value } : row)),
     );
   };
 
   const addIngredient = () => {
+    if (locked) return;
     setIngredients((prev) => [...prev, { key: newKey(), name: '', quantity: '', unit: 'g' }]);
   };
 
   const removeIngredient = (key: string) => {
+    if (locked) return;
     setIngredients((prev) => {
       const next = prev.filter((r) => r.key !== key);
       return next.length > 0 ? next : [{ key: newKey(), name: '', quantity: '', unit: 'g' }];
@@ -508,6 +551,7 @@ export default function RecipeEditorScreen() {
               placeholderTextColor={Colors.textMuted}
               value={title}
               onChangeText={setTitle}
+              editable={!locked}
               returnKeyType="next"
               maxLength={120}
             />
@@ -521,6 +565,7 @@ export default function RecipeEditorScreen() {
             <TouchableOpacity
               style={styles.pickerRow}
               onPress={() => setShowCategoryPicker((v) => !v)}
+              disabled={locked}
               activeOpacity={0.75}
               accessibilityRole="button"
               accessibilityLabel={`Category: ${showCustomCategory ? (customCategory.trim() || 'Custom category') : category}. Tap to change`}
@@ -552,6 +597,7 @@ export default function RecipeEditorScreen() {
                       setShowCategoryPicker(false);
                     }}
                     activeOpacity={0.75}
+                    disabled={locked}
                   >
                     <Text
                       style={[
@@ -574,6 +620,7 @@ export default function RecipeEditorScreen() {
                     setShowCategoryPicker(false);
                   }}
                   activeOpacity={0.75}
+                  disabled={locked}
                 >
                   <Text
                     style={[
@@ -594,6 +641,7 @@ export default function RecipeEditorScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={customCategory}
                 onChangeText={setCustomCategory}
+                editable={!locked}
                 returnKeyType="done"
                 maxLength={60}
               />
@@ -613,6 +661,7 @@ export default function RecipeEditorScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={servings}
                 onChangeText={setServings}
+                editable={!locked}
                 keyboardType="numeric"
                 returnKeyType="next"
                 maxLength={3}
@@ -626,6 +675,7 @@ export default function RecipeEditorScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={prepTime}
                 onChangeText={setPrepTime}
+                editable={!locked}
                 keyboardType="numeric"
                 returnKeyType="next"
                 maxLength={4}
@@ -648,6 +698,7 @@ export default function RecipeEditorScreen() {
                   onCycleUnit={() => cycleUnit(row.key, row.unit)}
                   onRemove={() => removeIngredient(row.key)}
                   showRemove={ingredients.length > 1}
+                  disabled={locked}
                 />
               </View>
             ))}
@@ -655,6 +706,7 @@ export default function RecipeEditorScreen() {
             <TouchableOpacity
               style={styles.addIngredientBtn}
               onPress={addIngredient}
+              disabled={locked}
               activeOpacity={0.75}
               accessibilityRole="button"
               accessibilityLabel="Add ingredient"
@@ -707,7 +759,10 @@ export default function RecipeEditorScreen() {
             )}
             <TouchableOpacity
               style={styles.recomputeBtn}
-              onPress={recomputeMacros}
+              onPress={() => {
+                if (!locked) recomputeMacros();
+              }}
+              disabled={locked}
               activeOpacity={0.75}
               accessibilityRole="button"
               accessibilityLabel="Recompute macros"
@@ -728,6 +783,7 @@ export default function RecipeEditorScreen() {
               placeholderTextColor={Colors.textMuted}
               value={instructions}
               onChangeText={setInstructions}
+              editable={!locked}
               multiline
               textAlignVertical="top"
               returnKeyType="default"
@@ -745,6 +801,7 @@ export default function RecipeEditorScreen() {
               placeholderTextColor={Colors.textMuted}
               value={freezerTips}
               onChangeText={setFreezerTips}
+              editable={!locked}
               multiline
               textAlignVertical="top"
               returnKeyType="default"
@@ -758,13 +815,13 @@ export default function RecipeEditorScreen() {
             title={saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Recipe'}
             variant="primary"
             onPress={handleSave}
-            disabled={saving || closing}
+            disabled={locked}
           />
           <Button
             title="Cancel"
             variant="ghost"
             onPress={() => navigation.goBack()}
-            disabled={saving || closing}
+            disabled={locked}
           />
         </View>
 
@@ -783,6 +840,7 @@ interface IngredientEditorRowProps {
   onCycleUnit: () => void;
   onRemove: () => void;
   showRemove: boolean;
+  disabled: boolean;
 }
 
 function IngredientEditorRow({
@@ -792,6 +850,7 @@ function IngredientEditorRow({
   onCycleUnit,
   onRemove,
   showRemove,
+  disabled,
 }: IngredientEditorRowProps) {
   return (
     <View style={styles.ingredientRow}>
@@ -802,6 +861,7 @@ function IngredientEditorRow({
         placeholderTextColor={Colors.textMuted}
         value={row.name}
         onChangeText={onChangeName}
+        editable={!disabled}
         returnKeyType="next"
       />
       {/* Quantity */}
@@ -811,6 +871,7 @@ function IngredientEditorRow({
         placeholderTextColor={Colors.textMuted}
         value={row.quantity}
         onChangeText={onChangeQuantity}
+        editable={!disabled}
         keyboardType="decimal-pad"
         returnKeyType="next"
       />
@@ -818,6 +879,7 @@ function IngredientEditorRow({
       <TouchableOpacity
         style={styles.unitChip}
         onPress={onCycleUnit}
+        disabled={disabled}
         activeOpacity={0.75}
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         accessibilityRole="button"
@@ -829,6 +891,7 @@ function IngredientEditorRow({
       {showRemove && (
         <TouchableOpacity
           onPress={onRemove}
+          disabled={disabled}
           activeOpacity={0.75}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"

@@ -359,4 +359,138 @@ describe('RecipeEditorScreen save deadline', () => {
       expect(mockGoBack).not.toHaveBeenCalled();
     });
   });
+  describe('editor is read-only while a save is pending', () => {
+    const resolved = { kcal: 10, protein: 3, carbs: 0, fat: 0 };
+    const hangSecond = () => {
+      mockLookup.mockImplementation((name: string) =>
+        name === 'zzz hanging' ? new Promise(() => {}) : Promise.resolve(resolved),
+      );
+    };
+
+    it('starts no new run when Recompute is pressed during the save and saves the first run', async () => {
+      hangSecond();
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
+      expect(mockLookup).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Create Recipe'));
+        await jest.advanceTimersByTimeAsync(1000);
+      });
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Recompute macros'));
+        await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
+      });
+
+      expect(mockLookup).toHaveBeenCalledTimes(2);
+      const expected = computeRecipeMacros(
+        [
+          { name: 'zzz fine', baseQuantity: 100, unit: 'g' },
+          { name: 'zzz hanging', baseQuantity: 100, unit: 'g' },
+        ],
+        4,
+        { 'zzz fine': resolved },
+      ).macros;
+      expect(expected.calories).toBeGreaterThan(0);
+      expect(mockCreateRecipe).toHaveBeenCalledTimes(1);
+      expect(mockCreateRecipe.mock.calls[0][0]).toMatchObject({
+        calories: expected.calories,
+        protein: expected.protein,
+      });
+    });
+
+    it('ignores typing during the save', async () => {
+      hangSecond();
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
+
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Create Recipe'));
+        await jest.advanceTimersByTimeAsync(100);
+      });
+      await act(async () => {
+        const [nameA] = utils.getAllByPlaceholderText('Ingredient name');
+        const [qtyA] = utils.getAllByPlaceholderText('Qty');
+        fireEvent.changeText(nameA, 'zzz changed');
+        fireEvent.changeText(qtyA, '999');
+        fireEvent.changeText(utils.getByPlaceholderText('Recipe name'), 'Other title');
+        await jest.advanceTimersByTimeAsync(700);
+      });
+
+      expect(utils.getAllByPlaceholderText('Ingredient name')[0].props.value).toBe('zzz fine');
+      expect(utils.getAllByPlaceholderText('Qty')[0].props.value).toBe('100');
+      expect(utils.queryByDisplayValue('Mystery stew')).toBeTruthy();
+      expect(utils.queryByDisplayValue('Other title')).toBeNull();
+      expect(mockLookup).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
+      });
+      expect(mockCreateRecipe).toHaveBeenCalledTimes(1);
+      const saved = mockCreateRecipe.mock.calls[0][0];
+      expect(saved.title).toBe('Mystery stew');
+      expect(saved.ingredients.map((i: { name: string }) => i.name)).toEqual([
+        'zzz fine',
+        'zzz hanging',
+      ]);
+    });
+
+    it('disables the controls during the save, keeps them disabled under the Saved Alert and releases on answer', async () => {
+      hangSecond();
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
+
+      const disabledState = () => ({
+        recompute: utils.getByLabelText('Recompute macros').props.accessibilityState?.disabled,
+        add: utils.getByLabelText('Add ingredient').props.accessibilityState?.disabled,
+        unit: utils.getAllByLabelText(/Change unit/)[0].props.accessibilityState?.disabled,
+        remove: utils.getAllByLabelText(/Remove ingredient/)[0].props.accessibilityState?.disabled,
+        category: utils.getByLabelText(/^Category:/).props.accessibilityState?.disabled,
+        title: utils.getByPlaceholderText('Recipe name').props.editable,
+      });
+
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Create Recipe'));
+        await jest.advanceTimersByTimeAsync(100);
+      });
+      expect(disabledState()).toEqual({
+        recompute: true,
+        add: true,
+        unit: true,
+        remove: true,
+        category: true,
+        title: false,
+      });
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
+      });
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(disabledState().recompute).toBe(true);
+      expect(disabledState().title).toBe(false);
+
+      await act(async () => {
+        alertSpy.mock.calls[0][2]![0].onPress!();
+      });
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+      expect(disabledState().recompute).toBeFalsy();
+      expect(disabledState().title).toBe(true);
+    });
+
+    it('enables the controls again when the save fails', async () => {
+      hangSecond();
+      mockCreateRecipe.mockRejectedValueOnce(new Error('disk full'));
+      const utils = render(<RecipeEditorScreen />);
+      await fillIngredients(utils, ['zzz fine', 'zzz hanging']);
+
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Create Recipe'));
+        await jest.advanceTimersByTimeAsync(SAVE_DEADLINE_MS);
+      });
+
+      expect(alertSpy.mock.calls[0][0]).toBe('Error');
+      expect(utils.getByLabelText('Recompute macros').props.accessibilityState?.disabled).toBeFalsy();
+      expect(utils.getByPlaceholderText('Recipe name').props.editable).toBe(true);
+    });
+  });
 });

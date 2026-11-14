@@ -220,12 +220,14 @@ export default function RecipeDetailScreen() {
                 <Row
                   title={ing.name}
                   trailing={
-                    <Text style={styles.qtyText}>
-                      {getCalculatedQuantity(ing.baseQuantity)
-                        .toFixed(1)
-                        .replace(/\.0$/, '')}{' '}
-                      {ing.unit}
-                    </Text>
+                    ing.baseQuantity === 0 ? undefined : (
+                      <Text style={styles.qtyText}>
+                        {getCalculatedQuantity(ing.baseQuantity)
+                          .toFixed(1)
+                          .replace(/\.0$/, '')}{' '}
+                        {ing.unit}
+                      </Text>
+                    )
                   }
                   style={styles.ingredientRow}
                 />
