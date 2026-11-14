@@ -46,6 +46,9 @@ const expoGoStub = {
     request.identifier ?? 'expo-go-stub',
   cancelScheduledNotificationAsync: async (): Promise<void> => undefined,
   cancelAllScheduledNotificationsAsync: async (): Promise<void> => undefined,
+  addNotificationResponseReceivedListener: () => ({ remove: (): void => undefined }),
+  getLastNotificationResponse: (): null => null,
+  clearLastNotificationResponse: (): void => undefined,
   AndroidImportance: { DEFAULT: 5 },
   SchedulableTriggerInputTypes: {
     CALENDAR: 'calendar',
