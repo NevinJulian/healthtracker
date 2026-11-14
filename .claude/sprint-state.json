@@ -47,7 +47,8 @@
     "State is committed on sprint/auto-fixes after every transition. The branch is pushed at lane-level events, not per state commit, because every push starts a CI run.",
     "Lane D's branch starts from sprint/auto-fixes with sprint/lane-d-recipes (a355753) merged in, per #352's sprint 6 decision. Lanes B and C wait for lane A's merge.",
     "#447: src/components/index.ts belongs to no lane, so QuickAddSheet is imported by path. SettingsScreen \"three spreadsheet files\" wording (stale after #447) is a wording finding: filed in #464, not worked.",
-    "#352: gr/gr. are grams only when quantity >= 10 (below stays name only, \"1 gr. Zwiebel\" = große), per decision item 2 bar. The slash second-measure rule applies to mass units only (decision item 4 says a weight)."
+    "#352: gr/gr. are grams only when quantity >= 10 (below stays name only, \"1 gr. Zwiebel\" = große), per decision item 2 bar. The slash second-measure rule applies to mass units only (decision item 4 says a weight).",
+    "Pushed lane history is not rewritten (a force-push request was denied by the auto-mode permission classifier). From now on developer briefs say: split commits before the first push. #352 ea8e626 stays one commit for four parser rules in one function; accepted, named in the report."
   ],
   "lanes": {
     "A": {
@@ -121,12 +122,16 @@
     },
     "352": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
       "security": "required (fetches arbitrary web pages)",
       "workOrder": "C:/git/ht-lanes/wo/352.md",
       "deviceCheck": "sprint 5 item 9 + sprint 6 item 8",
-      "notes": "work order ready. Rulings: gr = grams only at >=10; slash rule mass units only; dedupe schuss/meter in UNSURE_WORDS."
+      "notes": "work order ready. Rulings: gr = grams only at >=10; slash rule mass units only; dedupe schuss/meter in UNSURE_WORDS. Round 1 dev: 29 red rows fail at 5ba8738, pass at ea8e626; 136 suites / 2326 tests. Fix is ONE commit for four rules: asking the developer to split it via history rewrite + force-push was denied by the auto-mode classifier, so it stays one commit (accepted by orchestrator, flagged for report section 6).",
+      "commits": [
+        "5ba8738 test",
+        "ea8e626 fix"
+      ]
     },
     "447": {
       "lane": "A",
@@ -217,6 +222,10 @@
     {
       "at": "2026-11-14T14:12:33.197Z",
       "event": "#352 work order saved; developer dispatched (round 1); #464 gained the invariants-test finding"
+    },
+    {
+      "at": "2026-11-14T14:15:34.714Z",
+      "event": "#352 round 1 developer done (5ba8738 test, ea8e626 fix); tester + security dispatched in parallel"
     }
   ]
 }
