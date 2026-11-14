@@ -201,11 +201,11 @@ function detectUnit(token: string): { unit: string; isLiquid: boolean } | null {
 
 // ─── Unit conversion to grams / ml ───────────────────────────────────────────
 
+const ML_PER_FLUID_OUNCE = 29.57;
+
 /**
  * Extended unit-to-gram map covering units not in units.ts (kg, l, lb).
  */
-const ML_PER_FLUID_OUNCE = 29.57;
-
 const EXTENDED_UNIT_TO_GRAMS: Record<string, number> = {
   g:    1,
   ml:   1,

@@ -322,7 +322,7 @@ describe('sprint 5 probe lines', () => {
     '1 tsp each salt and pepper',
     '1 TL je Salz und Pfeffer',
     '1 EL je',
-  ])('round 3: keeps %s as a name without a quantity', (line) => {
+  ])('keeps %s as a name without a quantity', (line) => {
     expectNameOnly(line);
   });
 

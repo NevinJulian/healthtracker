@@ -43,7 +43,6 @@ const NUMBER_CHARACTER = new RegExp(String.raw`[\d${FRACTIONS}]`);
 const SECOND_MEASURE = /^\s*\/\s*\d{1,6}(?:[.,]\d{1,3})?\s*([A-Za-zÄÖÜäöüß]{1,15})\.?(?![A-Za-zÄÖÜäöüß])/;
 const TRAILING_NUMBER = /\s(\d{1,4})$/;
 const LAST_WORD = /([A-Za-zÄÖÜäöüß]+)$/;
-const FILLER_BETWEEN_WORDS = /^[\s.,]+/;
 const WHITESPACE = /\s+/;
 const EDGE_PUNCTUATION = /^[^A-Za-zÄÖÜäöüß]+|[^A-Za-zÄÖÜäöüß]+$/g;
 const ABBREVIATION = /^[(\[]?[A-Za-zÄÖÜäöüß]+\.[)\]]?$/;
