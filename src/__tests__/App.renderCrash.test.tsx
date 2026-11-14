@@ -32,6 +32,8 @@ jest.mock('../services/notifications', () => ({
   configureNotificationHandler: jest.fn(),
   ensureAndroidChannel: jest.fn(() => Promise.resolve()),
   reconcileScheduledNotifications: jest.fn(() => Promise.resolve()),
+  subscribeToWeeklyReviewTaps: jest.fn(() => jest.fn()),
+  takeLaunchWeeklyReviewTap: jest.fn(() => false),
 }));
 
 const mockNavigator = { crash: true, mounts: 0 };

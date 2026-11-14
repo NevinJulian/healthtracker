@@ -22,6 +22,7 @@ import {
 import { initDatabase, getOnboardingComplete, getLatestBodyWeight } from './src/db/database';
 import { installStress369 } from './src/db/devStress369';
 import AppNavigator from './src/navigation/AppNavigator';
+import { navigationRef } from './src/navigation/navigationRef';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import RecoveryScreen, { formatErrorDetail } from './src/components/RecoveryScreen';
@@ -32,7 +33,30 @@ import {
   configureNotificationHandler,
   ensureAndroidChannel,
   reconcileScheduledNotifications,
+  subscribeToWeeklyReviewTaps,
+  takeLaunchWeeklyReviewTap,
 } from './src/services/notifications';
+
+const WEEKLY_REVIEW_ROUTE = 'Weekly review';
+
+interface TapState {
+  /** The navigator has reported ready and is still mounted. */
+  ready: boolean;
+  /** The navigator is mounted. */
+  mounted: boolean;
+  /** A tap that arrived before the navigator was ready. */
+  held: boolean;
+  /** A tap may still be held. Closed for good by a startup failure, onboarding or a crashed navigator. */
+  open: boolean;
+}
+
+function NavigatorLifecycle({ onMount, onUnmount }: { onMount: () => void; onUnmount: () => void }) {
+  useEffect(() => {
+    onMount();
+    return onUnmount;
+  }, [onMount, onUnmount]);
+  return null;
+}
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -50,6 +74,48 @@ export default function App() {
 
   const initInFlight = useRef<Promise<void> | null>(null);
 
+  const tapState = useRef<TapState>({ ready: false, mounted: false, held: false, open: true });
+  const launchTapRead = useRef(false);
+
+  const closeTaps = useCallback(() => {
+    tapState.current.open = false;
+    tapState.current.held = false;
+  }, []);
+
+  const openWeeklyReview = useCallback(() => {
+    const taps = tapState.current;
+    if (taps.ready) {
+      navigationRef.navigate(WEEKLY_REVIEW_ROUTE);
+    } else if (taps.open) {
+      taps.held = true;
+    }
+  }, []);
+
+  const handleNavigatorReady = useCallback(() => {
+    const taps = tapState.current;
+    taps.ready = true;
+    if (taps.held) {
+      taps.held = false;
+      navigationRef.navigate(WEEKLY_REVIEW_ROUTE);
+    }
+  }, []);
+
+  const handleNavigatorMount = useCallback(() => {
+    tapState.current.mounted = true;
+  }, []);
+
+  const handleNavigatorUnmount = useCallback(() => {
+    tapState.current.mounted = false;
+    tapState.current.ready = false;
+    closeTaps();
+  }, [closeTaps]);
+
+  const readLaunchTap = useCallback((): boolean => {
+    if (launchTapRead.current) return false;
+    launchTapRead.current = true;
+    return takeLaunchWeeklyReviewTap();
+  }, []);
+
   const runInit = useCallback((): Promise<void> => {
     if (initInFlight.current) return initInFlight.current;
     const attempt = (async () => {
@@ -63,10 +129,18 @@ export default function App() {
           getOnboardingComplete(),
           getLatestBodyWeight(),
         ]);
+        const launchTap = readLaunchTap();
+        if (!onboardingComplete) {
+          closeTaps();
+        } else if (launchTap) {
+          openWeeklyReview();
+        }
         setLatestWeight(weight);
         setOnboardingDone(onboardingComplete);
         setDbReady(true);
       } catch (err: any) {
+        readLaunchTap();
+        closeTaps();
         console.error('[App] DB init failed:', err);
         const detail = formatErrorDetail(err);
         setError(detail || 'Unknown error during database initialisation');
@@ -76,7 +150,7 @@ export default function App() {
     });
     initInFlight.current = attempt;
     return attempt;
-  }, []);
+  }, [closeTaps, openWeeklyReview, readLaunchTap]);
 
   useEffect(() => {
     configureNotificationHandler();
@@ -84,8 +158,15 @@ export default function App() {
     runInit();
   }, [runInit]);
 
+  useEffect(() => subscribeToWeeklyReviewTaps(openWeeklyReview), [openWeeklyReview]);
+
   const showFailure = Boolean(error || fontError);
   const started = dbReady && fontsLoaded && !showFailure;
+  const navigatorShown = started && onboardingDone !== false;
+
+  useEffect(() => {
+    if (navigatorShown && !tapState.current.mounted) closeTaps();
+  }, [navigatorShown, closeTaps]);
 
   useEffect(() => {
     if (!started) return;
@@ -147,6 +228,8 @@ export default function App() {
       <StatusBar barStyle="light-content" />
       <AppErrorBoundary>
         <NavigationContainer
+          ref={navigationRef}
+          onReady={handleNavigatorReady}
           theme={{
             dark: true,
             colors: {
@@ -165,6 +248,7 @@ export default function App() {
             },
           }}
         >
+          <NavigatorLifecycle onMount={handleNavigatorMount} onUnmount={handleNavigatorUnmount} />
           <AppNavigator />
         </NavigationContainer>
       </AppErrorBoundary>

@@ -68,6 +68,7 @@ describe('automatic backup round trip', () => {
     const files = new Map<string, string>();
     const { db, backup } = loadFreshModules(files);
     await db.initDatabase();
+    await db.setWeeklyReviewEnabled(false);
 
     await db.setSetting('autoBackupKey', 'before');
     await db.logWorkoutSet('2024-03-01', 'Bench Press', { reps: 8, weightKg: 60 });
@@ -96,5 +97,28 @@ describe('automatic backup round trip', () => {
       });
     }
     expect(files.has(entry.uri)).toBe(true);
+  });
+
+  it('schedules the weekly review after a restore, recording only its notification id', async () => {
+    const files = new Map<string, string>();
+    const { db, backup } = loadFreshModules(files);
+    await db.initDatabase();
+    const before = await backup.buildBackupPayload();
+    await backup.runAutoBackupIfDue(new Date('2026-10-08T14:03:00Z'));
+    const [entry] = await backup.listAutoBackups();
+    const notifications = require('expo-notifications') as typeof import('expo-notifications');
+    jest.mocked(notifications.scheduleNotificationAsync).mockClear();
+
+    await backup.restoreBackupFromUri(entry.uri);
+
+    expect(notifications.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ identifier: 'weekly-review' })
+    );
+    const after = await backup.buildBackupPayload();
+    const idRow = after.tables.app_state.filter((row) => row.key === 'weeklyReviewNotificationId');
+    expect(idRow).toHaveLength(1);
+    expect(canonical(after.tables.app_state)).toEqual(
+      [...canonical(before.tables.app_state), ...idRow.map((row) => JSON.stringify(row))].sort()
+    );
   });
 });

@@ -12,6 +12,7 @@ Each file typically corresponds to a specific route in the React Navigation setu
 - `DashboardScreen.tsx` (Today) - The primary entry point showing today's tasks, the weight log, and bonus workouts.
 - `OverviewScreen.tsx` (Schedule) - Displays the 7-day rolling window schedule with completion states.
 - `AnalyticsDashboardScreen.tsx` (Analytics) - Provides 7-day and 30-day view charts, analyzing completion rates and weight trends.
+- `WeeklyReviewScreen.tsx` (Weekly review) - Compares the last 7 days with the 7 before: training, lifting, new bests, nutrition and weight rate. The aggregation lives in `weeklyReviewHelpers.ts`.
 - `MealPrepScreen.tsx` (Meal Prep) - Weekly meal planner and inventory view.
 - `RecipesScreen.tsx`, `RecipeDetailScreen.tsx` & `RecipeEditorScreen.tsx` (Recipes) - The recipe library browsing, detail-viewing and create/edit interface.
 - `DiscoverScreen.tsx` & `DiscoverDetailScreen.tsx` (Discover) - Search and view recipes from the external, keyless TheMealDB source.

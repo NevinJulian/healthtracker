@@ -32,6 +32,12 @@ jest.mock('../../db/database', () => ({
   setBackupReminderDay: jest.fn(),
   getBackupReminderTime: jest.fn(),
   setBackupReminderTime: jest.fn(),
+  getWeeklyReviewEnabled: jest.fn(),
+  setWeeklyReviewEnabled: jest.fn(),
+  getWeeklyReviewDay: jest.fn(),
+  setWeeklyReviewDay: jest.fn(),
+  getWeeklyReviewTime: jest.fn(),
+  setWeeklyReviewTime: jest.fn(),
   getNutritionGoals: jest.fn(),
   setNutritionGoalCalories: jest.fn(),
   setNutritionGoalProtein: jest.fn(),
@@ -175,6 +181,12 @@ beforeEach(() => {
   resetMock(db.setBackupReminderDay, undefined);
   resetMock(db.getBackupReminderTime, '18:00');
   resetMock(db.setBackupReminderTime, undefined);
+  resetMock(db.getWeeklyReviewEnabled, false);
+  resetMock(db.setWeeklyReviewEnabled, undefined);
+  resetMock(db.getWeeklyReviewDay, 0);
+  resetMock(db.setWeeklyReviewDay, undefined);
+  resetMock(db.getWeeklyReviewTime, '19:00');
+  resetMock(db.setWeeklyReviewTime, undefined);
   resetMock(db.getNutritionGoals, { calories: 1800, protein: 150 });
   resetMock(db.setNutritionGoalCalories, undefined);
   resetMock(db.setNutritionGoalProtein, undefined);
