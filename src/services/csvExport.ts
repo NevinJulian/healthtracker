@@ -90,9 +90,9 @@ export function foodLogToCsv(rows: readonly FoodLogExportRow[]): string {
 }
 
 /**
- * Write workout_sets.csv, daily_log.csv, meals.csv and food_log.csv to the cache directory and
- * share them one after the other. A file that cannot be written or shared is
- * reported and does not stop the next one.
+ * Write workout_sets.csv, daily_log.csv, meals.csv and food_log.csv to the
+ * cache directory and share them one after the other. A file that cannot be
+ * written or shared is reported and does not stop the next one.
  *
  * @returns The names of the files that failed.
  * @throws  When sharing is unavailable, a table cannot be read, or no file was exported.
