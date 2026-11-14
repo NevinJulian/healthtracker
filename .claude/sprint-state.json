@@ -229,7 +229,8 @@
         "bc58ff0 merge rules",
         "32b5673 recipe detail",
         "0d833b5 shopping row"
-      ]
+      ],
+      "securityVerdict": "APPROVE round 1 (0d833b5): new UPDATE fully bound; inside the existing transaction; checked lines excluded by the query; different keys skipped; no swallowed catch."
     },
     "451": {
       "lane": "D",
@@ -492,6 +493,10 @@
     {
       "at": "2026-11-14T14:54:30.241Z",
       "event": "CI test check on 7af8dd0: success"
+    },
+    {
+      "at": "2026-11-14T14:54:37.311Z",
+      "event": "#450 security APPROVE round 1"
     }
   ],
   "pendingFinish": [
