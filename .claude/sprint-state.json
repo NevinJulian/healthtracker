@@ -217,11 +217,17 @@
     },
     "450": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
       "security": "required (database.ts shopping-list writes)",
       "notes": "work order ready (written ahead on sprint/auto-fixes e65a92f); waits for #352, #451, #454 in lane order. Re-check line numbers before dispatch. Lane D files for #450 untouched by #352/#451/#454 (checked against 8e197c9), so work order line numbers hold.",
-      "workOrder": "C:/git/ht-lanes/wo/450.md"
+      "workOrder": "C:/git/ht-lanes/wo/450.md",
+      "commits": [
+        "2682526 test",
+        "bc58ff0 merge rules",
+        "32b5673 recipe detail",
+        "0d833b5 shopping row"
+      ]
     },
     "451": {
       "lane": "D",
@@ -472,6 +478,10 @@
     {
       "at": "2026-11-14T14:53:46.979Z",
       "event": "#346 round 1 developer done and pushed (tip 4bf8c88, 143/2051); tester + security dispatched"
+    },
+    {
+      "at": "2026-11-14T14:54:19.079Z",
+      "event": "#450 round 1 developer done (tip 0d833b5, 138/2466); tester + security dispatched"
     }
   ],
   "pendingFinish": [
