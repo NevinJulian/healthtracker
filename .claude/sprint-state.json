@@ -131,13 +131,18 @@
   "issues": {
     "346": {
       "lane": "B",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
       "security": "required (database.ts reads, notifications deep link)",
       "workOrder": "C:/git/ht-lanes/wo/346.md",
       "deviceCheck": "decision 9",
       "notes": "rulings: expoNotifications.ts stub + __mocks__/expo-notifications.js assigned to lane B (additive); listed mock/count test edits pre-authorised; no new permission prompt (gap filed as #465). Round 1 dev: 19 commits, NOT pushed; 83/107 feature tests fail at eda4feb; 142/143 suites green, the one failure is autoBackupRoundTrip (reconcile after restore now writes weeklyReviewNotificationId because the reminder is on by default). Orchestrator ruling: option (b) setup-only (fixture disables the weekly review before the backup; assertion untouched) + a new test documenting the extra key; option (a) (drop the OS-id key) rejected. Not a round trip (no tester verdict). Developer stash count of 3 was a miscount: still the 2 pre-sprint stashes.",
-      "preFeatureSha": "eda4feb"
+      "preFeatureSha": "eda4feb",
+      "commits": [
+        "be59a92..eda4feb skeletons + tests (9)",
+        "51e8bdf..ae5ab11 feature (10, incl. 2 test commits 4ae2649, 5f1764b)",
+        "4bf8c88 round-trip fixture (ruling)"
+      ]
     },
     "351": {
       "lane": "C",
@@ -463,6 +468,10 @@
     {
       "at": "2026-11-14T14:51:52.184Z",
       "event": "#346 developer stopped on autoBackupRoundTrip; ruling sent (fixture setup change + new test)"
+    },
+    {
+      "at": "2026-11-14T14:53:46.979Z",
+      "event": "#346 round 1 developer done and pushed (tip 4bf8c88, 143/2051); tester + security dispatched"
     }
   ],
   "pendingFinish": [
