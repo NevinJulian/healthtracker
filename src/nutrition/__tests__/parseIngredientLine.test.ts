@@ -472,3 +472,28 @@ describe('sprint 6 round 2 probe lines', () => {
     },
   );
 });
+
+describe('sprint 6 round 3 probe lines', () => {
+  it.each([
+    '1 cup flour plus a tablespoon',
+    '1 cup flour, plus a tbsp for dusting',
+    '1 cup flour and a tbsp',
+    '1 EL Mehl plus ein TL',
+    '1 EL Mehl und ein TL Zucker',
+    '1 Tasse Mehl plus einen EL',
+    '1 Tasse Mehl, dazu ein EL',
+    '2 cloves garlic or a tsp of powder',
+    '2 Zehen Knoblauch oder ein TL Knoblauchpulver',
+    '200 g Butter oder ein EL Öl',
+    '200 g flour or a cup',
+  ])('keeps %s as a name without a quantity (second measure in the name)', (line) => {
+    expectNameOnly(line);
+  });
+
+  it.each([
+    ['1 can (14 oz) tomatoes', '(14 oz) tomatoes', 1],
+    ['1 Dose Tomaten (400 g)', 'Tomaten (400 g)', 1],
+  ])('keeps the count of %s', (line, name, quantity) => {
+    expect(parseIngredientLine(line)).toEqual({ name, quantity, unit: 'whole' });
+  });
+});
