@@ -49,7 +49,8 @@
     "#447: src/components/index.ts belongs to no lane, so QuickAddSheet is imported by path. SettingsScreen \"three spreadsheet files\" wording (stale after #447) is a wording finding: filed in #464, not worked.",
     "#352: gr/gr. are grams only when quantity >= 10 (below stays name only, \"1 gr. Zwiebel\" = große), per decision item 2 bar. The slash second-measure rule applies to mass units only (decision item 4 says a weight).",
     "Pushed lane history is not rewritten (a force-push request was denied by the auto-mode permission classifier). From now on developer briefs say: split commits before the first push. #352 ea8e626 stays one commit for four parser rules in one function; accepted, named in the report.",
-    "Agents must not create extra worktrees or directory junctions (the #447 developer deleted lane-a/node_modules by removing a temp worktree that linked it). Pre-fix proofs check out pre-fix source files in place and restore them."
+    "Agents must not create extra worktrees or directory junctions (the #447 developer deleted lane-a/node_modules by removing a temp worktree that linked it). Pre-fix proofs check out pre-fix source files in place and restore them.",
+    "#346: src/services/expoNotifications.ts (Expo Go stub) and __mocks__/expo-notifications.js belong to no lane; assigned to lane B, additive only. The default-on weekly review without any permission request is a product gap, not built around: filed as #465."
   ],
   "lanes": {
     "A": {
@@ -72,29 +73,29 @@
       "name": "weekly review",
       "branch": "sprint/lane-b-review",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "analysing",
+      "status": "in_progress",
       "waitsFor": "lane A merged into sprint/auto-fixes",
       "order": [
         346
       ],
-      "current": null,
+      "current": 346,
       "done": [],
       "parked": [],
-      "note": "worktree detached at 6bcdf82 (lane A tip) for read-ahead analysis; lane branch is cut from sprint/auto-fixes after lane A merges"
+      "base": "56ecae3"
     },
     "C": {
       "name": "expenditure",
       "branch": "sprint/lane-c-expenditure",
       "worktree": "C:/git/ht-lanes/lane-c",
-      "status": "analysing",
+      "status": "in_progress",
       "waitsFor": "lane A merged into sprint/auto-fixes",
       "order": [
         351
       ],
-      "current": null,
+      "current": 351,
       "done": [],
       "parked": [],
-      "note": "same as B"
+      "base": "56ecae3"
     },
     "D": {
       "name": "recipes",
@@ -117,15 +118,21 @@
   "issues": {
     "346": {
       "lane": "B",
-      "status": "analysing",
+      "status": "in_dev",
       "roundTrips": 0,
-      "security": "required (database.ts reads, notifications deep link)"
+      "security": "required (database.ts reads, notifications deep link)",
+      "workOrder": "C:/git/ht-lanes/wo/346.md",
+      "deviceCheck": "decision 9",
+      "notes": "rulings: expoNotifications.ts stub + __mocks__/expo-notifications.js assigned to lane B (additive); listed mock/count test edits pre-authorised; no new permission prompt (gap filed as #465)."
     },
     "351": {
       "lane": "C",
-      "status": "analysing",
+      "status": "in_dev",
       "roundTrips": 0,
-      "security": "required (database.ts goal write)"
+      "security": "required (database.ts goal write)",
+      "workOrder": "C:/git/ht-lanes/wo/351.md",
+      "deviceCheck": "decision 11",
+      "notes": "rulings: Analytics mock factories gain 2 functions; suggestGoals unchanged; stepper race -> #464; en-GB dates."
     },
     "352": {
       "lane": "D",
@@ -192,7 +199,9 @@
       "security": "skip (pure parser, no I/O)"
     }
   },
-  "foundDuringSprint": [],
+  "foundDuringSprint": [
+    465
+  ],
   "smallFindingsIssue": 464,
   "log": [
     {
@@ -301,6 +310,14 @@
     {
       "at": "2026-11-14T14:29:31.530Z",
       "event": "#352 tester REJECT round 2 (roundTrips=2, last round next) -> ruling 12"
+    },
+    {
+      "at": "2026-11-14T14:32:19.503Z",
+      "event": "filed #465 (weekly review default-on vs permission); #464 gained 4 items"
+    },
+    {
+      "at": "2026-11-14T14:32:19.503Z",
+      "event": "lane B and C branches cut at 56ecae3 and pushed; #346 and #351 work orders saved; developers dispatched (round 1)"
     }
   ],
   "pendingFinish": [
