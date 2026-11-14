@@ -56,7 +56,7 @@
       "name": "food log",
       "branch": "sprint/lane-a-foodlog",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "cleanup",
+      "status": "merged",
       "order": [
         447
       ],
@@ -64,7 +64,9 @@
       "done": [
         447
       ],
-      "parked": []
+      "parked": [],
+      "mergeSha": "bf16d7a",
+      "cleanup": "f19b15d: comment-only (restore docblock gained the food_log rule, an inline why-comment removed; exportCsv docblock rewrapped). ORCHESTRATOR verified every changed line is a comment. 1944/136 before and after. Left: CLAUDE.md now stale (v40, food_log.csv) -> docs pass at the end; duplicated QUICK_ADD_* / FOOD_LOG_* constants -> #464."
     },
     "B": {
       "name": "weekly review",
@@ -127,8 +129,8 @@
     },
     "352": {
       "lane": "D",
-      "status": "in_test",
-      "roundTrips": 1,
+      "status": "in_dev",
+      "roundTrips": 2,
       "security": "required (fetches arbitrary web pages)",
       "workOrder": "C:/git/ht-lanes/wo/352.md",
       "deviceCheck": "sprint 5 item 9 + sprint 6 item 8",
@@ -144,12 +146,13 @@
       ],
       "securityVerdict": "APPROVE round 1 (ea8e626): sprint 5 fetch/JSON-LD guards hold on SDK 58 base; new regexes bounded, LAST_WORD is O(n^2) unanchored but 1.1 ms at the 500-char cap (note, not a block); 30k hostile fuzz lines, 0 throws, max 0.14 ms; readDraft lets only typed strings/numbers through. | APPROVE round 2 (43abd32): MAX_LINE_LENGTH still first; EDGE_PUNCTUATION O(n^2) within one token, worst 1.1 ms at 500 chars; prototype-key words safe; 40k fuzz lines 0 throws.",
       "testerVerdicts": [
-        "round 1 REJECT: first-two-words rule too narrow; ~30 realistic lines still get a wrong quantity (multi-word modifiers, bracketed modifiers, hyphenated, each/jeweils/jede without a unit, unlisted abbreviations Teel./Pak./P.)"
+        "round 1 REJECT: first-two-words rule too narrow; ~30 realistic lines still get a wrong quantity (multi-word modifiers, bracketed modifiers, hyphenated, each/jeweils/jede without a unit, unlisted abbreviations Teel./Pak./P.)",
+        "round 2 REJECT (narrow): all round 1 lines fixed, ~1130 probe lines, no regressions; remaining form: unit read + second measure later in the name (\"1 cup flour, plus a tbsp\" -> 240 g, \"1 EL Mehl und ein TL Zucker\" -> 15 g, \"or\" alternatives)"
       ]
     },
     "447": {
       "lane": "A",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "security": "required (schema, database.ts, backup restore, csvExport)",
       "workOrder": "C:/git/ht-lanes/wo/447.md",
@@ -285,6 +288,22 @@
     {
       "at": "2026-11-14T14:26:25.460Z",
       "event": "lane B and C worktrees created detached at 6bcdf82; #346 and #351 analysts dispatched ahead (read-only)"
+    },
+    {
+      "at": "2026-11-14T14:29:31.529Z",
+      "event": "merged lane A into sprint/auto-fixes",
+      "sha": "bf16d7a"
+    },
+    {
+      "at": "2026-11-14T14:29:31.530Z",
+      "event": "integration gates after lane A: typecheck pass, 136 suites / 1944 tests"
+    },
+    {
+      "at": "2026-11-14T14:29:31.530Z",
+      "event": "#352 tester REJECT round 2 (roundTrips=2, last round next) -> ruling 12"
     }
+  ],
+  "pendingFinish": [
+    "CLAUDE.md: migrations list ends at v40 (food_log), CSV export writes four files incl. food_log.csv; plus whatever lanes B-D change. One docs commit after all lanes merge."
   ]
 }
