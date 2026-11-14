@@ -7,7 +7,7 @@ describe('parseIngredientLine', () => {
     ['500g Hackfleisch', 500, 'g', 'Hackfleisch'],
     ['1 EL Olivenöl', 15, 'g', 'Olivenöl'],
     ['2 Essl. Honig', 30, 'g', 'Honig'],
-    ['3 TL Zucker', 15, 'g', 'Zucker'],
+    ['3 TL Zucker', 12.5, 'g', 'Zucker'],
     ['1,5 kg Mehl', 1500, 'g', 'Mehl'],
     ['2-3 EL Öl', 37.5, 'g', 'Öl'],
     ['2–3 EL Öl', 37.5, 'g', 'Öl'],
@@ -25,7 +25,7 @@ describe('parseIngredientLine', () => {
     ['5 cl Rum', 50, 'ml', 'Rum'],
     ['250 ml Wasser', 250, 'ml', 'Wasser'],
     ['1 l Milch', 1000, 'ml', 'Milch'],
-    ['1 Tasse Reis', 240, 'g', 'Reis'],
+    ['1 Tasse Reis', 185, 'g', 'Reis'],
   ])('%s', (line, quantity, unit, name) => {
     expect(parseIngredientLine(line as string)).toEqual({ name, quantity, unit });
   });
@@ -111,7 +111,7 @@ describe('parseIngredientLine unsure lines', () => {
   it.each([
     ['0.125 l Milch', 125, 'ml', 'Milch'],
     ['1.5 kg Mehl', 1500, 'g', 'Mehl'],
-    ['2.25 cups sugar', 540, 'g', 'sugar'],
+    ['2.25 cups sugar', 450, 'g', 'sugar'],
     ['1.0005 kg Mehl', 1000.5, 'g', 'Mehl'],
   ])('reads %s as a decimal', (line, quantity, unit, name) => {
     expect(parseIngredientLine(line)).toEqual({ name, quantity, unit });
@@ -164,27 +164,27 @@ const expectNameOnly = (line: string) =>
 
 describe('parseIngredientLine allow-list', () => {
   it('reads a hyphenated mixed number as a sum, not a range', () => {
-    expect(parseMeasure('flour', '1.5 cup').baseQuantity).toBe(360);
-    expect(parseIngredientLine('1-1/2 cups flour')).toEqual({ name: 'flour', quantity: 360, unit: 'g' });
-    expect(parseIngredientLine('2-1/4 cups flour')).toEqual({ name: 'flour', quantity: 540, unit: 'g' });
+    expect(parseMeasure('flour', '1.5 cup').baseQuantity).toBe(187.5);
+    expect(parseIngredientLine('1-1/2 cups flour')).toEqual({ name: 'flour', quantity: 187.5, unit: 'g' });
+    expect(parseIngredientLine('2-1/4 cups flour')).toEqual({ name: 'flour', quantity: 281.25, unit: 'g' });
   });
 
   it.each([
-    ['1 ½ cups sugar', 'sugar', 360],
-    ['1½ cups sugar', 'sugar', 360],
-    ['1 1/2 cups sugar', 'sugar', 360],
+    ['1 ½ cups sugar', 'sugar', 300],
+    ['1½ cups sugar', 'sugar', 300],
+    ['1 1/2 cups sugar', 'sugar', 300],
     ['1,5 kg Mehl', 'Mehl', 1500],
     ['2-3 EL Öl', 'Öl', 37.5],
     ['500 gramm Mehl', 'Mehl', 500],
     ['1 Kilo Kartoffeln', 'Kartoffeln', 1000],
     ['2 Esslöffel Öl', 'Öl', 30],
-    ['3 Teelöffel Zucker', 'Zucker', 15],
-    ['3 tbs sugar', 'sugar', 45],
+    ['3 Teelöffel Zucker', 'Zucker', 12.5],
+    ['3 tbs sugar', 'sugar', 37.5],
     ['2 Liter Wasser', 'Wasser', 2000],
     ['200 Milliliter Milch', 'Milch', 200],
     ['1 can (14.5 oz) diced tomatoes', '(14.5 oz) diced tomatoes', 1],
-    ['2 cups of flour', 'flour', 480],
-    ['2 Tassen von Reis', 'Reis', 480],
+    ['2 cups of flour', 'flour', 250],
+    ['2 Tassen von Reis', 'Reis', 370],
     ['2 extra large eggs', 'extra large eggs', 2],
     ['1 xl egg', 'xl egg', 1],
     ['3 Eier (Größe M)', 'Eier (Größe M)', 3],
@@ -378,12 +378,11 @@ describe('sprint 5 probe lines', () => {
     expect(parseIngredientLine(line)).toEqual({ name, quantity, unit: 'whole' });
   });
 
-  // CUP: #454 updates these
   it.each([
     ['1-1/2 cups flour'],
     ['1 1/2 cups flour'],
-  ])('guard: CUP: #454 updates these, %s is 360 g', (line) => {
-    expect(parseIngredientLine(line)).toEqual({ name: 'flour', quantity: 360, unit: 'g' });
+  ])('guard: %s weighs flour at its own density', (line) => {
+    expect(parseIngredientLine(line)).toEqual({ name: 'flour', quantity: 187.5, unit: 'g' });
   });
 
   it('reads gr as grams from 10 up only', () => {

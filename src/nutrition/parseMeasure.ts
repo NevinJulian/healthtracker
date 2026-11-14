@@ -27,6 +27,7 @@
  */
 
 import { convertToGrams } from './units';
+import { gramsPerCup } from './ingredientDensity';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -211,6 +212,13 @@ const EXTENDED_UNIT_TO_GRAMS: Record<string, number> = {
   pinch: 0.5,
 };
 
+const CUP_FRACTION: Record<string, number> = {
+  cup:  1,
+  tbsp: 1 / 16,
+  tsp:  1 / 48,
+  ml:   1 / 240,
+};
+
 function convertQuantity(
   quantity: number,
   unitStr: string,
@@ -321,6 +329,12 @@ export function parseMeasure(ingredient: string, measure: string): ParsedIngredi
 
     if (detectedUnit.unit === 'whole') {
       return { name: cleanName, baseQuantity: quantity, unit: 'whole', isVague: false };
+    }
+
+    const cupFraction = CUP_FRACTION[detectedUnit.unit];
+    const perCup = cupFraction === undefined ? undefined : gramsPerCup(cleanName);
+    if (cupFraction !== undefined && perCup !== undefined) {
+      return { name: cleanName, baseQuantity: quantity * cupFraction * perCup, unit: 'g', isVague: false };
     }
 
     // Weight / volume unit detected — convert to grams or ml

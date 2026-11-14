@@ -82,12 +82,12 @@ describe('parseMeasure — spoon and cup units', () => {
 
   it('parses cup', () => {
     const r = parseMeasure('Flour', '2 cup');
-    expect(r.baseQuantity).toBeCloseTo(480);
+    expect(r.baseQuantity).toBeCloseTo(250);
   });
 
   it('parses cups (plural)', () => {
     const r = parseMeasure('Rice', '2 cups');
-    expect(r.baseQuantity).toBeCloseTo(480);
+    expect(r.baseQuantity).toBeCloseTo(370);
   });
 });
 
@@ -102,7 +102,7 @@ describe('parseMeasure — unicode fractions', () => {
 
   it('handles ¼ cup', () => {
     const r = parseMeasure('Sugar', '¼ cup');
-    expect(r.baseQuantity).toBeCloseTo(60);
+    expect(r.baseQuantity).toBeCloseTo(50);
   });
 
   it('handles ¾ cup', () => {
