@@ -40,6 +40,12 @@ const LEADING_FILLER = /^[\s,.:\-–—]+/;
 const LEADING_OF = /^(?:of|von)\s+/i;
 const BRACKETED = /\([^()]*\)/g;
 const NUMBER_CHARACTER = new RegExp(String.raw`[\d${FRACTIONS}]`);
+const SECOND_MEASURE = /^\s*\/\s*\d{1,6}(?:[.,]\d{1,3})?\s*([A-Za-zÄÖÜäöüß]{1,15})\.?(?![A-Za-zÄÖÜäöüß])/;
+const TRAILING_NUMBER = /\s(\d{1,4})$/;
+const LAST_WORD = /([A-Za-zÄÖÜäöüß]+)$/;
+const FILLER_BETWEEN_WORDS = /^[\s.,]+/;
+const EACH_WORDS: ReadonlySet<string> = new Set(['each', 'je']);
+const MASS_UNITS: ReadonlySet<string> = new Set(['g', 'kg']);
 const BAD_NAME_START = /^[+/&]/;
 const CONNECTORS: ReadonlySet<string> = new Set(['to', 'or', 'and', 'plus', 'bis', 'oder', 'und', 'x', '×']);
 
@@ -58,13 +64,13 @@ const ENGLISH_UNITS: ReadonlyMap<string, string> = new Map(
 const UNSURE_WORDS: ReadonlySet<string> = new Set([
   't', 'c', 'fl', 'floz', 'fluid', 'pt', 'qt', 'gal', 'gallon', 'pint', 'quart', 'in', 'inch', 'inches',
   'stick', 'pkg', 'pkt', 'package', 'mug', 'glass', 'shot', 'drop', 'splash', 'dash', 'drizzle', 'glug',
-  'knob', 'handful', 'gr', 'cube', 'bowl', 'cupful', 'spoon', 'spoonful', 'dessertspoon', 'dsp', 'scoop',
+  'knob', 'handful', 'gr', 'pk', 'pr', 'cube', 'bowl', 'cupful', 'spoon', 'spoonful', 'dessertspoon', 'dsp', 'scoop',
   'dollop', 'sheet', 'strip', 'mg', 'milligram', 'microgram', 'dl', 'deciliter', 'decilitre', 'centiliter',
   'centilitre', 'cm', 'mm', 'centimeter', 'centimetre', 'millimeter', 'millimetre', 'meter', 'metre', 'ft',
   'foot', 'feet', 'yard', 'ltr', 'lt', 'tablespoonful', 'teaspoonful',
-  'glas', 'becher', 'schuss', 'spritzer', 'tropfen', 'würfel', 'wuerfel', 'tafel', 'riegel', 'kugel',
+  'glas', 'becher', 'spritzer', 'tropfen', 'würfel', 'wuerfel', 'tafel', 'riegel', 'kugel',
   'löffel', 'kaffeelöffel', 'schale', 'schälchen', 'tüte', 'beutel', 'kelle', 'pfund', 'pfd', 'unze',
-  'zentiliter', 'deziliter', 'zentimeter', 'meter', 'milligramm', 'messerspitze', 'prise', 'finger',
+  'zentiliter', 'deziliter', 'zentimeter', 'milligramm', 'messerspitze', 'prise', 'finger',
 ]);
 
 function englishUnit(word: string): string | undefined {
@@ -189,11 +195,41 @@ function tidyName(text: string): string {
     .trim();
 }
 
+function hasNoNumber(text: string): boolean {
+  return !NUMBER_CHARACTER.test(text.replace(BRACKETED, ''));
+}
+
+function endsWithNumberedWord(name: string): boolean {
+  const trailing = TRAILING_NUMBER.exec(name);
+  if (!trailing) return false;
+  const head = name.slice(0, trailing.index);
+  const last = LAST_WORD.exec(head);
+  if (!last || CONNECTORS.has(last[1].toLowerCase())) return false;
+  return hasNoNumber(head);
+}
+
 function isAcceptableName(name: string): boolean {
   if (name === '' || BAD_NAME_START.test(name)) return false;
-  if (NUMBER_CHARACTER.test(name.replace(BRACKETED, ''))) return false;
+  if (!hasNoNumber(name) && !endsWithNumberedWord(name)) return false;
   const first = FIRST_WORD.exec(name);
   return !(first && CONNECTORS.has(first[1].toLowerCase()));
+}
+
+function isMeasureWord(word: string): boolean {
+  const lower = word.toLowerCase();
+  return (
+    Object.prototype.hasOwnProperty.call(UNIT_WORDS, lower) ||
+    englishUnit(word) !== undefined ||
+    isUnsureWord(word)
+  );
+}
+
+function startsWithMeasureWord(name: string): boolean {
+  const first = FIRST_WORD.exec(name);
+  if (!first) return false;
+  if (isMeasureWord(first[1])) return true;
+  const second = FIRST_WORD.exec(name.slice(first[0].length).replace(FILLER_BETWEEN_WORDS, ''));
+  return second !== null && isMeasureWord(second[1]);
 }
 
 export function parseIngredientLine(line: string): ParsedIngredientLine {
@@ -220,7 +256,8 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
     const word = UNIT_WORD.exec(afterQuantity);
     if (word) {
       const key = word[1].toLowerCase();
-      const known = Object.prototype.hasOwnProperty.call(UNIT_WORDS, key) ? UNIT_WORDS[key] : undefined;
+      const own = Object.prototype.hasOwnProperty.call(UNIT_WORDS, key) ? UNIT_WORDS[key] : undefined;
+      const known = own ?? (key === 'gr' && qty.value >= 10 ? UNIT_WORDS.g : undefined);
       const english = known ? undefined : englishUnit(word[1]);
       if (known) {
         unit = known.unit;
@@ -231,14 +268,19 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
         hasUnit = true;
       }
       if (hasUnit) afterQuantity = afterQuantity.slice(word[0].length);
+      if (hasUnit && MASS_UNITS.has(unit)) {
+        const second = SECOND_MEASURE.exec(afterQuantity);
+        if (second && isMeasureWord(second[1])) afterQuantity = afterQuantity.slice(second[0].length);
+      }
     }
 
     const name = tidyName(afterQuantity);
     if (!isAcceptableName(name)) return nameOnly(whole);
 
-    if (!hasUnit) {
+    if (!hasUnit && startsWithMeasureWord(name)) return nameOnly(whole);
+    if (hasUnit) {
       const first = FIRST_WORD.exec(name);
-      if (first && isUnsureWord(first[1])) return nameOnly(whole);
+      if (first && EACH_WORDS.has(first[1].toLowerCase())) return nameOnly(whole);
     }
 
     const quantityText = String(Number(qty.value.toFixed(6)));
