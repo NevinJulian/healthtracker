@@ -142,12 +142,21 @@ describe('backup export → restore round trip reproduces the DB exactly (#336)'
     // 5. weekly_template: an edit.
     await db.updateTemplateDay(1, 'Custom Walk Task', 'Custom Hammer Task');
 
+    // 6. food_log: two entries, the first deleted so the ids do not start at 1.
+    const firstEntry = await db.addFoodLogEntry({
+      date: pinnedDate, label: 'Deleted', calories: 100, protein: 0, carbs: 0, fat: 0,
+    });
+    await db.addFoodLogEntry({
+      date: pinnedDate, label: 'Snack', calories: 250.5, protein: 10, carbs: 20, fat: 5,
+    });
+    await db.deleteFoodLogEntry(firstEntry);
+
     // ── Snapshot exactly the way the real export does ────────────────────
     const before = await backup.buildBackupPayload();
     const schemaVersionBefore = await db.getCurrentSchemaVersion();
     const tableNames = Object.keys(before.tables).sort();
     // Sanity: at least the 5 tables above, really seeded (non-empty).
-    for (const t of ['daily_log', 'weekly_meal_plan', 'meal_inventory', 'workout_set_log', 'app_state', 'weekly_template']) {
+    for (const t of ['daily_log', 'weekly_meal_plan', 'meal_inventory', 'workout_set_log', 'app_state', 'weekly_template', 'food_log']) {
       expect(tableNames).toContain(t);
     }
 
