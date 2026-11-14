@@ -148,7 +148,8 @@
         "2cc8fb6 feat db",
         "b3be8b7 test fix",
         "77d9275 feat card"
-      ]
+      ],
+      "securityVerdict": "APPROVE round 1 (77d9275): bound params, one txn, malformed appliedOn -> null, NaN paths end in insufficient, only Apply writes the goal. Notes: (1) applyAdaptiveCalorieGoal has no own validation (caller-safe today); (2) restored huge nutritionGoalCalories accepted (hand-edited backup, pre-existing); (3) Apply uses toISODate() vs todayKey elsewhere (midnight edge); (4) failed refresh after a successful write shows goal was not changed."
     },
     "352": {
       "lane": "D",
@@ -389,12 +390,17 @@
     {
       "at": "2026-11-14T14:42:10.218Z",
       "event": "#451 tester APPROVE round 1 -> ready; #454 developer dispatched"
+    },
+    {
+      "at": "2026-11-14T14:42:21.007Z",
+      "event": "#351 security APPROVE round 1 (notes held for tester verdict)"
     }
   ],
   "pendingFinish": [
     "CLAUDE.md: migrations list ends at v40 (food_log), CSV export writes four files incl. food_log.csv; plus whatever lanes B-D change. One docs commit after all lanes merge."
   ],
   "pendingSmallFindings": [
-    "#451 tester: handleSave guards only closing, not saving; a double tap on Save within one frame could start two saves (pre-existing, timing)"
+    "#451 tester: handleSave guards only closing, not saving; a double tap on Save within one frame could start two saves (pre-existing, timing)",
+    "#351 security: restored nutritionGoalCalories of 1e300 accepted (max Infinity) - hand-edited backup, pre-existing"
   ]
 }
