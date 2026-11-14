@@ -136,12 +136,12 @@
     },
     "352": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 2,
       "security": "required (fetches arbitrary web pages)",
       "workOrder": "C:/git/ht-lanes/wo/352.md",
       "deviceCheck": "sprint 5 item 9 + sprint 6 item 8",
-      "notes": "work order ready. Rulings: gr = grams only at >=10; slash rule mass units only; dedupe schuss/meter in UNSURE_WORDS. Round 1 dev: 29 red rows fail at 5ba8738, pass at ea8e626; 136 suites / 2326 tests. Fix is ONE commit for four rules: asking the developer to split it via history rewrite + force-push was denied by the auto-mode classifier, so it stays one commit (accepted by orchestrator, flagged for report section 6). Round 2 rulings 5-10 in the work order: whole-name rule before the first comma, each-words with or without unit, abbreviation rule, split commits before pushing. Round 2 dev: all A-E rows pass, 2359 tests. Orchestrator ruling 11 before test: unit word anywhere in a bare count name -> name only (closes \"1 level, tsp salt\").",
+      "notes": "work order ready. Rulings: gr = grams only at >=10; slash rule mass units only; dedupe schuss/meter in UNSURE_WORDS. Round 1 dev: 29 red rows fail at 5ba8738, pass at ea8e626; 136 suites / 2326 tests. Fix is ONE commit for four rules: asking the developer to split it via history rewrite + force-push was denied by the auto-mode classifier, so it stays one commit (accepted by orchestrator, flagged for report section 6). Round 2 rulings 5-10 in the work order: whole-name rule before the first comma, each-words with or without unit, abbreviation rule, split commits before pushing. Round 2 dev: all A-E rows pass, 2359 tests. Orchestrator ruling 11 before test: unit word anywhere in a bare count name -> name only (closes \"1 level, tsp salt\"). Round 3 (LAST) dev: 11 rows fail at 22e6c12, pass at 593d786; 2375 tests; corpus 1116 lines clean. Security for round 3 skipped: diff reuses the existing BRACKETED regex, no new pattern (round 2 approval carries over; tester runs fuzz/timing).",
       "commits": [
         "5ba8738 test",
         "ea8e626 fix",
@@ -149,7 +149,9 @@
         "070235e fix r2 rule 5",
         "92fabc7 fix r2 rule 6",
         "b8d3a3d test r2 ruling 11",
-        "43abd32 fix r2 ruling 11"
+        "43abd32 fix r2 ruling 11",
+        "22e6c12 test r3",
+        "593d786 fix r3 ruling 12"
       ],
       "securityVerdict": "APPROVE round 1 (ea8e626): sprint 5 fetch/JSON-LD guards hold on SDK 58 base; new regexes bounded, LAST_WORD is O(n^2) unanchored but 1.1 ms at the 500-char cap (note, not a block); 30k hostile fuzz lines, 0 throws, max 0.14 ms; readDraft lets only typed strings/numbers through. | APPROVE round 2 (43abd32): MAX_LINE_LENGTH still first; EDGE_PUNCTUATION O(n^2) within one token, worst 1.1 ms at 500 chars; prototype-key words safe; 40k fuzz lines 0 throws.",
       "testerVerdicts": [
@@ -318,6 +320,14 @@
     {
       "at": "2026-11-14T14:32:19.503Z",
       "event": "lane B and C branches cut at 56ecae3 and pushed; #346 and #351 work orders saved; developers dispatched (round 1)"
+    },
+    {
+      "at": "2026-11-14T14:32:59.470Z",
+      "event": "#352 round 3 developer done; tester re-dispatched (last round); security skipped for r3 (no new regex)"
+    },
+    {
+      "at": "2026-11-14T14:32:59.470Z",
+      "event": "#346 developer (lane B) and #351 developer (lane C) dispatched, round 1"
     }
   ],
   "pendingFinish": [
