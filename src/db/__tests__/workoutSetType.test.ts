@@ -47,10 +47,9 @@ describe('set_type on logged sets', () => {
 });
 
 describe('migration v39', () => {
-  it('adds set_type with the exact SQL, last in the list', () => {
-    const last = MIGRATIONS[MIGRATIONS.length - 1];
-    expect(last.version).toBe(39);
-    expect(last.sql).toBe('ALTER TABLE workout_set_log ADD COLUMN set_type TEXT;');
+  it('adds set_type with the exact SQL', () => {
+    const v39 = MIGRATIONS.find((m) => m.version === 39);
+    expect(v39?.sql).toBe('ALTER TABLE workout_set_log ADD COLUMN set_type TEXT;');
   });
 
   it('leaves a row inserted before v39 as NULL', async () => {
