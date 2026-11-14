@@ -91,6 +91,8 @@ import {
   type WorkoutSetSlice,
 } from './analyticsHelpers';
 import { NUTRITION_GOALS } from '../nutrition/goals';
+import type { AdaptiveTdeeResult } from '../nutrition/adaptiveTdee';
+import type { GoalType } from '../nutrition/tdee';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1114,6 +1116,19 @@ export function LiftingSectionCard({
       )}
     </>
   );
+}
+
+// ─── Nutrition: Energy expenditure card ───────────────────────────────────────
+
+export function EnergyExpenditureCard(props: {
+  result: AdaptiveTdeeResult;
+  currentGoal: number;
+  goalType: GoalType | null;
+  appliedOn: string | null;
+  todayISO: string;
+  onApply: (kcal: number) => Promise<void>;
+}) {
+  return null;
 }
 
 // ─── Nutrition: Section card ──────────────────────────────────────────────────

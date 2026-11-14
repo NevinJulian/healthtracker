@@ -113,6 +113,14 @@ jest.mock('../../db/database', () => ({
   // Manually controlled, keyed by call order: 1st call = run A, 2nd = run B.
   getInventorySnapshot: jest.fn(() => mockNextDeferred(mockInventoryDeferreds)),
   getLoggedExercises: jest.fn(() => mockNextDeferred(mockExercisesDeferreds)),
+  getUserProfile: jest.fn().mockResolvedValue({
+    heightCm: null,
+    age: null,
+    sex: null,
+    activityLevel: null,
+    goalType: null,
+  }),
+  getAdaptiveTdeeAppliedOn: jest.fn().mockResolvedValue(null),
 }));
 
 import AnalyticsDashboardScreen from '../AnalyticsDashboardScreen';
