@@ -78,7 +78,7 @@
       "name": "weekly review",
       "branch": "sprint/lane-b-review",
       "worktree": "C:/git/ht-lanes/lane-b",
-      "status": "cleanup",
+      "status": "merged",
       "waitsFor": "lane A merged into sprint/auto-fixes",
       "order": [
         346
@@ -89,7 +89,8 @@
       ],
       "parked": [],
       "base": "56ecae3",
-      "cleanup": "no changes needed, no commit (every new export has a caller; tsc --noUnusedLocals found nothing the lane added; one [Notifications] console.log kept to match siblings). Left: pre-existing unused cancelBackupReminder import in SettingsScreen, exported WORKOUT_SETS_BETWEEN_SQL like its siblings."
+      "cleanup": "no changes needed, no commit (every new export has a caller; tsc --noUnusedLocals found nothing the lane added; one [Notifications] console.log kept to match siblings). Left: pre-existing unused cancelBackupReminder import in SettingsScreen, exported WORKOUT_SETS_BETWEEN_SQL like its siblings.",
+      "mergeSha": "3076717"
     },
     "C": {
       "name": "expenditure",
@@ -138,7 +139,7 @@
   "issues": {
     "346": {
       "lane": "B",
-      "status": "ready",
+      "status": "merged",
       "roundTrips": 0,
       "security": "required (database.ts reads, notifications deep link)",
       "workOrder": "C:/git/ht-lanes/wo/346.md",
@@ -526,6 +527,15 @@
     {
       "at": "2026-11-14T14:59:25.130Z",
       "event": "integration gates after lane D: typecheck pass, 146 suites / 2639 tests (= 139/2016 + lane D 7/623)"
+    },
+    {
+      "at": "2026-11-14T15:00:41.815Z",
+      "event": "merged lane B into sprint/auto-fixes (no conflicts)",
+      "sha": "3076717"
+    },
+    {
+      "at": "2026-11-14T15:00:41.816Z",
+      "event": "integration gates after lane B: typecheck pass, 153 suites / 2746 tests (= 146/2639 + lane B 7/107)"
     }
   ],
   "pendingFinish": [
