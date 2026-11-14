@@ -133,12 +133,12 @@
     },
     "351": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 1,
       "security": "required (database.ts goal write)",
       "workOrder": "C:/git/ht-lanes/wo/351.md",
       "deviceCheck": "decision 11",
-      "notes": "rulings: Analytics mock factories gain 2 functions; suggestGoals unchanged; stepper race -> #464; en-GB dates. Round 1 dev: 139 suites / 2004 tests; 52 fail at fb7653f. Tester to judge: suggestion line hidden within 10 kcal (decision removes only the button?), input rows hidden in insufficient cases, two own-test fix commits. Round 2 rulings 6-8: show suggestion line always, writer validates its input, failed refresh after a successful Apply uses LoadErrorView not the Apply Alert.",
+      "notes": "rulings: Analytics mock factories gain 2 functions; suggestGoals unchanged; stepper race -> #464; en-GB dates. Round 1 dev: 139 suites / 2004 tests; 52 fail at fb7653f. Tester to judge: suggestion line hidden within 10 kcal (decision removes only the button?), input rows hidden in insufficient cases, two own-test fix commits. Round 2 rulings 6-8: show suggestion line always, writer validates its input, failed refresh after a successful Apply uses LoadErrorView not the Apply Alert. Round 2 dev: 139/2016; ruling 8 needed no code (loadData catches its own errors -> refresh banner), pinned by a guard test; security note 4 was a misreading.",
       "preFeatureSha": "fb7653f",
       "commits": [
         "47cf24c..fb7653f tests+stubs (3)",
@@ -147,7 +147,10 @@
         "6b62204 feat maths",
         "2cc8fb6 feat db",
         "b3be8b7 test fix",
-        "77d9275 feat card"
+        "77d9275 feat card",
+        "4ded075 test r2",
+        "b3a8b4a fix r2 ruling 6",
+        "2b543b6 fix r2 ruling 7"
       ],
       "securityVerdict": "APPROVE round 1 (77d9275): bound params, one txn, malformed appliedOn -> null, NaN paths end in insufficient, only Apply writes the goal. Notes: (1) applyAdaptiveCalorieGoal has no own validation (caller-safe today); (2) restored huge nutritionGoalCalories accepted (hand-edited backup, pre-existing); (3) Apply uses toISODate() vs todayKey elsewhere (midnight edge); (4) failed refresh after a successful write shows goal was not changed.",
       "testerVerdicts": [
@@ -401,6 +404,10 @@
     {
       "at": "2026-11-14T14:44:29.307Z",
       "event": "#351 tester REJECT round 1 (roundTrips=1) -> rulings 6-9"
+    },
+    {
+      "at": "2026-11-14T14:46:24.793Z",
+      "event": "#351 round 2 developer done (tip 2b543b6); tester + security re-check dispatched"
     }
   ],
   "pendingFinish": [
