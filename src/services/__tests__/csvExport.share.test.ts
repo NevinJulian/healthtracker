@@ -4,6 +4,7 @@ const mockAvailable = jest.fn<Promise<boolean>, []>();
 const mockSets = jest.fn();
 const mockLog = jest.fn();
 const mockMeals = jest.fn();
+const mockFoodLog = jest.fn();
 
 jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///cache/',
@@ -19,6 +20,7 @@ jest.mock('../../db/database', () => ({
   getAllWorkoutSetsForExport: () => mockSets(),
   getAllDailyLogForExport: () => mockLog(),
   getAllMealsForExport: () => mockMeals(),
+  getAllFoodLogForExport: () => mockFoodLog(),
 }));
 
 import { exportCsv } from '../csvExport';
@@ -27,6 +29,7 @@ const URIS = [
   'file:///cache/workout_sets.csv',
   'file:///cache/daily_log.csv',
   'file:///cache/meals.csv',
+  'file:///cache/food_log.csv',
 ];
 
 beforeEach(() => {
@@ -37,14 +40,15 @@ beforeEach(() => {
   mockSets.mockResolvedValue([]);
   mockLog.mockResolvedValue([]);
   mockMeals.mockResolvedValue([]);
+  mockFoodLog.mockResolvedValue([]);
 });
 
 describe('exportCsv', () => {
-  it('reports nothing failed when all three files were shared', async () => {
+  it('reports nothing failed when all four files were shared', async () => {
     await expect(exportCsv()).resolves.toEqual({ failed: [] });
   });
 
-  it('writes the three files to the cache directory in order', async () => {
+  it('writes the four files to the cache directory in order', async () => {
     await exportCsv();
 
     expect(mockWrite.mock.calls.map((c) => c[0])).toEqual(URIS);
@@ -86,6 +90,7 @@ describe('exportCsv', () => {
       [URIS[0], { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text', dialogTitle: 'Save workout_sets.csv' }],
       [URIS[1], { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text', dialogTitle: 'Save daily_log.csv' }],
       [URIS[2], { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text', dialogTitle: 'Save meals.csv' }],
+      [URIS[3], { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text', dialogTitle: 'Save food_log.csv' }],
     ]);
   });
 
@@ -120,14 +125,14 @@ describe('exportCsv', () => {
     mockShare.mockRejectedValueOnce(new Error('dismissed'));
 
     await expect(exportCsv()).resolves.toEqual({ failed: ['workout_sets.csv'] });
-    expect(mockShare).toHaveBeenCalledTimes(3);
+    expect(mockShare).toHaveBeenCalledTimes(4);
   });
 
   it('keeps going after a write fails, skips that share and reports the file', async () => {
     mockWrite.mockRejectedValueOnce(new Error('disk full'));
 
     await expect(exportCsv()).resolves.toEqual({ failed: ['workout_sets.csv'] });
-    expect(mockShare.mock.calls.map((c) => c[0])).toEqual([URIS[1], URIS[2]]);
+    expect(mockShare.mock.calls.map((c) => c[0])).toEqual([URIS[1], URIS[2], URIS[3]]);
   });
 
   it('reports every failed file in order', async () => {
