@@ -173,7 +173,7 @@ function detectUnit(token: string): { unit: string; isLiquid: boolean } | null {
       return { unit: 'lb', isLiquid: false };
     case 'fl':
     case 'floz':
-      return { unit: 'ml', isLiquid: true }; // approx 30 ml per fl oz
+      return { unit: 'floz', isLiquid: true };
     case 'clove':
     case 'cloves':
     case 'head':
@@ -199,9 +199,12 @@ function detectUnit(token: string): { unit: string; isLiquid: boolean } | null {
 /**
  * Extended unit-to-gram map covering units not in units.ts (kg, l, lb).
  */
+const ML_PER_FLUID_OUNCE = 29.57;
+
 const EXTENDED_UNIT_TO_GRAMS: Record<string, number> = {
   g:    1,
   ml:   1,
+  floz: ML_PER_FLUID_OUNCE,
   kg:   1000,
   l:    1000,
   tsp:  5,
@@ -217,6 +220,7 @@ const CUP_FRACTION: Record<string, number> = {
   tbsp: 1 / 16,
   tsp:  1 / 48,
   ml:   1 / 240,
+  floz: ML_PER_FLUID_OUNCE / 240,
 };
 
 function convertQuantity(
