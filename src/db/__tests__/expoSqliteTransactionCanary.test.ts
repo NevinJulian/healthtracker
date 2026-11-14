@@ -43,7 +43,9 @@ function extractMethodBody(source: string): string {
 
 const EXPECTED_BODY =
   "{ try { await this.execAsync('BEGIN'); await task(); await this.execAsync('COMMIT'); } " +
-  "catch (e) { await this.execAsync('ROLLBACK'); throw e; } }";
+  "catch (e) { try { await this.execAsync('ROLLBACK'); } catch { " +
+  '// SQLite may already have rolled back (for example, after an interrupted write). ' +
+  '// Preserve the original error if rollback also fails. } throw e; } }';
 
 describe('expo-sqlite withTransactionAsync canary (#369)', () => {
   it.each([['build/SQLiteDatabase.js'], ['src/SQLiteDatabase.ts']])(
