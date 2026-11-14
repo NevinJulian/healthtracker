@@ -3208,6 +3208,12 @@ export async function getAdaptiveTdeeAppliedOn(): Promise<string | null> {
 /** Set the calorie goal and record the apply date in one transaction. Protein is untouched. */
 export function applyAdaptiveCalorieGoal(kcal: number, todayISO: string): Promise<void> {
   return _enqueueWrite('applyAdaptiveCalorieGoal', async () => {
+    if (!Number.isInteger(kcal) || kcal < 1000 || kcal > 10000) {
+      throw new Error(`applyAdaptiveCalorieGoal: kcal must be an integer from 1000 to 10000, got ${kcal}`);
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(todayISO)) {
+      throw new Error(`applyAdaptiveCalorieGoal: date must be YYYY-MM-DD, got ${todayISO}`);
+    }
     const db = getDatabase();
     const upsert =
       'INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value';
