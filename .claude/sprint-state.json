@@ -67,7 +67,8 @@
       ],
       "parked": [],
       "mergeSha": "bf16d7a",
-      "cleanup": "f19b15d: comment-only (restore docblock gained the food_log rule, an inline why-comment removed; exportCsv docblock rewrapped). ORCHESTRATOR verified every changed line is a comment. 1944/136 before and after. Left: CLAUDE.md now stale (v40, food_log.csv) -> docs pass at the end; duplicated QUICK_ADD_* / FOOD_LOG_* constants -> #464."
+      "cleanup": "f19b15d: comment-only (restore docblock gained the food_log rule, an inline why-comment removed; exportCsv docblock rewrapped). ORCHESTRATOR verified every changed line is a comment. 1944/136 before and after. Left: CLAUDE.md now stale (v40, food_log.csv) -> docs pass at the end; duplicated QUICK_ADD_* / FOOD_LOG_* constants -> #464.",
+      "ci": "GitHub test check on 56ecae3 (integration after lane A merge): completed success (Linux)"
     },
     "B": {
       "name": "weekly review",
@@ -328,6 +329,10 @@
     {
       "at": "2026-11-14T14:32:59.470Z",
       "event": "#346 developer (lane B) and #351 developer (lane C) dispatched, round 1"
+    },
+    {
+      "at": "2026-11-14T14:33:09.771Z",
+      "event": "CI test check on 56ecae3: success"
     }
   ],
   "pendingFinish": [
