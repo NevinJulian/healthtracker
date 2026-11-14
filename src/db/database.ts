@@ -3197,12 +3197,25 @@ export function setNutritionGoals(kcal: number, g: number): Promise<void> {
   });
 }
 
+const SETTING_ADAPTIVE_TDEE_APPLIED_ON = 'adaptiveTdeeAppliedOn';
+
+/** Date the adaptive calorie goal was last applied, or null when never or unreadable. */
 export async function getAdaptiveTdeeAppliedOn(): Promise<string | null> {
-  return null;
+  const raw = await getSetting(SETTING_ADAPTIVE_TDEE_APPLIED_ON);
+  return raw !== null && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
 }
 
+/** Set the calorie goal and record the apply date in one transaction. Protein is untouched. */
 export function applyAdaptiveCalorieGoal(kcal: number, todayISO: string): Promise<void> {
-  return Promise.resolve();
+  return _enqueueWrite('applyAdaptiveCalorieGoal', async () => {
+    const db = getDatabase();
+    const upsert =
+      'INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value';
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(upsert, [SETTING_NUTRITION_GOAL_CALORIES, String(kcal)]);
+      await db.runAsync(upsert, [SETTING_ADAPTIVE_TDEE_APPLIED_ON, todayISO]);
+    });
+  });
 }
 
 // ── User profile settings (#281) ─────────────────────────────────────────────
