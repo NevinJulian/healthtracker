@@ -83,3 +83,7 @@ export function validateQuickAdd(fields: QuickAddFields): QuickAddResult {
     },
   };
 }
+
+export function formatEntrySummary(entry: { calories: number; protein: number }): string {
+  return `${Math.round(entry.calories)} kcal · ${Math.round(entry.protein)} g protein`;
+}
