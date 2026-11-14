@@ -45,7 +45,8 @@
     "Work orders are saved verbatim at C:/git/ht-lanes/wo/<issue>.md (outside the repo) so a resumed session can re-dispatch without re-analysing.",
     "Tester and security run in parallel on the same commit range where security applies. An issue is ready only when both approve; a REJECT and a BLOCK in the same round count as one round trip.",
     "State is committed on sprint/auto-fixes after every transition. The branch is pushed at lane-level events, not per state commit, because every push starts a CI run.",
-    "Lane D's branch starts from sprint/auto-fixes with sprint/lane-d-recipes (a355753) merged in, per #352's sprint 6 decision. Lanes B and C wait for lane A's merge."
+    "Lane D's branch starts from sprint/auto-fixes with sprint/lane-d-recipes (a355753) merged in, per #352's sprint 6 decision. Lanes B and C wait for lane A's merge.",
+    "#447: src/components/index.ts belongs to no lane, so QuickAddSheet is imported by path. SettingsScreen \"three spreadsheet files\" wording (stale after #447) is a wording finding: filed in #464, not worked."
   ],
   "lanes": {
     "A": {
@@ -124,9 +125,12 @@
     },
     "447": {
       "lane": "A",
-      "status": "analysing",
+      "status": "in_dev",
       "roundTrips": 0,
-      "security": "required (schema, database.ts, backup restore, csvExport)"
+      "security": "required (schema, database.ts, backup restore, csvExport)",
+      "workOrder": "C:/git/ht-lanes/wo/447.md",
+      "deviceCheck": "decision 9",
+      "notes": "work order ready; rulings: no barrel edit (import by path), Settings wording to #464, en-GB chip labels, listed test edits pre-authorised"
     },
     "450": {
       "lane": "D",
@@ -150,7 +154,7 @@
     }
   },
   "foundDuringSprint": [],
-  "smallFindingsIssue": null,
+  "smallFindingsIssue": 464,
   "log": [
     {
       "at": "2026-11-14T15:20:00Z",
@@ -180,6 +184,14 @@
     {
       "at": "2026-11-14T14:07:28.865Z",
       "event": "#450 work order saved; issue waits its turn in lane D"
+    },
+    {
+      "at": "2026-11-14T14:09:10.673Z",
+      "event": "filed #464 Sprint 6: small findings (Settings CSV wording)"
+    },
+    {
+      "at": "2026-11-14T14:09:10.674Z",
+      "event": "#447 work order saved; developer dispatched (round 1)"
     }
   ]
 }
