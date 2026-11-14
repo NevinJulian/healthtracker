@@ -825,6 +825,19 @@ export const MIGRATIONS: Migration[] = [
   ALTER TABLE recipe_library ADD COLUMN archived_at TEXT;
 ` },
   { version: 39, sql: 'ALTER TABLE workout_set_log ADD COLUMN set_type TEXT;' },
+  { version: 40, sql: `
+  CREATE TABLE IF NOT EXISTS food_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    label TEXT,
+    calories REAL NOT NULL,
+    protein REAL NOT NULL DEFAULT 0,
+    carbs REAL NOT NULL DEFAULT 0,
+    fat REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_food_log_date ON food_log(date);
+` },
 ];
 
 /**

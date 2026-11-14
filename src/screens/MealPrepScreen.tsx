@@ -25,6 +25,7 @@ import {
   getRecipes,
   getRecipesIncludingArchived,
   getOftenCookedRecipes,
+  getFoodLogTotalsByDate,
   Recipe,
   MealInventoryWithRecipe,
   WeeklyMealPlanItem,
@@ -110,6 +111,7 @@ export default function MealPrepScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [planRecipes, setPlanRecipes] = useState<Recipe[]>([]);
   const [oftenCookedIds, setOftenCookedIds] = useState<string[]>([]);
+  const [foodLogTotals, setFoodLogTotals] = useState<Record<string, { calories: number; protein: number }>>({});
 
   // Tracks whether the screen has completed its first load. Post-action
   // refreshes (handleLogCookedMeal, handleAssignMeal, handleToggleConsumed)
@@ -145,12 +147,14 @@ export default function MealPrepScreen() {
       setLoading(true);
     }
     try {
-      const [inv, plan, allRecipes, allPlanRecipes, oftenIds] = await Promise.all([
+      const today = toISODate();
+      const [inv, plan, allRecipes, allPlanRecipes, oftenIds, entryTotals] = await Promise.all([
         getMealInventory(),
         getWeeklyMealPlan(),
         getRecipes(),
         getRecipesIncludingArchived(),
         loadOftenCookedIds(),
+        getFoodLogTotalsByDate(today, addDaysKey(today, 6)),
       ]);
       if (!mountedRef.current || runIdRef.current !== runId) return;
       setInventory(inv);
@@ -158,6 +162,7 @@ export default function MealPrepScreen() {
       setRecipes(allRecipes);
       setPlanRecipes(allPlanRecipes);
       setOftenCookedIds(oftenIds);
+      setFoodLogTotals(entryTotals);
       hasLoadedOnceRef.current = true;
     } catch (err) {
       if (!mountedRef.current || runIdRef.current !== runId) return;
@@ -405,8 +410,13 @@ export default function MealPrepScreen() {
             lunchPlan?.is_consumed && lunchRecipe,
             dinnerPlan?.is_consumed && dinnerRecipe,
           ].filter(Boolean) as Recipe[];
-          const totalKcal = consumed.reduce((s, r) => s + (r.calories || 0), 0);
-          const totalProtein = consumed.reduce((s, r) => s + (r.protein || 0), 0);
+          const entryTotal = foodLogTotals[dateStr];
+          const totalKcal = Math.round(
+            consumed.reduce((s, r) => s + (r.calories || 0), 0) + (entryTotal?.calories ?? 0)
+          );
+          const totalProtein = Math.round(
+            consumed.reduce((s, r) => s + (r.protein || 0), 0) + (entryTotal?.protein ?? 0)
+          );
 
           return (
             <Card

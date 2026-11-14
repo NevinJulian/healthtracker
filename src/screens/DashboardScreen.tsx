@@ -32,6 +32,8 @@ import {
   syncRollingSchedule,
   toISODate,
   getTodaysMealsWithRecipe,
+  getFoodLogForDate,
+  type FoodLogEntry,
   MealPlanWithRecipe,
   toggleMealConsumed,
   getWaterForDay,
@@ -59,6 +61,8 @@ import {
 } from '../components';
 import { iconChipIconColor } from '../components/IconChip';
 import LoadErrorView from '../components/LoadErrorView';
+import QuickAddSheet from '../components/QuickAddSheet';
+import { formatEntrySummary } from '../components/quickAddInput';
 
 // ─── Verdure circle checkbox ──────────────────────────────────────────────────
 // Replaces old square Checkbox: 24px circle, empty = line2 ring, done = sage fill
@@ -310,6 +314,8 @@ function HammerSection({
 export default function DashboardScreen() {
   const [entry, setEntry] = useState<DailyLogEntry | null>(null);
   const [todaysMeals, setTodaysMeals] = useState<MealPlanWithRecipe[]>([]);
+  const [todaysEntries, setTodaysEntries] = useState<FoodLogEntry[]>([]);
+  const [quickAdd, setQuickAdd] = useState<{ entry: FoodLogEntry | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<'initial' | 'refresh' | null>(null);
 
@@ -401,9 +407,10 @@ export default function DashboardScreen() {
     }
     try {
       await syncRollingSchedule();
-      const [data, meals, water, goal, measurements, setsToday] = await Promise.all([
+      const [data, meals, entries, water, goal, measurements, setsToday] = await Promise.all([
         getLogByDate(date),
         getTodaysMealsWithRecipe(date),
+        getFoodLogForDate(date),
         getWaterForDay(date),
         getHydrationGoal(),
         getLatestMeasurements(),
@@ -413,6 +420,7 @@ export default function DashboardScreen() {
 
       setEntry(data);
       setTodaysMeals(meals);
+      setTodaysEntries(entries);
       setWaterMl(water);
       setHydrationGoal(goal);
       setLatestMeasurements(measurements);
@@ -478,6 +486,15 @@ export default function DashboardScreen() {
       subscription.remove();
     };
   }, [loadToday]);
+
+  const reloadTodaysEntries = async () => {
+    try {
+      setTodaysEntries(await getFoodLogForDate(toISODate()));
+    } catch (err) {
+      console.error('DashboardScreen: getFoodLogForDate error', err);
+      setLoadError('refresh');
+    }
+  };
 
   const handleToggle = async (
     field: 'walk_completed' | 'hammer_completed' | 'fasting_completed'
@@ -907,6 +924,21 @@ export default function DashboardScreen() {
           ) : (
             <Text style={styles.emptyHint}>No meals planned for today.</Text>
           )}
+          {todaysEntries.map((item) => {
+            const title = item.label ?? 'Quick add';
+            return (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => setQuickAdd({ entry: item })}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${title}`}
+              >
+                <Row title={title} subtitle={formatEntrySummary(item)} />
+              </TouchableOpacity>
+            );
+          })}
+          <Button title="+ Quick add" variant="ghost" onPress={() => setQuickAdd({ entry: null })} />
         </View>
 
         {/* ── Body Weight Logging ──────────────────────────────────────────── */}
@@ -1092,6 +1124,14 @@ export default function DashboardScreen() {
         isVisible={isExtraModalVisible}
         onClose={() => setExtraModalVisible(false)}
         onAddWorkout={handleAddExtraWorkout}
+      />
+
+      <QuickAddSheet
+        visible={quickAdd !== null}
+        today={today}
+        entry={quickAdd?.entry ?? null}
+        onClose={() => setQuickAdd(null)}
+        onChanged={() => void reloadTodaysEntries()}
       />
 
       {/* ── Body Measurements Modal ──────────────────────────────────────── */}

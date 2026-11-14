@@ -72,6 +72,10 @@ jest.mock('../../db/database', () => ({
     return `${y}-${m}-${day}`;
   }),
   getTodaysMealsWithRecipe: jest.fn(() => Promise.resolve([])),
+  getFoodLogForDate: jest.fn(() => Promise.resolve([])),
+  addFoodLogEntry: jest.fn(() => Promise.resolve(1)),
+  updateFoodLogEntry: jest.fn(() => Promise.resolve(undefined)),
+  deleteFoodLogEntry: jest.fn(() => Promise.resolve(undefined)),
   toggleMealConsumed: jest.fn(() => Promise.resolve(undefined)),
   getWaterForDay: jest.fn(() => Promise.resolve(0)),
   addWater: jest.fn(() => Promise.resolve(undefined)),
