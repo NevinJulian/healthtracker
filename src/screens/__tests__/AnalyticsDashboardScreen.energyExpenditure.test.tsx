@@ -202,9 +202,9 @@ describe('EnergyExpenditureCard', () => {
   });
 
   it('shows no button when the suggestion is within 10 kcal of the goal', () => {
-    const { queryByLabelText, queryByText } = card({ result: { ...ESTIMATE, estimate: 2010 } });
+    const { queryByLabelText, getByText } = card({ result: { ...ESTIMATE, estimate: 2010 } });
     expect(queryByLabelText('Apply')).toBeNull();
-    expect(queryByText(/Suggested goal/)).toBeNull();
+    expect(getByText('Suggested goal 2010 kcal (now 2000)')).toBeTruthy();
   });
 
   it('shows the suggestion even when it equals the current goal', () => {

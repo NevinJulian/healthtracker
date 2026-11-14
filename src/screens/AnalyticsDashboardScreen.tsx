@@ -100,7 +100,6 @@ import {
   computeAdaptiveTdee,
   suggestGoalCalories,
   canApply,
-  APPLY_DEADBAND_KCAL,
   type AdaptiveTdeeResult,
 } from '../nutrition/adaptiveTdee';
 import type { GoalType } from '../nutrition/tdee';
@@ -1174,8 +1173,6 @@ export function EnergyExpenditureCard({
     suggestion !== null
       ? canApply({ suggestion, currentGoal, todayISO, appliedOn })
       : { show: false, returnsOn: null };
-  const suggestionDiffers =
-    suggestion !== null && Math.abs(suggestion - currentGoal) > APPLY_DEADBAND_KCAL;
 
   const confirmApply = () => {
     if (suggestion === null) return;
@@ -1231,7 +1228,7 @@ export function EnergyExpenditureCard({
         </View>
       )}
 
-      {suggestionDiffers && (
+      {suggestion !== null && (
         <Text style={styles.energySuggestion}>
           {`Suggested goal ${suggestion} kcal (now ${currentGoal})`}
         </Text>
