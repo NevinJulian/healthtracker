@@ -130,10 +130,11 @@
     },
     "450": {
       "lane": "D",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "security": "required (database.ts shopping-list writes)",
-      "notes": "analyst running ahead, read-only on sprint/auto-fixes (files untouched by #352/#451/#454)"
+      "notes": "work order ready (written ahead on sprint/auto-fixes e65a92f); waits for #352, #451, #454 in lane order. Re-check line numbers before dispatch.",
+      "workOrder": "C:/git/ht-lanes/wo/450.md"
     },
     "451": {
       "lane": "D",
@@ -175,6 +176,10 @@
     {
       "at": "2026-11-14T14:06:32.103Z",
       "event": "#450 analyst dispatched ahead (read-only)"
+    },
+    {
+      "at": "2026-11-14T14:07:28.865Z",
+      "event": "#450 work order saved; issue waits its turn in lane D"
     }
   ]
 }
