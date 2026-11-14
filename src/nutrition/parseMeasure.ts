@@ -155,10 +155,12 @@ function detectUnit(token: string): { unit: string; isLiquid: boolean } | null {
     case 'litre':
       return { unit: 'l', isLiquid: true };
     case 'tsp':
+    case 'tl':
     case 'teaspoon':
     case 't':
       return { unit: 'tsp', isLiquid: false };
     case 'tbsp':
+    case 'el':
     case 'tablespoon':
     case 'tb':
     case 'tbl':
