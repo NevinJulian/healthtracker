@@ -228,7 +228,6 @@ describe('parseIngredientLine allow-list', () => {
     '1 Becher Sahne',
     '1 Würfel Hefe',
     '1 cup/240 ml milk',
-    '100 g/3.5 oz flour',
   ])('keeps %s as a name without a quantity', (line) => {
     expectNameOnly(line);
   });
@@ -249,7 +248,7 @@ describe('parseIngredientLine invariants', () => {
     'splash', 'dash', 'drizzle', 'glug', 'knob', 'handful', 'gr', 'Gr', 'gr.', 'cube', 'bowl', 'spoon',
     'spoonful', 'scoop', 'dollop', 'sheet', 'strip', 'mg', 'cm', 'mm', 'meter', 'ft', 'yard', 'Glas',
     'Becher', 'Schuss', 'Spritzer', 'Tropfen', 'Würfel', 'Tafel', 'Riegel', 'Kugel', 'Löffel', 'Schale',
-    'Tüte', 'Beutel', 'Pfund', 'Pfd.', 'Unze', 'Zentimeter', 'Deziliter', 'Zentiliter',
+    'Tüte', 'Beutel', 'Pfund', 'Pfd.', 'Unze', 'Zentimeter', 'Deziliter', 'Zentiliter', 'Pk.', 'Pr.', 'Pk', 'Pr',
   ];
   const QUANTITIES = ['1', '2', '1/2', '1 1/2'];
 
@@ -277,7 +276,6 @@ describe('parseIngredientLine invariants', () => {
     '1 tablespoon plus 1 teaspoon oil',
     '1 cup + 2 tbsp flour',
     '1 cup/240 ml milk',
-    '100 g/3.5 oz flour',
     '2 x 400 g Dose Tomaten',
     '2x400g Tomaten',
     '3 × 125 g Mozzarella',
@@ -287,7 +285,6 @@ describe('parseIngredientLine invariants', () => {
     '2 oder 3 Zwiebeln',
     '1 cup & 2 tbsp flour',
     '1 EL + 1 TL Honig',
-    '200 g/7 oz butter',
     '1 cup / 240 ml milk',
     '1 1/2 cups plus 1 tbsp flour',
     '2 tbsp + 1 tsp sugar',
@@ -304,5 +301,107 @@ describe('parseIngredientLine invariants', () => {
     '1 cup 240 ml milk',
   ])('keeps %s as the whole line', (line) => {
     expectNameOnly(line);
+  });
+});
+
+describe('sprint 5 probe lines', () => {
+  it.each([
+    '1 heaped tsp sugar',
+    '2 level tablespoons flour',
+    '1 scant cup milk',
+    '2 gestrichene TL Backpulver',
+    '1 gehäufter EL Zucker',
+    '2 level tsp salt',
+    '1 rounded tablespoon honey',
+    '1 large tsp sugar',
+    '1 gestr. TL Salz',
+    '2 large cloves garlic',
+    '1 fresh bunch parsley',
+    '1 Pk. Hefe',
+    '1 Pr. Salz',
+    '1 tsp each salt and pepper',
+    '1 TL je Salz und Pfeffer',
+    '1 EL je',
+  ])('round 3: keeps %s as a name without a quantity', (line) => {
+    expectNameOnly(line);
+  });
+
+  it.each([
+    ['250 gr butter', 'butter', 250],
+    ['100 gr. Butter', 'Butter', 100],
+    ['250g/9oz plain flour', 'plain flour', 250],
+    ['100 g/3.5 oz flour', 'flour', 100],
+    ['200 g/7 oz butter', 'butter', 200],
+    ['500 g Mehl Type 405', 'Mehl Type 405', 500],
+    ['200 g Mehl 405', 'Mehl 405', 200],
+  ])('reads %s', (line, name, quantity) => {
+    expect(parseIngredientLine(line)).toEqual({ name, quantity, unit: 'g' });
+  });
+
+  it.each([
+    '1 gr. Zwiebel',
+    '1 Becher Schmand',
+    '1 Glas Rotwein',
+    '1/2 Würfel Hefe',
+    '1.000 g Mehl',
+    '1,000 g flour',
+    '1,000 ml milk',
+    '8 fl oz milk',
+    '1 pint cream',
+    '1 quart stock',
+    '1 gallon water',
+    '2 T butter',
+    '1 t salt',
+    '1 c flour',
+    '1 to 2 tablespoons oil',
+    '1/2 cup plus 2 tablespoons sugar',
+    '1 cup/240 ml milk',
+    '250 ml/9 fl oz milk',
+    '1 cup 240 ml milk',
+    '2 cups flour, plus 2 tablespoons',
+    '1 g 250 flour',
+  ])('guard: keeps %s as a name without a quantity', (line) => {
+    expectNameOnly(line);
+  });
+
+  it('guard: keeps the count of 2 Stangen Lauch', () => {
+    expect(parseIngredientLine('2 Stangen Lauch')).toEqual({ name: 'Stangen Lauch', quantity: 2, unit: 'whole' });
+  });
+
+  it.each([
+    ['2 extra large eggs', 'extra large eggs', 2],
+    ['1 xl egg', 'xl egg', 1],
+    ['3 Eier (Größe M)', 'Eier (Größe M)', 3],
+    ['1 jar pasta sauce', 'jar pasta sauce', 1],
+    ['2 große Zwiebeln', 'große Zwiebeln', 2],
+  ])('guard: keeps the count of %s', (line, name, quantity) => {
+    expect(parseIngredientLine(line)).toEqual({ name, quantity, unit: 'whole' });
+  });
+
+  // CUP: #454 updates these
+  it.each([
+    ['1-1/2 cups flour'],
+    ['1 1/2 cups flour'],
+  ])('guard: CUP: #454 updates these, %s is 360 g', (line) => {
+    expect(parseIngredientLine(line)).toEqual({ name: 'flour', quantity: 360, unit: 'g' });
+  });
+
+  it('reads gr as grams from 10 up only', () => {
+    expect(parseIngredientLine('10 gr flour')).toEqual({ name: 'flour', quantity: 10, unit: 'g' });
+    expectNameOnly('9 gr flour');
+  });
+
+  it('takes a second measure only after a mass unit and only when it is a unit', () => {
+    expect(parseIngredientLine('1 kg/2.2 lb potatoes')).toEqual({ name: 'potatoes', quantity: 1000, unit: 'g' });
+    expectNameOnly('250 g/2 Zwiebeln');
+  });
+
+  it('returns quickly on long hostile lines', () => {
+    for (const line of ['1 '.repeat(250), '1/'.repeat(250), '123456789/'.repeat(50)]) {
+      const started = Date.now();
+      const result = parseIngredientLine(line);
+      expect(Date.now() - started).toBeLessThan(50);
+      expect(result.quantity).toBe(0);
+    }
   });
 });
