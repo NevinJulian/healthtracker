@@ -85,6 +85,32 @@ describe('adaptive TDEE apply', () => {
     expect(await db.getNutritionGoals()).toEqual({ calories: 2100, protein: 140 });
   });
 
+  it.each([
+    ['NaN', NaN, '2024-06-30'],
+    ['Infinity', Infinity, '2024-06-30'],
+    ['a fraction', 2150.5, '2024-06-30'],
+    ['below 1000', 999, '2024-06-30'],
+    ['above 10000', 10001, '2024-06-30'],
+    ['a malformed date', 2150, '2024-6-30'],
+    ['an empty date', 2150, ''],
+  ])('rejects %s and writes nothing', async (_name, kcal, date) => {
+    const { db } = loadFresh();
+    await db.initDatabase();
+    await db.setNutritionGoals(2000, 140);
+
+    await expect(db.applyAdaptiveCalorieGoal(kcal, date)).rejects.toThrow();
+
+    expect(await db.getNutritionGoals()).toEqual({ calories: 2000, protein: 140 });
+    expect(await db.getAdaptiveTdeeAppliedOn()).toBeNull();
+  });
+
+  it.each([1000, 10000])('accepts %d kcal', async (kcal) => {
+    const { db } = loadFresh();
+    await db.initDatabase();
+    await db.applyAdaptiveCalorieGoal(kcal, '2024-06-30');
+    expect((await db.getNutritionGoals()).calories).toBe(kcal);
+  });
+
   it('keeps the goal and the apply date through a backup and restore', async () => {
     const { db, backup } = loadFresh();
     await db.initDatabase();

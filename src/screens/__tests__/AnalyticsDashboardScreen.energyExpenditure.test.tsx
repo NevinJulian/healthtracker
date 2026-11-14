@@ -207,6 +207,18 @@ describe('EnergyExpenditureCard', () => {
     expect(queryByText(/Suggested goal/)).toBeNull();
   });
 
+  it('shows the suggestion even when it equals the current goal', () => {
+    const { getByText, queryByLabelText } = card({ result: { ...ESTIMATE, estimate: 2000 } });
+    expect(getByText('Suggested goal 2000 kcal (now 2000)')).toBeTruthy();
+    expect(queryByLabelText('Apply')).toBeNull();
+  });
+
+  it('shows the suggestion during the wait without the button', () => {
+    const { getByText, queryByLabelText } = card({ appliedOn: '2024-06-27' });
+    expect(getByText('Suggested goal 2200 kcal (now 2000)')).toBeTruthy();
+    expect(queryByLabelText('Apply')).toBeNull();
+  });
+
   it('shows no suggestion without a goal type', () => {
     const { queryByLabelText, queryByText } = card({ goalType: null });
     expect(queryByLabelText('Apply')).toBeNull();
@@ -301,6 +313,25 @@ describe('AnalyticsDashboardScreen energy expenditure', () => {
     expect(applyAdaptiveCalorieGoal).toHaveBeenCalledWith(2200, '2024-06-30');
     expect(utils.queryByLabelText('Apply')).toBeNull();
     expect(utils.getByText('Apply is available again on 7 Jul 2024')).toBeTruthy();
+  });
+
+  it('a failed refresh after a successful apply shows the load banner and not the failed-apply alert', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const utils = render(<AnalyticsDashboardScreen />);
+    await triggerFocus();
+
+    fireEvent.press(utils.getByLabelText('Apply'));
+    const buttons = alertSpy.mock.calls[0][2];
+    jest.mocked(getConsumedMacrosByDay).mockRejectedValue(new Error('boom'));
+    await act(async () => {
+      await buttons[1].onPress();
+    });
+    await flush();
+
+    expect(applyAdaptiveCalorieGoal).toHaveBeenCalledWith(2200, '2024-06-30');
+    expect(utils.getByText("Couldn't refresh. Showing the last loaded data.")).toBeTruthy();
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
   });
 
   it('names the missing input when there is too little data', async () => {
