@@ -193,12 +193,17 @@
     },
     "451": {
       "lane": "D",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
-      "security": "skip unless the diff leaves the editor screen (UI-only)",
+      "security": "skipped: diff confined to RecipeEditorScreen.tsx and its tests (UI only, no db/api/fs/external input)",
       "notes": "work order ready (written ahead at 945399f); waits for #352. Its also-found (Alert throw leaves lock) filed in #464. Line numbers re-checked: no src/screens change between 945399f and 593d786. Round 1 dev STOPPED before pushing: the lock breaks RecipeEditorScreen.overlap first test, which encodes the removed scenario (edit during save supersedes the run). Orchestrator ruling: rewrite that one test in place for the same sequence (edit ignored, 1 lookup, saves run 1, goBack after OK), own commit, second test byte-identical. Not a round trip (no tester verdict).",
       "workOrder": "C:/git/ht-lanes/wo/451.md",
-      "deviceCheck": "none (decision 5)"
+      "deviceCheck": "none (decision 5)",
+      "commits": [
+        "aa0e52c test",
+        "4b89e9d test (overlap rewrite)",
+        "4380268 fix"
+      ]
     },
     "454": {
       "lane": "D",
@@ -358,6 +363,10 @@
     {
       "at": "2026-11-14T14:39:50.474Z",
       "event": "#451 developer stopped on overlap test; ruling sent (rewrite first case)"
+    },
+    {
+      "at": "2026-11-14T14:40:42.116Z",
+      "event": "#451 round 1 developer done (tip 4380268, 2379 tests); tester dispatched; security skipped (UI only)"
     }
   ],
   "pendingFinish": [
