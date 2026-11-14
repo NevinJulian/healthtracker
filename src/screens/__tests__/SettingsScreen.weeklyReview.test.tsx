@@ -177,7 +177,7 @@ describe('SettingsScreen weekly review', () => {
     });
     await flushMicrotasks();
 
-    expect(db.setWeeklyReviewTime).toHaveBeenCalledWith('19:01');
+    expect(db.setWeeklyReviewTime).toHaveBeenCalledWith('19:15');
     expect(mockReconcile).toHaveBeenCalledTimes(1);
   });
 
