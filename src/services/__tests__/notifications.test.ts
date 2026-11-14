@@ -50,6 +50,9 @@ jest.mock('../../db/database', () => ({
   getBackupReminderEnabled: jest.fn(),
   getBackupReminderDay: jest.fn(),
   getBackupReminderTime: jest.fn(),
+  getWeeklyReviewEnabled: jest.fn(),
+  getWeeklyReviewDay: jest.fn(),
+  getWeeklyReviewTime: jest.fn(),
   getCookWhenEmptyEnabled: jest.fn(),
 }));
 
@@ -81,6 +84,9 @@ beforeEach(() => {
   jest.mocked(db.getBackupReminderEnabled).mockResolvedValue(false);
   jest.mocked(db.getBackupReminderDay).mockResolvedValue(0);
   jest.mocked(db.getBackupReminderTime).mockResolvedValue('18:00');
+  jest.mocked(db.getWeeklyReviewEnabled).mockResolvedValue(false);
+  jest.mocked(db.getWeeklyReviewDay).mockResolvedValue(0);
+  jest.mocked(db.getWeeklyReviewTime).mockResolvedValue('19:00');
 });
 
 describe('parseTimeString', () => {
@@ -702,6 +708,7 @@ describe('reconcile skips unchanged reminders', () => {
     jest.mocked(db.getWeeklyCookDayTime).mockResolvedValue(cookTime);
     jest.mocked(db.getMealReminderEnabled).mockResolvedValue(true);
     jest.mocked(db.getBackupReminderEnabled).mockResolvedValue(true);
+    jest.mocked(db.getWeeklyReviewEnabled).mockResolvedValue(true);
   }
 
   function osListFrom(entries: Map<string, unknown>) {
@@ -717,7 +724,7 @@ describe('reconcile skips unchanged reminders', () => {
     enableAll();
 
     await reconcileScheduledNotifications();
-    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(6);
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(7);
 
     jest.mocked(Notifications.scheduleNotificationAsync).mockClear();
     jest.mocked(Notifications.cancelScheduledNotificationAsync).mockClear();
@@ -772,7 +779,7 @@ describe('reconcile skips unchanged reminders', () => {
     jest.mocked(Notifications.getAllScheduledNotificationsAsync).mockRejectedValue(new Error('no list'));
     await expect(reconcileScheduledNotifications()).resolves.toBeUndefined();
 
-    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(6);
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(7);
   });
 
   it('re-enabling a reminder that was disabled schedules it again', async () => {

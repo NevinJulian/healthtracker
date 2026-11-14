@@ -59,6 +59,9 @@ import {
   getBackupReminderEnabled,
   getBackupReminderDay,
   getBackupReminderTime,
+  getWeeklyReviewEnabled,
+  getWeeklyReviewDay,
+  getWeeklyReviewTime,
   type MealType,
 } from '../db/database';
 
@@ -77,6 +80,11 @@ const COOKDAY_REMINDER_IDENTIFIER = 'cookday-reminder';
 const BACKUP_REMINDER_IDENTIFIER = 'backup-reminder';
 /** app_state key for the OS-scheduled notification id. */
 const BACKUP_REMINDER_ID_KEY = 'backupReminderNotificationId';
+
+/** Stable notification identifier for the weekly review. */
+const WEEKLY_REVIEW_IDENTIFIER = 'weekly-review';
+/** app_state key for the OS-scheduled notification id. */
+const WEEKLY_REVIEW_ID_KEY = 'weeklyReviewNotificationId';
 
 /**
  * app_state flag gating the one-shot post-upgrade sweep in
@@ -498,6 +506,108 @@ export async function cancelBackupReminder(): Promise<void> {
   await cancelReminder(BACKUP_REMINDER_IDENTIFIER, BACKUP_REMINDER_ID_KEY, 'backup reminder');
 }
 
+// ─── Weekly review ───────────────────────────────────────────────────────────
+
+/**
+ * Returns the stable notification identifier string for the weekly review.
+ * Exported for use in tests.
+ */
+export function getWeeklyReviewIdentifier(): string {
+  return WEEKLY_REVIEW_IDENTIFIER;
+}
+
+/**
+ * Schedule a weekly repeating review notification on the given weekday + time.
+ * Cancels any previously scheduled weekly review first.
+ *
+ * @param day  0–6 (0 = Sunday)
+ * @param time "HH:MM"
+ */
+export async function scheduleWeeklyReview(day: number, time: string): Promise<void> {
+  try {
+    await cancelWeeklyReview();
+
+    const { hour, minute } = parseTimeString(time);
+    const weekday = mapWeekdayToExpo(day);
+
+    const id = await Notifications.scheduleNotificationAsync({
+      identifier: getWeeklyReviewIdentifier(),
+      content: {
+        title: 'Your week in review',
+        body: 'Tap to see the last 7 days.',
+        sound: false,
+        ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday,
+        hour,
+        minute,
+      },
+    });
+
+    await setSetting(WEEKLY_REVIEW_ID_KEY, id);
+    lastScheduledSignature.set(WEEKLY_REVIEW_IDENTIFIER, weeklySignature(weekday, hour, minute));
+    console.log(`[Notifications] Weekly review scheduled (weekday ${weekday}, ${time}, id: ${id})`);
+  } catch (err) {
+    console.warn('[Notifications] scheduleWeeklyReview failed:', err);
+  }
+}
+
+/**
+ * Cancel the previously scheduled weekly review (if any).
+ * Silently succeeds when no review was previously scheduled.
+ */
+export async function cancelWeeklyReview(): Promise<void> {
+  await cancelReminder(WEEKLY_REVIEW_IDENTIFIER, WEEKLY_REVIEW_ID_KEY, 'weekly review');
+}
+
+type ResponseListener = Parameters<typeof Notifications.addNotificationResponseReceivedListener>[0];
+
+function isWeeklyReviewResponse(response: Parameters<ResponseListener>[0]): boolean {
+  return response.notification.request.identifier === WEEKLY_REVIEW_IDENTIFIER;
+}
+
+/**
+ * Call `onTap` whenever the user taps the weekly review notification while the
+ * app is running. Taps on any other notification are ignored. Returns the
+ * function that removes the listener.
+ */
+export function subscribeToWeeklyReviewTaps(onTap: () => void): () => void {
+  try {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (isWeeklyReviewResponse(response)) onTap();
+    });
+    return () => {
+      try {
+        subscription.remove();
+      } catch (err) {
+        console.warn('[Notifications] removing the weekly review tap listener failed:', err);
+      }
+    };
+  } catch (err) {
+    console.warn('[Notifications] subscribeToWeeklyReviewTaps failed:', err);
+    return () => {};
+  }
+}
+
+/**
+ * True when the app was opened by tapping the weekly review notification.
+ * Reads the launch response once and clears it, whichever notification it was
+ * for, so it cannot be reported again.
+ */
+export function takeLaunchWeeklyReviewTap(): boolean {
+  try {
+    const response = Notifications.getLastNotificationResponse();
+    if (!response) return false;
+    Notifications.clearLastNotificationResponse();
+    return isWeeklyReviewResponse(response);
+  } catch (err) {
+    console.warn('[Notifications] takeLaunchWeeklyReviewTap failed:', err);
+    return false;
+  }
+}
+
 // ─── Reconcile ───────────────────────────────────────────────────────────────
 
 /** The `_reconcile()` pass currently in flight, if any (#311). */
@@ -684,22 +794,23 @@ async function _reconcile(): Promise<void> {
   } catch (err) {
     console.warn('[Notifications] reconcile: backup reminder failed:', err);
   }
-}
 
-// ─── Weekly review ───────────────────────────────────────────────────────────
+  // Weekly review
+  try {
+    const reviewEnabled = await getWeeklyReviewEnabled();
+    const reviewDay = await getWeeklyReviewDay();
+    const reviewTime = await getWeeklyReviewTime();
 
-export function getWeeklyReviewIdentifier(): string {
-  return '';
-}
-
-export async function scheduleWeeklyReview(day: number, time: string): Promise<void> {}
-
-export async function cancelWeeklyReview(): Promise<void> {}
-
-export function subscribeToWeeklyReviewTaps(onTap: () => void): () => void {
-  return () => {};
-}
-
-export function takeLaunchWeeklyReviewTap(): boolean {
-  return false;
+    const { hour: reviewHour, minute: reviewMinute } = parseTimeString(reviewTime);
+    if (reviewEnabled) {
+      const signature = weeklySignature(mapWeekdayToExpo(reviewDay), reviewHour, reviewMinute);
+      if (!isCurrent(WEEKLY_REVIEW_IDENTIFIER, signature)) {
+        await scheduleWeeklyReview(reviewDay, reviewTime);
+      }
+    } else {
+      await cancelWeeklyReview();
+    }
+  } catch (err) {
+    console.warn('[Notifications] reconcile: weekly review failed:', err);
+  }
 }
