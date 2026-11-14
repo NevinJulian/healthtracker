@@ -685,3 +685,21 @@ async function _reconcile(): Promise<void> {
     console.warn('[Notifications] reconcile: backup reminder failed:', err);
   }
 }
+
+// ─── Weekly review ───────────────────────────────────────────────────────────
+
+export function getWeeklyReviewIdentifier(): string {
+  return '';
+}
+
+export async function scheduleWeeklyReview(day: number, time: string): Promise<void> {}
+
+export async function cancelWeeklyReview(): Promise<void> {}
+
+export function subscribeToWeeklyReviewTaps(onTap: () => void): () => void {
+  return () => {};
+}
+
+export function takeLaunchWeeklyReviewTap(): boolean {
+  return false;
+}

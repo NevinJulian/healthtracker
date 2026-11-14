@@ -3784,3 +3784,27 @@ export async function setBackupReminderTime(time: string): Promise<void> {
   assertTime(time);
   await setSetting(SETTING_BACKUP_REMINDER_TIME, time);
 }
+
+// ── Weekly review settings and reads ─────────────────────────────────────────
+
+export async function getWeeklyReviewEnabled(): Promise<boolean> {
+  return false;
+}
+
+export async function setWeeklyReviewEnabled(enabled: boolean): Promise<void> {}
+
+export async function getWeeklyReviewDay(): Promise<number> {
+  return 0;
+}
+
+export async function setWeeklyReviewDay(day: number): Promise<void> {}
+
+export async function getWeeklyReviewTime(): Promise<string> {
+  return '';
+}
+
+export async function setWeeklyReviewTime(time: string): Promise<void> {}
+
+export async function getWorkoutSetsBetween(fromISO: string, toISO: string): Promise<WorkoutSet[]> {
+  return [];
+}
