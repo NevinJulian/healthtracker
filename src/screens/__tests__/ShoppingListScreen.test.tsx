@@ -19,8 +19,8 @@ import { getShoppingListItems, ShoppingListItem } from '../../db/database';
 
 const mockGetItems = jest.mocked(getShoppingListItems);
 
-function item(id: number, name: string, is_checked = false): ShoppingListItem {
-  return { id, ingredient_name: name, total_quantity: 2, unit: 'g', is_checked };
+function item(id: number, name: string, is_checked = false, total_quantity = 2): ShoppingListItem {
+  return { id, ingredient_name: name, total_quantity, unit: 'g', is_checked };
 }
 
 const SECTION_TITLES = [
@@ -103,5 +103,16 @@ describe('ShoppingListScreen quantities', () => {
     await waitFor(() => expect(view.getByText('Milk')).toBeTruthy());
 
     expect(view.getByText('1.25 l')).toBeTruthy();
+  });
+
+  it('shows only the name for a name-only line', async () => {
+    mockGetItems.mockReset();
+    mockGetItems.mockResolvedValue([item(1, 'Salt', false, 0), item(2, 'Onion')]);
+    const view = render(<ShoppingListScreen />);
+    await waitFor(() => expect(view.getByText('Salt')).toBeTruthy());
+
+    expect(view.queryByText('0 g')).toBeNull();
+    expect(view.queryByText('0')).toBeNull();
+    expect(view.getByText('2 g')).toBeTruthy();
   });
 });

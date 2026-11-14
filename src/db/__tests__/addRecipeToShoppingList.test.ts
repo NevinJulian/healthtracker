@@ -146,3 +146,29 @@ describe('addRecipeToShoppingList() (#320)', () => {
     expect(typeof db.insertCookingTask).toBe('function');
   });
 });
+
+
+describe('addRecipeToShoppingList() with name-only items', () => {
+  afterEach(() => {
+    jest.dontMock('expo-sqlite');
+  });
+
+  it('adds one name-only line and the cooking task', async () => {
+    const db = loadFreshDatabaseModule();
+    await db.initDatabase();
+    await db.addRecipeToShoppingList(
+      [
+        { name: 'Salt', quantity: 0, unit: 'pinch' },
+        { name: 'Salt', quantity: 0, unit: 'g' },
+      ],
+      'r001',
+      2,
+    );
+
+    const rows = await db.getShoppingListItems();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].ingredient_name).toBe('Salt');
+    expect(rows[0].total_quantity).toBe(0);
+    expect(await db.getCookingTasks()).toHaveLength(1);
+  });
+});
