@@ -81,6 +81,23 @@ describe('expoNotifications (Expo Go guard)', () => {
     expect(mockSetSetting).toHaveBeenCalledWith('workoutReminderNotificationId', 'workout-reminder');
   });
 
+  it('Expo Go on Android: the stub covers the notification tap API', () => {
+    inEnvironment({ os: 'android', expoGo: true }, true, (req) => {
+      const stub = req('../expoNotifications').default;
+      const notifications = req('../notifications');
+
+      const subscription = stub.addNotificationResponseReceivedListener(() => {});
+      expect(typeof subscription.remove).toBe('function');
+      expect(() => subscription.remove()).not.toThrow();
+      expect(stub.getLastNotificationResponse()).toBeNull();
+      expect(() => stub.clearLastNotificationResponse()).not.toThrow();
+
+      const unsubscribe = notifications.subscribeToWeeklyReviewTaps(() => {});
+      expect(() => unsubscribe()).not.toThrow();
+      expect(notifications.takeLaunchWeeklyReviewTap()).toBe(false);
+    });
+  });
+
   it('Expo Go on iOS: loads the real package', () => {
     inEnvironment({ os: 'ios', expoGo: true }, false, (req) => {
       const mod = req('../expoNotifications');
