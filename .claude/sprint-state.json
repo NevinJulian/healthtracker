@@ -132,12 +132,22 @@
     },
     "351": {
       "lane": "C",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
       "security": "required (database.ts goal write)",
       "workOrder": "C:/git/ht-lanes/wo/351.md",
       "deviceCheck": "decision 11",
-      "notes": "rulings: Analytics mock factories gain 2 functions; suggestGoals unchanged; stepper race -> #464; en-GB dates."
+      "notes": "rulings: Analytics mock factories gain 2 functions; suggestGoals unchanged; stepper race -> #464; en-GB dates. Round 1 dev: 139 suites / 2004 tests; 52 fail at fb7653f. Tester to judge: suggestion line hidden within 10 kcal (decision removes only the button?), input rows hidden in insufficient cases, two own-test fix commits.",
+      "preFeatureSha": "fb7653f",
+      "commits": [
+        "47cf24c..fb7653f tests+stubs (3)",
+        "8b880b1 refactor tdee",
+        "fc0c176 test fix",
+        "6b62204 feat maths",
+        "2cc8fb6 feat db",
+        "b3be8b7 test fix",
+        "77d9275 feat card"
+      ]
     },
     "352": {
       "lane": "D",
@@ -367,6 +377,10 @@
     {
       "at": "2026-11-14T14:40:42.116Z",
       "event": "#451 round 1 developer done (tip 4380268, 2379 tests); tester dispatched; security skipped (UI only)"
+    },
+    {
+      "at": "2026-11-14T14:41:43.595Z",
+      "event": "#351 round 1 developer done (tip 77d9275); tester + security dispatched"
     }
   ],
   "pendingFinish": [
