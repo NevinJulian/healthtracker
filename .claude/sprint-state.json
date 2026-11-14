@@ -150,7 +150,8 @@
         "339a12d..33ee1b1 tests (9 commits, red phase)",
         "0ccf030..6bcdf82 feature (11 commits, incl. 2 test-query fixes ad5c134, ef94a1a)"
       ],
-      "preFeatureSha": "33ee1b1"
+      "preFeatureSha": "33ee1b1",
+      "securityVerdict": "APPROVE round 1 (6bcdf82): all SQL bound; v40 append-only and idempotent; restore DELETE inside the txn, only when table live and key absent; writers re-validate and throw; sheet shows Alerts on failure; CSV label goes through guardFormula. Note: restore does not range-check food_log values (hand-edited backup) -> #464."
     },
     "450": {
       "lane": "D",
@@ -248,6 +249,10 @@
     {
       "at": "2026-11-14T14:22:50.831Z",
       "event": "#447 round 1 developer done (tip 6bcdf82, pre-feature 33ee1b1); tester + security dispatched"
+    },
+    {
+      "at": "2026-11-14T14:23:32.303Z",
+      "event": "#447 security APPROVE (round 1); #464 gained 2 items (restore range check, BioForceModal raw values)"
     }
   ]
 }
