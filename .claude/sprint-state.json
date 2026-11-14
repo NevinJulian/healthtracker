@@ -115,10 +115,11 @@
         454,
         450
       ],
-      "current": 454,
+      "current": 450,
       "done": [
         352,
-        451
+        451,
+        454
       ],
       "parked": [],
       "setup": "done: merge 945399f (parents 8e197c9, a355753), 1 hunk resolved by conflict agent taking the lane side; RecipeEditorScreen.tsx byte-identical to a355753 and differs from integration only by the draft parts (+46/-7, verified by orchestrator); 136 suites / 2270 tests green; pushed",
@@ -208,10 +209,10 @@
     },
     "450": {
       "lane": "D",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "security": "required (database.ts shopping-list writes)",
-      "notes": "work order ready (written ahead on sprint/auto-fixes e65a92f); waits for #352, #451, #454 in lane order. Re-check line numbers before dispatch.",
+      "notes": "work order ready (written ahead on sprint/auto-fixes e65a92f); waits for #352, #451, #454 in lane order. Re-check line numbers before dispatch. Lane D files for #450 untouched by #352/#451/#454 (checked against 8e197c9), so work order line numbers hold.",
       "workOrder": "C:/git/ht-lanes/wo/450.md"
     },
     "451": {
@@ -233,7 +234,7 @@
     },
     "454": {
       "lane": "D",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "security": "light check: new comma regexes read imported measure text (TheMealDB, URL import), so run despite the frozen-scope skip note",
       "workOrder": "C:/git/ht-lanes/wo/454.md",
@@ -248,7 +249,10 @@
         "5146104 pinch",
         "4d67b1a EL/TL"
       ],
-      "securityVerdict": "APPROVE round 1 (4d67b1a): new comma regexes linear (1M chars 40 ms); gramsPerCup prototype-safe; 200k fuzz finite, no throw."
+      "securityVerdict": "APPROVE round 1 (4d67b1a): new comma regexes linear (1M chars 40 ms); gramsPerCup prototype-safe; 200k fuzz finite, no throw.",
+      "testerVerdicts": [
+        "round 1 APPROVE: 56 fail pre-fix on values; 137/2456; all 15 planned assertion edits hand-checked; corpus diff 35/1233 lines changed, all dry-goods cup/spoon lines; liquids and other units identical. Accepted per decision: 1,234 kg reads as 1234 kg (thousands rule)."
+      ]
     }
   },
   "foundDuringSprint": [
@@ -448,6 +452,10 @@
     {
       "at": "2026-11-14T14:49:02.022Z",
       "event": "integration gates after lane C: typecheck pass, 139 suites / 2016 tests"
+    },
+    {
+      "at": "2026-11-14T14:49:21.865Z",
+      "event": "#454 tester APPROVE round 1 -> ready; #450 developer dispatched"
     }
   ],
   "pendingFinish": [
@@ -461,6 +469,8 @@
     "#351 tester: a goal restored from a hand-edited backup above ~9090 makes the suggestion exceed 10000; the writer throws and the card shows Couldn't change goal (fails safe)",
     "#454 security: parseMeasure can return baseQuantity Infinity for absurd digit runs (e.g. 400 nines + kg) on the Discover path, which has no MAX_QUANTITY guard; pre-existing, needs a corrupt TheMealDB response",
     "#454 security: normaliseIngredientName indexes ALIAS_MAP (plain object) without an own-key check, so an ingredient named __proto__ or constructor returns a non-string; parseMeasure catches it and returns quantity 0; pre-existing",
-    "#454 security: the existing rangeLeadMatch regex in parseMeasure is mildly super-linear on hostile 1-1-1-... input (100k chars ~0.5 s); Discover measures have no length cap; pre-existing"
+    "#454 security: the existing rangeLeadMatch regex in parseMeasure is mildly super-linear on hostile 1-1-1-... input (100k chars ~0.5 s); Discover measures have no length cap; pre-existing",
+    "#454 tester: parseMeasure ignores a stated gram weight in brackets (\"1 cup (125g) flour\" uses the cup conversion); pre-existing",
+    "#454 tester: parseMeasure does not know dl or cl (\"2 dl\" gives 2 whole) on the Discover path; the URL line parser handles them; pre-existing"
   ]
 }
