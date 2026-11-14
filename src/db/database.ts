@@ -3787,24 +3787,51 @@ export async function setBackupReminderTime(time: string): Promise<void> {
 
 // ── Weekly review settings and reads ─────────────────────────────────────────
 
+const SETTING_WEEKLY_REVIEW_ENABLED = 'weeklyReviewEnabled';
+const SETTING_WEEKLY_REVIEW_DAY     = 'weeklyReviewDay';
+const SETTING_WEEKLY_REVIEW_TIME    = 'weeklyReviewTime';
+
+const DEFAULT_WEEKLY_REVIEW_DAY  = 0;       // Sunday
+const DEFAULT_WEEKLY_REVIEW_TIME = '19:00';
+
+/** Returns false only when the weekly review was switched off. Default: true. */
 export async function getWeeklyReviewEnabled(): Promise<boolean> {
-  return false;
+  const raw = await getSetting(SETTING_WEEKLY_REVIEW_ENABLED);
+  return raw !== 'false';
 }
 
-export async function setWeeklyReviewEnabled(enabled: boolean): Promise<void> {}
+export async function setWeeklyReviewEnabled(enabled: boolean): Promise<void> {
+  await setSetting(SETTING_WEEKLY_REVIEW_ENABLED, enabled ? 'true' : 'false');
+}
 
+/** Returns the saved weekday (0–6, 0 = Sunday) for the weekly review. */
 export async function getWeeklyReviewDay(): Promise<number> {
-  return 0;
+  return parseDaySetting(await getSetting(SETTING_WEEKLY_REVIEW_DAY)) ?? DEFAULT_WEEKLY_REVIEW_DAY;
 }
 
-export async function setWeeklyReviewDay(day: number): Promise<void> {}
+export async function setWeeklyReviewDay(day: number): Promise<void> {
+  assertDay(day);
+  await setSetting(SETTING_WEEKLY_REVIEW_DAY, String(day));
+}
 
+/** Returns the saved time ("HH:MM") for the weekly review. Default: "19:00". */
 export async function getWeeklyReviewTime(): Promise<string> {
-  return '';
+  return parseTimeSetting(await getSetting(SETTING_WEEKLY_REVIEW_TIME)) ?? DEFAULT_WEEKLY_REVIEW_TIME;
 }
 
-export async function setWeeklyReviewTime(time: string): Promise<void> {}
+export async function setWeeklyReviewTime(time: string): Promise<void> {
+  assertTime(time);
+  await setSetting(SETTING_WEEKLY_REVIEW_TIME, time);
+}
 
+export const WORKOUT_SETS_BETWEEN_SQL = `SELECT * FROM workout_set_log WHERE date >= ? AND date <= ?
+     ORDER BY date ASC, exercise ASC, set_index ASC`;
+
+/**
+ * Return every set of every exercise logged from `fromISO` to `toISO`
+ * (inclusive), warm-ups included, ordered by date, exercise, then set_index.
+ */
 export async function getWorkoutSetsBetween(fromISO: string, toISO: string): Promise<WorkoutSet[]> {
-  return [];
+  const db = getDatabase();
+  return db.getAllAsync<WorkoutSet>(WORKOUT_SETS_BETWEEN_SQL, [fromISO, toISO]);
 }
