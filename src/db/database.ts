@@ -2346,7 +2346,8 @@ export interface DailyMacroTotals {
 /**
  * Return per-day macro totals (calories, protein, carbs, fat) from meals
  * that were marked as consumed in weekly_meal_plan, joined to recipe_library
- * for macro values. Only days that have at least one consumed meal appear.
+ * for macro values, plus the day's food_log entries. Only days that have at
+ * least one consumed meal or entry appear; mealCount counts meals only.
  *
  * @param days - How many calendar days back to look (default 30).
  */
@@ -2363,19 +2364,27 @@ export async function getConsumedMacrosByDay(days: number = 30): Promise<DailyMa
     meal_count: number;
   }>(
     `SELECT
-       p.date,
-       SUM(r.calories) AS calories,
-       SUM(r.protein)  AS protein,
-       SUM(r.carbs)    AS carbs,
-       SUM(r.fat)      AS fat,
-       COUNT(*)        AS meal_count
-     FROM weekly_meal_plan p
-     JOIN recipe_library r ON p.recipe_id = r.id
-     WHERE p.is_consumed = 1
-       AND p.date >= ?
-     GROUP BY p.date
-     ORDER BY p.date ASC`,
-    [cutoffISO]
+       date,
+       SUM(calories) AS calories,
+       SUM(protein)  AS protein,
+       SUM(carbs)    AS carbs,
+       SUM(fat)      AS fat,
+       SUM(is_meal)  AS meal_count
+     FROM (
+       SELECT p.date AS date, r.calories AS calories, r.protein AS protein,
+              r.carbs AS carbs, r.fat AS fat, 1 AS is_meal
+       FROM weekly_meal_plan p
+       JOIN recipe_library r ON p.recipe_id = r.id
+       WHERE p.is_consumed = 1
+         AND p.date >= ?
+       UNION ALL
+       SELECT date, calories, protein, carbs, fat, 0 AS is_meal
+       FROM food_log
+       WHERE date >= ?
+     )
+     GROUP BY date
+     ORDER BY date ASC`,
+    [cutoffISO, cutoffISO]
   );
 
   return rows.map((r) => ({
