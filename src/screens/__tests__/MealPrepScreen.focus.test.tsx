@@ -31,6 +31,7 @@ jest.mock('@react-navigation/native', () => ({
 jest.mock('../../db/database', () => ({
   getMealInventory: jest.fn(() => Promise.resolve([])),
   getWeeklyMealPlan: jest.fn(() => Promise.resolve([])),
+  getFoodLogTotalsByDate: jest.fn(() => Promise.resolve({})),
   logCookedMeal: jest.fn(() => Promise.resolve(undefined)),
   assignMealToPlan: jest.fn(() => Promise.resolve(undefined)),
   toggleMealConsumed: jest.fn(() => Promise.resolve(undefined)),
