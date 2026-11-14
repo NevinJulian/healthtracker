@@ -111,9 +111,10 @@
         454,
         450
       ],
-      "current": 451,
+      "current": 454,
       "done": [
-        352
+        352,
+        451
       ],
       "parked": [],
       "setup": "done: merge 945399f (parents 8e197c9, a355753), 1 hunk resolved by conflict agent taking the lane side; RecipeEditorScreen.tsx byte-identical to a355753 and differs from integration only by the draft parts (+46/-7, verified by orchestrator); 136 suites / 2270 tests green; pushed",
@@ -203,7 +204,7 @@
     },
     "451": {
       "lane": "D",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 0,
       "security": "skipped: diff confined to RecipeEditorScreen.tsx and its tests (UI only, no db/api/fs/external input)",
       "notes": "work order ready (written ahead at 945399f); waits for #352. Its also-found (Alert throw leaves lock) filed in #464. Line numbers re-checked: no src/screens change between 945399f and 593d786. Round 1 dev STOPPED before pushing: the lock breaks RecipeEditorScreen.overlap first test, which encodes the removed scenario (edit during save supersedes the run). Orchestrator ruling: rewrite that one test in place for the same sequence (edit ignored, 1 lookup, saves run 1, goBack after OK), own commit, second test byte-identical. Not a round trip (no tester verdict).",
@@ -213,11 +214,14 @@
         "aa0e52c test",
         "4b89e9d test (overlap rewrite)",
         "4380268 fix"
+      ],
+      "testerVerdicts": [
+        "round 1 APPROVE: 5 tests fail pre-fix on behaviour, 136/2379 green; every control checked from code; lock releases on all 4 paths; overlap rewrite keeps the sequence and still fails pre-fix"
       ]
     },
     "454": {
       "lane": "D",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "security": "skip (pure parser, no I/O)",
       "workOrder": "C:/git/ht-lanes/wo/454.md",
@@ -381,9 +385,16 @@
     {
       "at": "2026-11-14T14:41:43.595Z",
       "event": "#351 round 1 developer done (tip 77d9275); tester + security dispatched"
+    },
+    {
+      "at": "2026-11-14T14:42:10.218Z",
+      "event": "#451 tester APPROVE round 1 -> ready; #454 developer dispatched"
     }
   ],
   "pendingFinish": [
     "CLAUDE.md: migrations list ends at v40 (food_log), CSV export writes four files incl. food_log.csv; plus whatever lanes B-D change. One docs commit after all lanes merge."
+  ],
+  "pendingSmallFindings": [
+    "#451 tester: handleSave guards only closing, not saving; a double tap on Save within one frame could start two saves (pre-existing, timing)"
   ]
 }
