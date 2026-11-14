@@ -1,8 +1,8 @@
-# Sprint report: `sprint/auto-fixes` (sprint 5)
+# Sprint report: `sprint/auto-fixes` (sprint 6)
 
-Autonomous sprint, started 2026-10-09 07:24 UTC from `main` `e4e6e3b`, finished at about 09:05 UTC in one session. Frozen scope: the 11 open issues in `.claude/SPRINT.md` §3, the first feature sprint. The orchestrator only dispatched work, judged it, merged lanes and recorded state. Developer agents wrote every line of code, and tester agents checked every change adversarially. Security agents reviewed every change that reached `src/db`, the backup and restore path, `src/api`, the filesystem or external input; skips are recorded per issue in §2.
+Autonomous sprint, started 2026-11-14 at about 14:00 UTC from `main` `4dd49ae` (Expo SDK 58), finished at about 15:05 UTC in one session. Frozen scope: the 7 open issues in `.claude/SPRINT.md` §3, the second feature sprint. The orchestrator only dispatched work, judged it, merged lanes and recorded state. Developer agents wrote every line of code, and tester agents checked every change adversarially. Security agents reviewed every change that reached `src/db`, the backup and restore path, `src/api` or external input; the one skip is recorded in §2.
 
-`/sprint` was called with `resume`. The state file found was sprint 4's (finished, merged as PR #446, older than 24 hours) and no `sprint/auto-fixes` branch existed, so there was nothing to resume and sprint 5 started fresh.
+The state file found at start was sprint 5's (finished, older than 24 hours) and no `sprint/auto-fixes` branch existed, so sprint 6 started fresh.
 
 **Nothing has been merged to `main`, and no PR has been opened.** The PR waits for the cold review and the device checks in §7.
 
@@ -10,101 +10,74 @@ Autonomous sprint, started 2026-10-09 07:24 UTC from `main` `e4e6e3b`, finished 
 
 ## 1. Outcome
 
-10 of 11 issues landed on `sprint/auto-fixes` and all four lanes are merged. **#352 (import a recipe from a URL) is parked** after three rejected test rounds; its work is on `sprint/lane-d-recipes` and is not on the integration branch. No abort condition was hit. The integration branch is green: typecheck clean, 1778 tests in 129 suites (baseline on `main` 1387 / 107), and the GitHub `test` check is green on every lane merge.
+All 7 issues landed on `sprint/auto-fixes`, and all four lanes are merged. **Nothing was parked.** No abort condition was hit. The integration branch is green: typecheck clean, 2746 tests in 153 suites (baseline on `main` 1843 / 131), and the GitHub `test` check is green after every lane merge that was pushed.
 
-Three issues needed more than one round:
+#352 (import a recipe from a URL), parked at the end of sprint 5, landed on the last allowed round:
 
-- **#347** went back once: the security review blocked it (a unit named `constructor` wrote `NaN` into a shopping-list quantity), and I added two of the tester's findings to the same round.
-- **#338** went back once, on my decision, although tester and security had both approved it: the new pruning could delete the pre-restore safety snapshot it had just written.
-- **#352** was rejected three times and parked.
+- **#352** was rejected twice by the tester, both times for the same class of defect that parked it in sprint 5: a confident wrong quantity on an ingredient line. Round 1's rule only looked at the first two words of the name. Round 2 still read "1 cup flour, plus a tbsp" as 240 g. Round 3 was approved after a probe corpus of about 1,240 real ingredient lines found no wrong quantity left.
+- **#351** went back once: the card hid the suggested goal when it was within 10 kcal of the current goal, where the decision only hides the Apply button.
+- **#447, #346, #451, #454 and #450** passed the tester on the first round.
 
-One migration was added: v39, `ALTER TABLE workout_set_log ADD COLUMN set_type TEXT;`. `src/db/schema.ts` differs from `main` by exactly that one added line; no existing migration was touched.
+One migration was added: v40, the `food_log` table and its date index. `src/db/schema.ts` differs from `main` by 13 added lines and no removed lines; no existing migration was touched.
 
 **Read before merging:**
 
-- **#442 lands without the fix for #452.** #442's new message tells users to "open the recipe in the editor later and save it". Today that save silently deletes every ingredient stored with quantity 0. The fix was built and tested inside #352, which is parked. See §6, item 1.
-- Several features contain choices the decisions did not make. They are listed in §6, items 8 and 9, and three are marked "Read this one" in #455.
+- **#346's weekly review notification is on by default, but the app never asks for notification permission unless a Settings reminder toggle is used** (#465). On Android 13+ and iOS, a user who never touched those toggles will not get it. Decide #465 before or right after this merges.
+- **#346 changes the startup path in `App.tsx`** to route a notification tap. Jest can't see a native crash there; the SDK 57 notifications crash was invisible to both jest and CI. The #346 device check opens the app; do it.
+- **Several rulings of mine** filled gaps the decisions left (§6). They are the orchestrator's picks, not the owner's.
 
-7 new issues were filed during the sprint (§4). None was worked.
+3 issues were filed during the sprint (§4), and #464 collects 20 small findings. None was worked.
 
 ---
 
 ## 2. Merged
 
-Lane merges into `sprint/auto-fixes` (regular merge commits): A `da4e89a`, B `47a1443`, D `ec31d05`, C `664e181`. None had a conflict.
+Lane merges into `sprint/auto-fixes` (regular merge commits): A `bf16d7a`, C `eec95fb`, D `158738d`, B `3076717`, then the docs branch `e70dac5`. None had a conflict. Lane D started with a merge of the parked sprint 5 branch (`945399f`), which had one predicted conflict in `RecipeEditorScreen.tsx`; the `conflict` agent took the lane side, and the file differs from the integration branch only by the draft helpers.
 
 | Issue | Title (short) | Lane branch | Commits | What the tests assert |
 |---|---|---|---|---|
-| #344 | Set types: working and warm-up | `sprint/lane-a-training` | `23623e3` `a3f1fcd` `fd43749` `91bf0a7` `da6298c` `10a3f39` | A warm-up is stored as `'warmup'`, a working set as NULL; v39 is the last migration with the exact SQL, and a row from before it reads NULL; a backup round trip keeps the value and an older backup restores NULL; `computePRs` and `bestSetPerDay` of a mixed history equal those of its working sets; the toggle starts on Working on every open and keeps the choice while open; warm-up rows show a label. 13 tests fail before the feature code. |
-| #337 | Last session's set in the set logger | `sprint/lane-a-training` | `acf0a79` `759d6d1` `c6a6547` `4bc6592` `cf0ffce` `e55c722` `247f190` `57d39b3` | `getLastSetForExercise` returns the working set with the highest `set_index` of the latest earlier day, skips warm-ups and today, and uses the `(exercise, date)` index (`EXPLAIN QUERY PLAN`); the line reads "Last time: 80 kg × 8 · yesterday" / "N days ago"; tapping fills both inputs; both inputs show the values as placeholders; no history means no line and empty inputs; a rejected read leaves the logger usable. |
-| #342 | Weight trend line and kg/week rate | `sprint/lane-a-training` | `9ebf5a4` `078e92a` `bd6570e` `957426b` `37659ba` `440aaef` `b852bfa` `ef7012b` | Trend values for a hand-computed series with α = 2/11 (80, 80, 80, 80, 81.8182, 83.3058, 84.5229); a gap in dates changes nothing; the rate is the least-squares slope over calendar days of the last 14 days (−0.7 kg/week for the test series) and "—" with fewer than 5 weigh-ins; the chart shows a dot per weigh-in and the line from the 5th; the 30-day view cuts the 90-day trend and does not restart it; the Weight tile shows a trend change or "—", never a raw difference. |
-| #444 | Remove confirm no longer promises a refund that is not given | `sprint/lane-b-meals` | `fee7eea` `eb6295b` `14194af` | An eaten meal without an inventory pointer gets exactly "This meal will be removed from your nutrition history."; with a pointer the old text; not eaten the old short text. 1 test fails pre-fix. A db test pins the pointer the loader returns for a tick without stock. |
-| #347 | Shopping list: merge at write time, group by aisle | `sprint/lane-b-meals` | `a866883` `53058f3` `1c92118` `455b5db` `6455c65` `87e59fd` `2ea8f6d` `ba52f81` `34b0c07` `013ab3b` `b0273aa` `3871273` | "Onion, diced" 1 whole plus "onion, chopped" 2 whole is one line of 3; 500 g + 0.5 kg is 1000 g; g never merges with ml; a checked line is never merged into; two items of one recipe merge and a failing item rolls the whole add back; units named `constructor` or `__proto__` sum normally; an overflowing sum makes a new line; the row shows 1.25 for a stored 1.25; the ten sections render in the decision's order; no keyword sits in two sections and no seeded ingredient falls into Other. |
-| #348 | Copy a meal, copy a day, "Often cooked" | `sprint/lane-b-meals` | `1c88e43` `877e742` `0e6e388` `6a25227` `a47912e` `930bf4f` `1637168` `05ff77d` `421aada` `0efe49a` `d47ed9b` `3358f01` | A copy fills only empty slots and returns `{copied, skipped}`; an occupied slot is unchanged; copies are unticked with no inventory pointer and `meal_inventory` is untouched; the source day, duplicates and malformed dates are ignored; every result message word for word; a double tap copies once; the ranking counts cook events with a 0.95-per-day decay, clamps future dates and leaves out archived recipes; the picker shows "Often cooked" first and each recipe once. |
-| #442 | Discover import: wording, 429 receivers, "In your library" | `sprint/lane-d-recipes-442-443` | `711b910` `31c2726` `5f0b565` `d0c057d` | A lookup that itself receives a 429 resolves `'not-looked-up'`, sets the pause and caches nothing (12 of 22 fail pre-fix); a 503 still resolves null; the Alert and the card use the new sentence, singular and plural, with no "minute"; a recipe found in the library on load, or an import that answers "Already in your library", shows "In your library"; a fresh clean import keeps "Macros computed from local data". |
-| #443 | Recipe editor: "Saved" Alert before the editor closes | `sprint/lane-d-recipes-442-443` | `9dd5480` `1c6136e` `b37248a` `45be56c` | After a save with ingredients that were not looked up (deadline, aborted recompute, or refused by the budget) one Alert titled "Saved" shows the count, singular or plural; the editor closes exactly once when it is answered or dismissed, never after an unmount; no Alert when every lookup finished; Save is disabled but not labelled "Saving…" while the Alert is up. 8 tests fail pre-fix. |
-| #338 | Automatic rotating local backups | `sprint/lane-c-data` | `58ed095` `1159bd8` `5265a1b` `7b403cb` `5071407` `3cb297d` `6f82e6e` `92da621` `d4c1f71` `6dfa160` `b5a54f6` `88000bd` `7db3ccd` `1d69df8` `15ed805` `7243da4` `d168992` `6a39c40` `e6fb6e6` | A backup is written when none exists or the newest is at least 24 h old, to a temp name and then moved; only the newest 7 by file name remain and foreign files are untouched; a failed write prunes nothing; two calls write once; none is written during a restore; the start is not delayed and a rejection never reaches the recovery screen; safety snapshots go to the document directory, the newest 3 stay, and the one just written is never pruned; restoring from the list validates like a picked file and never touches its source; a round trip on a real database gives the same rows. |
-| #339 | CSV export | `sprint/lane-c-data` | `edc742c` `8ec9bba` `83cb3f2` `1b4eb66` `5aafc11` `82a70de` `e57f83c` `308cc0f` `b8f9757` `c8bd38a` | Fields with commas, quotes, CR, LF and umlauts are quoted per RFC 4180; each file starts with one BOM and every line ends in CRLF; an empty table gives the header only; the three header rows match the decision; `set_type` is `warmup` only for `'warmup'`; a meal whose recipe is missing keeps its date, slot and tick; the three files are written and shared in order and a failed one does not stop the next; the button reports a partial and a total failure. |
+| #447 | Quick add: calories and macros without a recipe | `sprint/lane-a-foodlog` | `339a12d` `76c2a9c` `8c406fb` `ef1d12d` `43584c1` `de43228` `bf17cd2` `4700619` `33ee1b1` (tests) · `0ccf030` `608ced4` `fa8dcae` `8f6c700` `3d8fbb9` `081efe3` `ad5c134` `44ef5f6` `cfaf04a` `ef94a1a` `6bcdf82` · cleanup `f19b15d` | v40 creates `food_log` and `idx_food_log_date` and records version 40; `getConsumedMacrosByDay` = consumed meals + entries, an entries-only day appears with `mealCount 0`, the window excludes older entries; `getAverageConsumedMacros` and plan adherence are unchanged with entries; writers validate (calories 0 < x ≤ 5000, macros 0–500, label ≤ 60, "1,5" = 1.5, "1e3" rejected) and update/delete only their row; a backup round trip keeps the entries with ids, and a backup without a `food_log` key empties the table; `food_log.csv` is the fourth shared file with header, date/id order, BOM, CRLF and the formula guard; Today lists entries below the meal plan, "+ Quick add" is always there, add/edit/delete with a confirm, 7 day chips; Meal Prep's pill and footer include the day's entries. 63 tests fail before the feature code. Security: approved. |
+| #346 | Weekly review digest | `sprint/lane-b-review` | `be59a92` (neutral skeletons) `c56be60` `af90250` `3374d97` `615be7d` `a8007aa` `cc26f6c` `fdf3fc6` `eda4feb` (tests) · `51e8bdf` `79ca9f9` `5d1859f` `270c151` `c28e6ab` `4ae2649` `38c4216` `4b82822` `5f1764b` `ae5ab11` `4bf8c88` | Windows are the last 7 local days and the 7 before (month, year and DST boundaries); gym done of non-rest days, walks of 7; working sets and tonnage without warm-ups; a new best must be strictly heavier than every working set before the window, so ties and first sessions are not bests; mean calories and protein over days with meals or entries; the weight rate is the Analytics card's; "Nothing logged in these 7 days." and per-section empty lines; no judgement words or good/bad colours; the notification is weekly, on by default, Sunday 19:00, identifier `weekly-review`, idempotent in reconcile; a tap opens the screen once the navigator is ready (including a cold start) and is dropped on startup failure, render-crash recovery and onboarding, never replayed after Retry; Settings toggle, day and time like the backup reminder. 84 tests fail on the skeletons. Security: approved. |
+| #351 | Adaptive TDEE from energy balance | `sprint/lane-c-expenditure` | `47cf24c` `bde1316` `fb7653f` (tests + stubs) · `8b880b1` `fc0c176` `6b62204` `2cc8fb6` `b3be8b7` `77d9275` · round 2 `4ded075` `b3a8b4a` `2b543b6` | Steady weight, linear loss (0.1 kg/day on 2500 → 3270), linear gain (0.05 kg/day on 3000 → 2620), missing days, noisy weight, days under 1000 kcal; every threshold on both sides (13/14 logged days, 9/10 weigh-ins, 70 %/130 % of the formula TDEE, the ±10 % bound, the 10 kcal deadband, day 6/7 after Apply, the 1000 floor); today never counts; the card shows estimate, formula TDEE and inputs, the reason and progress when there is no estimate, the suggestion line always and Apply only outside the deadband and the 7-day wait; Apply confirms and writes only the calorie goal and the date in one transaction; the writer rejects non-integer, out-of-range and malformed input; `suggestGoals` output is unchanged. 52 tests fail before the feature code. Security: approved (two rounds). |
+| #352 | Import a recipe from a URL | `sprint/lane-d-import` | sprint 5 (merged in at `945399f`): `45dbb7c` … `a355753`, 21 commits · sprint 6: `5ba8738` `ea8e626` · `1e462ae` `070235e` `92fabc7` `b8d3a3d` `43abd32` · `22e6c12` `593d786` · cleanup `4e678d6` | Every probe line from sprint 5's three rounds and sprint 6's three rounds is a literal row: a modifier between the number and a unit ("1 heaped tsp sugar", "1 (heaped) tsp salt", "1 level-tsp salt", "1 slightly heaped tsp salt"), each-words ("1 tsp each salt and pepper", "1 TL jeweils Salz"), unlisted abbreviations ("1 Teel. Salz"), a second measure later in the name ("1 cup flour, plus a tbsp", "1 EL Mehl und ein TL Zucker"), all name only; "250 gr butter" is 250 g, "250g/9oz plain flour" is 250 g, "500 g Mehl Type 405" keeps its number in the name; containers stay name only; keep-count guards stay ("2 Stangen Lauch", "1 can (14 oz) tomatoes"). The fetch, JSON-LD and editor-draft tests come from sprint 5. 29, then 33, then 11 rows failed before each round's fix. Security: approved all three rounds (no ReDoS; 40,000 hostile lines). |
+| #451 | Recipe editor read-only while a save is pending | `sprint/lane-d-import` | `aa0e52c` `4b89e9d` (tests) · `4380268` | Save → 1 s → Recompute starts no new lookup and saves the first run's macros; typing during the save changes nothing; every control is disabled during the save and under the "Saved" Alert and released on answer; a failed save re-enables them; the existing overlap test now expects the same edit-during-save to be ignored (see §6). 5 tests fail before the fix. Security: skipped (UI only, no data path). |
+| #454 | Volumes of dry goods converted at their own density | `sprint/lane-d-import` | `1655dc1` (tests) · `e09af67` `6d104a4` `2533e03` `4ccdefc` `5146104` `4d67b1a` | Each table entry as a cup, a tablespoon and a teaspoon; German names, compounds ("Weizenmehl", "caster sugar", "cornflour"), longest keyword wins ("brown sugar" 210, "Paniermehl" 110); "rice vinegar" and "butter lettuce" don't match; liquids unchanged; "2 floz" 59.14 ml; "1,5 kg" 1500 g, "1,000 g" 1000 g, "0,125 l" 125 ml; "1 pinch" 0.5 g; EL/TL in any case; "1 1/2 cups flour" through the URL import gives 187.5 g. 15 existing expected values change, exactly the ones the work order listed (old → new checked by hand). 56 tests fail before the fix. Security: light check, approved. |
+| #450 | Ingredients without a quantity | `sprint/lane-d-import` | `2682526` (tests) · `bc58ff0` `32b5673` `0d833b5` | Two name-only adds in different units give one line; a name-only add onto an open line with an amount adds nothing; an amount onto an open name-only line gives it that amount and unit; a checked line is never merged into; the recipe detail shows a quantity-0 ingredient by name only at 1 and 4 servings; the shopping row shows only the name. 7 tests fail before the fix. Security: approved. |
 
-Lane cleanup commits: A `9e4c73f` (comments only), C `ae52f46` (two constants moved above a docblock in `backup.ts`; I read the diff: both are unchanged literals moved past a comment, used only inside functions further down). Lanes B and D needed none.
-
-**Security review**
-
-- **Reviewed and approved:** #344, #337, #347 (blocked in round 1, approved in round 2), #348, #442, #443, #338, #339.
-- **Skipped, with reason:** #444 (one text branch in `MealPrepScreen.tsx` on a field the screen already holds, plus tests); #342 (arithmetic helpers and one screen, no database, backup, api or filesystem code).
-
-**Round trips**
-
-| Issue | Round trips | Why |
-|---|---|---|
-| #347 | 1 | Security BLOCK: the unit table was a plain object, so a unit of `constructor` or `__proto__` made a second add write `NaN` to the quantity; the merged sum was not checked for overflow. Sent back in the same round by me, although the tester approved: the row printed a stored 1.25 as "1.3", and the tester's list of misfiled ingredients (one of them a seeded name). |
-| #338 | 1 | Sent back by me although tester and security approved. Security's note: the snapshot prune keeps the newest 3 by name and did not exempt the file it had just written, so after a corrected clock the fresh pre-restore snapshot could be deleted at once. The tester's note: a test for a missing folder guarded nothing because the mock did not behave like the real API. |
-| #352 | 3 | Parked. See §3. |
-
-All other issues passed on the first test round.
+Cleanup: lane A `f19b15d` (comments only), lane D `4e678d6` (one unused regex, one moved constant, one test title), lanes B and C no changes. A docs branch (`905782a`, `67303ed`) brings `CLAUDE.md` up to date: migrations end at v40, four CSV files, quick-add totals, name-only shopping lines, the density table, the weekly review drawer entry and tap, the URL import's network fetch, and the new screen suites.
 
 ---
 
 ## 3. Parked
 
-| Issue | How far it got | Exactly why it stalled | What a human needs to decide |
-|---|---|---|---|
-| #352 Import a recipe from a URL | Fully built: 21 commits on `sprint/lane-d-recipes` (tip `a355753`), 1829 tests green on that branch, security approved all three rounds. Fetch limits, the JSON-LD parser, the editor prefill and the dialog passed every round. About 62 ingredient lines from seven real recipe sites: none wrong through the parser. | The ingredient line parser, three times for the same class of defect: a confident wrong quantity where the decision asks for a name without a quantity. Round 1: English unit words were not recognised ("1 1/2 cups flour" gave 1.5 whole "cups flour"; 14 of 14 English lines wrong), "1.000 g" gave 1 g. Round 2, fixed word by word: still wrong on "1-1/2 cups", fl oz, `T`/`t`/`c`, "1 to 2 tablespoons", "1,000 g". Round 3, rebuilt as an allow-list: all of that fixed, but a modifier between the quantity and the unit still slips through as a bare count: "1 heaped tsp sugar" gives 1 whole "heaped tsp sugar"; the same for "level", "scant", "gestrichene", "gehäufter", and the abbreviations "Pk." and "Pr.". 6 of 43 new probe lines were wrong. | Finish it (the remaining rule is small: do not count when either of the first two words of a bare-count name is a unit or measure word, then one more test round), or set a different bar for free-text ingredient lines. The allow-list also made some lines name-only that parsed before ("250 gr butter", "1 Becher Schmand", "250g/9oz plain flour"). Known and unfixed on the branch: pages that are not UTF-8 import with broken umlauts; the source URL is not stored. The full account is in a comment on #352. |
+None.
 
-The root cause is partly in the work order: its unit map listed German words only, and I did not catch that when I read it. The first developer and the first two fixes then chased word lists.
-
-Parking #352 has one side effect: commit `76d752f` on that branch also fixes a data loss that exists today (#452). It does not land.
+The closest call was **#352**, which used all three rounds. If round 3 had failed, the stall was precise: the line parser kept finding new free-text forms that produced a wrong quantity. The bar the owner set ("a wrong quantity is a defect, a name without a quantity never is") is what made it finish, because every round's fix could err towards name-only. The cost of that bias is in §6, item 2.
 
 ---
 
 ## 4. Found during sprint
 
-7 issues were filed with the label `found-during-sprint`. **None of them was worked.**
+Filed, labelled `found-during-sprint`. **None was worked.**
 
-| Issue | Note |
-|---|---|
-| #449 | Backup export reads the tables one by one, not in one transaction. A write between two reads gives a file whose tables disagree. The automatic backup at start (#338) makes the overlap a little more likely. |
-| #450 | An ingredient stored with quantity 0 shows as "0 g" in the recipe detail and goes on the shopping list as a 0-quantity line. |
-| #451 | Recipe editor: tapping Recompute or editing a row while a save is pending saves the recipe with partial macros (reproduced: 0 / 0 / 0 / 0 instead of 10 kcal). Present before the sprint. |
-| #452 | Recipe editor: saving a recipe silently deletes its ingredients that have quantity 0. Present before the sprint. Its tested fix is inside the parked #352, and #442's new wording sends users to exactly that save. |
-| #453 | Shopping list: "Onion" and "Onions" stay two lines, because the #347 decision has no plural handling. |
-| #454 | `parseMeasure` turns volumes into grams at 1 ml = 1 g for every ingredient ("1 1/2 cups flour" is 360 g), so macros for cup-measured dry goods are too high. On `main` today through the Discover import. |
-| #455 | Sprint 5: small findings. 85 checkboxes: cases that need restored or hand-edited data, a wrong clock or one exact moment, plus comments, tests and tidy-ups. Three are marked "Read this one". Ten of them concern only the parked #352 branch. |
+- **#465**: the weekly review notification is on by default, but permission is only ever requested from a Settings toggle, so users who never used one won't get it. Needs a product decision (when to ask).
+- **#466**: the density table misses common names: "cocoa", "cacao", "Kakaopulver"; "cooked rice" gets the uncooked density.
+- **#464, Sprint 6: small findings**, 20 checkboxes: the Settings CSV text still says "three spreadsheet files"; a throw from the "Saved" Alert would leave the editor locked; the line-parser invariants test can't see a partly renamed name; restore doesn't range-check `food_log` values; `BioForceModal` raw values; quick-add limits defined twice; `getConsumedMacrosByDay(days)` covers `days + 1` days; the Settings calorie stepper can overwrite an applied adaptive goal; "1 tbsp; olive oil" keeps the semicolon in the name; a double tap on Save within one frame; a restored calorie goal has no upper bound; the adaptive apply date across midnight; `getAdaptiveTdeeAppliedOn` only pattern-checks; `parseMeasure` can return `Infinity` on the Discover path; `ALIAS_MAP` prototype keys; a mildly slow range regex; a stated gram weight in brackets is ignored; `parseMeasure` doesn't know dl or cl; the weekly review toggle flickers on first load; the review screen reads the whole set history on every focus.
 
 ---
 
 ## 5. Integration branch state
 
-- **Branch:** `sprint/auto-fixes`. The last commit that changes code is the lane C merge `664e181`; state and report commits follow it.
-- **typecheck:** pass at `664e181` (exit 0).
-- **tests:** 1778 passed / 1778, 129 suites at `664e181`, with `--maxWorkers=2`, exit 0. The baseline on `main` `e4e6e3b` was 1387 / 107. After each merge: A 1460 / 110, B 1623 / 120, D 1638 / 121, C 1778 / 129.
-- **`src/db/schema.ts`:** one line added against `main`, none removed: `{ version: 39, sql: 'ALTER TABLE workout_set_log ADD COLUMN set_type TEXT;' }`.
-- **GitHub CI `test` check:** success on `caea6aa` (lane A), `ad5d3d2` (+B), `bfc0492` (+D) and `7d2cbcf` (all four lanes, the last push before this report). The report commit itself is docs and state only.
-- **Size:** 66 files changed, +6689 / −282 against `main` (state file and report excluded). 88 commits besides merges and state commits.
-- **Not changed:** `package.json`, `package-lock.json`, `app.json`, `eas.json`, `babel.config.js`, `jest.config.js`, `__mocks__/`, `CLAUDE.md`, the workflows. So `build-check.yml` will not run on the PR, and no native dependency moved.
-- **Not on this branch:** anything of #352. `src/api/recipeHtml.ts`, `src/api/fetchRecipePage.ts` and `src/nutrition/parseIngredientLine.ts` do not exist here.
-- **Note on timezones:** `npm test` is `cross-env TZ=UTC jest`, so every local run was UTC, on Windows. CI runs Linux.
-- **Left on disk:** the lane worktrees `C:/git/ht-lanes/lane-a` … `lane-d` and the work orders in `C:/git/ht-lanes/wo/`. All lane branches are pushed, including the parked `sprint/lane-d-recipes`.
+- **Branch:** `sprint/auto-fixes`. The last commit that changes code is the lane B merge `3076717`; the docs merge `e70dac5` changes only `CLAUDE.md`; state and report commits follow.
+- **typecheck:** pass at `e70dac5` (exit 0).
+- **tests:** 2746 passed / 2746, 153 suites at `e70dac5`, with `--maxWorkers=2`, exit 0. The baseline on `main` `4dd49ae` was 1843 / 131. After each merge: A 1944 / 136, C 2016 / 139, D 2639 / 146, B 2746 / 153. Each step is exactly the previous total plus the lane's own suites and tests.
+- **`src/db/schema.ts`:** 13 lines added against `main`, none removed: the v40 entry (`CREATE TABLE IF NOT EXISTS food_log …` and `CREATE INDEX IF NOT EXISTS idx_food_log_date ON food_log(date)`).
+- **GitHub CI `test` check:** success on `56ecae3` (lane A), `7af8dd0` (+C) and `e21796f` (all four lanes). Lane D's merge was pushed together with lane B's. The docs merge `e70dac5` was still running when this report was written; it changes only `CLAUDE.md`.
+- **Size:** 97 files changed, +9252 / −102 against `main` (state file and report excluded). 100 commits besides merges and state commits, 21 of them the sprint 5 #352 work.
+- **Changed outside `src/`:** `App.tsx` (#346 tap routing), `__mocks__/expo-notifications.js` (+5 lines, three jest.fns for the tap API, additive), `CLAUDE.md`.
+- **Not changed:** `package.json`, `package-lock.json`, `app.json`, `eas.json`, `babel.config.js`, `jest.config.js`, the workflows. So `build-check.yml` will not run on the PR, and no native dependency moved.
+- **Note on timezones:** `npm test` is `cross-env TZ=UTC jest`, so every local run was UTC, on Windows. The #346 tester also ran the review helpers under four other timezones. CI runs Linux.
+- **Left on disk:** the lane worktrees `C:/git/ht-lanes/lane-a` … `lane-d` and the work orders in `C:/git/ht-lanes/wo/`. All lane branches and `sprint/docs` are pushed.
 
 **Opening the PR.** This uses the GitHub MCP, as the sprint protocol requires; the `gh` CLI is not used. Do this only after §7 is fully ticked. Call `mcp__github__create_pull_request` with:
 
@@ -113,97 +86,57 @@ owner: NevinJulian
 repo:  healthtracker
 base:  main
 head:  sprint/auto-fixes
-title: Sprint 5: set types, last-time line, weight trend, shopping merge, meal copy, automatic backups, CSV export
+title: Sprint 6: quick add, weekly review, adaptive TDEE, recipe URL import, editor lock, dry-goods densities, name-only ingredients
 body: |
-  Autonomous sprint 5. See SPRINT_REPORT.md on the branch for per-issue tests, round trips and the review list.
+  Autonomous sprint 6. See SPRINT_REPORT.md on the branch for per-issue tests, round trips and the review list.
   Merge with a regular merge commit, never squash.
-  #352 is parked and is not part of this PR.
 
-  Closes #337
-  Closes #338
-  Closes #339
-  Closes #342
-  Closes #344
-  Closes #347
-  Closes #348
-  Closes #442
-  Closes #443
-  Closes #444
+  Closes #346
+  Closes #351
+  Closes #352
+  Closes #447
+  Closes #450
+  Closes #451
+  Closes #454
 ```
 
-If you decide to hold #442 until #452 is settled (§6, item 1), change `Closes #442` to `Refs #442`; that keeps the issue open but does not take the wording out of the branch.
+If you decide #465 must be fixed before the weekly review ships, change `Closes #346` to `Refs #346` and keep the notification work out of the release notes until #465 is done; the code itself is not harmful without it.
 
 ---
 
 ## 6. What I would not merge without reading
 
-1. **#442 ships a message that leads into a data loss (#452).** The import Alert and card now say "… Open the recipe in the editor later and save it to look them up." The editor's `rowsToIngredients` drops every row with quantity 0 on save, so a Discover-imported recipe loses its vague-measure ingredients when the user follows that advice. The drop is older than this sprint; the wording is yours and is implemented as decided. The fix exists, tested and security-approved, in commit `76d752f` on the parked branch, tangled with the URL import's `draft` param. Decide before merging: pull the quantity-0 rule out and ship it with this PR, or accept the gap for now.
-
-2. **#338 — `src/services/backup.ts` deletes files.** Every delete goes through one function that re-checks an anchored name pattern and builds the path from a folder constant, and the tester threw 18 odd names at it without one wrong delete. But all of it ran against an in-memory file map and sql.js, never against a real file system. The device check is the first real run. Also know:
-   - The `App.tsx` call sits in an effect that waits for the database, the fonts and no failure screen. The work order put it directly after `setDbReady(true)`; the developer moved it so it cannot run on the recovery screen.
-   - `importBackup` was split into the picker plus `restoreBackupFromUri`, and the Settings restore handler was folded into a shared `confirmRestore`. The existing restore tests pass untouched, which is the evidence that the picked-file path is unchanged.
-   - A freshly emptied database pushes out your last good automatic backup after seven daily app-opens.
-   - An automatic backup now runs right after start, which makes #449 a little more likely.
-   - The self-deleting snapshot (round 2) needed a corrected clock plus three earlier restores. Both reviewers had let it pass.
-
-3. **#344 — migration v39 has only ever run on sql.js.** The tester migrated a real v38 database through `initDatabase` on that engine; expo-sqlite on the phone is the device check. Backups carry the column with no change to `backup.ts` or `restoreFromPayload`, because the dump is `SELECT *` and restore filters keys against the live table. A `set_type` that is neither NULL nor `'warmup'` counts as working everywhere.
-
-4. **#347 — merged shopping lines cannot be un-merged.** The merge is inside `_addShoppingListItemImpl`, in the write queue and the recipe transaction. Read `src/data/shoppingMerge.ts` (40 lines) and the three-line change in `database.ts`. The aisle table in `src/data/aisles.ts` is 722 keywords written by an agent, checked only against the seeded recipes and about 40 probe names; expect misfiles. The row now shows up to three decimals for sums that the old one-decimal format would have rounded wrongly; values it showed exactly look as before.
-
-5. **#348 — what "copy" means was decided by the analyst.** "The next 7 days" became the six other days the screen shows. A copy does no stock check, although the Assign picker requires stock. A copy takes an archived recipe along. A copy is its own write and does not go through `assignMealToPlan`; it relies on the write queue, not on the unique index, to keep a slot single.
-
-6. **#339 — the CSV has a formula guard you did not ask for.** A text field starting with `=`, `+`, `-`, `@`, TAB or CR gets a leading apostrophe, visible in the spreadsheet. It is there because recipe titles can come from the web. It is one function (`guardFormula`); remove it if you want a byte-faithful export. Excel with a semicolon list separator may not split the files into columns; the device check uses Google Sheets. Whether the three share sheets really appear one after the other on Android is unverified.
-
-7. **#342 — my ruling changed the Weight tile, and the line has never been seen on a screen.** The analyst's design fell back to the raw first-to-last difference whenever the first weigh-in of the month had no trend value yet, which is every user in their first month. I ruled that the tile shows a trend change or "—", because your decision says "trend values, not raw ones". That changed one existing assertion (`weightResilience`, "+5.0" from two raw points became "+1.5" from six). The line is drawn with rotated Views sized from a layout event; jest only sees it through a simulated event. With exactly five weigh-ins the rate can read "+2.5 kg/week".
-
-8. **Work orders I amended.** Each amendment is appended to the work order file and recorded in the state file.
-   - #442: "In your library" only for a recipe that was already in the library; the analyst had it replace the subtitle for every clean import.
-   - #344: the weight prefill stays as it is; the analyst wanted it to skip warm-ups.
-   - #342: no raw fallback on the Weight tile (item 7).
-   - #443: when an existing assertion ("no Saving… label after a deadline save") failed against the planned design, I kept the assertion and changed the design: `saving` is released after the write and a separate `closing` state blocks Save while the Alert is up.
-   - #352: the script-tag scan must be linear; the work order's regex was quadratic on a hostile 3 MB page. (Parked, but the reasoning holds if it is finished.)
-
-9. **Picks that nobody decided.**
-   - #344: a two-segment toggle between the "Add set" heading and the inputs; a gold "Warm-up" pill in the set list; a warm-up-only exercise shows "No sets logged yet.".
-   - #337: when the most recent earlier day holds only warm-ups, the line shows the last working set of the next older day; the line sits between the toggle and the inputs; tapping overwrites typed text; exercise names match exactly.
-   - #342: dots 6 px at 0.35 opacity, a 2 px line, no legend; the rate line under the range toggle; the window is the last 14 calendar days counted back from today.
-   - #347: the merged line keeps its own name and unit; the sum is rounded to three decimals; the lowest-id open line gets the amount; checked items sit below unchecked ones inside a section; headers render in capitals through the existing style; longest keyword wins, and keywords of three letters or fewer match whole words only.
-   - #348: the chooser wording and rows ("Today", "Tomorrow", then a weekday date); all result messages; "Often cooked" recipes are removed from the full list, which gets an "All recipes" header; ties by later date, then title.
-   - #442: the singular sentence ("1 ingredient couldn't be looked up right now and counts as 0. … look it up.").
-   - #443: Alert title "Saved", button "OK"; the Alert also counts lookups refused by the budget; the banner keeps the names in brackets.
-   - #338: file names `healthtracker-auto-YYYYMMDDTHHmmssZ.json`; a file dated more than an hour ahead is ignored for the 24-hour check and never pruned; row text "8 Oct 2026, 14:03" and sizes in B / KB / MB; the empty-state sentence; "Share failed" and "Sharing unavailable".
-   - #339: CRLF line ends; NULL written empty; flags as stored; row order; "Save <filename>" as dialog title; "CSV export incomplete" and "CSV export failed"; the formula guard (item 6).
-
-10. **#443 and #451.** The new Alert reports what was saved. If the user taps Recompute while a save is pending, the save finishes early with partial macros (#451, older than the sprint); the Alert then says "2 ingredients" where the user expected 1. The `if (closing) return` guard has no test that can reach it.
-
-11. **`CLAUDE.md` and the agent files were not touched, and they are behind.** No lane owned them. `CLAUDE.md` does not mention migration v39, automatic backups, `src/services/csvExport.ts`, `src/data/aisles.ts` or `src/data/shoppingMerge.ts`. `.claude/agents/developer.md` still says Expo SDK 54 / RN 0.81.
-
-12. **Process failures worth knowing.**
-    - #352's work order had a German-only unit map although the existing parser handles English measures. I read that work order before dispatch and did not see it. That one gap cost the issue.
-    - Developers ignored two instructions several times: three read a test exit code through a pipe, and two edited files with `sed` or `node` instead of the edit tool (#348, and #338's second round for a proof that was never committed). The testers checked the affected diffs for CR and mojibake and found none.
-    - The #339 tester and developer disagree on how the reader tests failed before the code (a `TypeError` on a missing function, or assertions against stubs). The tester also read the full-suite totals through `grep`; the exit code 0 for that tip is the developer's and mine at the merge.
-    - #339's CSV round trip, #338's file handling and #348's race test ran on sql.js and in-memory mocks only.
-    - Every work order ran well past the 400-word limit in the analyst's instructions (670 to 1480 words). For features I had asked for more.
-    - The #352 round-1 tester ended with a background test run still alive; it reported stopping it. Later testers were told to leave no process running and confirmed it.
-    - My state helper failed once on a shell quoting error before anything was written; I switched to patch files. No transition was lost.
-    - Two lane branches exist for lane D: `sprint/lane-d-recipes-442-443` (what merged) and `sprint/lane-d-recipes` (the same plus the parked #352).
+1. **`App.tsx` (#346).** The tap routing sits on the startup path: a `navigationRef`, a tap held until `onReady`, a `NavigatorLifecycle` child that detects a crashed navigator, a listener subscribed on mount. The tester read it line by line and every case is tested, but this is exactly where SDK 57's notification crash lived, invisible to jest and CI. Read the diff, and open the app in Expo Go from a cold start.
+2. **`src/nutrition/parseIngredientLine.ts` (#352).** It grew over six rounds across two sprints, and every fix leaned towards "name only". Real lines now lose counts they could have kept, e.g. "2 medium potatoes (about 1 lb)", "3 eggs in shell", "1 (14 oz) can tomatoes", "2 Mozzarella (125 g)". That is what the bar asks for, but you should see how conservative it is. Two of the rules are my rulings, not the decision's: `gr` means grams only from 10 up (below that, "1 gr. Zwiebel" is "große"), and a second measure after `/` is dropped only after a mass unit. **`ea8e626` is one commit for four rules**: asking the developer to split it needed a force-push, which this session's permission settings blocked, so it stays coarse. Every later commit was split before its first push.
+3. **`src/nutrition/ingredientDensity.ts` and `parseMeasure.ts` (#454).** Three rulings of mine: (a) I rejected the analyst's "English keywords match whole words only" and kept the decision's "or the end of the last word" for every keyword, so "cornflour" matches flour (good) and "licorice" matches rice (harmless, but wrong); (b) the name is cut at the first comma before matching ("flour, sifted" matches); (c) a thousands comma needs a leading digit 1–9, so "0,125 l" stays 125 ml instead of 125 l as a literal reading of the decision would give. The decision's own thousands rule reads a European "1,234 kg" as 1234 kg; that is the decision's choice, and "1,5 kg" (the common form) is right. Coconut flour gets 125 g per cup (real: about 115).
+4. **Restore now deletes data on purpose (#447).** Restoring a backup made before v40 empties `food_log`, as decision 6 says ("a restore brings back the backup's state"). It runs inside the restore transaction, after the pre-restore safety snapshot, so it is recoverable. It is still the first restore path that deletes rows a backup doesn't mention.
+5. **Edits to existing tests, all authorised by me, each in its own commit or listed in a work order:**
+   - #451 `4b89e9d` rewrote the first test in `RecipeEditorScreen.overlap.test.tsx`. It asserted that an edit during a pending save starts a new lookup run, which is what the decision removes. Same setup and steps, new expectations. It still fails before the fix.
+   - #346 `4bf8c88` turns the weekly review off in `autoBackupRoundTrip`'s fixture before the backup is taken, because the default-on reminder makes the post-restore reconcile write one more `app_state` row (`weeklyReviewNotificationId`). The assertion is untouched, and a new test pins the default-on case. The intermediate commits `5d1859f` … `ae5ab11` are probably red on that test, which matters if you bisect. `notifications.test.ts` counts went from 6 to 7 for the same reason.
+   - #447 `76c2a9c` finds migration v39 by version instead of "last".
+   - #454 changed 15 expected values from 1 ml = 1 g to the density table, all in `6d104a4`.
+   - Mock factories in about 30 screen suites gained the new database functions, and nothing else.
+6. **`__mocks__/expo-notifications.js`** gained three jest.fns. `CLAUDE.md` warns about these mocks; the change is additive only.
+7. **`CLAUDE.md`** was edited by a cleanup agent to describe the sprint's features. Read it: it is what every future agent will believe.
+8. **Picks the decisions didn't make**, listed so you can overrule them:
+   - #447: sheet title "Quick add", button "+ Quick add", chips "Today" / "Yesterday" / "Mon 9" (en-GB), fields "Label (optional)", "Calories (kcal)", "Protein (g)", "Carbs (g)", "Fat (g)", Save reads "Update" while editing, Delete Alert "Delete entry?", empty text "No entries for this day.", the sheet imported by path (not through `src/components/index.ts`, which no lane owns). Meal Prep now rounds the whole day total, so recipe-only days that used to show fractional kcal are rounded too.
+   - #346: drawer "Weekly review" with `calendar-number-outline`; header "Last 7 days · 8 Nov – 14 Nov" / "Previous 7 days · 1 Nov – 7 Nov"; rows "Gym sessions 3 of 5", "Walks 4 of 7", "Working sets", "Tonnage 5,300 kg", "Mean calories", "Mean protein", "Days logged", "Goal 2,400 kcal · 160 g"; changes "+2 sets", "−1250 kg", "no change", "—" when the previous window had none; Settings subtitle "A summary of the last 7 days on your chosen day"; "logged before the window" means at least one working set; a day with no `daily_log` row is neither planned nor done.
+   - #351: card title "Energy expenditure", first in Nutrition; "Formula estimate: {F} kcal/day"; "Logged days: N of 28 (M left out, under 1000 kcal)"; "Need 14 logged days. You have 9."; "Far from the formula estimate. Usually meals are missing from the log."; "Suggested goal {S} kcal (now {G})", shown whenever there is a suggestion (my ruling, from decision items 8–9); Alert "Change calorie goal?"; "Apply is available again on {date}"; input rows shown only with an estimate or the out-of-range case; the writer accepts 1000–10000 kcal.
+   - #352: everything in item 2.
+   - #450: with duplicate open lines in an old database, the first same-key line in id order takes the amount.
 
 ---
 
 ## 7. Before the PR
 
-Run from `sprint/auto-fixes` on the phone, in Expo Go. All unticked; tick them yourself. No check needs edited code, a preview build or a notification.
+Device checks, from `C:/git/ht-lanes/wo/<issue>.md`, in Expo Go via the QR code from `sprint/auto-fixes`:
 
-- [ ] **Cold review:** a fresh Claude Code session with none of this sprint's context runs `/code-review` on `main...sprint/auto-fixes`.
-- [ ] **CI on the tip:** the GitHub `test` check on the tip of `sprint/auto-fixes` is green (it was on `7d2cbcf`; the report commit follows it).
-- [ ] **Decision on #452** (§6, item 1) before #442's wording ships.
-- [ ] **#344 (do this first, it runs migration v39 on your real database):** launch the app with your existing data: it starts normally and earlier sets are still listed. Open a lift's set logger, log one Warm-up and two Working sets for one exercise. The warm-up row shows a "Warm-up" label, the working rows do not. Open Analytics: that exercise's PR and progression ignore the warm-up. Reopen the logger: the toggle is back on Working.
-- [ ] **#337:** open the logger for an exercise you logged on an earlier day. The line shows that session's last working set (not a warm-up), and tapping it fills both fields. An exercise you never logged shows no line.
-- [ ] **#342:** the Analytics weight card shows faint dots and a smooth solid line, and the kg/week figure has the sign you'd expect from your last two weeks. Toggle 30 days / 90 days: the line must not restart at the left edge.
-- [ ] **#444:** cook one portion of a recipe, assign it to two slots and tick both. Removing the second one shows the text without the inventory sentence. Removing the first shows the old text.
-- [ ] **#347:** add two recipes that share an ingredient (for example two with olive oil or garlic cloves). The list shows one line with the summed amount, under its section.
-- [ ] **#348:** plan Lunch on day 1 and on day 2 (a different recipe), then copy day 1's lunch to days 2, 3 and 4. Expect "Copied 2 meals. Skipped 1 already planned.", days 3 and 4 filled and unticked, day 2 unchanged. Check that the "Copy day to…" pill sits properly in the day card. Then open Log Cooked Meal: your usual recipes are under "Often cooked" at the top, each once.
-- [ ] **#338:** after a start, Settings lists one automatic backup. Share opens the share sheet. Restoring it works and your data is still there. Open Settings once on a fresh install or after clearing data, before any backup exists: the list shows the empty-state sentence, not an error.
-- [ ] **#339:** tap "Export as CSV", save the three files and open `meals.csv` in Google Sheets. Umlauts and recipe names with commas are intact. On Android, the three share sheets appear one after the other.
-
-No device check: #442 and #443 (by decision: the request limit cannot be reached on purpose in Expo Go; the 429 path, the wording and the Alert are covered by tests).
+- [ ] **#447** (decision 9): On Today, add "Snack" with 250 kcal and 10 g protein. It shows below the meal plan, and the Meal Prep card for today shows 250 kcal more. Edit it to 300 kcal, then delete it. Add one for Yesterday with the chip: it doesn't show on Today, and the sheet lists it under Yesterday. Export as CSV and open `food_log.csv` in Google Sheets.
+- [ ] **#346** (decision 9): Open "Weekly review" from the drawer. The two ranges are the last 7 days and the 7 before, and the figures match what you logged this week. In Settings, turn the weekly review off and on and change its day: no error. The notification tap is covered by tests only. **Also open the app from a cold start once and check it reaches Today** (the startup path changed).
+- [ ] **#351** (decision 11): Analytics shows the Energy expenditure card. With too little data it names the missing input and how far along it is. With enough data, the mean intake and the weight change look like your last four weeks. If it offers Apply, apply it: Settings shows the new calorie goal, and the card shows when Apply comes back.
+- [ ] **#352** (sprint 5 item 9 and sprint 6 item 8): Import a recipe page from a big recipe site you use. The editor opens with title, ingredients, steps and servings, and saving computes macros. A news article URL shows "This page has no recipe data the app can read." Import one German recipe page (for example fooby.ch or chefkoch.de): its ingredients come through with sensible amounts or with none, never a wrong one. Check any line with "gestrichen", "gehäuft", "Pk." or "gr".
+- [ ] **#454** (decision 7): Import by URL an American recipe that measures flour in cups (for example from allrecipes.com). The editor shows about 125 g per cup of flour, not 240 g.
+- [ ] **#450** (decision 5): Open a recipe with an ingredient without a quantity (a Discover import with "to taste", or a URL import with a name-only line). It shows by name only. Add it to the shopping list: the line reads "Salt", not "Salt 0 g". Then add a recipe that has salt in grams: the same line now shows the grams.
+- [ ] **#451**: no device check (decision 5). A save that waits on a slow lookup can't be produced on purpose in Expo Go; the tests cover it.
+- [ ] **Cold review**: a fresh Claude Code session with none of this sprint's context runs `/code-review` on `main...sprint/auto-fixes`.
+- [ ] **Decide #465** (permission for the default-on weekly review) before or right after merging.

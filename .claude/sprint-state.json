@@ -1,7 +1,7 @@
 {
   "sprint": 6,
-  "startedAt": "2026-11-14T15:20:00Z",
-  "status": "running",
+  "startedAt": "2026-11-14T14:00:00Z",
+  "status": "finished",
   "integrationBranch": "sprint/auto-fixes",
   "baseSha": "4dd49ae",
   "baseline": {
@@ -54,7 +54,8 @@
     "#451: RecipeEditorScreen.overlap.test first case encoded the scenario the decision removes; rewritten in place for the same sequence (approved edit to an existing test, own commit).",
     "#454: keyword matching per decision item 2 literally for all keywords; analyst-proposed English whole-word restriction rejected. First-comma cut and leading-1-9 thousands rule accepted.",
     "#346: autoBackupRoundTrip broke because the default-on weekly review makes the post-restore reconcile write its OS-id key. Fixed by a fixture setup change (weekly review off before the backup), assertion untouched, plus a new test for the default-on behaviour. Dropping the OS-id key was rejected: it would break the reminder pattern to fit a test.",
-    "#346: the new weekly review DB functions sit right after the backup reminder settings, which is the end of database.ts. Accepted (work order placement); no other lane appends there, so no conflict risk."
+    "#346: the new weekly review DB functions sit right after the backup reminder settings, which is the end of database.ts. Accepted (work order placement); no other lane appends there, so no conflict risk.",
+    "startedAt corrected from the 15:20 guess to about 14:00 UTC (the scope-freeze commit 8e197c9 is 14:04 UTC)."
   ],
   "lanes": {
     "A": {
@@ -536,6 +537,10 @@
     {
       "at": "2026-11-14T15:00:41.816Z",
       "event": "integration gates after lane B: typecheck pass, 153 suites / 2746 tests (= 146/2639 + lane B 7/107)"
+    },
+    {
+      "at": "2026-11-14T15:05:39.344Z",
+      "event": "docs branch merged (e70dac5); final gates typecheck pass, 153 suites / 2746 tests; #464 updated to 20 findings; SPRINT_REPORT.md written; run finished, PR not opened"
     }
   ],
   "pendingFinish": [
@@ -554,5 +559,28 @@
     "#454 tester: parseMeasure does not know dl or cl (\"2 dl\" gives 2 whole) on the Discover path; the URL line parser handles them; pre-existing",
     "#346 tester: the Settings weekly review toggle renders off and flips on after hydration (visible flicker, no data impact)",
     "#346 tester: WeeklyReviewScreen loads the whole workout set history (getWorkoutSetsBetween from 0000-01-01) on every focus to find prior bests; fine at current sizes, unbounded"
-  ]
+  ],
+  "finishedAt": "2026-11-14T15:05:39.344Z",
+  "result": {
+    "merged": [
+      447,
+      346,
+      351,
+      352,
+      451,
+      454,
+      450
+    ],
+    "parked": [],
+    "roundTrips": {
+      "351": 1,
+      "352": 2
+    },
+    "finalSha": "e70dac5",
+    "typecheck": "pass",
+    "testSuites": 153,
+    "tests": 2746,
+    "ci": "test success on 56ecae3, 7af8dd0, e21796f; e70dac5 (docs only) pending at report time"
+  },
+  "docs": "sprint/docs 905782a + 67303ed (CLAUDE.md only), merged as e70dac5"
 }
