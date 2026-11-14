@@ -9,13 +9,21 @@
     "testSuites": 131,
     "tests": 1843
   },
-  "frozenScope": [447, 346, 351, 352, 451, 454, 450],
+  "frozenScope": [
+    447,
+    346,
+    351,
+    352,
+    451,
+    454,
+    450
+  ],
   "excluded": {
     "349": "sprint 7 (native package)",
-    "392": "sprint 7 (native package)",
     "350": "sprint 8 (dark mode)",
     "353": "needs a development build",
     "355": "needs a development build",
+    "392": "sprint 7 (native package)",
     "396": "not part of the feature sprints",
     "441": "not part of the feature sprints",
     "445": "not part of the feature sprints",
@@ -44,9 +52,11 @@
       "name": "food log",
       "branch": "sprint/lane-a-foodlog",
       "worktree": "C:/git/ht-lanes/lane-a",
-      "status": "pending",
-      "order": [447],
-      "current": null,
+      "status": "in_progress",
+      "order": [
+        447
+      ],
+      "current": 447,
       "done": [],
       "parked": []
     },
@@ -56,7 +66,9 @@
       "worktree": "C:/git/ht-lanes/lane-b",
       "status": "pending",
       "waitsFor": "lane A merged into sprint/auto-fixes",
-      "order": [346],
+      "order": [
+        346
+      ],
       "current": null,
       "done": [],
       "parked": []
@@ -67,7 +79,9 @@
       "worktree": "C:/git/ht-lanes/lane-c",
       "status": "pending",
       "waitsFor": "lane A merged into sprint/auto-fixes",
-      "order": [351],
+      "order": [
+        351
+      ],
       "current": null,
       "done": [],
       "parked": []
@@ -76,26 +90,86 @@
       "name": "recipes",
       "branch": "sprint/lane-d-import",
       "worktree": "C:/git/ht-lanes/lane-d",
-      "status": "pending",
-      "order": [352, 451, 454, 450],
-      "current": null,
+      "status": "in_progress",
+      "order": [
+        352,
+        451,
+        454,
+        450
+      ],
+      "current": 352,
       "done": [],
-      "parked": []
+      "parked": [],
+      "setup": "merging sprint/lane-d-recipes (a355753) into sprint/lane-d-import: 1 conflict hunk in RecipeEditorScreen.tsx, dispatched to conflict agent"
     }
   },
   "issues": {
-    "447": { "lane": "A", "status": "pending", "roundTrips": 0, "security": "required (schema, database.ts, backup restore, csvExport)" },
-    "346": { "lane": "B", "status": "pending", "roundTrips": 0, "security": "required (database.ts reads, notifications deep link)" },
-    "351": { "lane": "C", "status": "pending", "roundTrips": 0, "security": "required (database.ts goal write)" },
-    "352": { "lane": "D", "status": "pending", "roundTrips": 0, "security": "required (fetches arbitrary web pages)" },
-    "451": { "lane": "D", "status": "pending", "roundTrips": 0, "security": "skip unless the diff leaves the editor screen (UI-only)" },
-    "454": { "lane": "D", "status": "pending", "roundTrips": 0, "security": "skip (pure parser, no I/O)" },
-    "450": { "lane": "D", "status": "pending", "roundTrips": 0, "security": "required (database.ts shopping-list writes)" }
+    "346": {
+      "lane": "B",
+      "status": "pending",
+      "roundTrips": 0,
+      "security": "required (database.ts reads, notifications deep link)"
+    },
+    "351": {
+      "lane": "C",
+      "status": "pending",
+      "roundTrips": 0,
+      "security": "required (database.ts goal write)"
+    },
+    "352": {
+      "lane": "D",
+      "status": "pending",
+      "roundTrips": 0,
+      "security": "required (fetches arbitrary web pages)"
+    },
+    "447": {
+      "lane": "A",
+      "status": "analysing",
+      "roundTrips": 0,
+      "security": "required (schema, database.ts, backup restore, csvExport)"
+    },
+    "450": {
+      "lane": "D",
+      "status": "pending",
+      "roundTrips": 0,
+      "security": "required (database.ts shopping-list writes)"
+    },
+    "451": {
+      "lane": "D",
+      "status": "pending",
+      "roundTrips": 0,
+      "security": "skip unless the diff leaves the editor screen (UI-only)"
+    },
+    "454": {
+      "lane": "D",
+      "status": "pending",
+      "roundTrips": 0,
+      "security": "skip (pure parser, no I/O)"
+    }
   },
   "foundDuringSprint": [],
   "smallFindingsIssue": null,
   "log": [
-    { "at": "2026-11-14T15:20:00Z", "event": "preflight green on main 4dd49ae; created and pushed sprint/auto-fixes", "sha": "4dd49ae" },
-    { "at": "2026-11-14T15:22:00Z", "event": "scope frozen: 447, 346, 351, 352, 451, 454, 450 (all open)" }
+    {
+      "at": "2026-11-14T15:20:00Z",
+      "event": "preflight green on main 4dd49ae; created and pushed sprint/auto-fixes",
+      "sha": "4dd49ae"
+    },
+    {
+      "at": "2026-11-14T15:22:00Z",
+      "event": "scope frozen: 447, 346, 351, 352, 451, 454, 450 (all open)"
+    },
+    {
+      "at": "2026-11-14T14:05:45.963Z",
+      "event": "worktrees lane-a and lane-d created at 8e197c9, npm ci done in both"
+    },
+    {
+      "at": "2026-11-14T14:05:45.963Z",
+      "event": "lane D: merge of sprint/lane-d-recipes conflicts in 1 hunk of RecipeEditorScreen.tsx (integration moved: #452 landed separately); conflict agent dispatched"
+    },
+    {
+      "at": "2026-11-14T14:05:45.963Z",
+      "event": "#447 analyst dispatched"
+    }
   ]
 }
