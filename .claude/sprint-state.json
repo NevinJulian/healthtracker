@@ -101,7 +101,8 @@
       "current": 352,
       "done": [],
       "parked": [],
-      "setup": "merging sprint/lane-d-recipes (a355753) into sprint/lane-d-import: 1 conflict hunk in RecipeEditorScreen.tsx, dispatched to conflict agent"
+      "setup": "done: merge 945399f (parents 8e197c9, a355753), 1 hunk resolved by conflict agent taking the lane side; RecipeEditorScreen.tsx byte-identical to a355753 and differs from integration only by the draft parts (+46/-7, verified by orchestrator); 136 suites / 2270 tests green; pushed",
+      "base": "945399f"
     }
   },
   "issues": {
@@ -119,7 +120,7 @@
     },
     "352": {
       "lane": "D",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "security": "required (fetches arbitrary web pages)"
     },
@@ -142,9 +143,10 @@
     },
     "451": {
       "lane": "D",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
-      "security": "skip unless the diff leaves the editor screen (UI-only)"
+      "security": "skip unless the diff leaves the editor screen (UI-only)",
+      "notes": "analyst running ahead, read-only on lane-d at 945399f"
     },
     "454": {
       "lane": "D",
@@ -192,6 +194,15 @@
     {
       "at": "2026-11-14T14:09:10.674Z",
       "event": "#447 work order saved; developer dispatched (round 1)"
+    },
+    {
+      "at": "2026-11-14T14:10:04.303Z",
+      "event": "lane D setup merge done and verified",
+      "sha": "945399f"
+    },
+    {
+      "at": "2026-11-14T14:10:04.304Z",
+      "event": "#447 developer dispatched (round 1); #352 analyst and #451 analyst (ahead) dispatched"
     }
   ]
 }
