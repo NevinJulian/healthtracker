@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, Text } from 'react-native';
 import { render, act, fireEvent } from '@testing-library/react-native';
 
 let latestFocusEffect: (() => void | (() => void)) | null = null;
@@ -277,10 +277,10 @@ describe('AnalyticsDashboardScreen energy expenditure', () => {
     expect(utils.getByText('Mean intake: 2500 kcal/day')).toBeTruthy();
     expect(utils.getByText('Suggested goal 2200 kcal (now 2000)')).toBeTruthy();
 
-    const tree = JSON.stringify(utils.toJSON());
-    const divider = tree.indexOf('"Nutrition"');
-    const energy = tree.indexOf('Energy expenditure');
-    const adherence = tree.indexOf('Nutrition adherence');
+    const texts = utils.UNSAFE_getAllByType(Text).map((n) => String(n.props.children));
+    const divider = texts.indexOf('Nutrition');
+    const energy = texts.indexOf('Energy expenditure');
+    const adherence = texts.indexOf('Nutrition adherence');
     expect(divider).toBeGreaterThan(-1);
     expect(energy).toBeGreaterThan(divider);
     expect(adherence).toBeGreaterThan(energy);
