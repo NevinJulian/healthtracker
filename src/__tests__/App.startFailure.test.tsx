@@ -33,6 +33,8 @@ jest.mock('../services/notifications', () => ({
   configureNotificationHandler: jest.fn(),
   ensureAndroidChannel: jest.fn(() => Promise.resolve()),
   reconcileScheduledNotifications: jest.fn(() => Promise.resolve()),
+  subscribeToWeeklyReviewTaps: jest.fn(() => jest.fn()),
+  takeLaunchWeeklyReviewTap: jest.fn(() => false),
 }));
 jest.mock('../navigation/AppNavigator', () => {
   const { Text: T } = require('react-native');
