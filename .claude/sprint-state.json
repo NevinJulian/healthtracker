@@ -152,7 +152,7 @@
         "b3a8b4a fix r2 ruling 6",
         "2b543b6 fix r2 ruling 7"
       ],
-      "securityVerdict": "APPROVE round 1 (77d9275): bound params, one txn, malformed appliedOn -> null, NaN paths end in insufficient, only Apply writes the goal. Notes: (1) applyAdaptiveCalorieGoal has no own validation (caller-safe today); (2) restored huge nutritionGoalCalories accepted (hand-edited backup, pre-existing); (3) Apply uses toISODate() vs todayKey elsewhere (midnight edge); (4) failed refresh after a successful write shows goal was not changed.",
+      "securityVerdict": "APPROVE round 1 (77d9275): bound params, one txn, malformed appliedOn -> null, NaN paths end in insufficient, only Apply writes the goal. Notes: (1) applyAdaptiveCalorieGoal has no own validation (caller-safe today); (2) restored huge nutritionGoalCalories accepted (hand-edited backup, pre-existing); (3) Apply uses toISODate() vs todayKey elsewhere (midnight edge); (4) failed refresh after a successful write shows goal was not changed. | APPROVE round 2 (2b543b6): validation first in the queued unit, before any transaction; throw reaches the card Alert; loadData never rethrows (note 4 confirmed as non-issue).",
       "testerVerdicts": [
         "round 1 REJECT: suggestion line hidden within 10 kcal (decision 8-9 hide only the button). Everything else verified; input rows hidden in insufficient cases judged NOT a contradiction (progress text covers item 6)."
       ]
@@ -421,6 +421,10 @@
     {
       "at": "2026-11-14T14:46:58.568Z",
       "event": "#454 round 1 developer done (tip 4d67b1a, 137/2456); tester + light security dispatched"
+    },
+    {
+      "at": "2026-11-14T14:47:02.715Z",
+      "event": "#351 security APPROVE round 2"
     }
   ],
   "pendingFinish": [
