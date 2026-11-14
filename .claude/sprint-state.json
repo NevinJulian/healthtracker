@@ -104,7 +104,8 @@
       "parked": [],
       "base": "56ecae3",
       "mergeSha": "eec95fb",
-      "cleanup": "no changes needed, no commit (all exported constants used in-file, new imports used, docblocks accurate, no debug/issue numbers). Left: ~10 constants and 2 types exported from adaptiveTdee.ts with no outside importer (API surface, not cleanup)."
+      "cleanup": "no changes needed, no commit (all exported constants used in-file, new imports used, docblocks accurate, no debug/issue numbers). Left: ~10 constants and 2 types exported from adaptiveTdee.ts with no outside importer (API surface, not cleanup).",
+      "ci": "GitHub test check on 7af8dd0 (integration after lane C merge): completed success (Linux)"
     },
     "D": {
       "name": "recipes",
@@ -487,6 +488,10 @@
     {
       "at": "2026-11-14T14:54:24.940Z",
       "event": "#346 security APPROVE round 1"
+    },
+    {
+      "at": "2026-11-14T14:54:30.241Z",
+      "event": "CI test check on 7af8dd0: success"
     }
   ],
   "pendingFinish": [
