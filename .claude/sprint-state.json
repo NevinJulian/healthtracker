@@ -109,8 +109,10 @@
         454,
         450
       ],
-      "current": 352,
-      "done": [],
+      "current": 451,
+      "done": [
+        352
+      ],
       "parked": [],
       "setup": "done: merge 945399f (parents 8e197c9, a355753), 1 hunk resolved by conflict agent taking the lane side; RecipeEditorScreen.tsx byte-identical to a355753 and differs from integration only by the draft parts (+46/-7, verified by orchestrator); 136 suites / 2270 tests green; pushed",
       "base": "945399f"
@@ -137,7 +139,7 @@
     },
     "352": {
       "lane": "D",
-      "status": "in_test",
+      "status": "ready",
       "roundTrips": 2,
       "security": "required (fetches arbitrary web pages)",
       "workOrder": "C:/git/ht-lanes/wo/352.md",
@@ -157,7 +159,8 @@
       "securityVerdict": "APPROVE round 1 (ea8e626): sprint 5 fetch/JSON-LD guards hold on SDK 58 base; new regexes bounded, LAST_WORD is O(n^2) unanchored but 1.1 ms at the 500-char cap (note, not a block); 30k hostile fuzz lines, 0 throws, max 0.14 ms; readDraft lets only typed strings/numbers through. | APPROVE round 2 (43abd32): MAX_LINE_LENGTH still first; EDGE_PUNCTUATION O(n^2) within one token, worst 1.1 ms at 500 chars; prototype-key words safe; 40k fuzz lines 0 throws.",
       "testerVerdicts": [
         "round 1 REJECT: first-two-words rule too narrow; ~30 realistic lines still get a wrong quantity (multi-word modifiers, bracketed modifiers, hyphenated, each/jeweils/jede without a unit, unlisted abbreviations Teel./Pak./P.)",
-        "round 2 REJECT (narrow): all round 1 lines fixed, ~1130 probe lines, no regressions; remaining form: unit read + second measure later in the name (\"1 cup flour, plus a tbsp\" -> 240 g, \"1 EL Mehl und ein TL Zucker\" -> 15 g, \"or\" alternatives)"
+        "round 2 REJECT (narrow): all round 1 lines fixed, ~1130 probe lines, no regressions; remaining form: unit read + second measure later in the name (\"1 cup flour, plus a tbsp\" -> 240 g, \"1 EL Mehl und ein TL Zucker\" -> 15 g, \"or\" alternatives)",
+        "round 3 APPROVE: 11 rows fail at 43abd32, pass at 593d786; 136/2375; corpus ~1240 lines incl. new l5.txt, ruling 12 only drops quantities, no new wrong quantity; fuzz 300k, timing <=1.3 ms"
       ]
     },
     "447": {
@@ -188,16 +191,16 @@
     },
     "451": {
       "lane": "D",
-      "status": "pending",
+      "status": "in_dev",
       "roundTrips": 0,
       "security": "skip unless the diff leaves the editor screen (UI-only)",
-      "notes": "work order ready (written ahead at 945399f); waits for #352. Its also-found (Alert throw leaves lock) filed in #464.",
+      "notes": "work order ready (written ahead at 945399f); waits for #352. Its also-found (Alert throw leaves lock) filed in #464. Line numbers re-checked: no src/screens change between 945399f and 593d786.",
       "workOrder": "C:/git/ht-lanes/wo/451.md",
       "deviceCheck": "none (decision 5)"
     },
     "454": {
       "lane": "D",
-      "status": "pending",
+      "status": "analysing",
       "roundTrips": 0,
       "security": "skip (pure parser, no I/O)"
     }
@@ -333,6 +336,14 @@
     {
       "at": "2026-11-14T14:33:09.771Z",
       "event": "CI test check on 56ecae3: success"
+    },
+    {
+      "at": "2026-11-14T14:35:15.128Z",
+      "event": "#352 tester APPROVE round 3 -> ready (roundTrips 2)"
+    },
+    {
+      "at": "2026-11-14T14:35:15.128Z",
+      "event": "#451 developer dispatched (round 1); #454 analyst dispatched"
     }
   ],
   "pendingFinish": [
