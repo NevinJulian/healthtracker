@@ -44,6 +44,9 @@ const SECOND_MEASURE = /^\s*\/\s*\d{1,6}(?:[.,]\d{1,3})?\s*([A-Za-zÄÖÜäöü�
 const TRAILING_NUMBER = /\s(\d{1,4})$/;
 const LAST_WORD = /([A-Za-zÄÖÜäöüß]+)$/;
 const FILLER_BETWEEN_WORDS = /^[\s.,]+/;
+const WHITESPACE = /\s+/;
+const EDGE_PUNCTUATION = /^[^A-Za-zÄÖÜäöüß]+|[^A-Za-zÄÖÜäöüß]+$/g;
+const ABBREVIATION = /^[(\[]?[A-Za-zÄÖÜäöüß]+\.[)\]]?$/;
 const EACH_WORDS: ReadonlySet<string> = new Set(['each', 'je']);
 const MASS_UNITS: ReadonlySet<string> = new Set(['g', 'kg']);
 const BAD_NAME_START = /^[+/&]/;
@@ -224,12 +227,19 @@ function isMeasureWord(word: string): boolean {
   );
 }
 
-function startsWithMeasureWord(name: string): boolean {
-  const first = FIRST_WORD.exec(name);
-  if (!first) return false;
-  if (isMeasureWord(first[1])) return true;
-  const second = FIRST_WORD.exec(name.slice(first[0].length).replace(FILLER_BETWEEN_WORDS, ''));
-  return second !== null && isMeasureWord(second[1]);
+function isMeasureToken(token: string): boolean {
+  if (isMeasureWord(token)) return true;
+  return token.includes('-') && token.split('-').some((part) => part.length > 1 && isMeasureWord(part));
+}
+
+function namesAMeasure(name: string): boolean {
+  if (name.startsWith('(')) return true;
+  const tokens = name.split(',', 1)[0].split(WHITESPACE).filter((token) => token !== '');
+  return tokens.some((token, index) => {
+    const word = token.replace(EDGE_PUNCTUATION, '');
+    if (word !== '' && isMeasureToken(word)) return true;
+    return index < tokens.length - 1 && ABBREVIATION.test(token);
+  });
 }
 
 export function parseIngredientLine(line: string): ParsedIngredientLine {
@@ -277,7 +287,7 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
     const name = tidyName(afterQuantity);
     if (!isAcceptableName(name)) return nameOnly(whole);
 
-    if (!hasUnit && startsWithMeasureWord(name)) return nameOnly(whole);
+    if (!hasUnit && namesAMeasure(name)) return nameOnly(whole);
     if (hasUnit) {
       const first = FIRST_WORD.exec(name);
       if (first && EACH_WORDS.has(first[1].toLowerCase())) return nameOnly(whole);
