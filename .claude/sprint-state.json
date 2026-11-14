@@ -143,10 +143,12 @@
     },
     "451": {
       "lane": "D",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
       "security": "skip unless the diff leaves the editor screen (UI-only)",
-      "notes": "analyst running ahead, read-only on lane-d at 945399f"
+      "notes": "work order ready (written ahead at 945399f); waits for #352. Its also-found (Alert throw leaves lock) filed in #464.",
+      "workOrder": "C:/git/ht-lanes/wo/451.md",
+      "deviceCheck": "none (decision 5)"
     },
     "454": {
       "lane": "D",
@@ -203,6 +205,10 @@
     {
       "at": "2026-11-14T14:10:04.304Z",
       "event": "#447 developer dispatched (round 1); #352 analyst and #451 analyst (ahead) dispatched"
+    },
+    {
+      "at": "2026-11-14T14:11:14.354Z",
+      "event": "#451 work order saved; #464 gained the Alert-throw lock finding"
     }
   ]
 }
