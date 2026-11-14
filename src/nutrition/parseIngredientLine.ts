@@ -47,7 +47,7 @@ const FILLER_BETWEEN_WORDS = /^[\s.,]+/;
 const WHITESPACE = /\s+/;
 const EDGE_PUNCTUATION = /^[^A-Za-zÄÖÜäöüß]+|[^A-Za-zÄÖÜäöüß]+$/g;
 const ABBREVIATION = /^[(\[]?[A-Za-zÄÖÜäöüß]+\.[)\]]?$/;
-const EACH_WORDS: ReadonlySet<string> = new Set(['each', 'je']);
+const EACH_WORDS: ReadonlySet<string> = new Set(['each', 'je', 'jeweils', 'jede', 'jeder', 'jedem', 'jeden', 'jedes']);
 const MASS_UNITS: ReadonlySet<string> = new Set(['g', 'kg']);
 const BAD_NAME_START = /^[+/&]/;
 const CONNECTORS: ReadonlySet<string> = new Set(['to', 'or', 'and', 'plus', 'bis', 'oder', 'und', 'x', '×']);
@@ -232,6 +232,13 @@ function isMeasureToken(token: string): boolean {
   return token.includes('-') && token.split('-').some((part) => part.length > 1 && isMeasureWord(part));
 }
 
+function namesEachWord(name: string): boolean {
+  return name
+    .split(',', 1)[0]
+    .split(WHITESPACE)
+    .some((token) => EACH_WORDS.has(token.replace(EDGE_PUNCTUATION, '').toLowerCase()));
+}
+
 function namesAMeasure(name: string): boolean {
   if (name.startsWith('(')) return true;
   const tokens = name.split(',', 1)[0].split(WHITESPACE).filter((token) => token !== '');
@@ -288,10 +295,7 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
     if (!isAcceptableName(name)) return nameOnly(whole);
 
     if (!hasUnit && namesAMeasure(name)) return nameOnly(whole);
-    if (hasUnit) {
-      const first = FIRST_WORD.exec(name);
-      if (first && EACH_WORDS.has(first[1].toLowerCase())) return nameOnly(whole);
-    }
+    if (namesEachWord(name)) return nameOnly(whole);
 
     const quantityText = String(Number(qty.value.toFixed(6)));
     const parsed = parseMeasure(name, `${quantityText} ${unit}`.trim());
