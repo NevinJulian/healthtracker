@@ -405,3 +405,61 @@ describe('sprint 5 probe lines', () => {
     }
   });
 });
+
+describe('sprint 6 round 1 probe lines', () => {
+  it.each([
+    '1 slightly heaped tsp salt',
+    '1 very heaped tsp salt',
+    '1 good heaped tbsp sugar',
+    '1 generous heaped tbsp sugar',
+    '1 slightly rounded tablespoon honey',
+    '1 slightly scant cup flour',
+    '1 not quite level tsp salt',
+    '1 big heaped tsp salt',
+    '1 gut gehäufter EL Zucker',
+    '1 sehr gehäufter TL Zimt',
+    '1 knapper gestrichener EL Mehl',
+    '1 gut gestrichener TL Salz',
+    '1 ganz kleiner TL Salz',
+    '2 fast volle EL Mehl',
+    '2 sehr große Tassen Mehl',
+  ])('keeps %s as a name without a quantity (words before the unit)', (line) => {
+    expectNameOnly(line);
+  });
+
+  it.each([
+    '1 (heaped) tsp salt',
+    '1 (gestr.) TL Salz',
+    '1 (scant) cup milk',
+    '1 (level) tbsp sugar',
+    '1 (rounded) tablespoon honey',
+    '1 level-tsp salt',
+  ])('keeps %s as a name without a quantity (brackets and hyphens)', (line) => {
+    expectNameOnly(line);
+  });
+
+  it.each([
+    '1 each red and green pepper',
+    '2 each red and yellow peppers',
+    '1 of each: red and green pepper',
+    '1 jede Paprika',
+    '1 TL jeweils Salz und Pfeffer',
+    '1 EL jeweils Salz',
+    '1 TL von jedem',
+    '1 each of red and green pepper',
+  ])('keeps %s as a name without a quantity (each-words)', (line) => {
+    expectNameOnly(line);
+  });
+
+  it.each(['1 Teel. Salz', '1 Pak. Hefe', '1 P. Backpulver'])(
+    'keeps %s as a name without a quantity (abbreviations)',
+    (line) => {
+      expectNameOnly(line);
+    },
+  );
+
+  it('keeps a count when only a part after the first comma is a measure word', () => {
+    expect(parseIngredientLine('2 Zwiebeln, in Ringen')).toEqual({ name: 'Zwiebeln, in Ringen', quantity: 2, unit: 'whole' });
+    expect(parseIngredientLine('2 t-bone steaks')).toEqual({ name: 't-bone steaks', quantity: 2, unit: 'whole' });
+  });
+});
