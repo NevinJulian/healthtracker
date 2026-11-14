@@ -256,7 +256,10 @@ export function parseMeasure(ingredient: string, measure: string): ParsedIngredi
       return { name: cleanName, baseQuantity: 0, unit: 'g', isVague: true };
     }
 
-    const m = measure.trim();
+    const m = measure
+      .trim()
+      .replace(/\b[1-9]\d{0,2}(?:,\d{3})+(?!\d)/g, (thousands) => thousands.replace(/,/g, ''))
+      .replace(/(\d),(\d)/g, '$1.$2');
 
     // ── Attempt to split the measure into (quantity) + (unit) ──────────────
 
