@@ -3046,6 +3046,12 @@ async function _restoreFromPayload(
     await db.execAsync('DROP INDEX IF EXISTS idx_weekly_meal_plan_date_meal_type');
     await db.execAsync('DROP INDEX IF EXISTS idx_workout_set_log_date_exercise_set_index');
 
+    // A backup made before food_log existed has no key for it, and a restore
+    // brings back the backup's state.
+    if (liveTableSet.has('food_log') && !('food_log' in payloadTables)) {
+      await db.runAsync('DELETE FROM food_log');
+    }
+
     for (const [tableName, rows] of Object.entries(payloadTables)) {
       // Skip tables that don't exist in the current schema
       if (!liveTableSet.has(tableName)) continue;
