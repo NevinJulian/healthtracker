@@ -50,7 +50,9 @@
     "#352: gr/gr. are grams only when quantity >= 10 (below stays name only, \"1 gr. Zwiebel\" = große), per decision item 2 bar. The slash second-measure rule applies to mass units only (decision item 4 says a weight).",
     "Pushed lane history is not rewritten (a force-push request was denied by the auto-mode permission classifier). From now on developer briefs say: split commits before the first push. #352 ea8e626 stays one commit for four parser rules in one function; accepted, named in the report.",
     "Agents must not create extra worktrees or directory junctions (the #447 developer deleted lane-a/node_modules by removing a temp worktree that linked it). Pre-fix proofs check out pre-fix source files in place and restore them.",
-    "#346: src/services/expoNotifications.ts (Expo Go stub) and __mocks__/expo-notifications.js belong to no lane; assigned to lane B, additive only. The default-on weekly review without any permission request is a product gap, not built around: filed as #465."
+    "#346: src/services/expoNotifications.ts (Expo Go stub) and __mocks__/expo-notifications.js belong to no lane; assigned to lane B, additive only. The default-on weekly review without any permission request is a product gap, not built around: filed as #465.",
+    "#451: RecipeEditorScreen.overlap.test first case encoded the scenario the decision removes; rewritten in place for the same sequence (approved edit to an existing test, own commit).",
+    "#454: keyword matching per decision item 2 literally for all keywords; analyst-proposed English whole-word restriction rejected. First-comma cut and leading-1-9 thousands rule accepted."
   ],
   "lanes": {
     "A": {
@@ -194,19 +196,23 @@
       "status": "in_dev",
       "roundTrips": 0,
       "security": "skip unless the diff leaves the editor screen (UI-only)",
-      "notes": "work order ready (written ahead at 945399f); waits for #352. Its also-found (Alert throw leaves lock) filed in #464. Line numbers re-checked: no src/screens change between 945399f and 593d786.",
+      "notes": "work order ready (written ahead at 945399f); waits for #352. Its also-found (Alert throw leaves lock) filed in #464. Line numbers re-checked: no src/screens change between 945399f and 593d786. Round 1 dev STOPPED before pushing: the lock breaks RecipeEditorScreen.overlap first test, which encodes the removed scenario (edit during save supersedes the run). Orchestrator ruling: rewrite that one test in place for the same sequence (edit ignored, 1 lookup, saves run 1, goBack after OK), own commit, second test byte-identical. Not a round trip (no tester verdict).",
       "workOrder": "C:/git/ht-lanes/wo/451.md",
       "deviceCheck": "none (decision 5)"
     },
     "454": {
       "lane": "D",
-      "status": "analysing",
+      "status": "pending",
       "roundTrips": 0,
-      "security": "skip (pure parser, no I/O)"
+      "security": "skip (pure parser, no I/O)",
+      "workOrder": "C:/git/ht-lanes/wo/454.md",
+      "deviceCheck": "decision 7",
+      "notes": "work order ready at 593d786; waits for #451. Rulings: decision matching rule literally for all keywords (analyst English whole-word restriction rejected), comma cut accepted, thousands comma needs leading 1-9 (0,125 l). Gap filed as #466."
     }
   },
   "foundDuringSprint": [
-    465
+    465,
+    466
   ],
   "smallFindingsIssue": 464,
   "log": [
@@ -344,6 +350,14 @@
     {
       "at": "2026-11-14T14:35:15.128Z",
       "event": "#451 developer dispatched (round 1); #454 analyst dispatched"
+    },
+    {
+      "at": "2026-11-14T14:39:50.474Z",
+      "event": "#454 work order saved; filed #466 (density table gaps)"
+    },
+    {
+      "at": "2026-11-14T14:39:50.474Z",
+      "event": "#451 developer stopped on overlap test; ruling sent (rewrite first case)"
     }
   ],
   "pendingFinish": [
