@@ -48,7 +48,8 @@
     "Lane D's branch starts from sprint/auto-fixes with sprint/lane-d-recipes (a355753) merged in, per #352's sprint 6 decision. Lanes B and C wait for lane A's merge.",
     "#447: src/components/index.ts belongs to no lane, so QuickAddSheet is imported by path. SettingsScreen \"three spreadsheet files\" wording (stale after #447) is a wording finding: filed in #464, not worked.",
     "#352: gr/gr. are grams only when quantity >= 10 (below stays name only, \"1 gr. Zwiebel\" = große), per decision item 2 bar. The slash second-measure rule applies to mass units only (decision item 4 says a weight).",
-    "Pushed lane history is not rewritten (a force-push request was denied by the auto-mode permission classifier). From now on developer briefs say: split commits before the first push. #352 ea8e626 stays one commit for four parser rules in one function; accepted, named in the report."
+    "Pushed lane history is not rewritten (a force-push request was denied by the auto-mode permission classifier). From now on developer briefs say: split commits before the first push. #352 ea8e626 stays one commit for four parser rules in one function; accepted, named in the report.",
+    "Agents must not create extra worktrees or directory junctions (the #447 developer deleted lane-a/node_modules by removing a temp worktree that linked it). Pre-fix proofs check out pre-fix source files in place and restore them."
   ],
   "lanes": {
     "A": {
@@ -139,12 +140,17 @@
     },
     "447": {
       "lane": "A",
-      "status": "in_dev",
+      "status": "in_test",
       "roundTrips": 0,
       "security": "required (schema, database.ts, backup restore, csvExport)",
       "workOrder": "C:/git/ht-lanes/wo/447.md",
       "deviceCheck": "decision 9",
-      "notes": "work order ready; rulings: no barrel edit (import by path), Settings wording to #464, en-GB chip labels, listed test edits pre-authorised"
+      "notes": "work order ready; rulings: no barrel edit (import by path), Settings wording to #464, en-GB chip labels, listed test edits pre-authorised Round 1 dev: 136 suites / 1944 tests green; 63 feature tests fail at 33ee1b1. Incident: the developer removed a temporary red-phase worktree that held a junction to lane-a/node_modules and it deleted that node_modules; restored with npm ci; orchestrator verified no stray worktrees and identical node_modules (475) in all three checkouts. MealPrep totals now Math.round recipe macros too (tester to judge).",
+      "commits": [
+        "339a12d..33ee1b1 tests (9 commits, red phase)",
+        "0ccf030..6bcdf82 feature (11 commits, incl. 2 test-query fixes ad5c134, ef94a1a)"
+      ],
+      "preFeatureSha": "33ee1b1"
     },
     "450": {
       "lane": "D",
@@ -238,6 +244,10 @@
     {
       "at": "2026-11-14T14:20:58.347Z",
       "event": "#352 tester REJECT round 1 (roundTrips=1); back to developer with rulings 5-10"
+    },
+    {
+      "at": "2026-11-14T14:22:50.831Z",
+      "event": "#447 round 1 developer done (tip 6bcdf82, pre-feature 33ee1b1); tester + security dispatched"
     }
   ]
 }
