@@ -3197,6 +3197,14 @@ export function setNutritionGoals(kcal: number, g: number): Promise<void> {
   });
 }
 
+export async function getAdaptiveTdeeAppliedOn(): Promise<string | null> {
+  return null;
+}
+
+export function applyAdaptiveCalorieGoal(kcal: number, todayISO: string): Promise<void> {
+  return Promise.resolve();
+}
+
 // ── User profile settings (#281) ─────────────────────────────────────────────
 //
 // Profile fields are stored as simple string KV pairs in app_state.
